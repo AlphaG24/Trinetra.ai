@@ -1,9 +1,10 @@
 "use client";
 
 import { Layout } from "@/components/layout/Layout";
+import { SocialAgentGallery } from "@/components/social/SocialAgentGallery";
 import { motion } from "framer-motion";
 import Link from "next/link";
-import { ArrowRight, Bot, Sparkles, Image, TrendingUp, CalendarDays } from "lucide-react";
+import { ArrowRight, CalendarDays, Image as ImageIcon, TrendingUp } from "lucide-react";
 
 export default function SocialAgentPage() {
   return (
@@ -57,32 +58,7 @@ export default function SocialAgentPage() {
               transition={{ duration: 0.7, delay: 0.2 }}
               className="flex-1 w-full max-w-[500px]"
             >
-              <div className="w-full max-w-[400px] mx-auto bg-[#130224] border border-[#1E0A35] rounded-[20px] shadow-[0_20px_60px_rgba(245,158,11,0.08)] overflow-hidden">
-                <div className="p-[16px] flex items-center justify-between">
-                  <div className="flex items-center gap-[12px]">
-                    <div className="w-[36px] h-[36px] rounded-full bg-gradient-to-tr from-[#F59E0B] to-[#FBBF24] p-[2px]">
-                      <div className="w-full h-full bg-[#130224] rounded-full border-2 border-[#130224]" />
-                    </div>
-                    <div className="text-[#F5F3FF] font-medium text-[14px]">trinetra.ai</div>
-                  </div>
-                </div>
-                <div className="w-full aspect-square bg-[#1A0530] flex items-center justify-center relative overflow-hidden">
-                  <div className="absolute inset-0 bg-[url('/grid.svg')] bg-center opacity-10 pointer-events-none" />
-                  <Sparkles size={64} className="text-[#F59E0B] opacity-40 animate-pulse" />
-                  <div className="absolute bottom-4 right-4 bg-black/60 backdrop-blur-md rounded-lg px-3 py-1.5 flex items-center gap-2 border border-white/10">
-                     <Bot size={14} className="text-[#F59E0B]"/>
-                     <span className="text-[12px] font-medium text-white">AI Posted</span>
-                  </div>
-                </div>
-                <div className="p-[16px]">
-                  <div className="text-[14px] font-semibold text-[#F5F3FF] mb-[8px]">1,204 likes</div>
-                  <div className="text-[14px] text-[#A8A0C0] leading-[1.6]">
-                    <span className="font-semibold text-[#F5F3FF] mr-2">trinetra.ai</span>
-                    Supercharge your workflows with autonomous agents. Our updated framework allows deep reasoning without human oversight.
-                  </div>
-                  <div className="text-[14px] text-[#F59E0B] mt-[6px]">#AI #Automation #Future</div>
-                </div>
-              </div>
+              <SocialAgentGallery />
             </motion.div>
 
           </div>
@@ -96,7 +72,7 @@ export default function SocialAgentPage() {
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-[30px]">
               <div className="bg-[#130224] border border-[#1E0A35] rounded-[16px] p-[32px]">
-                <Image className="text-[#F59E0B] mb-[20px]" size={32} />
+                <ImageIcon className="text-[#F59E0B] mb-[20px]" size={32} />
                 <h3 className="text-[#F5F3FF] font-semibold text-[20px] mb-[12px]">Intelligent Captioning</h3>
                 <p className="text-[#A8A0C0] text-[15px] leading-relaxed">It analyzes your specific brand voice styling generating high-converting captions directly mapped to specific formats natively.</p>
               </div>

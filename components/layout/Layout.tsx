@@ -1,6 +1,7 @@
 import { ReactNode } from "react";
 import { Navbar } from "./Navbar";
 import { Footer } from "./Footer";
+import { NetraAssistant } from "@/components/netra/NetraAssistant";
 import { ComingSoonToast } from "@/components/ui/ComingSoonToast";
 
 interface LayoutProps {
@@ -17,6 +18,7 @@ export function Layout({ children }: LayoutProps) {
             </main>
 
             <Footer />
+            <NetraAssistant />
             <ComingSoonToast />
         </div>
     );

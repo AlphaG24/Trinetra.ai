@@ -45,6 +45,7 @@ const cards = [
     hoverShadow: "hover:shadow-[0_0_40px_rgba(6,182,212,0.08)]",
     title: "Human Connection",
     description: "Platforms connecting retired professionals with those who need their wisdom. Experience never retires.",
+    blurDescription: true,
     linkText: "Coming Soon",
     linkRef: "#",
     linkStyle: "text-[#6B6088] cursor-default",
@@ -118,7 +119,11 @@ export function WhatWeBuild() {
               </h3>
 
               {/* Description */}
-              <p className="font-sans font-normal text-[15px] text-[#A8A0C0] leading-[1.7] mb-[24px]">
+              <p
+                className={`font-sans font-normal text-[15px] text-[#A8A0C0] leading-[1.7] mb-[24px] ${
+                  card.blurDescription ? "blur-[4px] select-none" : ""
+                }`}
+              >
                 {card.description}
               </p>
 
