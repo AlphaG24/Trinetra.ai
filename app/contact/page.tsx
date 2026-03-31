@@ -18,25 +18,24 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
+import { FacebookIcon } from "@/components/ui/FacebookIcon";
 import { Layout } from "@/components/layout/Layout";
 import { RedditIcon } from "@/components/ui/RedditIcon";
+import {
+  getConfigString,
+  hasConfiguredValue,
+  useActivePlans,
+  useSiteConfig,
+  useVisibleProducts,
+} from "@/lib/site-content";
 
 const FORMSPREE_ENDPOINT =
   process.env.NEXT_PUBLIC_FORMSPREE_ENDPOINT || "https://formspree.io/f/placeholder";
 
-const PRODUCT_INTEREST_MAP: Record<string, string> = {
-  "voice-agent": "AI Voice Agent",
-  "chat-agent": "AI Chat Agent",
-  "social-agent": "AI Social Media Agent",
-  "workflow-agent": "AI Workflow Agent",
-};
-
-const LINKEDIN_URL = "https://www.linkedin.com/in/trinetraedu-ai-7402143b8";
-const INSTAGRAM_URL =
-  "https://www.instagram.com/trinetraedu.ai?igsh=MTB6cW12NHZ3YjNnaw==";
-const REDDIT_URL = "https://www.reddit.com/u/trinetragroup/s/NMefhDCrYv";
-
 export default function ContactPage() {
+  const { data: siteConfig } = useSiteConfig();
+  const { data: products, error: productsError } = useVisibleProducts();
+  const { data: plans, error: plansError } = useActivePlans();
   const [honeypot, setHoneypot] = useState("");
   const [formData, setFormData] = useState({
     name: "",
@@ -54,6 +53,30 @@ export default function ContactPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitStatus, setSubmitStatus] = useState<"idle" | "success" | "error">("idle");
   const [buttonDisabled, setButtonDisabled] = useState(false);
+  const [isFoundingInquiry, setIsFoundingInquiry] = useState(false);
+
+  const companyEmail = getConfigString(siteConfig, "company_email");
+  const phone1 = getConfigString(siteConfig, "company_phone_1");
+  const phone2 = getConfigString(siteConfig, "company_phone_2");
+  const linkedinUrl = getConfigString(siteConfig, "social_linkedin");
+  const instagramUrl = getConfigString(siteConfig, "social_instagram");
+  const twitterUrl = getConfigString(siteConfig, "social_twitter");
+  const facebookUrl = getConfigString(siteConfig, "social_facebook");
+  const redditUrl = getConfigString(siteConfig, "social_reddit");
+
+  const dynamicProductOptions =
+    products.length > 0
+      ? products.map((product) => product.name)
+      : productsError
+        ? ["AI Voice Agent", "AI Chat Agent", "AI Social Media Agent", "AI Workflow Agent"]
+        : [];
+
+  const dynamicPlanOptions =
+    plans.length > 0
+      ? plans.map((plan) => `${plan.name} Plan`)
+      : plansError
+        ? ["Starter Plan", "Growth Plan", "Scale Plan"]
+        : [];
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -63,25 +86,53 @@ export default function ContactPage() {
     const params = new URLSearchParams(window.location.search);
     const plan = params.get("plan");
     const product = params.get("product");
+    const source = params.get("source");
 
     let presetInterest = "";
 
-    if (plan === "starter") {
-      presetInterest = "Starter Plan";
-    } else if (plan === "growth") {
-      presetInterest = "Growth Plan";
-    } else if (plan === "enterprise") {
-      presetInterest = "Enterprise Plan";
-    } else if (product && PRODUCT_INTEREST_MAP[product]) {
-      presetInterest = PRODUCT_INTEREST_MAP[product];
+    if (source === "founding") {
+      presetInterest = "General Inquiry";
+      setIsFoundingInquiry(true);
+    } else {
+      setIsFoundingInquiry(false);
+
+      if (plan) {
+        const matchedPlan = plans.find((item) => item.slug === plan);
+        if (matchedPlan) {
+          presetInterest = `${matchedPlan.name} Plan`;
+        } else if (plan === "starter") {
+          presetInterest = "Starter Plan";
+        } else if (plan === "growth") {
+          presetInterest = "Growth Plan";
+        } else if (plan === "scale") {
+          presetInterest = "Scale Plan";
+        }
+      }
+
+      if (product) {
+        const matchedProduct = products.find((item) => item.slug === product);
+        if (matchedProduct) {
+          presetInterest = matchedProduct.name;
+        } else if (product === "voice-agent") {
+          presetInterest = "AI Voice Agent";
+        } else if (product === "chat-agent") {
+          presetInterest = "AI Chat Agent";
+        } else if (product === "social-agent") {
+          presetInterest = "AI Social Media Agent";
+        } else if (product === "workflow-agent") {
+          presetInterest = "AI Workflow Agent";
+        }
+      }
     }
 
     if (!presetInterest) {
       return;
     }
 
-    setFormData((prev) => ({ ...prev, interest: presetInterest }));
-  }, []);
+    setFormData((prev) =>
+      prev.interest === presetInterest ? prev : { ...prev, interest: presetInterest }
+    );
+  }, [plans, products]);
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
@@ -244,6 +295,12 @@ export default function ContactPage() {
               Tell us about your business and we&apos;ll show you how AI can help.
             </p>
 
+            {isFoundingInquiry ? (
+              <div className="mb-[20px] inline-flex self-start rounded-[10px] border border-[rgba(245,158,11,0.18)] bg-[rgba(245,158,11,0.08)] px-[14px] py-[8px] font-sans text-[13px] font-medium text-[#FBBF24]">
+                Founding Client Inquiry
+              </div>
+            ) : null}
+
             <form className="flex flex-col gap-[20px]" onSubmit={handleSubmit} noValidate>
               <input
                 type="text"
@@ -337,15 +394,18 @@ export default function ContactPage() {
                     <option value="" disabled>
                       What are you interested in?
                     </option>
-                    <option value="Starter Plan">Starter Plan</option>
-                    <option value="Growth Plan">Growth Plan</option>
-                    <option value="Enterprise Plan">Enterprise Plan</option>
-                    <option value="AI Voice Agent">AI Voice Agent</option>
-                    <option value="AI Chat Agent">AI Chat Agent</option>
-                    <option value="AI Social Media Agent">AI Social Media Agent</option>
-                    <option value="AI Workflow Agent">AI Workflow Agent</option>
-                    <option value="Custom Solution">Custom Solution</option>
-                    <option value="Partnership">Partnership</option>
+                    <option value="General Inquiry">General Inquiry</option>
+                    {dynamicProductOptions.map((option) => (
+                      <option key={option} value={option}>
+                        {option}
+                      </option>
+                    ))}
+                    {dynamicPlanOptions.map((option) => (
+                      <option key={option} value={option}>
+                        {option}
+                      </option>
+                    ))}
+                    <option value="Partnership / Collaboration">Partnership / Collaboration</option>
                     <option value="Other">Other</option>
                   </select>
                   <div className="pointer-events-none absolute right-[16px] top-1/2 -translate-y-1/2 text-[#6B6088]">
@@ -396,8 +456,9 @@ export default function ContactPage() {
                 <div className="flex items-center gap-[8px] rounded-[8px] border border-[rgba(239,68,68,0.2)] bg-[rgba(239,68,68,0.1)] px-[16px] py-[12px] text-[15px] font-medium text-[#EF4444]">
                   <AlertCircle size={20} className="shrink-0" />
                   <span>
-                    Something went wrong. Please try again or email us directly at
-                    trinetraedu.ai@gmail.com
+                    {companyEmail
+                      ? `Something went wrong. Please try again or email us directly at ${companyEmail}`
+                      : "Something went wrong. Please try again."}
                   </span>
                 </div>
               ) : null}
@@ -435,34 +496,42 @@ export default function ContactPage() {
             </h2>
 
             <div className="flex flex-col gap-[20px]">
-              <div className="flex items-center gap-[16px]">
-                <Mail size={20} className="shrink-0 text-[#8B5CF6]" />
-                <a
-                  href="mailto:trinetraedu.ai@gmail.com"
-                  className="font-sans text-[15px] font-normal text-[#A8A0C0] transition-colors hover:text-[#F5F3FF]"
-                >
-                  trinetraedu.ai@gmail.com
-                </a>
-              </div>
-
-              <div className="flex items-start gap-[16px]">
-                <Phone size={20} className="mt-[2px] shrink-0 text-[#8B5CF6]" />
-                <div className="flex flex-col gap-[10px]">
-                  <span className="font-sans text-[15px] font-medium text-[#F5F3FF]">Call Us</span>
+              {hasConfiguredValue(companyEmail) ? (
+                <div className="flex items-center gap-[16px]">
+                  <Mail size={20} className="shrink-0 text-[#8B5CF6]" />
                   <a
-                    href="tel:+919580619562"
+                    href={`mailto:${companyEmail}`}
                     className="font-sans text-[15px] font-normal text-[#A8A0C0] transition-colors hover:text-[#F5F3FF]"
                   >
-                    {"\u{1F4DE}"} +91 95806 19562
-                  </a>
-                  <a
-                    href="tel:+919452045499"
-                    className="font-sans text-[15px] font-normal text-[#A8A0C0] transition-colors hover:text-[#F5F3FF]"
-                  >
-                    {"\u{1F4DE}"} +91 94520 45499
+                    {companyEmail}
                   </a>
                 </div>
-              </div>
+              ) : null}
+
+              {hasConfiguredValue(phone1) || hasConfiguredValue(phone2) ? (
+                <div className="flex items-start gap-[16px]">
+                  <Phone size={20} className="mt-[2px] shrink-0 text-[#8B5CF6]" />
+                  <div className="flex flex-col gap-[10px]">
+                    <span className="font-sans text-[15px] font-medium text-[#F5F3FF]">Call Us</span>
+                    {hasConfiguredValue(phone1) ? (
+                      <a
+                        href={`tel:${phone1.replace(/\s+/g, "")}`}
+                        className="font-sans text-[15px] font-normal text-[#A8A0C0] transition-colors hover:text-[#F5F3FF]"
+                      >
+                        {"\u{1F4DE}"} {phone1}
+                      </a>
+                    ) : null}
+                    {hasConfiguredValue(phone2) ? (
+                      <a
+                        href={`tel:${phone2.replace(/\s+/g, "")}`}
+                        className="font-sans text-[15px] font-normal text-[#A8A0C0] transition-colors hover:text-[#F5F3FF]"
+                      >
+                        {"\u{1F4DE}"} {phone2}
+                      </a>
+                    ) : null}
+                  </div>
+                </div>
+              ) : null}
 
               <div className="flex items-start gap-[16px]">
                 <MapPin size={20} className="mt-[2px] shrink-0 text-[#8B5CF6]" />
@@ -480,44 +549,101 @@ export default function ContactPage() {
               Connect With Us
             </h3>
             <div className="flex items-center gap-[16px]">
-              <a
-                href={LINKEDIN_URL}
-                target="_blank"
-                rel="noreferrer"
-                aria-label="LinkedIn"
-                className="flex h-[36px] w-[36px] items-center justify-center rounded-full bg-transparent text-[#6B6088] transition-colors duration-300 hover:bg-[rgba(139,92,246,0.1)] hover:text-[#F5F3FF]"
-              >
-                <Linkedin size={18} />
-              </a>
-              <a
-                href={INSTAGRAM_URL}
-                target="_blank"
-                rel="noreferrer"
-                aria-label="Instagram"
-                title="Coming Soon"
-                onClick={showComingSoonToast}
-                className="flex h-[36px] w-[36px] items-center justify-center rounded-full bg-transparent text-[#6B6088] opacity-50 transition-colors duration-300 hover:bg-[rgba(139,92,246,0.1)] hover:text-[#F5F3FF]"
-              >
-                <Instagram size={18} />
-              </a>
-              <button
-                type="button"
-                aria-label="Twitter"
-                title="Coming Soon"
-                onClick={showComingSoonToast}
-                className="flex h-[36px] w-[36px] items-center justify-center rounded-full bg-transparent text-[#6B6088] opacity-50 transition-colors duration-300 hover:bg-[rgba(139,92,246,0.1)] hover:text-[#F5F3FF]"
-              >
-                <Twitter size={18} />
-              </button>
-              <a
-                href={REDDIT_URL}
-                target="_blank"
-                rel="noreferrer"
-                aria-label="Reddit"
-                className="flex h-[36px] w-[36px] items-center justify-center rounded-full bg-transparent text-[#6B6088] transition-colors duration-300 hover:bg-[rgba(139,92,246,0.1)] hover:text-[#F5F3FF]"
-              >
-                <RedditIcon size={18} />
-              </a>
+              {linkedinUrl ? (
+                <a
+                  href={linkedinUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  aria-label="LinkedIn"
+                  className="flex h-[36px] w-[36px] items-center justify-center rounded-full bg-transparent text-[#6B6088] transition-colors duration-300 hover:bg-[rgba(139,92,246,0.1)] hover:text-[#F5F3FF]"
+                >
+                  <Linkedin size={18} />
+                </a>
+              ) : null}
+              {instagramUrl ? (
+                <a
+                  href={instagramUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  aria-label="Instagram"
+                  className="flex h-[36px] w-[36px] items-center justify-center rounded-full bg-transparent text-[#6B6088] transition-colors duration-300 hover:bg-[rgba(139,92,246,0.1)] hover:text-[#F5F3FF]"
+                >
+                  <Instagram size={18} />
+                </a>
+              ) : (
+                <button
+                  type="button"
+                  aria-label="Instagram"
+                  title="Coming Soon"
+                  onClick={showComingSoonToast}
+                  className="flex h-[36px] w-[36px] items-center justify-center rounded-full bg-transparent text-[#6B6088] opacity-50 transition-colors duration-300 hover:bg-[rgba(139,92,246,0.1)] hover:text-[#F5F3FF]"
+                >
+                  <Instagram size={18} />
+                </button>
+              )}
+              {twitterUrl ? (
+                <a
+                  href={twitterUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  aria-label="Twitter"
+                  className="flex h-[36px] w-[36px] items-center justify-center rounded-full bg-transparent text-[#6B6088] transition-colors duration-300 hover:bg-[rgba(139,92,246,0.1)] hover:text-[#F5F3FF]"
+                >
+                  <Twitter size={18} />
+                </a>
+              ) : (
+                <button
+                  type="button"
+                  aria-label="Twitter"
+                  title="Coming Soon"
+                  onClick={showComingSoonToast}
+                  className="flex h-[36px] w-[36px] items-center justify-center rounded-full bg-transparent text-[#6B6088] opacity-50 transition-colors duration-300 hover:bg-[rgba(139,92,246,0.1)] hover:text-[#F5F3FF]"
+                >
+                  <Twitter size={18} />
+                </button>
+              )}
+              {facebookUrl ? (
+                <a
+                  href={facebookUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  aria-label="Facebook"
+                  className="flex h-[36px] w-[36px] items-center justify-center rounded-full bg-transparent text-[#6B6088] transition-colors duration-300 hover:bg-[rgba(139,92,246,0.1)] hover:text-[#F5F3FF]"
+                >
+                  <FacebookIcon size={18} />
+                </a>
+              ) : (
+                <button
+                  type="button"
+                  aria-label="Facebook"
+                  title="Coming Soon"
+                  onClick={showComingSoonToast}
+                  className="flex h-[36px] w-[36px] items-center justify-center rounded-full bg-transparent text-[#6B6088] opacity-50 transition-colors duration-300 hover:bg-[rgba(139,92,246,0.1)] hover:text-[#F5F3FF]"
+                >
+                  <FacebookIcon size={18} />
+                </button>
+              )}
+              {redditUrl ? (
+                <a
+                  href={redditUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  aria-label="Reddit"
+                  className="flex h-[36px] w-[36px] items-center justify-center rounded-full bg-transparent text-[#6B6088] transition-colors duration-300 hover:bg-[rgba(139,92,246,0.1)] hover:text-[#F5F3FF]"
+                >
+                  <RedditIcon size={18} />
+                </a>
+              ) : (
+                <button
+                  type="button"
+                  aria-label="Reddit"
+                  title="Coming Soon"
+                  onClick={showComingSoonToast}
+                  className="flex h-[36px] w-[36px] items-center justify-center rounded-full bg-transparent text-[#6B6088] opacity-50 transition-colors duration-300 hover:bg-[rgba(139,92,246,0.1)] hover:text-[#F5F3FF]"
+                >
+                  <RedditIcon size={18} />
+                </button>
+              )}
             </div>
 
             <div className="my-[28px] h-[1px] w-full bg-[#1E0A35]" />

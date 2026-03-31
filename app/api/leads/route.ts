@@ -43,7 +43,7 @@ export async function POST(request: Request) {
             company_name: companyName || "",
             source: "chat_widget",
             interested_product: interestedProduct || "general",
-            message: leadMessage || "Lead captured via Netra chat assistant",
+            message: leadMessage || "Lead captured via chat widget",
             status: leadStatus || "new",
           }
         : null

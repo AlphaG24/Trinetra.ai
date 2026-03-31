@@ -30,7 +30,7 @@ const cards = [
     hoverShadow: "hover:shadow-[0_0_40px_rgba(245,158,11,0.08)]",
     title: "Smart Education",
     description: "Adaptive exam platforms that understand each student's cognitive profile and personalize every question.",
-    linkText: "Coming Soon",
+    linkText: "Trinetra Shiksha (In Stealth)",
     linkRef: "#",
     linkStyle: "text-[#6B6088] cursor-default",
     clickable: false

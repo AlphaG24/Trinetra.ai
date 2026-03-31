@@ -6,6 +6,39 @@ import Vapi from "@vapi-ai/web";
 // Ensure this environment variable is set in .env.local
 const VAPI_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPI_PUBLIC_KEY || "";
 const VAPI_ASSISTANT_ID = process.env.NEXT_PUBLIC_VAPI_ASSISTANT_ID || "";
+const VAPI_IS_CONFIGURED = Boolean(VAPI_PUBLIC_KEY && VAPI_ASSISTANT_ID);
+
+function getVapiErrorMessage(error: unknown) {
+    if (error instanceof Error) {
+        return error.message;
+    }
+
+    if (typeof error === "string") {
+        return error;
+    }
+
+    if (typeof error === "object" && error !== null) {
+        const record = error as Record<string, unknown>;
+        const directMessage = record.message;
+        if (typeof directMessage === "string") {
+            return directMessage;
+        }
+
+        const nestedError = record.error;
+        if (typeof nestedError === "string") {
+            return nestedError;
+        }
+
+        if (typeof nestedError === "object" && nestedError !== null) {
+            const nestedMessage = (nestedError as Record<string, unknown>).message;
+            if (typeof nestedMessage === "string") {
+                return nestedMessage;
+            }
+        }
+    }
+
+    return "Voice connection error.";
+}
 
 export function useVapi() {
     const [isConnecting, setIsConnecting] = useState(false);
@@ -18,44 +51,77 @@ export function useVapi() {
 
     useEffect(() => {
         if (!VAPI_PUBLIC_KEY) {
-            console.error("Missing NEXT_PUBLIC_VAPI_PUBLIC_KEY");
+            console.warn("[Vapi] Missing NEXT_PUBLIC_VAPI_PUBLIC_KEY – voice agent disabled.");
             return;
         }
 
+        let vapi: Vapi | null = null;
+
         try {
-            const vapi = new Vapi(VAPI_PUBLIC_KEY);
-            vapiRef.current = vapi;
-
-            vapi.on("call-start", () => {
-                setIsConnecting(false);
-                setIsConnected(true);
-            });
-
-            vapi.on("call-end", () => {
-                setIsConnecting(false);
-                setIsConnected(false);
-                setIsSpeaking(false);
-                setVolumeLevel(0);
-            });
-
-            vapi.on("speech-start", () => setIsSpeaking(true));
-            vapi.on("speech-end", () => setIsSpeaking(false));
-            vapi.on("volume-level", (vol) => setVolumeLevel(vol));
-
-            vapi.on("error", (err) => {
-                console.error("Vapi Error:", err);
-                setIsConnecting(false);
-                setIsConnected(false);
-                setError("Voice connection error.");
-            });
-
-            return () => {
-                vapi.stop();
-                vapi.removeAllListeners();
-            };
+            vapi = new Vapi(VAPI_PUBLIC_KEY);
         } catch (err) {
-            console.error("Vapi Init Error:", err);
+            console.warn("[Vapi] Failed to create instance:", err);
+            return;
         }
+
+        vapiRef.current = vapi;
+
+        const onCallStart = () => {
+            setError(null);
+            setIsConnecting(false);
+            setIsConnected(true);
+        };
+
+        const onCallEnd = () => {
+            setError(null);
+            setIsConnecting(false);
+            setIsConnected(false);
+            setIsSpeaking(false);
+            setVolumeLevel(0);
+        };
+
+        const onSpeechStart = () => setIsSpeaking(true);
+        const onSpeechEnd = () => setIsSpeaking(false);
+        const onVolume = (vol: number) => setVolumeLevel(vol);
+
+        const onError = (err: unknown) => {
+            const message = getVapiErrorMessage(err);
+            const normalizedMessage = message.toLowerCase();
+
+            setIsConnecting(false);
+            setIsConnected(false);
+            setIsSpeaking(false);
+            setVolumeLevel(0);
+
+            // Ignore benign "meeting ended" events that fire on normal call-end
+            if (
+                normalizedMessage.includes("meeting has ended") ||
+                normalizedMessage.includes("meeting ended")
+            ) {
+                setError(null);
+                return;
+            }
+
+            console.error("[Vapi] Error:", err);
+            setError(message || "Voice connection error.");
+        };
+
+        vapi.on("call-start", onCallStart);
+        vapi.on("call-end", onCallEnd);
+        vapi.on("speech-start", onSpeechStart);
+        vapi.on("speech-end", onSpeechEnd);
+        vapi.on("volume-level", onVolume);
+        vapi.on("error", onError);
+
+        return () => {
+            try {
+                vapi?.stop();
+            } catch {
+                // Suppress errors during cleanup (e.g. if call already ended)
+            }
+            vapi?.removeAllListeners();
+            vapiRef.current = null;
+        };
     }, []);
 
     const toggleCall = useCallback(async () => {
@@ -64,18 +130,19 @@ export function useVapi() {
         if (isConnected) {
             vapiRef.current.stop();
         } else {
+            setError(null);
             setIsConnecting(true);
             try {
-                console.log("Starting Vapi Call with Assistant ID:", VAPI_ASSISTANT_ID);
+                console.log("[Vapi] Starting call with Assistant ID:", VAPI_ASSISTANT_ID);
 
                 if (!VAPI_ASSISTANT_ID) {
                     throw new Error("Missing Assistant ID in env vars");
                 }
 
                 await vapiRef.current.start(VAPI_ASSISTANT_ID);
-            } catch (err: any) {
-                console.error("Failed to start call:", err);
-                setError(err.message || "Connection failed");
+            } catch (err: unknown) {
+                console.error("[Vapi] Failed to start call:", err);
+                setError(err instanceof Error ? err.message : "Connection failed");
                 setIsConnecting(false);
             }
         }
@@ -87,6 +154,7 @@ export function useVapi() {
         isSpeaking,
         volumeLevel,
         toggleCall,
-        error
+        error,
+        isConfigured: VAPI_IS_CONFIGURED,
     };
 }

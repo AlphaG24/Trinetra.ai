@@ -1,66 +1,116 @@
 "use client";
 
+import type { ReactNode } from "react";
+
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Instagram, Linkedin, Twitter } from "lucide-react";
+import { toast } from "sonner";
 
+import { FacebookIcon } from "@/components/ui/FacebookIcon";
 import { RedditIcon } from "@/components/ui/RedditIcon";
+import {
+  getConfigString,
+  useSiteConfig,
+  useVisibleProducts,
+} from "@/lib/site-content";
 
-const footerNavigation = [
-  {
-    title: "Products",
-    links: [
-      { name: "AI Voice Agent", href: "/products/voice-agent" },
-      { name: "AI Chat Agent", href: "/products/chat-agent" },
-      { name: "AI Social Agent", href: "/products/social-agent" },
-      { name: "AI Workflow Agent", href: "/products/workflow-agent" },
-      { name: "ExamAI", href: "#" },
-    ],
-  },
-  {
-    title: "Company",
-    links: [
-      { name: "About Us", href: "/about" },
-      { name: "Careers", href: "#" },
-      { name: "Blog", href: "/blog" },
-      { name: "Press Kit", href: "#" },
-      { name: "Contact", href: "/contact" },
-    ],
-  },
-  {
-    title: "Resources",
-    links: [
-      { name: "Documentation", href: "#" },
-      { name: "Help Center", href: "#" },
-      { name: "API Reference", href: "#" },
-      { name: "Status Page", href: "#" },
-      { name: "Changelog", href: "#" },
-    ],
-  },
-  {
-    title: "Legal",
-    links: [
-      { name: "Privacy Policy", href: "/privacy" },
-      { name: "Terms of Service", href: "/terms" },
-      { name: "Cookie Policy", href: "#" },
-      { name: "Refund Policy", href: "#" },
-    ],
-  },
+const fallbackProductLinks = [
+  { name: "AI Voice Agent", href: "/products/voice-agent", isComingSoon: false },
+  { name: "AI Chat Agent", href: "/products/chat-agent", isComingSoon: false },
+  { name: "AI Social Agent", href: "/products/social-agent", isComingSoon: false },
+  { name: "AI Workflow Agent", href: "/products/workflow-agent", isComingSoon: true },
 ];
+
+const companyLinks = [
+  { name: "About Us", href: "/about" },
+  { name: "Careers", href: "#" },
+  { name: "Blog", href: "/blog" },
+  { name: "Press Kit", href: "#" },
+  { name: "Contact", href: "/contact" },
+];
+
+const legalLinks = [
+  { name: "Privacy Policy", href: "/privacy" },
+  { name: "Terms of Service", href: "/terms" },
+  { name: "Cookie Policy", href: "#" },
+  { name: "Refund Policy", href: "/refund" },
+];
+
+function FooterIconButton({
+  href,
+  label,
+  children,
+  muted = false,
+}: {
+  href: string;
+  label: string;
+  children: ReactNode;
+  muted?: boolean;
+}) {
+  const baseClass =
+    "flex h-[36px] w-[36px] items-center justify-center rounded-full bg-transparent text-[#6B6088] transition-colors duration-300 hover:bg-[rgba(139,92,246,0.1)] hover:text-[#F5F3FF]";
+
+  if (!href) {
+    return (
+      <button
+        type="button"
+        aria-label={label}
+        title="Coming Soon"
+        onClick={() => toast("Coming Soon! We're working on it.")}
+        className={`${baseClass} ${muted ? "opacity-50" : ""}`}
+      >
+        {children}
+      </button>
+    );
+  }
+
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noreferrer"
+      aria-label={label}
+      className={`${baseClass} ${muted ? "opacity-50" : ""}`}
+    >
+      {children}
+    </a>
+  );
+}
 
 export function Footer() {
   const pathname = usePathname();
+  const { data: siteConfig } = useSiteConfig();
+  const { data: products, error: productsError } = useVisibleProducts();
 
   if (pathname?.startsWith("/dashboard")) {
     return null;
   }
 
+  const companyName = getConfigString(siteConfig, "company_name", "Trinetra AI");
+  const linkedinUrl = getConfigString(siteConfig, "social_linkedin");
+  const instagramUrl = getConfigString(siteConfig, "social_instagram");
+  const twitterUrl = getConfigString(siteConfig, "social_twitter");
+  const facebookUrl = getConfigString(siteConfig, "social_facebook");
+  const redditUrl = getConfigString(siteConfig, "social_reddit");
+
+  const productLinks =
+    products.length > 0
+      ? products.map((product) => ({
+          name: product.name,
+          href: `/products/${product.slug}`,
+          isComingSoon: product.status === "coming_soon",
+        }))
+      : productsError
+        ? fallbackProductLinks
+        : [];
+
   if (pathname === "/login") {
     return (
       <footer className="w-full border-t border-[#1E0A35] bg-[#0C0118] px-[20px] py-[20px] text-center">
         <p className="m-0 font-sans text-[13px] font-normal text-[#6B6088]">
-          &copy; 2025 Trinetra AI |{" "}
+          &copy; 2025 {companyName} |{" "}
           <Link href="/privacy" className="text-[#A78BFA] transition-colors hover:text-[#F5F3FF]">
             Privacy Policy
           </Link>{" "}
@@ -78,12 +128,12 @@ export function Footer() {
       <div className="mx-auto mb-[64px] h-[1px] w-1/2 bg-gradient-to-r from-transparent via-[#8B5CF6] to-transparent" />
 
       <div className="mx-auto max-w-[1280px]">
-        <div className="grid grid-cols-1 gap-[40px] md:grid-cols-2 lg:grid-cols-6">
+        <div className="grid grid-cols-1 gap-[40px] md:grid-cols-2 lg:grid-cols-5">
           <div className="flex flex-col items-start lg:col-span-2">
             <Link href="/" className="group flex items-center transition-opacity duration-300 hover:opacity-80">
               <Image
                 src="/trident.png"
-                alt="Trinetra AI Logo"
+                alt={`${companyName} Logo`}
                 width={70}
                 height={64}
                 className="inline-block h-[64px] w-auto object-contain"
@@ -96,69 +146,96 @@ export function Footer() {
             </p>
 
             <div className="mt-[24px] flex items-center gap-[16px]">
-              <a
-                href="https://www.linkedin.com/in/trinetraedu-ai-7402143b8"
-                target="_blank"
-                rel="noreferrer"
-                aria-label="LinkedIn"
-                className="flex h-[36px] w-[36px] items-center justify-center rounded-full bg-transparent text-[#6B6088] transition-colors duration-300 hover:bg-[rgba(139,92,246,0.1)] hover:text-[#F5F3FF]"
-              >
-                <Linkedin size={18} />
-              </a>
-              <a
-                href="https://www.instagram.com/trinetraedu.ai?igsh=MTB6cW12NHZ3YjNnaw=="
-                target="_blank"
-                rel="noreferrer"
-                aria-label="Instagram"
-                title="Coming Soon"
-                className="flex h-[36px] w-[36px] items-center justify-center rounded-full bg-transparent text-[#6B6088] opacity-50 transition-colors duration-300 hover:bg-[rgba(139,92,246,0.1)] hover:text-[#F5F3FF]"
-              >
+              {linkedinUrl ? (
+                <FooterIconButton href={linkedinUrl} label="LinkedIn">
+                  <Linkedin size={18} />
+                </FooterIconButton>
+              ) : null}
+              <FooterIconButton href={instagramUrl} label="Instagram" muted={!instagramUrl}>
                 <Instagram size={18} />
-              </a>
-              <a
-                href="#"
-                aria-label="Twitter"
-                title="Coming Soon"
-                className="flex h-[36px] w-[36px] items-center justify-center rounded-full bg-transparent text-[#6B6088] opacity-50 transition-colors duration-300 hover:bg-[rgba(139,92,246,0.1)] hover:text-[#F5F3FF]"
-              >
+              </FooterIconButton>
+              <FooterIconButton href={twitterUrl} label="Twitter" muted={!twitterUrl}>
                 <Twitter size={18} />
-              </a>
-              <a
-                href="https://www.reddit.com/u/trinetragroup/s/NMefhDCrYv"
-                target="_blank"
-                rel="noreferrer"
-                aria-label="Reddit"
-                className="flex h-[36px] w-[36px] items-center justify-center rounded-full bg-transparent text-[#6B6088] transition-colors duration-300 hover:bg-[rgba(139,92,246,0.1)] hover:text-[#F5F3FF]"
-              >
+              </FooterIconButton>
+              <FooterIconButton href={facebookUrl} label="Facebook" muted={!facebookUrl}>
+                <FacebookIcon size={18} />
+              </FooterIconButton>
+              <FooterIconButton href={redditUrl} label="Reddit" muted={!redditUrl}>
                 <RedditIcon size={18} />
-              </a>
+              </FooterIconButton>
             </div>
           </div>
 
-          {footerNavigation.map((col) => (
-            <div key={col.title} className="flex flex-col">
+          {productLinks.length > 0 ? (
+            <div className="flex flex-col">
               <h4 className="mb-[16px] font-sans text-[14px] font-semibold uppercase tracking-[0.05em] text-[#A8A0C0]">
-                {col.title}
+                Products
               </h4>
               <ul className="flex flex-col gap-[12px]">
-                {col.links.map((link) => (
+                {productLinks.map((link) => (
                   <li key={link.name}>
-                    <Link
-                      href={link.href}
-                      className="font-sans text-[14px] font-normal text-[#6B6088] transition-colors duration-200 hover:text-[#A78BFA]"
-                    >
-                      {link.name}
-                    </Link>
+                    {link.isComingSoon ? (
+                      <button
+                        type="button"
+                        onClick={() => toast("Coming Soon! We're working on it.")}
+                        className="font-sans text-[14px] font-normal text-[#6B6088] transition-colors duration-200 hover:text-[#A78BFA]"
+                      >
+                        {link.name}
+                      </button>
+                    ) : (
+                      <Link
+                        href={link.href}
+                        className="font-sans text-[14px] font-normal text-[#6B6088] transition-colors duration-200 hover:text-[#A78BFA]"
+                      >
+                        {link.name}
+                      </Link>
+                    )}
                   </li>
                 ))}
               </ul>
             </div>
-          ))}
+          ) : null}
+
+          <div className="flex flex-col">
+            <h4 className="mb-[16px] font-sans text-[14px] font-semibold uppercase tracking-[0.05em] text-[#A8A0C0]">
+              Company
+            </h4>
+            <ul className="flex flex-col gap-[12px]">
+              {companyLinks.map((link) => (
+                <li key={link.name}>
+                  <Link
+                    href={link.href}
+                    className="font-sans text-[14px] font-normal text-[#6B6088] transition-colors duration-200 hover:text-[#A78BFA]"
+                  >
+                    {link.name}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          <div className="flex flex-col">
+            <h4 className="mb-[16px] font-sans text-[14px] font-semibold uppercase tracking-[0.05em] text-[#A8A0C0]">
+              Legal
+            </h4>
+            <ul className="flex flex-col gap-[12px]">
+              {legalLinks.map((link) => (
+                <li key={link.name}>
+                  <Link
+                    href={link.href}
+                    className="font-sans text-[14px] font-normal text-[#6B6088] transition-colors duration-200 hover:text-[#A78BFA]"
+                  >
+                    {link.name}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
         </div>
 
         <div className="mt-[48px] flex flex-col items-center justify-between gap-[16px] border-t border-[#1E0A35] pt-[24px] md:flex-row">
           <p className="text-center font-sans text-[13px] font-normal text-[#6B6088] md:text-left">
-            &copy; 2025 Trinetra AI. All rights reserved.
+            &copy; 2025 {companyName}. All rights reserved.
           </p>
           <p className="flex items-center justify-center gap-[6px] font-sans text-[13px] font-normal text-[#6B6088] md:justify-end">
             Made in India.

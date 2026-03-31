@@ -7,7 +7,11 @@ import Link from "next/link";
 import { ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 
-import { createClient } from "@/utils/supabase/client";
+import {
+  getConfigString,
+  useSiteConfig,
+  useVisibleProducts,
+} from "@/lib/site-content";
 
 type ProductStatus = "live" | "beta" | "coming_soon";
 
@@ -51,12 +55,6 @@ const fallbackProducts: ProductNavItem[] = [
   },
 ];
 
-function normalizeStatus(value: unknown): ProductStatus {
-  return value === "live" || value === "beta" || value === "coming_soon"
-    ? value
-    : "coming_soon";
-}
-
 function canNavigateToProduct(status: ProductStatus) {
   return status === "live" || status === "beta";
 }
@@ -85,13 +83,28 @@ function getStatusMeta(status: ProductStatus) {
 }
 
 export function Navbar() {
+  const { data: siteConfig } = useSiteConfig();
+  const { data: productsData, loading: productsLoading, error: productsError } = useVisibleProducts();
   const [menuOpen, setMenuOpen] = useState(false);
   const [productsExpanded, setProductsExpanded] = useState(false);
   const [productsMenuOpen, setProductsMenuOpen] = useState(false);
-  const [productsLoading, setProductsLoading] = useState(true);
-  const [products, setProducts] = useState<ProductNavItem[]>(fallbackProducts);
   const [scrolled, setScrolled] = useState(false);
   const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const companyName = getConfigString(siteConfig, "company_name", "Trinetra AI");
+  const products: ProductNavItem[] =
+    productsData.length > 0
+      ? productsData.map((product) => ({
+          slug: product.slug,
+          name: product.name,
+          tagline: product.tagline || product.description,
+          status:
+            product.status === "live" || product.status === "beta" || product.status === "coming_soon"
+              ? product.status
+              : "coming_soon",
+        }))
+      : productsError
+        ? fallbackProducts
+        : [];
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 50);
@@ -107,61 +120,7 @@ export function Navbar() {
   }, [menuOpen]);
 
   useEffect(() => {
-    let isMounted = true;
-
-    const fetchProducts = async () => {
-      setProductsLoading(true);
-
-      try {
-        const supabase = createClient();
-        const { data, error } = await supabase
-          .from("products")
-          .select("slug, name, tagline, status, display_order")
-          .eq("is_visible", true)
-          .order("display_order", { ascending: true });
-
-        if (!isMounted) {
-          return;
-        }
-
-        if (error) {
-          console.error("Failed to load nav products", error);
-          setProducts(fallbackProducts);
-          return;
-        }
-
-        const normalized = (data ?? [])
-          .map((item) => {
-            if (!item?.slug || !item?.name) {
-              return null;
-            }
-
-            return {
-              slug: String(item.slug),
-              name: String(item.name),
-              tagline: typeof item.tagline === "string" ? item.tagline : "",
-              status: normalizeStatus(item.status),
-            } satisfies ProductNavItem;
-          })
-          .filter((item): item is ProductNavItem => item !== null);
-
-        setProducts(normalized.length > 0 ? normalized : fallbackProducts);
-      } catch (error) {
-        if (isMounted) {
-          console.error("Unexpected nav product load error", error);
-          setProducts(fallbackProducts);
-        }
-      } finally {
-        if (isMounted) {
-          setProductsLoading(false);
-        }
-      }
-    };
-
-    void fetchProducts();
-
     return () => {
-      isMounted = false;
       if (closeTimerRef.current) {
         clearTimeout(closeTimerRef.current);
       }
@@ -204,7 +163,7 @@ export function Navbar() {
           >
             <Image
               src="/logo-transparent.png"
-              alt="Trinetra Logo"
+              alt={companyName}
               width={320}
               height={90}
               className="h-24 w-auto"
@@ -243,6 +202,10 @@ export function Navbar() {
                 {productsLoading ? (
                   <div className="px-[14px] py-[16px] font-sans text-[14px] text-[#6B6088]">
                     Loading products...
+                  </div>
+                ) : products.length === 0 ? (
+                  <div className="px-[14px] py-[16px] font-sans text-[14px] text-[#6B6088]">
+                    No products available right now.
                   </div>
                 ) : (
                   <div className="flex flex-col gap-[4px]">
@@ -310,6 +273,13 @@ export function Navbar() {
             <Link href="/login" className="navbar__btn-login hidden" aria-hidden="true" tabIndex={-1}>
               Login
             </Link>
+            <button
+              type="button"
+              onClick={handleComingSoonClick}
+              className="hidden rounded-full border border-[#2D1255] bg-transparent px-[18px] py-[12px] font-sans text-[14px] font-medium text-[#A78BFA] transition-all duration-300 hover:border-[#8B5CF6] hover:bg-[rgba(139,92,246,0.08)] lg:inline-flex"
+            >
+              Trinetra Shiksha
+            </button>
             <Link href="/contact" className="navbar__btn-deploy">
               Deploy Agent
             </Link>
@@ -383,6 +353,8 @@ export function Navbar() {
               <div className="flex flex-col gap-[10px] border-l border-[#2D1255] pl-[18px]">
                 {productsLoading ? (
                   <p className="font-sans text-[14px] text-[#6B6088]">Loading products...</p>
+                ) : products.length === 0 ? (
+                  <p className="font-sans text-[14px] text-[#6B6088]">No products available right now.</p>
                 ) : (
                   products.map((product) => {
                     const statusMeta = getStatusMeta(product.status);
@@ -440,10 +412,19 @@ export function Navbar() {
             </Link>
           ))}
 
+          <button
+            type="button"
+            onClick={handleComingSoonClick}
+            className="navbar-mobile__link"
+            style={{ transitionDelay: `${0.2 + navLinks.length * 0.1}s` }}
+          >
+            Trinetra Shiksha
+          </button>
+
           <Link
             href="/contact"
             className="navbar-mobile__deploy"
-            style={{ transitionDelay: `${0.2 + navLinks.length * 0.1}s` }}
+            style={{ transitionDelay: `${0.3 + navLinks.length * 0.1}s` }}
             onClick={() => setMenuOpen(false)}
           >
             Deploy Agent

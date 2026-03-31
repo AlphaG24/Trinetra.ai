@@ -18,20 +18,18 @@ import Link from "next/link";
 import { toast } from "sonner";
 
 import { SocialAgentGallery } from "@/components/social/SocialAgentGallery";
+import { ProductRecord, useVisibleProducts } from "@/lib/site-content";
 
 const VoiceVisual = () => (
   <div className="mx-auto flex w-full max-w-[420px] flex-col items-center rounded-[20px] border border-[#1E0A35] bg-[#130224] p-[32px] shadow-[0_20px_60px_rgba(139,92,246,0.1)]">
-    <div className="mb-[8px] font-semibold uppercase tracking-wider text-[#6B6088] text-[13px]">
+    <div className="mb-[8px] text-[13px] font-semibold uppercase tracking-wider text-[#6B6088]">
       Incoming Call
     </div>
-    <div className="mb-[4px] font-display text-[32px] font-medium text-[#F5F3FF]">
-      Rahul Sharma
-    </div>
+    <div className="mb-[4px] font-display text-[32px] font-medium text-[#F5F3FF]">Rahul Sharma</div>
     <div className="mb-[32px] font-mono text-[16px] text-[#A78BFA]">02:34</div>
 
     <div className="relative w-full rounded-[16px] rounded-tl-sm bg-[#1A0530] p-[20px] text-[15px] leading-relaxed text-[#A8A0C0] shadow-md">
-      {`"Good afternoon! I'd be happy to book an appointment for you. Dr. Patel is
-      available tomorrow at 3 PM. Shall I confirm?"`}
+      {"Good afternoon! I'd be happy to book an appointment for you. Dr. Patel is available tomorrow at 3 PM. Shall I confirm?"}
     </div>
 
     <div className="mt-[40px] flex items-center gap-[10px] rounded-full border border-[rgba(16,185,129,0.2)] bg-[rgba(16,185,129,0.1)] px-[20px] py-[8px] text-[14px] font-medium text-[#10B981]">
@@ -61,8 +59,8 @@ const ChatVisual = () => (
         Do you integrate with my existing CRM out of the box?
       </div>
       <div className="max-w-[85%] self-start rounded-[14px] rounded-tl-sm border border-[#2D1255] bg-[#1E0A35] px-[16px] py-[12px] text-[15px] leading-relaxed text-[#A8A0C0]">
-        Yes! We natively integrate with Salesforce, HubSpot, and 50+ other CRMs
-        instantly. We also support custom generic webhooks if needed!
+        Yes! We natively integrate with Salesforce, HubSpot, and 50+ other CRMs instantly.
+        We also support custom generic webhooks if needed!
       </div>
     </div>
 
@@ -75,9 +73,7 @@ const ChatVisual = () => (
   </div>
 );
 
-const SocialVisual = () => (
-  <SocialAgentGallery />
-);
+const SocialVisual = () => <SocialAgentGallery />;
 
 const WorkflowVisual = () => (
   <div className="relative mx-auto flex w-full max-w-[400px] flex-col overflow-hidden rounded-[20px] border border-[#1E0A35] bg-[#130224] p-[24px] shadow-[0_20px_60px_rgba(139,92,246,0.1)]">
@@ -104,9 +100,7 @@ const WorkflowVisual = () => (
         <div className="absolute left-0 top-0 h-full w-[4px] bg-[#8B5CF6]" />
         <Mail size={22} className="ml-[4px] shrink-0 text-[#A78BFA]" />
         <div className="flex-1 truncate">
-          <div className="truncate text-[14px] font-medium text-[#F5F3FF]">
-            1. Incoming Email
-          </div>
+          <div className="truncate text-[14px] font-medium text-[#F5F3FF]">1. Incoming Email</div>
           <div className="truncate text-[13px] text-[#6B6088]">Trigger on new lead@...</div>
         </div>
       </div>
@@ -117,9 +111,7 @@ const WorkflowVisual = () => (
         <div className="absolute left-0 top-0 h-full w-[4px] bg-gradient-to-b from-[#8B5CF6] to-[#FBBF24]" />
         <Bot size={22} className="ml-[4px] shrink-0 text-[#FBBF24]" />
         <div className="flex-1 truncate">
-          <div className="truncate text-[14px] font-medium text-[#F5F3FF]">
-            2. AI Extraction
-          </div>
+          <div className="truncate text-[14px] font-medium text-[#F5F3FF]">2. AI Extraction</div>
           <div className="truncate text-[13px] text-[#A8A0C0]">Extract Intent &amp; Budget</div>
         </div>
         <Sparkles size={16} className="mr-[4px] shrink-0 animate-pulse text-[#FBBF24]" />
@@ -136,9 +128,7 @@ const WorkflowVisual = () => (
         <div className="absolute left-0 top-0 h-full w-[4px] bg-[#10B981]" />
         <Database size={22} className="ml-[4px] shrink-0 text-[#10B981]" />
         <div className="flex-1 truncate">
-          <div className="truncate text-[14px] font-medium text-[#F5F3FF]">
-            3. Add to CRM
-          </div>
+          <div className="truncate text-[14px] font-medium text-[#F5F3FF]">3. Add to CRM</div>
           <div className="truncate text-[13px] text-[#6B6088]">Insert row into Database</div>
         </div>
       </div>
@@ -146,90 +136,123 @@ const WorkflowVisual = () => (
   </div>
 );
 
-const products = [
+const fallbackProducts = [
   {
-    id: "voice",
-    badgeLabel: "Live",
-    badgeStyles:
-      "text-[#10B981] bg-[rgba(16,185,129,0.1)] border border-[rgba(16,185,129,0.15)]",
-    title: "AI Voice Agent",
+    slug: "voice-agent",
+    name: "AI Voice Agent",
+    tagline: "Always-on voice reception and appointment booking.",
     description:
       "Your AI receptionist that answers calls, books appointments, handles FAQs, and transfers to humans when needed. Speaks Hindi and English. Works 24/7/365.",
+    status: "live",
+    agentType: "voice",
     features: [
-      "Handles 100+ simultaneous calls",
-      "Hindi & English with natural voice",
-      "Books appointments to Google Calendar",
-      "Intelligent escalation to humans",
+      { title: "Handles 100+ simultaneous calls", description: "" },
+      { title: "Hindi & English with natural voice", description: "" },
+      { title: "Books appointments to Google Calendar", description: "" },
+      { title: "Intelligent escalation to humans", description: "" },
     ],
-    buttonText: "Explore Voice Agent ->",
-    buttonLink: "/products/voice-agent",
-    toastMessage: null,
-    alignment: "left",
-    VisualComponent: VoiceVisual,
   },
   {
-    id: "chat",
-    badgeLabel: "Live",
-    badgeStyles:
-      "text-[#10B981] bg-[rgba(16,185,129,0.1)] border border-[rgba(16,185,129,0.15)]",
-    title: "AI Chat Agent",
+    slug: "chat-agent",
+    name: "AI Chat Agent",
+    tagline: "Website chat support and lead capture.",
     description:
       "Embed an intelligent chatbot on your website that understands your business, answers questions, captures leads, and never sleeps.",
+    status: "coming_soon",
+    agentType: "chat",
     features: [
-      "Learns from your docs and FAQs",
-      "Captures leads automatically",
-      "Escalates complex queries",
-      "Embeds in 2 minutes",
+      { title: "Learns from your docs and FAQs", description: "" },
+      { title: "Captures leads automatically", description: "" },
+      { title: "Escalates complex queries", description: "" },
+      { title: "Embeds in 2 minutes", description: "" },
     ],
-    buttonText: "Coming Soon",
-    buttonLink: null,
-    toastMessage: "Chat Agent demo coming soon!",
-    alignment: "right",
-    VisualComponent: ChatVisual,
   },
   {
-    id: "social",
-    badgeLabel: "Beta",
-    badgeStyles:
-      "text-[#F59E0B] bg-[rgba(245,158,11,0.1)] border border-[rgba(245,158,11,0.15)]",
-    title: "AI Social Media Agent",
+    slug: "social-agent",
+    name: "AI Social Agent",
+    tagline: "AI-assisted social publishing workflows.",
     description:
       "Generate, schedule, and post content across Instagram and social platforms. AI creates captions, suggests hashtags, and maintains your brand voice.",
+    status: "beta",
+    agentType: "social",
     features: [
-      "Auto-generates captions & hashtags",
-      "Maintains brand voice consistency",
-      "Schedules posts automatically",
-      "Performance analytics",
+      { title: "Auto-generates captions & hashtags", description: "" },
+      { title: "Maintains brand voice consistency", description: "" },
+      { title: "Schedules posts automatically", description: "" },
+      { title: "Performance analytics", description: "" },
     ],
-    buttonText: "Coming Soon",
-    buttonLink: null,
-    toastMessage: "Social Agent demo coming soon!",
-    alignment: "left",
-    VisualComponent: SocialVisual,
   },
   {
-    id: "workflow",
-    badgeLabel: "Coming Soon",
-    badgeStyles:
-      "text-[#6B6088] bg-[rgba(107,96,136,0.1)] border border-[rgba(107,96,136,0.15)]",
-    title: "AI Workflow Agent",
+    slug: "workflow-agent",
+    name: "AI Workflow Agent",
+    tagline: "Cross-tool automations for business operations.",
     description:
       "Connect multiple tools together to automate multi-step business processes natively. Data extraction, intelligent routing, and pipeline reporting done autonomously.",
+    status: "coming_soon",
+    agentType: "workflow",
     features: [
-      "Connects multiple tools instantly",
-      "Automates multi-step processes",
-      "Data extraction and reporting",
-      "Advanced branching logic",
+      { title: "Connects multiple tools instantly", description: "" },
+      { title: "Automates multi-step processes", description: "" },
+      { title: "Data extraction and reporting", description: "" },
+      { title: "Advanced branching logic", description: "" },
     ],
-    buttonText: "Coming Soon",
-    buttonLink: null,
-    toastMessage: "Workflow Agent demo coming soon!",
-    alignment: "right",
-    VisualComponent: WorkflowVisual,
   },
 ] as const;
 
+function getStatusMeta(status: ProductRecord["status"]) {
+  switch (status) {
+    case "live":
+      return {
+        label: "Live",
+        badgeStyles:
+          "text-[#10B981] bg-[rgba(16,185,129,0.1)] border border-[rgba(16,185,129,0.15)]",
+      };
+    case "beta":
+      return {
+        label: "Beta",
+        badgeStyles:
+          "text-[#F59E0B] bg-[rgba(245,158,11,0.1)] border border-[rgba(245,158,11,0.15)]",
+      };
+    default:
+      return {
+        label: "Coming Soon",
+        badgeStyles:
+          "text-[#6B6088] bg-[rgba(107,96,136,0.1)] border border-[rgba(107,96,136,0.15)]",
+      };
+  }
+}
+
+function getVisualComponent(agentType: ProductRecord["agentType"]) {
+  switch (agentType) {
+    case "voice":
+      return VoiceVisual;
+    case "chat":
+      return ChatVisual;
+    case "social":
+      return SocialVisual;
+    case "workflow":
+      return WorkflowVisual;
+    default:
+      return VoiceVisual;
+  }
+}
+
+function formatFeatureText(feature: { title: string; description: string }) {
+  if (feature.title && feature.description) {
+    return `${feature.title}: ${feature.description}`;
+  }
+
+  return feature.title || feature.description;
+}
+
 export function ProductsShowcase() {
+  const { data, error } = useVisibleProducts();
+  const products = data.length > 0 ? data : error ? fallbackProducts : [];
+
+  if (products.length === 0) {
+    return null;
+  }
+
   return (
     <section id="products" className="w-full overflow-hidden bg-[#080010] pb-[60px] pt-[100px]">
       <div className="mx-auto max-w-[1280px] px-[20px] md:px-[80px]">
@@ -272,17 +295,22 @@ export function ProductsShowcase() {
             transition={{ duration: 0.6, delay: 0.2 }}
             className="mx-auto max-w-[580px] font-sans text-[16px] font-normal leading-[1.6] text-[#A8A0C0] md:text-[18px]"
           >
-            Not demos. Not concepts. Production-ready AI agents deployed in real
-            businesses.
+            Not demos. Not concepts. Production-ready AI agents deployed in real businesses.
           </motion.p>
         </div>
 
         <div className="flex flex-col gap-[80px]">
           {products.map((product, idx) => {
-            const isReversed = product.alignment === "right";
+            const VisualComponent = getVisualComponent(product.agentType);
+            const isReversed = idx % 2 === 1;
+            const statusMeta = getStatusMeta(product.status);
+            const featureItems =
+              product.features.length > 0
+                ? product.features.map(formatFeatureText).filter(Boolean)
+                : [];
 
             return (
-              <React.Fragment key={product.id}>
+              <React.Fragment key={product.slug}>
                 <div
                   className={`flex flex-col items-center gap-[60px] md:flex-row ${
                     isReversed ? "md:flex-row-reverse" : ""
@@ -296,45 +324,47 @@ export function ProductsShowcase() {
                     className="flex w-full flex-col items-start text-left md:w-1/2"
                   >
                     <div
-                      className={`inline-block rounded-full px-[12px] py-[4px] font-sans text-[12px] font-medium ${product.badgeStyles}`}
+                      className={`inline-block rounded-full px-[12px] py-[4px] font-sans text-[12px] font-medium ${statusMeta.badgeStyles}`}
                     >
-                      {product.badgeLabel}
+                      {statusMeta.label}
                     </div>
 
                     <h3 className="mt-[16px] font-display text-[32px] font-bold leading-tight text-[#F5F3FF]">
-                      {product.title}
+                      {product.name}
                     </h3>
 
                     <p className="mt-[16px] font-sans text-[16px] font-normal leading-[1.7] text-[#A8A0C0]">
-                      {product.description}
+                      {product.tagline || product.description}
                     </p>
 
-                    <div className="mt-[24px] flex w-full flex-col gap-[12px]">
-                      {product.features.map((feature) => (
-                        <div key={feature} className="flex items-start gap-[10px]">
-                          <Check size={18} className="mt-[2px] shrink-0 text-[#10B981]" />
-                          <span className="font-sans text-[15px] font-normal text-[#A8A0C0]">
-                            {feature}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
+                    {featureItems.length > 0 ? (
+                      <div className="mt-[24px] flex w-full flex-col gap-[12px]">
+                        {featureItems.map((feature) => (
+                          <div key={feature} className="flex items-start gap-[10px]">
+                            <Check size={18} className="mt-[2px] shrink-0 text-[#10B981]" />
+                            <span className="font-sans text-[15px] font-normal text-[#A8A0C0]">
+                              {feature}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : null}
 
-                    {product.buttonLink ? (
+                    {product.status === "live" || product.status === "beta" ? (
                       <Link
-                        href={product.buttonLink}
+                        href={`/products/${product.slug}`}
                         className="mt-[28px] inline-block rounded-[10px] border border-[#2D1255] px-[24px] py-[12px] font-sans text-[15px] font-medium text-[#A78BFA] transition-all duration-300 hover:border-[#8B5CF6] hover:bg-[rgba(139,92,246,0.05)]"
                       >
-                        {product.buttonText}
+                        {`Explore ${product.name} ->`}
                       </Link>
                     ) : (
                       <button
                         type="button"
-                        onClick={() => toast(product.toastMessage || "Coming Soon!")}
+                        onClick={() => toast("Coming Soon! We're working on it.")}
                         aria-disabled={true}
                         className="mt-[28px] inline-flex cursor-not-allowed items-center rounded-[10px] border border-[#2D1255] px-[24px] py-[12px] font-sans text-[15px] font-medium text-[#A78BFA] opacity-60"
                       >
-                        {product.buttonText}
+                        Coming Soon
                       </button>
                     )}
                   </motion.div>
@@ -346,7 +376,7 @@ export function ProductsShowcase() {
                     transition={{ duration: 0.7, delay: 0.2, ease: "easeOut" }}
                     className="w-full md:w-1/2"
                   >
-                    <product.VisualComponent />
+                    <VisualComponent />
                   </motion.div>
                 </div>
 

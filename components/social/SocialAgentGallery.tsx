@@ -3,6 +3,8 @@
 import Image from "next/image";
 import { Bookmark, Heart, MessageCircle, MoreVertical, Send } from "lucide-react";
 
+import { getConfigString, hasConfiguredValue, useSiteConfig } from "@/lib/site-content";
+
 type StickyNote = {
   color: string;
   rotation: string;
@@ -43,6 +45,11 @@ const notes: StickyNote[] = [
 ];
 
 export function SocialAgentGallery() {
+  const { data: siteConfig } = useSiteConfig();
+  const phone1 = getConfigString(siteConfig, "company_phone_1");
+  const phone2 = getConfigString(siteConfig, "company_phone_2");
+  const hasPhoneBlock = hasConfiguredValue(phone1) || hasConfiguredValue(phone2);
+
   return (
     <div className="mx-auto w-full max-w-[296px] overflow-hidden rounded-[18px] border border-[#E8E2F6]/30 bg-[#F7F4FF] shadow-[0_18px_56px_rgba(0,0,0,0.16)]">
       <div className="flex items-center justify-between bg-[#FBFAFF] px-[12px] py-[9px]">
@@ -62,13 +69,15 @@ export function SocialAgentGallery() {
       </div>
 
       <div className="bg-[#1B1B1B] px-[12px] pb-[14px] pt-[10px]">
-        <div className="mb-[10px] flex justify-end text-right text-[8px] font-semibold uppercase tracking-[0.08em] text-[#E5C84D]">
-          <div>
-            MOB NO- 9580619562
-            <br />
-            9452045499
+        {hasPhoneBlock ? (
+          <div className="mb-[10px] flex justify-end text-right text-[8px] font-semibold uppercase tracking-[0.08em] text-[#E5C84D]">
+            <div>
+              {hasConfiguredValue(phone1) ? `MOB NO- ${phone1}` : null}
+              {hasConfiguredValue(phone1) && hasConfiguredValue(phone2) ? <br /> : null}
+              {hasConfiguredValue(phone2) ? phone2 : null}
+            </div>
           </div>
-        </div>
+        ) : null}
 
         <div className="mb-[8px] flex justify-center">
           <Image
