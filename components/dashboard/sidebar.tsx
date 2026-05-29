@@ -1,127 +1,111 @@
-'use client';
+'use client'
 
-import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
-import {
-    Home,
-    Users,
-    Network,
-    CreditCard,
-    Key,
-    FileText,
-    LifeBuoy,
-    ShieldAlert,
-    LogOut,
-    User
-} from 'lucide-react';
-import { createClient } from '@/utils/supabase/client';
-import { useEffect, useState } from 'react';
-import { clsx } from 'clsx';
+import Link from 'next/link'
+import { usePathname } from 'next/navigation'
+import { motion, AnimatePresence } from 'framer-motion'
+import { 
+  Home, FlaskConical, Bot, Calendar, Target, BarChart3, 
+  Phone, MessageCircle, MessageSquare, Settings, CreditCard, 
+  HeadphonesIcon, X 
+} from 'lucide-react'
+import { useDashboardStore } from '@/store/dashboardStore'
+import { hasAgentType } from '@/lib/utils/agentDetection'
 
-const navLinks = [
+export function Sidebar({ agents }: { agents: any[] }) {
+  const pathname = usePathname()
+  const { isMobileSidebarOpen, setMobileSidebarOpen } = useDashboardStore()
+  
+  const hasVoice = hasAgentType(agents, 'voice')
+  const hasChat = hasAgentType(agents, 'chat')
+  const hasWhatsApp = hasAgentType(agents, 'whatsapp')
+
+  const topLinks = [
     { name: 'Overview', href: '/dashboard', icon: Home },
-    { name: 'My Agents', href: '/dashboard/agents', icon: Users },
-    { name: 'Integrations', href: '/dashboard/integrations', icon: Network },
+    { name: 'Demo', href: '/dashboard/demo', icon: FlaskConical, badge: 'NEW' },
+    { name: 'Agents', href: '/dashboard/agents', icon: Bot },
+    { name: 'Appointments', href: '/dashboard/appointments', icon: Calendar },
+    { name: 'Leads', href: '/dashboard/leads', icon: Target },
+    { name: 'Analytics', href: '/dashboard/analytics', icon: BarChart3 },
+  ]
+
+  const channelLinks = []
+  if (hasVoice) channelLinks.push({ name: 'Voice Calls', href: '/dashboard/calls', icon: Phone })
+  if (hasChat) channelLinks.push({ name: 'Chat', href: '/dashboard/conversations', icon: MessageCircle })
+  if (hasWhatsApp) channelLinks.push({ name: 'WhatsApp', href: '/dashboard/whatsapp', icon: MessageSquare })
+
+  const bottomLinks = [
+    { name: 'Settings', href: '/dashboard/settings', icon: Settings },
     { name: 'Billing', href: '/dashboard/billing', icon: CreditCard },
-    { name: 'API Keys', href: '/dashboard/keys', icon: Key },
-    { name: 'Logs', href: '/dashboard/logs', icon: FileText },
-    { name: 'Support', href: '/dashboard/support', icon: LifeBuoy },
-];
+    { name: 'Support', href: '/dashboard/support', icon: HeadphonesIcon },
+  ]
 
-export default function Sidebar() {
-    const pathname = usePathname();
-    const router = useRouter();
-    const supabase = createClient();
-    const [userEmail, setUserEmail] = useState<string | null>(null);
-
-    useEffect(() => {
-        const getUser = async () => {
-            const { data: { user } } = await supabase.auth.getUser();
-            setUserEmail(user?.email || null);
-        };
-        getUser();
-    }, [supabase]);
-
-    const handleSignOut = async () => {
-        await supabase.auth.signOut();
-        router.push('/login');
-    };
+  const NavLink = ({ item }: { item: any }) => {
+    const isActive = pathname === item.href
+    const Icon = item.icon
 
     return (
-        <aside className="w-64 border-r border-white/10 bg-black flex flex-col h-screen fixed left-0 top-0 z-50">
-            {/* Brand Header */}
-            <div className="h-16 flex items-center gap-3 px-6 border-b border-white/5">
-                <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center text-black font-bold text-xs tracking-tighter">
-                    T
-                </div>
-                <span className="font-bold tracking-widest text-white text-sm">TRINETRA</span>
-            </div>
+      <Link 
+        href={item.href}
+        onClick={() => setMobileSidebarOpen(false)}
+        className={`flex items-center justify-between px-3 py-2.5 rounded-lg transition-all duration-150 ${
+          isActive 
+            ? 'bg-violet-600/15 text-white border-l-2 border-violet-500' 
+            : 'text-gray-400 hover:text-gray-300 hover:bg-white/5 border-l-2 border-transparent'
+        }`}
+      >
+        <div className="flex items-center gap-3">
+          <Icon className={`w-5 h-5 ${isActive ? 'text-violet-500' : ''}`} />
+          <span className="font-medium text-sm">{item.name}</span>
+        </div>
+        {item.badge && (
+          <span className="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded-md bg-violet-500/20 text-violet-400">
+            {item.badge}
+          </span>
+        )}
+      </Link>
+    )
+  }
 
-            {/* Navigation Links */}
-            <nav className="flex-1 overflow-y-auto py-6 px-3 space-y-1">
-                {navLinks.map((link) => {
-                    const LinkIcon = link.icon;
-                    const isActive = pathname === link.href;
-                    return (
-                        <Link
-                            key={link.href}
-                            href={link.href}
-                            className={clsx(
-                                'flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg transition-all duration-200 group',
-                                isActive
-                                    ? 'bg-white/10 text-white shadow-[0_0_10px_rgba(255,255,255,0.05)] border border-white/5'
-                                    : 'text-zinc-400 hover:text-white hover:bg-white/5 border border-transparent'
-                            )}
-                        >
-                            <LinkIcon size={18} className={clsx("transition-colors", isActive ? "text-white" : "text-zinc-500 group-hover:text-white")} />
-                            {link.name}
-                        </Link>
-                    );
-                })}
+  return (
+    <>
+      {/* Mobile Overlay */}
+      <AnimatePresence>
+        {isMobileSidebarOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setMobileSidebarOpen(false)}
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 lg:hidden"
+          />
+        )}
+      </AnimatePresence>
 
-                {/* Secure Admin Link */}
-                {userEmail === 'raghav00424@gmail.com' && (
-                    <div className="pt-4 mt-4 border-t border-white/5 mx-2">
-                        <Link
-                            href="/admin"
-                            className={clsx(
-                                'flex items-center gap-3 px-3 py-2 text-xs font-bold tracking-wider rounded-lg transition-all group',
-                                pathname === '/admin'
-                                    ? 'bg-red-900/20 text-red-500 border border-red-900/50'
-                                    : 'text-zinc-600 hover:text-red-400 hover:bg-red-950/10'
-                            )}
-                        >
-                            <ShieldAlert size={16} className="group-hover:animate-pulse" />
-                            OVERWATCH
-                        </Link>
-                    </div>
-                )}
-            </nav>
+      {/* Sidebar Content */}
+      <div className={`fixed top-16 left-0 h-[calc(100vh-64px)] w-60 bg-[#080810]/95 backdrop-blur-xl border-r border-white/5 z-40 transition-transform duration-300 lg:translate-x-0 flex flex-col ${
+        isMobileSidebarOpen ? 'translate-x-0' : '-translate-x-full'
+      }`}>
+        <div className="p-4 flex-1 overflow-y-auto custom-scrollbar">
+          <div className="space-y-1">
+            {topLinks.map(link => <NavLink key={link.name} item={link} />)}
+          </div>
 
-            {/* Footer / User Profile */}
-            <div className="p-4 border-t border-white/10 bg-black/50 backdrop-blur-sm">
-                <div className="flex items-center gap-3 mb-4 px-2">
-                    <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center border border-white/10">
-                        <User size={14} className="text-zinc-400" />
-                    </div>
-                    <div className="overflow-hidden">
-                        <p className="text-xs font-medium text-white truncate">
-                            {userEmail || 'Loading...'}
-                        </p>
-                        <p className="text-[10px] text-zinc-500 truncate">
-                            Pro License
-                        </p>
-                    </div>
-                </div>
+          {channelLinks.length > 0 && (
+            <>
+              <div className="mt-8 mb-2 px-3">
+                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Channels</span>
+              </div>
+              <div className="space-y-1">
+                {channelLinks.map(link => <NavLink key={link.name} item={link} />)}
+              </div>
+            </>
+          )}
+        </div>
 
-                <button
-                    onClick={handleSignOut}
-                    className="w-full flex items-center justify-center gap-2 px-3 py-2 text-xs font-medium text-zinc-400 hover:text-white hover:bg-white/5 rounded-lg transition-colors border border-transparent hover:border-white/5"
-                >
-                    <LogOut size={14} />
-                    Sign Out
-                </button>
-            </div>
-        </aside>
-    );
+        <div className="p-4 border-t border-white/5 space-y-1">
+          {bottomLinks.map(link => <NavLink key={link.name} item={link} />)}
+        </div>
+      </div>
+    </>
+  )
 }

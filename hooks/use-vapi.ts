@@ -8,6 +8,36 @@ const VAPI_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPI_PUBLIC_KEY || "";
 const VAPI_ASSISTANT_ID = process.env.NEXT_PUBLIC_VAPI_ASSISTANT_ID || "";
 const VAPI_IS_CONFIGURED = Boolean(VAPI_PUBLIC_KEY && VAPI_ASSISTANT_ID);
 
+function collectErrorStrings(error: unknown, depth = 0, values: string[] = []) {
+    if (depth > 4 || error === null || error === undefined) {
+        return values;
+    }
+
+    if (typeof error === "string") {
+        values.push(error);
+        return values;
+    }
+
+    if (error instanceof Error) {
+        values.push(error.message);
+    }
+
+    if (typeof error === "object") {
+        for (const value of Object.values(error)) {
+            if (typeof value === "string") {
+                values.push(value);
+                continue;
+            }
+
+            if (typeof value === "object" && value !== null) {
+                collectErrorStrings(value, depth + 1, values);
+            }
+        }
+    }
+
+    return values;
+}
+
 function getVapiErrorMessage(error: unknown) {
     if (error instanceof Error) {
         return error.message;
@@ -35,9 +65,42 @@ function getVapiErrorMessage(error: unknown) {
                 return nestedMessage;
             }
         }
+
+        const reason = record.reason;
+        if (typeof reason === "string") {
+            return reason;
+        }
+
+        const errorMessage = record.errorMsg;
+        if (typeof errorMessage === "string") {
+            return errorMessage;
+        }
+
+        const errorDetail = record.errorDetail;
+        if (typeof errorDetail === "string") {
+            return errorDetail;
+        }
+
+        const collected = collectErrorStrings(error);
+        if (collected.length > 0) {
+            return collected.join(" | ");
+        }
     }
 
     return "Voice connection error.";
+}
+
+function isBenignMeetingEndedError(error: unknown) {
+    const normalized = collectErrorStrings(error)
+        .join(" | ")
+        .toLowerCase();
+
+    return (
+        normalized.includes("meeting has ended") ||
+        normalized.includes("meeting ended") ||
+        normalized.includes("due to ejection") ||
+        normalized.includes("left-meeting")
+    );
 }
 
 export function useVapi() {
@@ -86,7 +149,6 @@ export function useVapi() {
 
         const onError = (err: unknown) => {
             const message = getVapiErrorMessage(err);
-            const normalizedMessage = message.toLowerCase();
 
             setIsConnecting(false);
             setIsConnected(false);
@@ -94,10 +156,7 @@ export function useVapi() {
             setVolumeLevel(0);
 
             // Ignore benign "meeting ended" events that fire on normal call-end
-            if (
-                normalizedMessage.includes("meeting has ended") ||
-                normalizedMessage.includes("meeting ended")
-            ) {
+            if (isBenignMeetingEndedError(err) || isBenignMeetingEndedError(message)) {
                 setError(null);
                 return;
             }

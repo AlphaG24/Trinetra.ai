@@ -1,0 +1,79 @@
+.partner-theme {
+    /* Match exact Trinetra theme (Amber/Gold/Dark) */
+    --bg-primary: #0a0a0f;
+    --bg-card: rgba(16, 13, 31, 0.7);
+    --bg-card-hover: rgba(20, 16, 38, 0.9);
+    --border: rgba(245, 197, 24, 0.15); /* Amber border instead of purple */
+    --text-primary: #ffffff;
+    --text-muted: rgba(255,255,255,0.55);
+    --accent-yellow: #f5c518;
+    --accent-purple: #f5c518; /* Set to amber to override legacy purple usage */
+    --success: #10b981;
+    --warning: #f59e0b;
+    --error: #ef4444;
+
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    min-height: 100vh;
+}
+
+.partner-card {
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--bg-card);
+    backdrop-filter: blur(10px);
+    transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.partner-card:hover {
+    background: var(--bg-card-hover);
+}
+
+.partner-label {
+    /* Labels (ALL CAPS, small, muted) */
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+
+.partner-value {
+    /* Values (white, medium weight) */
+    font-size: 20px;
+    color: var(--text-primary);
+    font-weight: 500;
+}
+
+.partner-badge {
+    padding: 2px 8px;
+    border-radius: 9999px;
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+}
+
+.partner-badge-active, .partner-badge-converted, .partner-badge-paid {
+    background: rgba(16, 185, 129, 0.1);
+    color: var(--success);
+    border: 1px solid rgba(16, 185, 129, 0.2);
+}
+
+.partner-badge-pending, .partner-badge-inactive {
+    background: rgba(245, 158, 11, 0.1);
+    color: var(--warning);
+    border: 1px solid rgba(245, 158, 11, 0.2);
+}
+
+.partner-badge-suspended, .partner-badge-rejected {
+    background: rgba(239, 68, 68, 0.1);
+    color: var(--error);
+    border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+.partner-badge-qualified, .partner-badge-approved {
+    background: rgba(124, 58, 237, 0.1);
+    color: var(--accent-purple);
+    border: 1px solid rgba(124, 58, 237, 0.2);
+}

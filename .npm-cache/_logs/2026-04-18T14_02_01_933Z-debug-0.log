@@ -1,0 +1,66 @@
+0 verbose cli C:\Program Files\nodejs\node.exe C:\Users\Ketan singh\AppData\Roaming\npm\node_modules\npm\bin\npm-cli.js
+1 info using npm@11.5.2
+2 info using node@v22.18.0
+3 silly config load:file:C:\Users\Ketan singh\AppData\Roaming\npm\node_modules\npm\npmrc
+4 silly config load:file:C:\Users\Ketan singh\trinetra-fresh\.npmrc
+5 silly config load:file:C:\Users\Ketan singh\.npmrc
+6 silly config load:file:C:\Users\Ketan singh\AppData\Roaming\npm\etc\npmrc
+7 verbose title npm install react-hot-toast react-share
+8 verbose argv "install" "react-hot-toast" "react-share"
+9 verbose logfile logs-max:10 dir:C:\Users\Ketan singh\trinetra-fresh\.npm-cache\_logs\2026-04-18T14_02_01_933Z-
+10 verbose logfile C:\Users\Ketan singh\trinetra-fresh\.npm-cache\_logs\2026-04-18T14_02_01_933Z-debug-0.log
+11 silly logfile start cleaning logs, removing 1 files
+12 silly packumentCache heap:4345298944 maxSize:1086324736 maxEntrySize:543162368
+13 silly logfile done cleaning log files
+14 silly idealTree buildDeps
+15 silly fetch manifest react-hot-toast@*
+16 silly packumentCache full:https://registry.npmjs.org/react-hot-toast cache-miss
+17 http fetch GET https://registry.npmjs.org/react-hot-toast attempt 1 failed with EACCES
+18 http fetch GET https://registry.npmjs.org/react-hot-toast attempt 2 failed with EACCES
+19 http fetch GET https://registry.npmjs.org/react-hot-toast attempt 3 failed with EACCES
+20 silly fetch manifest react-share@*
+21 silly packumentCache full:https://registry.npmjs.org/react-share cache-miss
+22 http fetch GET https://registry.npmjs.org/react-share attempt 1 failed with EACCES
+23 http fetch GET https://registry.npmjs.org/react-share attempt 2 failed with EACCES
+24 http fetch GET https://registry.npmjs.org/react-share attempt 3 failed with EACCES
+25 silly placeDep ROOT react-hot-toast@ OK for: trinetra@0.1.0 want: *
+26 silly placeDep ROOT react-share@ OK for: trinetra@0.1.0 want: *
+27 verbose type system
+28 verbose stack FetchError: request to https://registry.npmjs.org/react-hot-toast failed, reason: 
+28 verbose stack     at ClientRequest.<anonymous> (C:\Users\Ketan singh\AppData\Roaming\npm\node_modules\npm\node_modules\minipass-fetch\lib\index.js:130:14)
+28 verbose stack     at ClientRequest.emit (node:events:518:28)
+28 verbose stack     at emitErrorEvent (node:_http_client:104:11)
+28 verbose stack     at _destroy (node:_http_client:898:9)
+28 verbose stack     at onSocketNT (node:_http_client:918:5)
+28 verbose stack     at process.processTicksAndRejections (node:internal/process/task_queues:91:21)
+29 error code EACCES
+30 error errno EACCES
+31 error FetchError: request to https://registry.npmjs.org/react-hot-toast failed, reason: 
+31 error     at ClientRequest.<anonymous> (C:\Users\Ketan singh\AppData\Roaming\npm\node_modules\npm\node_modules\minipass-fetch\lib\index.js:130:14)
+31 error     at ClientRequest.emit (node:events:518:28)
+31 error     at emitErrorEvent (node:_http_client:104:11)
+31 error     at _destroy (node:_http_client:898:9)
+31 error     at onSocketNT (node:_http_client:918:5)
+31 error     at process.processTicksAndRejections (node:internal/process/task_queues:91:21) {
+31 error   code: 'EACCES',
+31 error   errno: 'EACCES',
+31 error   type: 'system',
+31 error   requiredBy: '.'
+31 error }
+32 error
+32 error The operation was rejected by your operating system.
+32 error It's possible that the file was already in use (by a text editor or antivirus),
+32 error or that you lack permissions to access it.
+32 error
+32 error If you believe this might be a permissions issue, please double-check the
+32 error permissions of the file and its containing directories, or try running
+32 error the command again as root/Administrator.
+33 silly unfinished npm timer reify 1776520922990
+34 silly unfinished npm timer reify:loadTrees 1776520923003
+35 verbose cwd C:\Users\Ketan singh\trinetra-fresh
+36 verbose os Windows_NT 10.0.26200
+37 verbose node v22.18.0
+38 verbose npm  v11.5.2
+39 verbose exit 1
+40 verbose code 1
+41 error A complete log of this run can be found in: C:\Users\Ketan singh\trinetra-fresh\.npm-cache\_logs\2026-04-18T14_02_01_933Z-debug-0.log

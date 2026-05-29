@@ -1,0 +1,108 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="robotShell" x1="128" y1="96" x2="384" y2="432" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FDFEFF"/>
+      <stop offset="0.48" stop-color="#E7EDF7"/>
+      <stop offset="1" stop-color="#CBD6E7"/>
+    </linearGradient>
+    <radialGradient id="robotFace" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(256 166) rotate(90) scale(92 106)">
+      <stop stop-color="#475569"/>
+      <stop offset="1" stop-color="#0F172A"/>
+    </radialGradient>
+    <linearGradient id="robotAccent" x1="180" y1="170" x2="332" y2="170" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#67E8F9"/>
+      <stop offset="1" stop-color="#BAF7FF"/>
+    </linearGradient>
+    <filter id="robotShadow" x="48" y="48" width="416" height="416" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="12" stdDeviation="16" flood-color="#7C3AED" flood-opacity="0.18"/>
+    </filter>
+  </defs>
+
+  <style>
+    .robot-float {
+      transform-origin: 256px 238px;
+      animation: floatBody 3.4s ease-in-out infinite;
+    }
+
+    .robot-head {
+      transform-origin: 256px 168px;
+      animation: tiltHead 4.2s ease-in-out infinite;
+    }
+
+    .robot-arm-left {
+      transform-origin: 152px 308px;
+      animation: waveLeft 2.8s ease-in-out infinite;
+    }
+
+    .robot-arm-right {
+      transform-origin: 360px 312px;
+      animation: waveRight 3.1s ease-in-out infinite;
+    }
+
+    .robot-eye-left,
+    .robot-eye-right {
+      animation: blinkEyes 5.4s ease-in-out infinite;
+      transform-origin: center;
+    }
+
+    .robot-smile {
+      animation: smilePulse 3.2s ease-in-out infinite;
+      transform-origin: 256px 214px;
+    }
+
+    @keyframes floatBody {
+      0%, 100% { transform: translateY(0px); }
+      50% { transform: translateY(-10px); }
+    }
+
+    @keyframes tiltHead {
+      0%, 100% { transform: rotate(0deg); }
+      25% { transform: rotate(-4deg); }
+      75% { transform: rotate(4deg); }
+    }
+
+    @keyframes waveLeft {
+      0%, 100% { transform: rotate(10deg); }
+      50% { transform: rotate(22deg); }
+    }
+
+    @keyframes waveRight {
+      0%, 100% { transform: rotate(-10deg); }
+      50% { transform: rotate(-22deg); }
+    }
+
+    @keyframes blinkEyes {
+      0%, 44%, 48%, 100% { transform: scaleY(1); opacity: 1; }
+      46% { transform: scaleY(0.15); opacity: 0.85; }
+    }
+
+    @keyframes smilePulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.06); }
+    }
+  </style>
+
+  <g filter="url(#robotShadow)" class="robot-float">
+    <ellipse cx="256" cy="432" rx="102" ry="20" fill="#67E8F9" fill-opacity="0.12"/>
+
+    <g class="robot-head">
+      <circle cx="132" cy="174" r="40" fill="url(#robotShell)"/>
+      <circle cx="380" cy="174" r="40" fill="url(#robotShell)"/>
+      <circle cx="132" cy="174" r="26" fill="#7DD3FC" fill-opacity="0.45"/>
+      <circle cx="380" cy="174" r="26" fill="#7DD3FC" fill-opacity="0.45"/>
+
+      <rect x="118" y="70" width="276" height="206" rx="104" fill="url(#robotShell)"/>
+      <rect x="152" y="100" width="208" height="142" rx="70" fill="url(#robotFace)"/>
+
+      <circle cx="214" cy="172" r="15" fill="url(#robotAccent)" class="robot-eye-left"/>
+      <circle cx="298" cy="172" r="15" fill="url(#robotAccent)" class="robot-eye-right"/>
+      <path d="M224 214C236.5 229 275.5 229 288 214" stroke="#67E8F9" stroke-width="10" stroke-linecap="round" class="robot-smile"/>
+    </g>
+
+    <path d="M196 250H316C349.137 250 376 276.863 376 310V354C376 412.542 328.542 460 270 460H242C183.458 460 136 412.542 136 354V310C136 276.863 162.863 250 196 250Z" fill="url(#robotShell)"/>
+    <ellipse cx="256" cy="334" rx="70" ry="94" fill="#F8FBFF" fill-opacity="0.56"/>
+
+    <rect x="102" y="286" width="50" height="132" rx="25" transform="rotate(18 102 286)" fill="url(#robotShell)" class="robot-arm-left"/>
+    <rect x="360" y="302" width="50" height="132" rx="25" transform="rotate(-18 360 302)" fill="url(#robotShell)" class="robot-arm-right"/>
+  </g>
+</svg>
