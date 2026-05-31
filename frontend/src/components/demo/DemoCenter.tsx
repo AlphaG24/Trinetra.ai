@@ -32,6 +32,7 @@ export function DemoCenter({ agents }: DemoCenterProps) {
   const [minutesUsed, setMinutesUsed] = useState<number>(0)
   const [minutesLimit, setMinutesLimit] = useState<number>(20)
   const [assignedVapiAgentId, setAssignedVapiAgentId] = useState<string | null>(null)
+  const [userId, setUserId] = useState<string | null>(null)
   
   // Real Call History States
   const [demoHistory, setDemoHistory] = useState<CallLog[]>([])
@@ -44,16 +45,16 @@ export function DemoCenter({ agents }: DemoCenterProps) {
   const audioRef = useRef<HTMLAudioElement | null>(null)
 
   // Fetch demo quota
-  const fetchQuota = async () => {
+  const fetchQuota = async (activeUserId?: string) => {
     try {
-      const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user || !user.id || user.id === 'undefined' || user.id === 'null') return
+      const targetUserId = activeUserId || userId
+      if (!targetUserId || targetUserId === 'undefined' || targetUserId === 'null') return
 
+      const supabase = createClient()
       const { data, error } = await supabase
         .from('profiles')
         .select('demo_minutes_used, demo_minutes_limit, assigned_vapi_agent_id')
-        .eq('id', user.id)
+        .eq('id', targetUserId)
         .single()
 
       if (data && !error) {
@@ -67,25 +68,35 @@ export function DemoCenter({ agents }: DemoCenterProps) {
   }
 
   // Fetch Call History logs from backend
-  const fetchHistory = async () => {
+  const fetchHistory = async (activeUserId?: string) => {
     try {
       setIsLoadingHistory(true)
-      const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user || !user.id || user.id === 'undefined' || user.id === 'null') {
+      const targetUserId = activeUserId || userId
+      if (!targetUserId || targetUserId === 'undefined' || targetUserId === 'null') {
         setIsLoadingHistory(false)
         return
       }
 
-      const response = await fetch(`${FASTAPI_URL}/api/voice/history/${user.id}`)
+      const response = await fetch(`${FASTAPI_URL}/api/voice/history/${targetUserId}`)
       if (!response.ok) {
         throw new Error(`Failed to fetch history: ${response.status}`)
       }
 
       const resData = await response.json()
-      if (resData.status === 'success' && Array.isArray(resData.data)) {
-        setDemoHistory(resData.data)
+      console.log("DEBUG: Test History Data Received:", resData)
+
+      let historyList: CallLog[] = []
+      if (Array.isArray(resData)) {
+        historyList = resData
+      } else if (resData && Array.isArray(resData.data)) {
+        historyList = resData.data
+      } else if (resData && Array.isArray(resData.calls)) {
+        historyList = resData.calls
+      } else if (resData && resData.status === 'success' && Array.isArray(resData.data)) {
+        historyList = resData.data
       }
+
+      setDemoHistory(historyList)
     } catch (err) {
       console.error("Error fetching call history:", err)
     } finally {
@@ -93,12 +104,35 @@ export function DemoCenter({ agents }: DemoCenterProps) {
     }
   }
 
-  // Fetch quota and history on load
+  // Fetch quota and history on load and listen to auth changes
   useEffect(() => {
-    const fetchInitialData = async () => {
-      await Promise.all([fetchQuota(), fetchHistory()])
+    const supabase = createClient()
+    
+    // Fetch immediately
+    const checkUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user?.id) {
+        setUserId(user.id)
+        fetchQuota(user.id)
+        fetchHistory(user.id)
+      }
     }
-    fetchInitialData()
+    checkUser()
+
+    // Listen for changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user?.id) {
+        setUserId(session.user.id)
+        fetchQuota(session.user.id)
+        fetchHistory(session.user.id)
+      } else {
+        setUserId(null)
+      }
+    })
+
+    return () => {
+      subscription.unsubscribe()
+    }
   }, [])
 
   // Trigger toast warnings
