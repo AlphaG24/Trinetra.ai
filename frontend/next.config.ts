@@ -6,7 +6,7 @@ const cspHeader = `
     style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
     img-src 'self' blob: data: https://lh3.googleusercontent.com https://dashboard.retellai.com https://api.retellai.com https://*.retellai.com https://*.supabase.co;
     font-src 'self' data: https://fonts.gstatic.com;
-    connect-src 'self' http://localhost:8000 https://*.trycloudflare.com https://api.vapi.ai https://*.supabase.co wss://*.supabase.co https://formspree.io https://*.googleapis.com https://*.vapi.ai wss://*.vapi.ai https://*.daily.co wss://*.daily.co wss://*.wss.daily.co https://*.pluot.blue wss://*.pluot.blue https://dashboard.retellai.com https://api.retellai.com https://*.retellai.com wss://*.retellai.com https://raw.githubusercontent.com blob: data: stun: turn:;
+    connect-src 'self' http://localhost:8000 https://*.trycloudflare.com https://trinetra-ai-1-6f2n.onrender.com https://*.onrender.com https://api.vapi.ai https://*.supabase.co wss://*.supabase.co https://formspree.io https://*.googleapis.com https://*.vapi.ai wss://*.vapi.ai https://*.daily.co wss://*.daily.co wss://*.wss.daily.co https://*.pluot.blue wss://*.pluot.blue https://dashboard.retellai.com https://api.retellai.com https://*.retellai.com wss://*.retellai.com https://raw.githubusercontent.com blob: data: stun: turn:;
     media-src 'self' blob: https://dashboard.retellai.com https://api.retellai.com https://*.retellai.com https://storage.vapi.ai;
     worker-src 'self' blob:;
     child-src 'self' blob: https://dashboard.retellai.com https://api.retellai.com https://*.retellai.com;
