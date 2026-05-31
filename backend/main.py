@@ -18,3 +18,8 @@ app.add_middleware(
 )
 
 app.include_router(voice_router)
+
+@app.get("/")
+def read_root():
+    return {"message": "Trinetra Voice AI Backend is Active"}
+

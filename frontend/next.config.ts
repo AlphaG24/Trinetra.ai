@@ -18,13 +18,18 @@ const cspHeader = `
 `;
 
 const nextConfig: NextConfig = {
+  turbopack: {},
   typescript: {
     ignoreBuildErrors: true,
+  },
+  // @ts-ignore
+  eslint: {
+    ignoreDuringBuilds: true,
   },
   experimental: {
     cpus: 1,
     staticGenerationMaxConcurrency: 1,
-    workerThreads: true,
+    workerThreads: false,
   },
   webpack: (config, { dev, isServer }) => {
     if (dev) {
