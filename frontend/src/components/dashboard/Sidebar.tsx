@@ -23,7 +23,7 @@ interface SidebarLink {
   badge?: string
 }
 
-export function Sidebar({ agents }: { agents: SidebarAgent[] }) {
+export function Sidebar({ agents }: { agents: any[] }) {
   const pathname = usePathname()
   const { isMobileSidebarOpen, setMobileSidebarOpen } = useDashboardStore()
   

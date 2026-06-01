@@ -9,6 +9,8 @@ router = APIRouter(prefix="/api/voice", tags=["Voice Agent"])
 
 class StartDemoRequest(BaseModel):
     user_id: str
+    assigned_vapi_agent_id: str | None = None
+    user_email: str | None = None
 
 def is_valid_uuid(val: str) -> bool:
     try:
@@ -103,8 +105,15 @@ async def handle_vapi_webhook(request: Request):
         call_data = message.get('call', {})
         user_id = (
             call_data.get('assistantOverrides', {}).get('metadata', {}).get('userId') or
+            call_data.get('assistantOverrides', {}).get('variableValues', {}).get('user_id') or
             call_data.get('assistant', {}).get('metadata', {}).get('userId') or
             call_data.get('metadata', {}).get('userId')
+        )
+        user_email = (
+            call_data.get('assistantOverrides', {}).get('metadata', {}).get('userEmail') or
+            call_data.get('assistantOverrides', {}).get('variableValues', {}).get('user_email') or
+            call_data.get('assistant', {}).get('metadata', {}).get('userEmail') or
+            call_data.get('metadata', {}).get('userEmail')
         )
         
         if not user_id:
@@ -157,7 +166,9 @@ async def handle_vapi_webhook(request: Request):
                 
                 extracted_name = lead_data.get('name', "Demo User")
                 extracted_phone = lead_data.get('phone')
-                extracted_email = lead_data.get('email', "none@provided.com")
+                extracted_email = lead_data.get('email')
+                if not extracted_email or extracted_email == 'none@provided.com':
+                    extracted_email = user_email or "none@provided.com"
                 
                 # Handle boolean safely
                 raw_is_lead = lead_data.get('is_lead', False)

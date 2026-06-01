@@ -169,10 +169,15 @@ export function VoiceDemo({
         if (vapiRef.current === vapiInstance) vapiRef.current = null
       })
 
-      // 5. Start the call and pass the user ID so the webhook can save the lead
+      // 5. Start the call and pass the user ID and user email context
       await vapiInstance.start(finalAgentId, {
         metadata: {
-          userId: userId
+          userId: userId,
+          userEmail: user.email
+        },
+        variableValues: {
+          user_id: userId,
+          user_email: user.email
         }
       });
       console.log("5. Vapi Connection Request Sent Successfully!");

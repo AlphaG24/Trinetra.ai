@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { Play, Pause, FileText } from 'lucide-react'
+import { Play, Pause, FileText, Bot, FlaskConical, AlertTriangle, Loader2 } from 'lucide-react'
 import { VoiceDemo } from './VoiceDemo'
 import { TranscriptModal } from '../modals/TranscriptModal'
 import { createClient } from '@/utils/supabase/client'
@@ -248,7 +248,7 @@ export function DemoCenter({ agents }: DemoCenterProps) {
         <h1 className="text-3xl font-bold tracking-tight text-white flex items-center gap-3">
           {assignedVapiAgentId ? (
             <>
-              <span className="text-2xl">🤖</span> Your Active AI Workforce
+              <Bot className="w-6 h-6 text-violet-400 shrink-0" /> Your Active AI Workforce
               <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-500/10 text-green-400 border border-green-500/20">
                 <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
                 Status: Online
@@ -256,7 +256,7 @@ export function DemoCenter({ agents }: DemoCenterProps) {
             </>
           ) : (
             <>
-              <span className="text-2xl">🧪</span> Test Your AI Agent
+              <FlaskConical className="w-6 h-6 text-amber-400 shrink-0" /> Test Your AI Agent
             </>
           )}
         </h1>
@@ -297,7 +297,7 @@ export function DemoCenter({ agents }: DemoCenterProps) {
         <div className="relative overflow-hidden bg-gradient-to-r from-red-950/40 to-amber-950/40 border border-red-500/20 backdrop-blur-md rounded-2xl p-6 flex flex-col md:flex-row items-center justify-between gap-6 shadow-2xl animate-in slide-in-from-top duration-300">
           <div className="flex items-center gap-4 text-left">
             <div className="w-12 h-12 rounded-full bg-red-500/10 border border-red-500/20 flex items-center justify-center shrink-0">
-              <span className="text-xl">⚠️</span>
+              <AlertTriangle className="w-5 h-5 text-red-400" />
             </div>
             <div>
               <h3 className="text-lg font-bold text-white tracking-wide">Trial Complete</h3>
@@ -324,7 +324,7 @@ export function DemoCenter({ agents }: DemoCenterProps) {
       )}
 
       <VoiceDemo 
-        agentPhone="+91 80 4748 3921" 
+        agentPhone="+1 (341) 441-8499" 
         disabled={!assignedVapiAgentId && isLimitReached}
         assignedVapiAgentId={assignedVapiAgentId}
         onCallStarted={(used: number, limit: number) => {
@@ -354,7 +354,7 @@ export function DemoCenter({ agents }: DemoCenterProps) {
                 {isLoadingHistory ? (
                   <tr>
                     <td colSpan={6} className="px-6 py-12 text-center text-zinc-500 font-mono text-sm">
-                      <span className="inline-block animate-spin mr-2">⏳</span> Ingesting call logs...
+                      <Loader2 className="w-4 h-4 animate-spin mr-2 inline-block text-zinc-500" /> Ingesting call logs...
                     </td>
                   </tr>
                 ) : demoHistory.length === 0 ? (

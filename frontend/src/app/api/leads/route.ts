@@ -81,7 +81,7 @@ export async function POST(request: Request) {
 
   try {
     const supabase = await createClient();
-    const { error } = await supabase.from("leads").insert(row);
+    const { error } = await supabase.from("leads").insert(row as any);
 
     if (error) {
       if (error.code === "23505") {

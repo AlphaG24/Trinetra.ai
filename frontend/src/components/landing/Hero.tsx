@@ -7,75 +7,15 @@ import NextImage from "next/image";
 import { ChevronDown } from "lucide-react";
 
 import { VOICE_AGENT_NAME } from "@/lib/agent-branding";
-import { getConfigString, hasConfiguredValue, useSiteConfig } from "@/lib/site-content";
-import { useVapi } from "@/hooks/use-vapi";
-
-function getVoiceStatusCopy({
-  isConfigured,
-  isConnecting,
-  isConnected,
-  isSpeaking,
-  error,
-}: {
-  isConfigured: boolean;
-  isConnecting: boolean;
-  isConnected: boolean;
-  isSpeaking: boolean;
-  error: string | null;
-}) {
-  if (!isConfigured) {
-    return "";
-  }
-
-  if (error) {
-    return `We couldn't connect to ${VOICE_AGENT_NAME} right now. Please try again.`;
-  }
-
-  if (isConnecting) {
-    return `Connecting to ${VOICE_AGENT_NAME}. Browser web calls usually take 5-10 seconds.`;
-  }
-
-  if (isConnected && isSpeaking) {
-    return `${VOICE_AGENT_NAME} is speaking now. Reply naturally when it pauses.`;
-  }
-
-  if (isConnected) {
-    return `You are live with ${VOICE_AGENT_NAME} now. Start speaking naturally.`;
-  }
-
-  return "";
-}
+import { getConfigString, useSiteConfig } from "@/lib/site-content";
 
 export function Hero() {
   const { data: siteConfig } = useSiteConfig();
-  const { toggleCall, isConfigured, isConnecting, isConnected, isSpeaking, error } = useVapi();
   const demoPhoneNumber = getConfigString(siteConfig, "demo_phone_number");
-  const voiceStatusCopy = getVoiceStatusCopy({
-    isConfigured,
-    isConnecting,
-    isConnected,
-    isSpeaking,
-    error,
-  });
-  const voiceStatusTone = error
-    ? "border-[rgba(239,68,68,0.24)] bg-[rgba(127,29,29,0.22)] text-[#FCA5A5]"
-    : isConnected
-      ? "border-[rgba(16,185,129,0.24)] bg-[rgba(6,78,59,0.2)] text-[#A7F3D0]"
-      : "border-[rgba(139,92,246,0.24)] bg-[rgba(45,18,85,0.32)] text-[#FAF7FF]";
-  const shouldShowVoiceStatus = isConnecting || isConnected || Boolean(error);
+  const voiceStatusTone = "border-[rgba(139,92,246,0.24)] bg-[rgba(45,18,85,0.32)] text-[#FAF7FF]";
 
   const handleDemoClick = () => {
-    if (isConfigured) {
-      void toggleCall();
-      return;
-    }
-
-    if (hasConfiguredValue(demoPhoneNumber)) {
-      window.location.assign(`tel:${demoPhoneNumber.replace(/\s+/g, "")}`);
-      return;
-    }
-
-    window.location.assign("/contact?product=voice-agent");
+    window.location.assign("/login");
   };
 
   return (
@@ -199,28 +139,9 @@ export function Hero() {
           >
             <div className="absolute inset-0 rounded-full border border-[rgba(139,92,246,0.2)] transition-colors duration-300 group-hover:border-[#8B5CF6]" />
             <span className="mr-2 translate-y-[-1px] leading-none text-[#8B5CF6]">{">"}</span>
-            {isConfigured
-              ? isConnecting
-                ? "Connecting..."
-                : isConnected
-                  ? `End ${VOICE_AGENT_NAME} Call`
-                  : `Talk to ${VOICE_AGENT_NAME}`
-              : hasConfiguredValue(demoPhoneNumber)
-                ? "Watch Demo"
-                : "Request Demo"}
+            Talk to {VOICE_AGENT_NAME}
           </button>
         </motion.div>
-
-        {shouldShowVoiceStatus && voiceStatusCopy ? (
-          <motion.div
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.35, delay: 0.95, ease: "easeOut" }}
-            className={`mt-[18px] w-full max-w-[560px] rounded-[16px] border px-[18px] py-[14px] text-left font-sans text-[14px] leading-[1.6] ${voiceStatusTone}`}
-          >
-            {voiceStatusCopy}
-          </motion.div>
-        ) : null}
       </div>
 
       <motion.div

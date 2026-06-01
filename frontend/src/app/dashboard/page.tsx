@@ -256,7 +256,7 @@ export default function DashboardPage() {
           {userAgents.length === 0 ? (
             <div className="h-[280px] border border-dashed border-white/10 rounded-xl flex flex-col items-center justify-center p-8 text-center">
               <div className="w-12 h-12 rounded-full bg-zinc-800/50 flex items-center justify-center text-zinc-400 mb-4 border border-white/5">
-                🤖
+                <Bot className="w-6 h-6 text-zinc-400" />
               </div>
               <h3 className="text-white font-semibold text-base">No agents deployed yet</h3>
               <p className="text-zinc-400 text-sm max-w-sm mt-1 mb-6">

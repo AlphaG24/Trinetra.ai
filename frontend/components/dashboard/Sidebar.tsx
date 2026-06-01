@@ -35,7 +35,6 @@ export function Sidebar({ agents }: { agents: any[] }) {
 
   const bottomLinks = [
     { name: 'Settings', href: '/dashboard/settings', icon: Settings },
-    { name: 'Billing', href: '/dashboard/billing', icon: CreditCard },
     { name: 'Support', href: '/dashboard/support', icon: HeadphonesIcon },
   ]
 

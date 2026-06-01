@@ -314,45 +314,7 @@ export function DynamicProductPage({ slug }: { slug: string }) {
           : "Request a Demo";
 
   const handleDemoClick = (starterPrompt?: string) => {
-    const normalizedStarterPrompt = typeof starterPrompt === "string" ? starterPrompt : "";
-
-    if (isVoiceProduct && isConfigured) {
-      void toggleCall();
-      return;
-    }
-
-    if (isChatProduct && RETELL_CHAT_IS_CONFIGURED) {
-      if (chatDemoStatus === "loading") {
-        return;
-      }
-
-      if (normalizedStarterPrompt) {
-        setChatStarterPrompt(normalizedStarterPrompt);
-      } else if (chatDemoStatus !== "open") {
-        setChatStarterPrompt("");
-      }
-
-      if (chatDemoStatus === "open") {
-        toast(
-          normalizedStarterPrompt
-            ? `Try asking: ${normalizedStarterPrompt}`
-            : "The live chat window is already open."
-        );
-        return;
-      }
-
-      setChatDemoError("");
-      setChatDemoStatus("loading");
-      setChatOpenRequest((current) => current + 1);
-      return;
-    }
-
-    if (hasConfiguredValue(demoPhoneNumber)) {
-      window.location.assign(`tel:${demoPhoneNumber.replace(/\s+/g, "")}`);
-      return;
-    }
-
-    window.location.assign(`/contact?product=${product?.slug ?? slug}`);
+    window.location.assign("/login");
   };
 
   if (loading) {
@@ -453,7 +415,7 @@ export function DynamicProductPage({ slug }: { slug: string }) {
           ) : (
             <div className="flex w-full flex-col gap-[16px] sm:w-auto sm:flex-row">
               <Link
-                href={`/contact?product=${product.slug}`}
+                href="/login"
                 className="rounded-full bg-[#FBBF24] px-[32px] py-[16px] font-sans text-[16px] font-semibold text-[#080010] shadow-[0_0_30px_rgba(251,191,36,0.2)] transition-all hover:-translate-y-1 hover:bg-[#F59E0B]"
               >
                 Activate Your AI {"->"}
@@ -658,7 +620,7 @@ export function DynamicProductPage({ slug }: { slug: string }) {
             <ProductWaitlistForm slug={product.slug} />
           ) : (
             <Link
-              href={`/contact?product=${product.slug}`}
+              href="/login"
               className="rounded-full bg-[#FBBF24] px-[40px] py-[20px] font-sans text-[18px] font-bold text-[#080010] shadow-[0_0_40px_rgba(251,191,36,0.25)] transition-all hover:-translate-y-1 hover:bg-[#F59E0B]"
             >
               Activate Your AI {"->"}

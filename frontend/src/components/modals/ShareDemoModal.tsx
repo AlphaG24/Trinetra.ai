@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { X, Copy, Check, Smartphone, Mail, Link as LinkIcon } from 'lucide-react'
+import { X, Copy, Check, Smartphone, Mail, Link as LinkIcon, Bot } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 
 interface ShareDemoModalProps {
@@ -54,8 +54,8 @@ export function ShareDemoModal({ isOpen, onClose, shareToken }: ShareDemoModalPr
               {/* Preview Card */}
               <div className="p-4 bg-amber-500/5 border border-amber-500/20 rounded-xl">
                 <div className="flex items-center gap-3 mb-2">
-                  <div className="w-8 h-8 rounded-full bg-amber-500/20 flex items-center justify-center">
-                    <span className="text-lg">🤖</span>
+                  <div className="w-8 h-8 rounded-full bg-amber-500/20 flex items-center justify-center text-amber-500">
+                    <Bot className="w-4 h-4" />
                   </div>
                   <div>
                     <div className="font-semibold text-amber-500">Trinetra AI Demo</div>

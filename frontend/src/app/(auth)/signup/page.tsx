@@ -102,19 +102,6 @@ export default function SignupPage() {
           />
         </div>
 
-        {/* Floating Icons */}
-        <motion.div variants={floatAnimation} animate="animate" className="absolute top-16 left-16 xl:top-24 xl:left-24 p-4 rounded-2xl bg-white/5 backdrop-blur-md border border-white/10 shadow-[0_0_30px_rgba(245,158,11,0.2)]">
-          <PhoneCall className="w-8 h-8 text-amber-400" />
-        </motion.div>
-        
-        <motion.div variants={floatAnimation} animate="animate" style={{ animationDelay: '2s' }} className="absolute top-16 right-16 xl:top-24 xl:right-24 p-4 rounded-2xl bg-white/5 backdrop-blur-md border border-white/10 shadow-[0_0_30px_rgba(139,92,246,0.2)]">
-          <MessageSquare className="w-8 h-8 text-purple-400" />
-        </motion.div>
-
-        <motion.div variants={floatAnimation} animate="animate" style={{ animationDelay: '4s' }} className="absolute top-48 left-24 xl:top-64 xl:left-32 p-4 rounded-2xl bg-white/5 backdrop-blur-md border border-white/10 shadow-[0_0_30px_rgba(16,185,129,0.2)]">
-          <Bot className="w-8 h-8 text-emerald-400" />
-        </motion.div>
-
         <div className="relative z-10 w-full max-w-lg flex flex-col items-center text-center">
           <motion.div 
             initial={{ opacity: 0, scale: 0.8 }}

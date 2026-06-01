@@ -269,9 +269,6 @@ export function Navbar() {
           </ul>
 
           <div className="navbar__actions">
-            <Link href="/login" className="navbar__btn-login hidden" aria-hidden="true" tabIndex={-1}>
-              Login
-            </Link>
             <button
               type="button"
               onClick={handleComingSoonClick}
@@ -279,8 +276,8 @@ export function Navbar() {
             >
               Trinetra Shiksha
             </button>
-            <Link href="/contact" className="navbar__btn-deploy">
-              Deploy Agent
+            <Link href="/login" className="navbar__btn-deploy">
+              Login
             </Link>
           </div>
 
@@ -421,12 +418,12 @@ export function Navbar() {
           </button>
 
           <Link
-            href="/contact"
+            href="/login"
             className="navbar-mobile__deploy"
             style={{ transitionDelay: `${0.3 + navLinks.length * 0.1}s` }}
             onClick={() => setMenuOpen(false)}
           >
-            Deploy Agent
+            Login
           </Link>
         </nav>
       </div>

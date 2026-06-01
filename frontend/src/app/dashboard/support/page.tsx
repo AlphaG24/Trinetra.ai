@@ -1,16 +1,133 @@
-import { createClient } from '@/lib/server'
-import { redirect } from 'next/navigation'
-import { SupportPageClient } from '@/src/components/pages/SupportPageClient'
+'use client'
 
-export const metadata = {
-  title: 'Help & Support — Trinetra AI',
-  description: 'Get help, raise tickets, and contact the Trinetra AI team.',
-}
+import { useState } from 'react'
+import { Mail, MessageSquare, ChevronDown } from 'lucide-react'
 
-export default async function SupportPage() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
+const SUPPORT_EMAIL = "support@trinetraedu-ai.com";
+const WHATSAPP_NUMBER = "919452045499";
 
-  return <SupportPageClient user={user} />
+const FAQS = [
+  {
+    question: "How do I update the instructions or script for my AI agent?",
+    answer: "Currently, agent prompts and knowledge bases are managed by our engineering team to ensure high-quality conversations. Please open a Support Ticket with your requested script changes, and we will update your agent within 24 hours."
+  },
+  {
+    question: "Can the AI transfer a caller to a real human?",
+    answer: "Yes! Your agent is equipped with intelligent escalation. If a caller asks for a human, it will seamlessly transfer the call to the emergency business number you provided during onboarding."
+  },
+  {
+    question: "Where do I view the leads and appointments booked by the AI?",
+    answer: "All captured leads, call summaries, and booked appointments are automatically logged in your 'Leads' dashboard. We will also send an instant email if you have Lead Alerts enabled in Settings."
+  },
+  {
+    question: "Can I use my existing business phone number?",
+    answer: "Yes, you can port your existing business number to our platform, or we can provide you with a new local number. Contact our helpdesk to initiate a number port."
+  },
+  {
+    question: "What languages does the AI support?",
+    answer: "Our agents natively speak both English and Hindi. They can dynamically detect the caller's language and switch between them mid-conversation effortlessly."
+  }
+]
+
+export default function SupportPage() {
+  const [openIndex, setOpenIndex] = useState<number | null>(null)
+
+  const toggleFaq = (index: number) => {
+    setOpenIndex(openIndex === index ? null : index)
+  }
+
+  return (
+    <div className="space-y-12 max-w-4xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500 py-8">
+      
+      {/* Header */}
+      <div className="space-y-2 text-left">
+        <h1 className="text-3xl font-extrabold tracking-tight text-white flex items-center gap-3 font-display">
+          🎧 Help & Support
+        </h1>
+        <p className="text-violet-300/60 text-sm">
+          Get technical assistance, browse our FAQ guides, or contact support directly.
+        </p>
+      </div>
+
+      {/* Top Section: Contact Methods */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        
+        {/* Email Support */}
+        <div className="flex flex-col justify-between items-start space-y-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-violet-500/10 rounded-xl flex items-center justify-center text-violet-400 border border-violet-500/15">
+              <Mail className="w-5 h-5" />
+            </div>
+            <div>
+              <h2 className="text-lg font-bold text-white">Email Support</h2>
+              <p className="text-xs text-zinc-400">Response within 24 hours</p>
+            </div>
+          </div>
+          <button
+            onClick={() => window.open(`https://mail.google.com/mail/?view=cm&fs=1&to=${SUPPORT_EMAIL}`, '_blank')}
+            className="w-full sm:w-auto px-6 py-3 bg-violet-600 hover:bg-violet-500 text-white font-bold text-sm rounded-xl transition-all shadow-md hover:shadow-violet-500/20 active:scale-[0.98] cursor-pointer"
+          >
+            Open Support Ticket
+          </button>
+        </div>
+
+        {/* WhatsApp Support */}
+        <div className="flex flex-col justify-between items-start space-y-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-emerald-500/10 rounded-xl flex items-center justify-center text-emerald-400 border border-emerald-500/15">
+              <MessageSquare className="w-5 h-5" />
+            </div>
+            <div>
+              <h2 className="text-lg font-bold text-white">Live WhatsApp Chat</h2>
+              <p className="text-xs text-zinc-400">Instant chat assistance</p>
+            </div>
+          </div>
+          <button
+            onClick={() => window.open(`https://wa.me/${WHATSAPP_NUMBER}`, '_blank')}
+            className="w-full sm:w-auto px-6 py-3 bg-white/5 border border-white/10 hover:bg-white/10 text-zinc-200 hover:text-white font-semibold text-sm rounded-xl transition-all active:scale-[0.98] cursor-pointer"
+          >
+            Chat on WhatsApp
+          </button>
+        </div>
+
+      </div>
+
+      {/* Bottom Section: Interactive FAQ */}
+      <div className="space-y-6 pt-8 border-t border-white/5">
+        <div>
+          <h2 className="text-xl font-bold text-white">Frequently Asked Questions</h2>
+          <p className="text-xs text-violet-300/40 mt-1">Quick self-help answers for Voice AI operations.</p>
+        </div>
+
+        <div className="space-y-3">
+          {FAQS.map((faq, index) => {
+            const isOpen = openIndex === index
+            return (
+              <div 
+                key={index} 
+                className="bg-[#12101A] border border-white/5 rounded-xl overflow-hidden transition-all duration-200 hover:bg-white/[0.02]"
+              >
+                <button
+                  onClick={() => toggleFaq(index)}
+                  className="w-full px-5 py-4 flex items-center justify-between text-left font-medium text-sm text-zinc-200 hover:text-white transition-colors cursor-pointer"
+                >
+                  <span>{faq.question}</span>
+                  <ChevronDown 
+                    className={`w-4 h-4 text-zinc-400 shrink-0 transition-transform duration-200 ${isOpen ? 'rotate-180 text-violet-400' : ''}`} 
+                  />
+                </button>
+                
+                {isOpen && (
+                  <div className="px-5 pb-4 pt-1 text-xs text-zinc-400 leading-relaxed border-t border-white/5 bg-black/10 animate-in slide-in-from-top-1 duration-200">
+                    {faq.answer}
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
+    </div>
+  )
 }

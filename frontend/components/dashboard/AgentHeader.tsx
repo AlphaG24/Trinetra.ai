@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, Phone, X, Mic, Activity, Volume2, Wifi } from 'lucide-react';
 import Vapi from '@vapi-ai/web';
+import { createClient } from '@/lib/client';
 
 type AgentLike = {
     id?: string | number;
@@ -128,8 +129,24 @@ export function AgentHeader({ agent }: { agent: AgentLike }) {
 
         setCallStatus('connecting');
         try {
+            const supabase = createClient()
+            const { data: { user } } = await supabase.auth.getUser()
+
+            const metadata: any = {}
+            const variableValues: any = {}
+
+            if (user?.id) {
+                metadata.userId = user.id
+                metadata.userEmail = user.email
+                variableValues.user_id = user.id
+                variableValues.user_email = user.email
+            }
+
             console.log('Attempting vapi.start() with ID:', agent.vapi_assistant_id);
-            await vapi.start(agent.vapi_assistant_id);
+            await vapi.start(agent.vapi_assistant_id, {
+                metadata,
+                variableValues
+            });
             console.log('vapi.start() called successfully.');
         } catch (error: unknown) {
             const message = getVapiErrorMessage(error);
@@ -149,7 +166,7 @@ export function AgentHeader({ agent }: { agent: AgentLike }) {
     const handleToggleMute = () => {
         const vapi = vapiRef.current;
         if (vapi) {
-            vapi.setMuted(!vapi.muted);
+            vapi.setMuted(!vapi.isMuted());
         }
     };
 

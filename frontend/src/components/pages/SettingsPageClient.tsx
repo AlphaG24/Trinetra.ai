@@ -79,6 +79,7 @@ function ProfileTab({ user, profile }: { user: any; profile: any }) {
               value={(form as any)[f.key]}
               onChange={e => setForm(prev => ({ ...prev, [f.key]: e.target.value }))}
               placeholder={f.placeholder}
+              suppressHydrationWarning
               className="w-full px-4 py-3 bg-black/40 border border-white/10 rounded-xl text-white placeholder-white/30 text-sm focus:outline-none focus:border-amber-500/50 transition-colors"
             />
           </div>
@@ -89,6 +90,7 @@ function ProfileTab({ user, profile }: { user: any; profile: any }) {
           <select
             value={form.business_type}
             onChange={e => setForm(prev => ({ ...prev, business_type: e.target.value }))}
+            suppressHydrationWarning
             className="w-full px-4 py-3 bg-black/40 border border-white/10 rounded-xl text-white text-sm focus:outline-none focus:border-amber-500/50 appearance-none"
           >
             <option value="">Select type</option>
@@ -101,6 +103,7 @@ function ProfileTab({ user, profile }: { user: any; profile: any }) {
           <select
             value={form.language}
             onChange={e => setForm(prev => ({ ...prev, language: e.target.value }))}
+            suppressHydrationWarning
             className="w-full px-4 py-3 bg-black/40 border border-white/10 rounded-xl text-white text-sm focus:outline-none focus:border-amber-500/50 appearance-none"
           >
             {LANGUAGES.map(l => <option key={l} value={l}>{l}</option>)}
@@ -113,6 +116,7 @@ function ProfileTab({ user, profile }: { user: any; profile: any }) {
             type="text"
             value="Asia/Kolkata (IST)"
             readOnly
+            suppressHydrationWarning
             className="w-full px-4 py-3 bg-black/20 border border-white/5 rounded-xl text-white/40 text-sm cursor-not-allowed"
           />
           <p className="text-xs text-white/30">Locked to Indian Standard Time</p>
