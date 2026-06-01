@@ -3,7 +3,7 @@ import json
 import math
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
-from database import supabase
+from database import supabase, supabase_admin
 
 router = APIRouter(prefix="/api/voice", tags=["Voice Agent"])
 
@@ -24,7 +24,7 @@ async def check_limits_and_get_keys(req: StartDemoRequest):
     if not is_valid_uuid(req.user_id):
         raise HTTPException(status_code=400, detail="Invalid user_id format. Must be a valid UUID.")
         
-    user_res = supabase.table('profiles').select('demo_minutes_limit, demo_minutes_used').eq('id', req.user_id).execute()
+    user_res = supabase_admin.table('profiles').select('demo_minutes_limit, demo_minutes_used').eq('id', req.user_id).execute()
     if not user_res.data:
         raise HTTPException(status_code=404, detail="User profile not found")
         
@@ -37,7 +37,7 @@ async def check_limits_and_get_keys(req: StartDemoRequest):
     agent_id = None
     
     try:
-        config_res = supabase.table('system_config').select('config_key, config_value').in_('config_key', ['VAPI_PUBLIC_KEY', 'VAPI_AGENT_ID']).execute()
+        config_res = supabase_admin.table('system_config').select('config_key, config_value').in_('config_key', ['VAPI_PUBLIC_KEY', 'VAPI_AGENT_ID']).execute()
         config_map = {item['config_key']: item['config_value'] for item in config_res.data}
         public_key = config_map.get('VAPI_PUBLIC_KEY')
         agent_id = config_map.get('VAPI_AGENT_ID')
@@ -142,16 +142,16 @@ async def handle_vapi_webhook(request: Request):
         quota_cost = math.ceil(duration_seconds / 60) if duration_seconds > 0 else 0
         
         if user_id and is_valid_uuid(user_id):
-            # --- 2. INSERT CALL LOGS ---
+            # --- 2. INSERT CALL LOGS (BYPASSING RLS) ---
             try:
-                supabase.table("agent_call_logs").insert({
+                supabase_admin.table("agent_call_logs").insert({
                     "user_id": user_id,
                     "duration_seconds": duration_seconds,
                     "transcript": transcript,
                     "recording_url": recording_url,
                     "sentiment": sentiment
                 }).execute()
-                print("   -> [SUCCESS] Call Log saved to Supabase.", flush=True)
+                print("   -> [SUCCESS] Call Log saved to Supabase via admin.", flush=True)
             except Exception as e:
                 print(f"   -> [ERROR] Call Log Save Failed: {str(e)}", flush=True)
                 
@@ -161,23 +161,23 @@ async def handle_vapi_webhook(request: Request):
             # Pass the ENTIRE payload to our deep search function
             lead_data = deep_search_lead(payload)
             
-            if lead_data:
-                print(f"   -> [FOUND] Deep Search extracted lead: {lead_data}", flush=True)
+            if java_lead := lead_data:
+                print(f"   -> [FOUND] Deep Search extracted lead: {java_lead}", flush=True)
                 
-                extracted_name = lead_data.get('name', "Demo User")
-                extracted_phone = lead_data.get('phone')
-                extracted_email = lead_data.get('email')
+                extracted_name = java_lead.get('name', "Demo User")
+                extracted_phone = java_lead.get('phone')
+                extracted_email = java_lead.get('email')
                 if not extracted_email or extracted_email == 'none@provided.com':
                     extracted_email = user_email or "none@provided.com"
                 
                 # Handle boolean safely
-                raw_is_lead = lead_data.get('is_lead', False)
+                raw_is_lead = java_lead.get('is_lead', False)
                 is_lead = raw_is_lead is True or str(raw_is_lead).lower() == 'true'
                 
                 if extracted_phone and is_lead:
                     print(f"   -> [LEAD DETECTED] Saving phone: {extracted_phone}", flush=True)
                     try:
-                        supabase.table("leads").insert({
+                        supabase_admin.table("leads").insert({
                             "user_id": user_id,
                             "full_name": extracted_name,
                             "contact_name": extracted_name,
@@ -188,7 +188,7 @@ async def handle_vapi_webhook(request: Request):
                             "status": "new",
                             "source": "voice_demo"
                         }).execute()
-                        print("   -> [SUCCESS] Lead saved to Supabase.", flush=True)
+                        print("   -> [SUCCESS] Lead saved to Supabase via admin.", flush=True)
                     except Exception as e:
                         print(f"   -> [ERROR] Lead Save Failed: {str(e)}", flush=True)
                 else:
@@ -196,12 +196,12 @@ async def handle_vapi_webhook(request: Request):
             else:
                 print("   -> [INFO] Deep Search found NO lead data anywhere in payload.", flush=True)
 
-            # --- 4. UPDATE USER QUOTA ---
+            # --- 4. UPDATE USER QUOTA (BYPASSING RLS) ---
             try:
-                current_user = supabase.table('profiles').select('demo_minutes_used').eq('id', user_id).execute()
+                current_user = supabase_admin.table('profiles').select('demo_minutes_used').eq('id', user_id).execute()
                 if current_user.data:
                     new_usage = current_user.data[0]['demo_minutes_used'] + quota_cost
-                    supabase.table('profiles').update({"demo_minutes_used": new_usage}).eq('id', user_id).execute()
+                    supabase_admin.table('profiles').update({"demo_minutes_used": new_usage}).eq('id', user_id).execute()
                     print(f"   -> [SUCCESS] Quota updated. Used: {new_usage} mins.", flush=True)
             except Exception as e:
                 print(f"   -> [ERROR] Quota Update Failed: {str(e)}", flush=True)
@@ -214,5 +214,7 @@ async def handle_vapi_webhook(request: Request):
 async def get_user_call_history(user_id: str):
     if not is_valid_uuid(user_id):
         return {"status": "success", "data": []}
-    response = supabase.table("agent_call_logs").select("*").eq("user_id", user_id).order("created_at", desc=True).execute()
+    
+    # Query database call logs bypassing RLS restrictions while strictly isolating data matching the exact user_id
+    response = supabase_admin.table("agent_call_logs").select("*").eq("user_id", user_id).order("created_at", desc=True).execute()
     return {"status": "success", "data": response.data}
