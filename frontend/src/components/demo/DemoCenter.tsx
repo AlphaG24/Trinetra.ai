@@ -77,7 +77,7 @@ export function DemoCenter({ agents }: DemoCenterProps) {
         return
       }
 
-      const response = await fetch(`${FASTAPI_URL}/api/voice/history/${targetUserId}`)
+      const response = await fetch(`${FASTAPI_URL}/api/voice/history/${targetUserId}?cb=${Date.now()}`)
       if (!response.ok) {
         throw new Error(`Failed to fetch history: ${response.status}`)
       }
@@ -331,7 +331,12 @@ export function DemoCenter({ agents }: DemoCenterProps) {
           setMinutesUsed(used)
           setMinutesLimit(limit)
         }}
-        onCallEnded={fetchHistory}
+        onCallEnded={() => {
+          // Fetch after 3 seconds (when webhook usually completes)
+          setTimeout(() => fetchHistory(userId || undefined), 3000);
+          // Fetch again after 7 seconds as a safety fallback
+          setTimeout(() => fetchHistory(userId || undefined), 7000);
+        }}
       />
 
       {/* Recent Test History Table */}

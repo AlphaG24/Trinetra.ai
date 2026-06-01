@@ -22,7 +22,7 @@ export default async function AgentsPage() {
                     <p className="text-zinc-400 mt-2 font-light">Manage and configure your autonomous fleet.</p>
                 </div>
                 <Link
-                    href="/dashboard/marketplace"
+                    href="/dashboard/deploy"
                     className="flex items-center gap-2 px-4 py-2 bg-white text-black font-medium rounded-lg hover:bg-zinc-200 transition-colors"
                 >
                     <Plus size={18} />
@@ -84,7 +84,7 @@ export default async function AgentsPage() {
                         Your fleet is currently empty. Visit the Template Library to clone a pre-trained neural network and begin operations.
                     </p>
                     <Link
-                        href="/dashboard/marketplace"
+                        href="/dashboard/deploy"
                         className="px-6 py-3 bg-white text-black font-bold rounded-lg hover:bg-zinc-200 transition-colors flex items-center gap-2"
                     >
                         <Plus size={18} />

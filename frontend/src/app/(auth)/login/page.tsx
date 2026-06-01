@@ -61,19 +61,8 @@ export default function LoginPage() {
       }
 
       if (data.user) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('onboarding_complete')
-          .eq('id', data.user.id)
-          .single()
-
         toast.success('Successfully logged in!')
-        
-        if (profile?.onboarding_complete) {
-          router.push('/dashboard')
-        } else {
-          router.push('/dashboard/onboarding')
-        }
+        router.push('/dashboard')
       }
     } catch (err) {
       toast.error('An unexpected error occurred')
