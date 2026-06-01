@@ -7,7 +7,7 @@ import { TranscriptModal } from '../modals/TranscriptModal'
 import { createClient } from '@/utils/supabase/client'
 import { toast } from 'sonner'
 
-const FASTAPI_URL = process.env.NEXT_PUBLIC_FASTAPI_URL || "http://localhost:8000"
+const FASTAPI_URL = process.env.NEXT_PUBLIC_FASTAPI_URL || process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000"
 
 interface Agent {
   agent_type: string
@@ -77,7 +77,17 @@ export function DemoCenter({ agents }: DemoCenterProps) {
         return
       }
 
-      const response = await fetch(`${FASTAPI_URL}/api/voice/history/${targetUserId}?cb=${Date.now()}`)
+      const response = await fetch(`${FASTAPI_URL}/api/voice/history/${targetUserId}?cb=${Date.now()}`, {
+        method: 'GET',
+        cache: 'no-store',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        }
+      })
       if (!response.ok) {
         throw new Error(`Failed to fetch history: ${response.status}`)
       }
@@ -97,8 +107,9 @@ export function DemoCenter({ agents }: DemoCenterProps) {
       }
 
       setDemoHistory(historyList)
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error fetching call history:", err)
+      toast.error(`Network Error: ${err.message || "Failed to fetch logs from server."}`)
     } finally {
       setIsLoadingHistory(false)
     }

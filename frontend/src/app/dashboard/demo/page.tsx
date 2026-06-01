@@ -1,3 +1,7 @@
+export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
+export const revalidate = 0;
+
 import { createClient } from '@/lib/server'
 import { redirect } from 'next/navigation'
 import { DemoCenter } from '@/src/components/demo/DemoCenter'
