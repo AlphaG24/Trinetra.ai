@@ -385,3 +385,115 @@ async def handle_telegram_webhook(request: Request):
         print(f"[TELEGRAM WEBHOOK UNHANDLED ERROR] Webhook execution failed: {str(e)}", flush=True)
         traceback.print_exc()
         return {"status": "error", "message": "Internal server error"}
+
+
+@telegram_router.post("/vapi")
+async def handle_vapi_webhook(request: Request):
+    try:
+        payload = await request.json()
+    except Exception:
+        print("[VAPI WEBHOOK ERROR] Received non-JSON body", flush=True)
+        return {"status": "error", "message": "Invalid JSON body"}
+
+    try:
+        message = payload.get("message", {})
+        message_type = message.get("type")
+        
+        if message_type != "end-of-call-report":
+            print(f"[VAPI WEBHOOK INFO] Ignored event type: {message_type}", flush=True)
+            return {"status": "ignored", "message": "Only end-of-call-report processed"}
+
+        call = message.get("call", {})
+        assistant_id = call.get("assistantId") or message.get("assistantId")
+        if not assistant_id:
+            print("[VAPI WEBHOOK ERROR] Missing assistantId in webhook", flush=True)
+            return {"status": "ignored", "message": "Missing assistantId"}
+
+        transcript = call.get("transcript", "")
+        recording_url = call.get("recordingUrl", "")
+        duration = call.get("duration", 0)
+
+        # Database Match 1: Query the Supabase user_agents table.
+        # Select the user_id where vapi_agent_id equals the extracted assistantId.
+        try:
+            agent_res = supabase_admin.table("user_agents").select("user_id").eq("vapi_agent_id", assistant_id).execute()
+            if not agent_res.data:
+                print(f"[VAPI WEBHOOK INFO] No agent found matching vapi_agent_id: {assistant_id}", flush=True)
+                return {"status": "success", "message": f"No agent matching vapi_agent_id {assistant_id} found"}
+            
+            user_id = agent_res.data[0].get("user_id")
+            if not user_id:
+                print(f"[VAPI WEBHOOK ERROR] user_id is null for agent with vapi_agent_id: {assistant_id}", flush=True)
+                return {"status": "success", "message": "user_id mapping is empty"}
+        except Exception as db_err:
+            print(f"[VAPI WEBHOOK DATABASE ERROR] Supabase user_agents lookup failed: {str(db_err)}", flush=True)
+            traceback.print_exc()
+            return {"status": "success", "message": "Internal query database failure"}
+
+        # Database Match 2: Query the Supabase profiles table using user_id to retrieve telegram_chat_id
+        telegram_chat_id = None
+        try:
+            profile_res = supabase_admin.table("profiles").select("telegram_chat_id").eq("id", user_id).execute()
+            if profile_res.data:
+                telegram_chat_id = profile_res.data[0].get("telegram_chat_id")
+        except Exception as db_err2:
+            print(f"[VAPI WEBHOOK DATABASE ERROR] Supabase profiles lookup failed: {str(db_err2)}", flush=True)
+            traceback.print_exc()
+            # Don't fail the webhook, continue to logging the call even if profiles query failed
+
+        # Save Data: Insert a new row into the agent_call_logs table
+        try:
+            supabase_admin.table("agent_call_logs").insert({
+                "user_id": user_id,
+                "duration_seconds": int(duration) if duration is not None else 0,
+                "transcript": transcript,
+                "recording_url": recording_url,
+                "sentiment": "Neutral"
+            }).execute()
+            print(f"[VAPI WEBHOOK SUCCESS] Call log saved for User {user_id}", flush=True)
+        except Exception as insert_err:
+            print(f"[VAPI WEBHOOK DATABASE ERROR] Saving call logs failed: {str(insert_err)}", flush=True)
+            traceback.print_exc()
+
+        # Send Alert: If a telegram_chat_id exists, format message and send POST to Telegram API
+        if telegram_chat_id:
+            bot_token = os.getenv("TELEGRAM_BOT_TOKEN")
+            if bot_token:
+                minutes = int(duration) // 60
+                seconds = int(duration) % 60
+                duration_str = f"{minutes}m {seconds}s" if minutes > 0 else f"{seconds}s"
+                
+                snippet = transcript[:300] + "..." if transcript and len(transcript) > 300 else (transcript or "No transcript available.")
+                
+                telegram_message = (
+                    f"📞 *Call Completed!*\n\n"
+                    f"⏱ *Duration:* {duration_str}\n"
+                    f"📝 *Transcript Preview:*\n{snippet}"
+                )
+                
+                telegram_url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+                telegram_payload = {
+                    "chat_id": telegram_chat_id,
+                    "text": telegram_message,
+                    "parse_mode": "Markdown"
+                }
+
+                try:
+                    async with httpx.AsyncClient() as client:
+                        res = await client.post(telegram_url, json=telegram_payload, timeout=10.0)
+                        if res.status_code == 200:
+                            print(f"[VAPI WEBHOOK SUCCESS] Alert sent to Chat ID {telegram_chat_id}", flush=True)
+                        else:
+                            print(f"[VAPI WEBHOOK ERROR] Telegram API returned code {res.status_code}: {res.text}", flush=True)
+                except Exception as tg_err:
+                    print(f"[VAPI WEBHOOK ERROR] Failed to send Telegram alert: {str(tg_err)}", flush=True)
+                    traceback.print_exc()
+            else:
+                print("[VAPI WEBHOOK ERROR] TELEGRAM_BOT_TOKEN environment variable not set", flush=True)
+
+        return {"status": "success", "message": "Webhook processed successfully"}
+
+    except Exception as e:
+        print(f"[VAPI WEBHOOK UNHANDLED ERROR] Webhook execution failed: {str(e)}", flush=True)
+        traceback.print_exc()
+        return {"status": "error", "message": "Internal server error acknowledged"}

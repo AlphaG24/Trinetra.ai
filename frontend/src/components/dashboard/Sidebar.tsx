@@ -23,21 +23,30 @@ interface SidebarLink {
   badge?: string
 }
 
-export function Sidebar({ agents }: { agents: any[] }) {
+export function Sidebar({ agents: propAgents }: { agents?: any[] }) {
   const pathname = usePathname()
-  const { isMobileSidebarOpen, setMobileSidebarOpen } = useDashboardStore()
+  const { isMobileSidebarOpen, setMobileSidebarOpen, agents: storeAgents } = useDashboardStore()
   
+  const agents = propAgents || storeAgents || []
   const hasVoice = hasAgentType(agents, 'voice')
   const hasChat = hasAgentType(agents, 'chat')
   const hasWhatsApp = hasAgentType(agents, 'whatsapp')
 
+  const showDemo = !agents || agents.length === 0
+
   const topLinks: SidebarLink[] = [
     { name: 'Overview', href: '/dashboard', icon: Home },
-    { name: 'Demo', href: '/dashboard/demo', icon: FlaskConical, badge: 'NEW' },
+  ]
+
+  if (showDemo) {
+    topLinks.push({ name: 'Demo', href: '/dashboard/demo', icon: FlaskConical, badge: 'NEW' })
+  }
+
+  topLinks.push(
     { name: 'Agents', href: '/dashboard/agents', icon: Bot },
     { name: 'Leads', href: '/dashboard/leads', icon: Target },
     { name: 'Analytics', href: '/dashboard/analytics', icon: BarChart3 },
-  ]
+  )
 
   const channelLinks: SidebarLink[] = []
   if (hasVoice) channelLinks.push({ name: 'Voice Calls', href: '/dashboard/calls', icon: Phone })

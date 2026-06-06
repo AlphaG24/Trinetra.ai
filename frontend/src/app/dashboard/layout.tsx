@@ -24,11 +24,11 @@ export default async function DashboardLayout({
   ] = await Promise.all([
     supabase.from('profiles').select('*').eq('id', user.id).single(),
     supabase.from('subscriptions').select('*, plan:plans(*)').eq('user_id', user.id).single(),
-    supabase.from('agents').select('*').eq('user_id', user.id)
+    supabase.from('user_agents').select('*').eq('user_id', user.id)
   ])
 
   return (
-    <DashboardInitializer profile={profile} plan={subscription?.plan}>
+    <DashboardInitializer profile={profile} plan={subscription?.plan} agents={agents || []}>
       <div className="flex h-screen bg-[#080810] text-white overflow-hidden">
         <Topbar user={user} profile={profile} plan={subscription?.plan} />
         <Sidebar agents={agents || []} />

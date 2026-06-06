@@ -19,10 +19,15 @@ export default async function DemoPage() {
     redirect('/login')
   }
 
-  const { data: agents } = await supabase
-    .from('agents')
-    .select('*')
+  // Highly efficient check for deployed agents
+  const { count } = await supabase
+    .from('user_agents')
+    .select('id', { count: 'exact', head: true })
     .eq('user_id', user.id)
 
-  return <DemoCenter agents={agents || []} />
+  if (count && count > 0) {
+    redirect('/dashboard')
+  }
+
+  return <DemoCenter agents={[]} />
 }

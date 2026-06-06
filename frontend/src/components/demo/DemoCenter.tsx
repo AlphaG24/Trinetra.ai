@@ -76,6 +76,8 @@ export function DemoCenter({ agents }: DemoCenterProps) {
         setIsLoadingHistory(false)
         return
       }
+      
+      console.log("DEBUG: fetchHistory calling URL:", `${FASTAPI_URL}/api/voice/history/${targetUserId}`);
 
       const response = await fetch(`${FASTAPI_URL}/api/voice/history/${targetUserId}?cb=${Date.now()}`, {
         method: 'GET',
