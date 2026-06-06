@@ -5,6 +5,7 @@ import os
 import httpx
 import traceback
 from datetime import datetime
+from typing import Dict, Any
 from fastapi import APIRouter, HTTPException, Request, BackgroundTasks
 from pydantic import BaseModel
 from database import supabase, supabase_admin
@@ -15,12 +16,14 @@ router = APIRouter(prefix="/api/voice", tags=["Voice Agent"])
 # Initialize Gemini Client
 genai_client = genai.Client()
 
-class LeadExtraction(BaseModel):
+class KeyValuePair(BaseModel):
+    key: str
+    value: str
+
+class DynamicLeadExtraction(BaseModel):
     is_lead: bool
-    contact_name: str | None
-    contact_phone: str | None
-    service_requested: str | None
     intent_summary: str
+    extracted_data: list[KeyValuePair]
 
 def send_telegram_notification(phone: str, duration: int, sentiment: str, transcript: str, chat_id: str | None = None):
     bot_token = os.getenv("TELEGRAM_BOT_TOKEN")
@@ -434,6 +437,14 @@ async def handle_vapi_webhook(request: Request):
         recording_url = call.get("recordingUrl", "")
         duration = call.get("duration", 0)
 
+        customer_phone = (
+            call.get("customer", {}).get("number") or
+            call.get("customer", {}).get("phone") or
+            call.get("customerPhone") or
+            message.get("customer", {}).get("number") or
+            "Unknown"
+        )
+
         # Database Match 1: Query the Supabase user_agents table.
         # Select the user_id where vapi_agent_id equals the extracted assistantId.
         try:
@@ -482,26 +493,23 @@ async def handle_vapi_webhook(request: Request):
                 print("[VAPI WEBHOOK] Starting Gemini Deep Native Lead Extraction...", flush=True)
                 response = genai_client.models.generate_content(
                     model='gemini-2.5-flash',
-                    contents=f"Analyze this transcript (which may contain mixed Hindi/English) to find booking intent, name, phone number (often spoken digit-by-digit), and requested service. If the user wants to book or request a service, set is_lead = true. \n\nTranscript: {transcript}",
+                    contents=f"Analyze this transcript (which may contain mixed Hindi/English) to find booking intent, name, phone number (often spoken digit-by-digit), and requested service. Act as an unconstrained key-value extractor. Look for core data (name, phone number) but also dynamically capture any industry-specific variables mentioned in the transcript (e.g., budget, preferences, service types, timeline) and place them inside the extracted_data dictionary. If the user wants to book or request a service, set is_lead = true. \n\nTranscript: {transcript}",
                     config=genai.types.GenerateContentConfig(
                         response_mime_type="application/json",
-                        response_schema=LeadExtraction,
+                        response_schema=DynamicLeadExtraction,
                     ),
                 )
                 extracted = response.parsed
                 print(f"[VAPI WEBHOOK] Gemini extraction result: {extracted}", flush=True)
                 
-                if extracted and extracted.is_lead and extracted.contact_phone:
+                if extracted and extracted.is_lead:
                     print(f"[VAPI WEBHOOK] Hot Lead detected! Saving to appointments table...", flush=True)
                     # Insert into appointments table
                     scheduled_at = datetime.utcnow().isoformat() + "Z"
                     
                     supabase_admin.table("appointments").insert({
                         "user_id": user_id,
-                        "contact_name": extracted.contact_name or "Customer",
-                        "contact_phone": extracted.contact_phone,
-                        "notes": extracted.intent_summary,
-                        "meeting_type": extracted.service_requested,
+                        "extracted_data": extracted.extracted_data,
                         "booked_via": "voice",
                         "scheduled_at": scheduled_at,
                         "status": "pending"
@@ -513,12 +521,11 @@ async def handle_vapi_webhook(request: Request):
                     if telegram_chat_id:
                         bot_token = os.getenv("TELEGRAM_BOT_TOKEN")
                         if bot_token:
+                            dynamic_vars = "\n".join([f"🔹 **{k.replace('_', ' ').title()}:** {v}" for k, v in extracted.extracted_data.items()])
                             hot_lead_message = (
-                                f"🚨 *HOT LEAD CAPTURED!* 🚨\n"
-                                f"👤 *Name:* {extracted.contact_name or 'Customer'}\n"
-                                f"📞 *Phone:* {extracted.contact_phone}\n"
-                                f"💼 *Service:* {extracted.service_requested or 'Not specified'}\n"
-                                f"📝 *Notes:* {extracted.intent_summary}"
+                                f"🚨 **HOT LEAD CAPTURED!** 🚨\n"
+                                f"{dynamic_vars}\n"
+                                f"📝 **Summary:** {extracted.intent_summary}"
                             )
                             
                             telegram_url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
@@ -537,7 +544,7 @@ async def handle_vapi_webhook(request: Request):
                         else:
                             print("[VAPI WEBHOOK ERROR] TELEGRAM_BOT_TOKEN not configured for Hot Lead alert", flush=True)
                 else:
-                    print("[VAPI WEBHOOK] Transcript was not identified as a Hot Lead or contact_phone is missing.", flush=True)
+                    print("[VAPI WEBHOOK] Transcript was not identified as a Hot Lead.", flush=True)
         except Exception as lead_err:
             print(f"[VAPI WEBHOOK ERROR] Deep Native Lead Extraction failed: {str(lead_err)}", flush=True)
             traceback.print_exc()
@@ -550,12 +557,13 @@ async def handle_vapi_webhook(request: Request):
                 seconds = int(duration) % 60
                 duration_str = f"{minutes}m {seconds}s" if minutes > 0 else f"{seconds}s"
                 
-                snippet = transcript[:300] + "..." if transcript and len(transcript) > 300 else (transcript or "No transcript available.")
+                snippet = transcript[:250] + "..." if transcript and len(transcript) > 250 else (transcript or "No transcript available.")
                 
                 telegram_message = (
-                    f"📞 *Call Completed!*\n\n"
-                    f"⏱ *Duration:* {duration_str}\n"
-                    f"📝 *Transcript Preview:*\n{snippet}"
+                    f"📞 **New AI Call Log**\n"
+                    f"📱 **Phone:** {customer_phone}\n"
+                    f"⏱️ **Duration:** {duration_str}\n"
+                    f"📝 **Transcript Preview:** {snippet}"
                 )
                 
                 telegram_url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
