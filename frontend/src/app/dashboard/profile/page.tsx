@@ -19,6 +19,7 @@ import {
   Clock, 
   Languages
 } from 'lucide-react'
+import TelegramConnectionCard from '@/src/components/dashboard/TelegramConnectionCard'
 
 const INDUSTRIES = [
   'Clinic / Hospital',
@@ -50,7 +51,8 @@ export default function ProfilePage() {
     city: '',
     state: '',
     preferred_language: 'en',
-    timezone: 'Asia/Kolkata'
+    timezone: 'Asia/Kolkata',
+    telegram_chat_id: ''
   })
 
   const supabase = createClient()
@@ -71,7 +73,7 @@ export default function ProfilePage() {
 
         const { data: dbProfile, error: profileError } = await supabase
           .from('profiles')
-          .select('full_name, email, company_name, business_type, avatar_url, phone, city, state, preferred_language, timezone')
+          .select('full_name, email, company_name, business_type, avatar_url, phone, city, state, preferred_language, timezone, telegram_chat_id')
           .eq('id', user.id)
           .single()
 
@@ -87,7 +89,8 @@ export default function ProfilePage() {
             city: '',
             state: '',
             preferred_language: 'en',
-            timezone: 'Asia/Kolkata'
+            timezone: 'Asia/Kolkata',
+            telegram_chat_id: ''
           }
           setProfileState(fallback)
           setProfile(fallback as any)
@@ -103,7 +106,8 @@ export default function ProfilePage() {
             city: dbProfile.city || '',
             state: dbProfile.state || '',
             preferred_language: dbProfile.preferred_language || 'en',
-            timezone: dbProfile.timezone || 'Asia/Kolkata'
+            timezone: dbProfile.timezone || 'Asia/Kolkata',
+            telegram_chat_id: dbProfile.telegram_chat_id || ''
           }
           setProfileState(loaded)
           setProfile(loaded as any)
@@ -385,7 +389,7 @@ export default function ProfilePage() {
         </div>
 
         {/* Section 3: Localization & Region */}
-        <div className="space-y-6 pb-8">
+        <div className="space-y-6 pb-8 mb-8 border-b border-white/10">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-violet-500/10 rounded-xl text-violet-400">
               <Globe className="w-5 h-5" />
@@ -479,6 +483,9 @@ export default function ProfilePage() {
             </div>
           </div>
         </div>
+
+        {/* Section 4: Telegram Notification Alerts Config */}
+        <TelegramConnectionCard />
 
         {/* Actions Footer */}
         <div className="pt-6 border-t border-white/5 flex items-center justify-end">

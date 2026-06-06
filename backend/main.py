@@ -4,7 +4,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from voice_router import router as voice_router
+from voice_router import router as voice_router, telegram_router
 
 app = FastAPI(title="Trinetra API")
 
@@ -18,6 +18,7 @@ app.add_middleware(
 )
 
 app.include_router(voice_router)
+app.include_router(telegram_router)
 
 @app.get("/")
 def read_root():

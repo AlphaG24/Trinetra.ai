@@ -283,3 +283,105 @@ async def get_user_call_history(user_id: str):
     # Query database call logs bypassing RLS restrictions while strictly isolating data matching the exact user_id
     response = supabase_admin.table("agent_call_logs").select("*").eq("user_id", user_id).order("created_at", desc=True).execute()
     return {"status": "success", "data": response.data}
+
+
+# --- TELEGRAM BOT WEBHOOK ROUTER ---
+
+telegram_router = APIRouter(prefix="/api/v1/webhooks", tags=["Telegram Webhook"])
+
+def is_valid_uuid4(val: str) -> bool:
+    try:
+        u = uuid.UUID(str(val))
+        return u.version == 4
+    except ValueError:
+        return False
+
+@telegram_router.post("/telegram")
+async def handle_telegram_webhook(request: Request):
+    try:
+        payload = await request.json()
+    except Exception:
+        print("[TELEGRAM WEBHOOK ERROR] Received non-JSON body", flush=True)
+        return {"status": "error", "message": "Invalid JSON body"}
+
+    try:
+        message = payload.get("message")
+        if not message:
+            print("[TELEGRAM WEBHOOK INFO] Payload missing message key", flush=True)
+            return {"status": "ignored", "message": "No message in update"}
+
+        text = message.get("text")
+        chat = message.get("chat")
+        if not text or not chat:
+            print("[TELEGRAM WEBHOOK INFO] Message missing text or chat key", flush=True)
+            return {"status": "ignored", "message": "Message text or chat missing"}
+
+        chat_id = chat.get("id")
+        if chat_id is None:
+            print("[TELEGRAM WEBHOOK INFO] Chat missing id key", flush=True)
+            return {"status": "ignored", "message": "Chat ID missing"}
+
+        # Command matching: check if message.text starts with /start 
+        if not text.startswith("/start "):
+            print(f"[TELEGRAM WEBHOOK INFO] Text does not start with /start : '{text}'", flush=True)
+            return {"status": "ignored", "message": "Not a start deep link command"}
+
+        # Extract parameter following /start 
+        uuid_candidate = text[len("/start "):].strip()
+
+        # Validate UUID version 4
+        if not is_valid_uuid4(uuid_candidate):
+            print(f"[TELEGRAM WEBHOOK ERROR] Parameter '{uuid_candidate}' is not a valid UUIDv4", flush=True)
+            return {"status": "error", "message": "Invalid UUID version 4"}
+
+        chat_id_str = str(chat_id)
+        print(f"[TELEGRAM WEBHOOK INFO] Processing start deep link for User {uuid_candidate} with Chat ID {chat_id_str}", flush=True)
+
+        # Database Update: Update profiles where id matches UUID
+        # Set telegram_chat_id = chat_id_str, onboarding_complete = True
+        try:
+            db_res = supabase_admin.table("profiles").update({
+                "telegram_chat_id": chat_id_str,
+                "onboarding_complete": True
+            }).eq("id", uuid_candidate).execute()
+
+            if not db_res.data:
+                print(f"[TELEGRAM WEBHOOK ERROR] Profile with ID {uuid_candidate} not found in database", flush=True)
+                return {"status": "error", "message": "User profile not found"}
+
+            print(f"[TELEGRAM WEBHOOK SUCCESS] Database updated for User {uuid_candidate}", flush=True)
+        except Exception as db_err:
+            print(f"[TELEGRAM WEBHOOK DATABASE ERROR] Supabase update failed: {str(db_err)}", flush=True)
+            traceback.print_exc()
+            return {"status": "error", "message": "Database update failed"}
+
+        # User Telegram Confirmation: Asynchronous POST message to Telegram bot API
+        bot_token = os.getenv("TELEGRAM_BOT_TOKEN")
+        if not bot_token:
+            print("[TELEGRAM WEBHOOK ERROR] TELEGRAM_BOT_TOKEN environment variable not set", flush=True)
+            # Still return success to Telegram
+            return {"status": "success", "message": "Database updated but bot token missing"}
+
+        telegram_url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+        telegram_payload = {
+            "chat_id": chat_id,
+            "text": "🚀 Connection successful! Your account is now linked. You will receive real-time voice agent call transcripts directly in this chat."
+        }
+
+        try:
+            async with httpx.AsyncClient() as client:
+                res = await client.post(telegram_url, json=telegram_payload, timeout=10.0)
+                if res.status_code == 200:
+                    print(f"[TELEGRAM WEBHOOK SUCCESS] Confirmation message sent to Chat ID {chat_id_str}", flush=True)
+                else:
+                    print(f"[TELEGRAM WEBHOOK ERROR] Telegram API returned code {res.status_code}: {res.text}", flush=True)
+        except Exception as tg_err:
+            print(f"[TELEGRAM WEBHOOK ERROR] Failed to send Telegram message: {str(tg_err)}", flush=True)
+            traceback.print_exc()
+
+        return {"status": "success", "message": "Connection verified and database updated"}
+
+    except Exception as e:
+        print(f"[TELEGRAM WEBHOOK UNHANDLED ERROR] Webhook execution failed: {str(e)}", flush=True)
+        traceback.print_exc()
+        return {"status": "error", "message": "Internal server error"}
