@@ -25,43 +25,74 @@ class DynamicLeadExtraction(BaseModel):
     intent_summary: str
     extracted_data: list[KeyValuePair]
 
-def send_telegram_notification(phone: str, duration: int, sentiment: str, transcript: str, chat_id: str | None = None):
+def send_telegram_notification(
+    phone: str,
+    duration: int,
+    sentiment: str,
+    transcript: str,
+    chat_id: str | None = None,
+    is_lead: bool = False,
+    intent_summary: str = "",
+    extracted_data: list[dict] | None = None,
+):
     bot_token = os.getenv("TELEGRAM_BOT_TOKEN")
 
     if not bot_token or not chat_id:
         print("Skipping Telegram alert: No chat ID configured or Demo call", flush=True)
         return
 
-    # Format duration
+    url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+
+    # --- Message 1: Call Log Summary ---
     minutes = duration // 60
     seconds = duration % 60
     duration_str = f"{minutes}m {seconds}s" if minutes > 0 else f"{seconds}s"
 
-    # Truncate transcript to respect Telegram's 4096 character limit
+    # Truncate transcript preview to stay within Telegram's 4096 char limit
     safe_transcript = transcript[:3500] + "..." if transcript and len(transcript) > 3500 else (transcript or "No transcript available.")
 
-    message = f"🚨 *New AI Call Log*\n\n" \
-              f"📞 *Phone:* `{phone}`\n" \
-              f"⏱ *Duration:* {duration_str}\n" \
-              f"🧠 *Sentiment:* {sentiment}\n\n" \
-              f"📝 *Transcript:*\n{safe_transcript}"
-
-    url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
-    payload = {
-        "chat_id": chat_id,
-        "text": message,
-        "parse_mode": "Markdown"
-    }
+    summary_message = (
+        f"🚨 *New AI Call Log*\n\n"
+        f"📞 *Phone:* `{phone}`\n"
+        f"⏱ *Duration:* {duration_str}\n"
+        f"🧠 *Sentiment:* {sentiment}\n\n"
+        f"📝 *Transcript:*\n{safe_transcript}"
+    )
 
     try:
-        response = httpx.post(url, json=payload, timeout=10.0)
+        response = httpx.post(url, json={"chat_id": chat_id, "text": summary_message, "parse_mode": "Markdown"}, timeout=10.0)
         if response.status_code == 200:
-            print(f"[TELEGRAM SUCCESS] Notification sent for {phone}", flush=True)
+            print(f"[TELEGRAM SUCCESS] Call log summary sent for {phone}", flush=True)
         else:
-            print(f"[TELEGRAM ERROR] API rejected request: {response.text}", flush=True)
+            print(f"[TELEGRAM ERROR] Call log summary rejected: {response.text}", flush=True)
     except Exception as e:
-        print(f"[TELEGRAM ERROR] Network failure: {str(e)}", flush=True)
+        print(f"[TELEGRAM ERROR] Call log summary network failure: {str(e)}", flush=True)
         traceback.print_exc()
+
+    # --- Message 2: Hot Lead Siren (only if is_lead) ---
+    if is_lead:
+        dynamic_vars = ""
+        if extracted_data:
+            dynamic_vars = "\n".join([
+                f"🔹 *{kv.get('key', '').replace('_', ' ').title()}:* {kv.get('value', '')}"
+                for kv in extracted_data
+            ])
+
+        hot_lead_message = (
+            f"🚨🔥 *HOT LEAD CAPTURED!* 🔥🚨\n\n"
+            f"{dynamic_vars}\n\n"
+            f"📝 *Intent Summary:* {intent_summary}"
+        )
+
+        try:
+            response = httpx.post(url, json={"chat_id": chat_id, "text": hot_lead_message, "parse_mode": "Markdown"}, timeout=10.0)
+            if response.status_code == 200:
+                print(f"[TELEGRAM SUCCESS] Hot Lead Siren sent for {phone}", flush=True)
+            else:
+                print(f"[TELEGRAM ERROR] Hot Lead Siren rejected: {response.text}", flush=True)
+        except Exception as e:
+            print(f"[TELEGRAM ERROR] Hot Lead Siren network failure: {str(e)}", flush=True)
+            traceback.print_exc()
 
 class StartDemoRequest(BaseModel):
     user_id: str
@@ -222,7 +253,7 @@ async def handle_vapi_webhook(request: Request, background_tasks: BackgroundTask
             except Exception as db_err:
                 print(f"   -> [ERROR] Profiles lookup for telegram_chat_id failed: {str(db_err)}", flush=True)
 
-            # --- 2.5 TRIGGER BACKGROUND TELEGRAM NOTIFICATION TASK ---
+            # --- 2.5 EXTRACT CUSTOMER PHONE & LEAD DATA ---
             lead_data = deep_search_lead(payload)
             customer_phone = (
                 call_data.get('customer', {}).get('number') or 
@@ -233,22 +264,14 @@ async def handle_vapi_webhook(request: Request, background_tasks: BackgroundTask
                 "Unknown"
             )
             duration = duration_seconds
-            
-            try:
-                background_tasks.add_task(
-                    send_telegram_notification,
-                    customer_phone,
-                    duration,
-                    sentiment,
-                    transcript,
-                    telegram_chat_id
-                )
-                print(f"   -> [SUCCESS] Enqueued background Telegram notification for {customer_phone}", flush=True)
-            except Exception as e:
-                print(f"   -> [ERROR] Failed to queue background Telegram notification: {str(e)}", flush=True)
                 
             # --- 3. DEEP NATIVE LEAD EXTRACTION ---
             print("--- RUNNING DEEP NATIVE LEAD EXTRACTION ---", flush=True)
+            
+            # These will be populated by extraction and passed to the notification
+            extraction_is_lead = False
+            extraction_intent_summary = ""
+            extraction_data_dicts: list[dict] = []
             
             if java_lead := lead_data:
                 print(f"   -> [FOUND] Deep Search extracted lead: {java_lead}", flush=True)
@@ -262,6 +285,16 @@ async def handle_vapi_webhook(request: Request, background_tasks: BackgroundTask
                 # Handle boolean safely
                 raw_is_lead = java_lead.get('is_lead', False)
                 is_lead = raw_is_lead is True or str(raw_is_lead).lower() == 'true'
+                extraction_is_lead = is_lead
+                extraction_intent_summary = java_lead.get('intent_summary', '')
+                
+                # Serialize extracted_data for notification if present
+                raw_extracted = java_lead.get('extracted_data', [])
+                if isinstance(raw_extracted, list):
+                    extraction_data_dicts = [
+                        kv if isinstance(kv, dict) else {"key": str(kv), "value": ""}
+                        for kv in raw_extracted
+                    ]
                 
                 if extracted_phone and is_lead:
                     print(f"   -> [LEAD DETECTED] Saving phone: {extracted_phone}", flush=True)
@@ -284,6 +317,23 @@ async def handle_vapi_webhook(request: Request, background_tasks: BackgroundTask
                     print("   -> [INFO] is_lead was false or phone was missing.", flush=True)
             else:
                 print("   -> [INFO] Deep Search found NO lead data anywhere in payload.", flush=True)
+
+            # --- 3.5 TRIGGER BACKGROUND TELEGRAM NOTIFICATION (AFTER EXTRACTION) ---
+            try:
+                background_tasks.add_task(
+                    send_telegram_notification,
+                    customer_phone,
+                    duration,
+                    sentiment,
+                    transcript,
+                    telegram_chat_id,
+                    extraction_is_lead,
+                    extraction_intent_summary,
+                    extraction_data_dicts,
+                )
+                print(f"   -> [SUCCESS] Enqueued background Telegram notification for {customer_phone} (is_lead={extraction_is_lead})", flush=True)
+            except Exception as e:
+                print(f"   -> [ERROR] Failed to queue background Telegram notification: {str(e)}", flush=True)
 
             # --- 4. UPDATE USER QUOTA (BYPASSING RLS) ---
             try:
