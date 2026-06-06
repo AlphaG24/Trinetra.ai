@@ -50,8 +50,11 @@ Trinetra.ai Team
 """
         msg.set_content(email_body)
         
-        # Connect to Gmail SMTP
-        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+        # Connect to Gmail SMTP via STARTTLS on port 587
+        with smtplib.SMTP("smtp.gmail.com", 587) as server:
+            server.ehlo()
+            server.starttls()  # Secure the connection
+            server.ehlo()
             server.login(smtp_email, smtp_password)
             server.send_message(msg)
             
