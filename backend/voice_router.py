@@ -1,66 +1,53 @@
 import uuid
 import json
 import math
-import smtplib
-from email.message import EmailMessage
 import os
+import httpx
+import traceback
 from fastapi import APIRouter, HTTPException, Request, BackgroundTasks
 from pydantic import BaseModel
 from database import supabase, supabase_admin
 
 router = APIRouter(prefix="/api/voice", tags=["Voice Agent"])
 
-def send_call_summary_email(to_email: str, phone: str, duration: int, sentiment: str, transcript: str):
-    smtp_email = os.getenv("SMTP_EMAIL")
-    smtp_password = os.getenv("SMTP_PASSWORD")
-    
-    if not smtp_email or not smtp_password:
-        print("[EMAIL ERROR] SMTP_EMAIL or SMTP_PASSWORD environment variable is not set.", flush=True)
+def send_telegram_notification(phone: str, duration: int, sentiment: str, transcript: str):
+    bot_token = os.getenv("TELEGRAM_BOT_TOKEN")
+    chat_id = os.getenv("TELEGRAM_CHAT_ID")
+
+    if not bot_token or not chat_id:
+        print("[TELEGRAM ERROR] Missing TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID variables.", flush=True)
         return
-        
-    if not to_email:
-        print("[EMAIL ERROR] Recipient email is empty or invalid.", flush=True)
-        return
+
+    # Format duration
+    minutes = duration // 60
+    seconds = duration % 60
+    duration_str = f"{minutes}m {seconds}s" if minutes > 0 else f"{seconds}s"
+
+    # Truncate transcript to respect Telegram's 4096 character limit
+    safe_transcript = transcript[:3500] + "..." if transcript and len(transcript) > 3500 else (transcript or "No transcript available.")
+
+    message = f"🚨 *New AI Call Log*\n\n" \
+              f"📞 *Phone:* `{phone}`\n" \
+              f"⏱ *Duration:* {duration_str}\n" \
+              f"🧠 *Sentiment:* {sentiment}\n\n" \
+              f"📝 *Transcript:*\n{safe_transcript}"
+
+    url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+    payload = {
+        "chat_id": chat_id,
+        "text": message,
+        "parse_mode": "Markdown"
+    }
 
     try:
-        msg = EmailMessage()
-        msg["Subject"] = f"Trinetra.ai Call Summary - Phone: {phone}"
-        msg["From"] = smtp_email
-        msg["To"] = to_email
-        
-        # Format duration as minutes and seconds
-        minutes = duration // 60
-        seconds = duration % 60
-        duration_str = f"{minutes}m {seconds}s" if minutes > 0 else f"{seconds}s"
-        
-        email_body = f"""Hello,
-
-Here is the summary of the call received on your assistant:
-
---- CALL DETAILS ---
-Customer Phone: {phone}
-Duration: {duration_str}
-Sentiment: {sentiment}
-
---- CALL TRANSCRIPT ---
-{transcript if transcript else 'No transcript available.'}
-
-Best regards,
-Trinetra.ai Team
-"""
-        msg.set_content(email_body)
-        
-        # Connect to Gmail SMTP via STARTTLS on port 587
-        with smtplib.SMTP("smtp.gmail.com", 587) as server:
-            server.ehlo()
-            server.starttls()  # Secure the connection
-            server.ehlo()
-            server.login(smtp_email, smtp_password)
-            server.send_message(msg)
-            
-        print(f"[EMAIL SUCCESS] Call summary sent to {to_email}", flush=True)
+        response = httpx.post(url, json=payload, timeout=10.0)
+        if response.status_code == 200:
+            print(f"[TELEGRAM SUCCESS] Notification sent for {phone}", flush=True)
+        else:
+            print(f"[TELEGRAM ERROR] API rejected request: {response.text}", flush=True)
     except Exception as e:
-        print(f"[EMAIL ERROR] Failed to send email to {to_email}: {str(e)}", flush=True)
+        print(f"[TELEGRAM ERROR] Network failure: {str(e)}", flush=True)
+        traceback.print_exc()
 
 class StartDemoRequest(BaseModel):
     user_id: str
@@ -169,12 +156,13 @@ async def handle_vapi_webhook(request: Request, background_tasks: BackgroundTask
             print("ERROR: No user_id found in webhook payload.", flush=True)
             return {"status": "success", "detail": "Missing user_id ignored"}
 
-        # Fetch the user's email from Supabase
-        user_email = None
-        try:
-            user_email = supabase_admin.table('profiles').select('email').eq('id', user_id).execute().data[0]['email']
-        except Exception as e:
-            print(f"ERROR: Failed to fetch user's email from Supabase: {str(e)}", flush=True)
+        # Extract user's email from payload metadata
+        user_email = (
+            call_data.get('assistantOverrides', {}).get('metadata', {}).get('userEmail') or
+            call_data.get('assistantOverrides', {}).get('variableValues', {}).get('user_email') or
+            call_data.get('assistant', {}).get('metadata', {}).get('userEmail') or
+            call_data.get('metadata', {}).get('userEmail')
+        )
             
         analysis = message.get('analysis', {})
         artifact = message.get('artifact', {})
@@ -211,7 +199,7 @@ async def handle_vapi_webhook(request: Request, background_tasks: BackgroundTask
             except Exception as e:
                 print(f"   -> [ERROR] Call Log Save Failed: {str(e)}", flush=True)
 
-            # --- 2.5 TRIGGER BACKGROUND EMAIL TASK ---
+            # --- 2.5 TRIGGER BACKGROUND TELEGRAM NOTIFICATION TASK ---
             lead_data = deep_search_lead(payload)
             customer_phone = (
                 call_data.get('customer', {}).get('number') or 
@@ -225,16 +213,15 @@ async def handle_vapi_webhook(request: Request, background_tasks: BackgroundTask
             
             try:
                 background_tasks.add_task(
-                    send_call_summary_email,
-                    user_email,
+                    send_telegram_notification,
                     customer_phone,
                     duration,
                     sentiment,
                     transcript
                 )
-                print(f"   -> [SUCCESS] Enqueued background email task for {user_email}", flush=True)
+                print(f"   -> [SUCCESS] Enqueued background Telegram notification for {customer_phone}", flush=True)
             except Exception as e:
-                print(f"   -> [ERROR] Failed to queue background email task: {str(e)}", flush=True)
+                print(f"   -> [ERROR] Failed to queue background Telegram notification: {str(e)}", flush=True)
                 
             # --- 3. DEEP NATIVE LEAD EXTRACTION ---
             print("--- RUNNING DEEP NATIVE LEAD EXTRACTION ---", flush=True)
