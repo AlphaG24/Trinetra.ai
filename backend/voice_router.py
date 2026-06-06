@@ -504,12 +504,13 @@ async def handle_vapi_webhook(request: Request):
                 
                 if extracted and extracted.is_lead:
                     print(f"[VAPI WEBHOOK] Hot Lead detected! Saving to appointments table...", flush=True)
-                    # Insert into appointments table
+                    # Serialize list[KeyValuePair] to list[dict] for Supabase JSON column
+                    serialized_data = [kv.model_dump() for kv in extracted.extracted_data]
                     scheduled_at = datetime.utcnow().isoformat() + "Z"
                     
                     supabase_admin.table("appointments").insert({
                         "user_id": user_id,
-                        "extracted_data": extracted.extracted_data,
+                        "extracted_data": serialized_data,
                         "booked_via": "voice",
                         "scheduled_at": scheduled_at,
                         "status": "pending"
@@ -518,75 +519,79 @@ async def handle_vapi_webhook(request: Request):
                     print(f"[VAPI WEBHOOK] Lead successfully saved to appointments table.", flush=True)
                     
                     # Dispatch Hot Lead Telegram alert if chat ID exists
-                    if telegram_chat_id:
-                        bot_token = os.getenv("TELEGRAM_BOT_TOKEN")
-                        if bot_token:
-                            dynamic_vars = "\n".join([f"🔹 **{k.replace('_', ' ').title()}:** {v}" for k, v in extracted.extracted_data.items()])
-                            hot_lead_message = (
-                                f"🚨 **HOT LEAD CAPTURED!** 🚨\n"
-                                f"{dynamic_vars}\n"
-                                f"📝 **Summary:** {extracted.intent_summary}"
-                            )
-                            
-                            telegram_url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
-                            telegram_payload = {
-                                "chat_id": telegram_chat_id,
-                                "text": hot_lead_message,
-                                "parse_mode": "Markdown"
-                            }
-                            
-                            async with httpx.AsyncClient() as client:
-                                res = await client.post(telegram_url, json=telegram_payload, timeout=10.0)
-                                if res.status_code == 200:
-                                    print(f"[VAPI WEBHOOK SUCCESS] Hot Lead Alert sent to Chat ID {telegram_chat_id}", flush=True)
-                                else:
-                                    print(f"[VAPI WEBHOOK ERROR] Telegram API returned code {res.status_code} for Hot Lead alert: {res.text}", flush=True)
-                        else:
-                            print("[VAPI WEBHOOK ERROR] TELEGRAM_BOT_TOKEN not configured for Hot Lead alert", flush=True)
+                    try:
+                        if telegram_chat_id:
+                            bot_token = os.getenv("TELEGRAM_BOT_TOKEN")
+                            if bot_token:
+                                dynamic_vars = "\n".join([f"🔹 *{kv.key.replace('_', ' ').title()}:* {kv.value}" for kv in extracted.extracted_data])
+                                hot_lead_message = (
+                                    f"🚨 *HOT LEAD CAPTURED!* 🚨\n"
+                                    f"{dynamic_vars}\n"
+                                    f"📝 *Summary:* {extracted.intent_summary}"
+                                )
+                                
+                                telegram_url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+                                telegram_payload = {
+                                    "chat_id": telegram_chat_id,
+                                    "text": hot_lead_message,
+                                    "parse_mode": "Markdown"
+                                }
+                                
+                                async with httpx.AsyncClient() as client:
+                                    res = await client.post(telegram_url, json=telegram_payload, timeout=10.0)
+                                    if res.status_code == 200:
+                                        print(f"[VAPI WEBHOOK SUCCESS] Hot Lead Alert sent to Chat ID {telegram_chat_id}", flush=True)
+                                    else:
+                                        print(f"[VAPI WEBHOOK ERROR] Telegram API returned code {res.status_code} for Hot Lead alert: {res.text}", flush=True)
+                            else:
+                                print("[VAPI WEBHOOK ERROR] TELEGRAM_BOT_TOKEN not configured for Hot Lead alert", flush=True)
+                    except Exception as tg_lead_err:
+                        print(f"Extraction or Alert Error: {tg_lead_err}", flush=True)
+                        traceback.print_exc()
                 else:
                     print("[VAPI WEBHOOK] Transcript was not identified as a Hot Lead.", flush=True)
         except Exception as lead_err:
-            print(f"[VAPI WEBHOOK ERROR] Deep Native Lead Extraction failed: {str(lead_err)}", flush=True)
+            print(f"Extraction or Alert Error: {lead_err}", flush=True)
             traceback.print_exc()
 
         # Send Alert: If a telegram_chat_id exists, format message and send POST to Telegram API
-        if telegram_chat_id:
-            bot_token = os.getenv("TELEGRAM_BOT_TOKEN")
-            if bot_token:
-                minutes = int(duration) // 60
-                seconds = int(duration) % 60
-                duration_str = f"{minutes}m {seconds}s" if minutes > 0 else f"{seconds}s"
-                
-                snippet = transcript[:250] + "..." if transcript and len(transcript) > 250 else (transcript or "No transcript available.")
-                
-                telegram_message = (
-                    f"📞 **New AI Call Log**\n"
-                    f"📱 **Phone:** {customer_phone}\n"
-                    f"⏱️ **Duration:** {duration_str}\n"
-                    f"📝 **Transcript Preview:** {snippet}"
-                )
-                
-                telegram_url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
-                telegram_payload = {
-                    "chat_id": telegram_chat_id,
-                    "text": telegram_message,
-                    "parse_mode": "Markdown"
-                }
+        try:
+            if telegram_chat_id:
+                bot_token = os.getenv("TELEGRAM_BOT_TOKEN")
+                if bot_token:
+                    minutes = int(duration) // 60
+                    seconds = int(duration) % 60
+                    duration_str = f"{minutes}m {seconds}s" if minutes > 0 else f"{seconds}s"
+                    
+                    snippet = transcript[:250] + "..." if transcript and len(transcript) > 250 else (transcript or "No transcript available.")
+                    
+                    telegram_message = (
+                        f"📞 *New AI Call Log*\n"
+                        f"📱 *Phone:* {customer_phone}\n"
+                        f"⏱️ *Duration:* {duration_str}\n"
+                        f"📝 *Transcript Preview:* {snippet}"
+                    )
+                    
+                    telegram_url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+                    telegram_payload = {
+                        "chat_id": telegram_chat_id,
+                        "text": telegram_message,
+                        "parse_mode": "Markdown"
+                    }
 
-                try:
                     async with httpx.AsyncClient() as client:
                         res = await client.post(telegram_url, json=telegram_payload, timeout=10.0)
                         if res.status_code == 200:
                             print(f"[VAPI WEBHOOK SUCCESS] Alert sent to Chat ID {telegram_chat_id}", flush=True)
                         else:
                             print(f"[VAPI WEBHOOK ERROR] Telegram API returned code {res.status_code}: {res.text}", flush=True)
-                except Exception as tg_err:
-                    print(f"[VAPI WEBHOOK ERROR] Failed to send Telegram alert: {str(tg_err)}", flush=True)
-                    traceback.print_exc()
+                else:
+                    print("[VAPI WEBHOOK ERROR] TELEGRAM_BOT_TOKEN environment variable not set", flush=True)
             else:
-                print("[VAPI WEBHOOK ERROR] TELEGRAM_BOT_TOKEN environment variable not set", flush=True)
-        else:
-            print("Skipping Telegram alert: No chat ID configured or Demo call", flush=True)
+                print("Skipping Telegram alert: No chat ID configured or Demo call", flush=True)
+        except Exception as tg_err:
+            print(f"Extraction or Alert Error: {tg_err}", flush=True)
+            traceback.print_exc()
 
         return {"status": "success", "message": "Webhook processed successfully"}
 
