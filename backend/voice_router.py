@@ -1,11 +1,63 @@
 import uuid
 import json
 import math
-from fastapi import APIRouter, HTTPException, Request
+import smtplib
+from email.message import EmailMessage
+import os
+from fastapi import APIRouter, HTTPException, Request, BackgroundTasks
 from pydantic import BaseModel
 from database import supabase, supabase_admin
 
 router = APIRouter(prefix="/api/voice", tags=["Voice Agent"])
+
+def send_call_summary_email(to_email: str, phone: str, duration: int, sentiment: str, transcript: str):
+    smtp_email = os.getenv("SMTP_EMAIL")
+    smtp_password = os.getenv("SMTP_PASSWORD")
+    
+    if not smtp_email or not smtp_password:
+        print("[EMAIL ERROR] SMTP_EMAIL or SMTP_PASSWORD environment variable is not set.", flush=True)
+        return
+        
+    if not to_email:
+        print("[EMAIL ERROR] Recipient email is empty or invalid.", flush=True)
+        return
+
+    try:
+        msg = EmailMessage()
+        msg["Subject"] = f"Trinetra.ai Call Summary - Phone: {phone}"
+        msg["From"] = smtp_email
+        msg["To"] = to_email
+        
+        # Format duration as minutes and seconds
+        minutes = duration // 60
+        seconds = duration % 60
+        duration_str = f"{minutes}m {seconds}s" if minutes > 0 else f"{seconds}s"
+        
+        email_body = f"""Hello,
+
+Here is the summary of the call received on your assistant:
+
+--- CALL DETAILS ---
+Customer Phone: {phone}
+Duration: {duration_str}
+Sentiment: {sentiment}
+
+--- CALL TRANSCRIPT ---
+{transcript if transcript else 'No transcript available.'}
+
+Best regards,
+Trinetra.ai Team
+"""
+        msg.set_content(email_body)
+        
+        # Connect to Gmail SMTP
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+            server.login(smtp_email, smtp_password)
+            server.send_message(msg)
+            
+        print(f"[EMAIL SUCCESS] Call summary sent to {to_email}", flush=True)
+    except Exception as e:
+        print(f"[EMAIL ERROR] Failed to send email to {to_email}: {str(e)}", flush=True)
 
 class StartDemoRequest(BaseModel):
     user_id: str
@@ -67,7 +119,7 @@ async def check_limits_and_get_keys(req: StartDemoRequest):
     }
 
 @router.post("/vapi-webhook")
-async def handle_vapi_webhook(request: Request):
+async def handle_vapi_webhook(request: Request, background_tasks: BackgroundTasks):
     try:
         payload = await request.json()
     except Exception:
@@ -109,16 +161,17 @@ async def handle_vapi_webhook(request: Request):
             call_data.get('assistant', {}).get('metadata', {}).get('userId') or
             call_data.get('metadata', {}).get('userId')
         )
-        user_email = (
-            call_data.get('assistantOverrides', {}).get('metadata', {}).get('userEmail') or
-            call_data.get('assistantOverrides', {}).get('variableValues', {}).get('user_email') or
-            call_data.get('assistant', {}).get('metadata', {}).get('userEmail') or
-            call_data.get('metadata', {}).get('userEmail')
-        )
         
         if not user_id:
             print("ERROR: No user_id found in webhook payload.", flush=True)
             return {"status": "success", "detail": "Missing user_id ignored"}
+
+        # Fetch the user's email from Supabase
+        user_email = None
+        try:
+            user_email = supabase_admin.table('profiles').select('email').eq('id', user_id).execute().data[0]['email']
+        except Exception as e:
+            print(f"ERROR: Failed to fetch user's email from Supabase: {str(e)}", flush=True)
             
         analysis = message.get('analysis', {})
         artifact = message.get('artifact', {})
@@ -154,12 +207,34 @@ async def handle_vapi_webhook(request: Request):
                 print("   -> [SUCCESS] Call Log saved to Supabase via admin.", flush=True)
             except Exception as e:
                 print(f"   -> [ERROR] Call Log Save Failed: {str(e)}", flush=True)
+
+            # --- 2.5 TRIGGER BACKGROUND EMAIL TASK ---
+            lead_data = deep_search_lead(payload)
+            customer_phone = (
+                call_data.get('customer', {}).get('number') or 
+                call_data.get('customer', {}).get('phone') or
+                call_data.get('customerPhone') or 
+                message.get('customer', {}).get('number') or
+                (lead_data or {}).get('phone') or
+                "Unknown"
+            )
+            duration = duration_seconds
+            
+            try:
+                background_tasks.add_task(
+                    send_call_summary_email,
+                    user_email,
+                    customer_phone,
+                    duration,
+                    sentiment,
+                    transcript
+                )
+                print(f"   -> [SUCCESS] Enqueued background email task for {user_email}", flush=True)
+            except Exception as e:
+                print(f"   -> [ERROR] Failed to queue background email task: {str(e)}", flush=True)
                 
             # --- 3. DEEP NATIVE LEAD EXTRACTION ---
             print("--- RUNNING DEEP NATIVE LEAD EXTRACTION ---", flush=True)
-            
-            # Pass the ENTIRE payload to our deep search function
-            lead_data = deep_search_lead(payload)
             
             if java_lead := lead_data:
                 print(f"   -> [FOUND] Deep Search extracted lead: {java_lead}", flush=True)
