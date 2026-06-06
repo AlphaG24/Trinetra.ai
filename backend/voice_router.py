@@ -10,12 +10,11 @@ from database import supabase, supabase_admin
 
 router = APIRouter(prefix="/api/voice", tags=["Voice Agent"])
 
-def send_telegram_notification(phone: str, duration: int, sentiment: str, transcript: str):
+def send_telegram_notification(phone: str, duration: int, sentiment: str, transcript: str, chat_id: str | None = None):
     bot_token = os.getenv("TELEGRAM_BOT_TOKEN")
-    chat_id = os.getenv("TELEGRAM_CHAT_ID")
 
     if not bot_token or not chat_id:
-        print("[TELEGRAM ERROR] Missing TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID variables.", flush=True)
+        print("Skipping Telegram alert: No chat ID configured or Demo call", flush=True)
         return
 
     # Format duration
@@ -199,6 +198,15 @@ async def handle_vapi_webhook(request: Request, background_tasks: BackgroundTask
             except Exception as e:
                 print(f"   -> [ERROR] Call Log Save Failed: {str(e)}", flush=True)
 
+            # --- 2.3 RETRIEVE TELEGRAM CHAT ID DYNAMICALLY ---
+            telegram_chat_id = None
+            try:
+                profile_res = supabase_admin.table("profiles").select("telegram_chat_id").eq("id", user_id).execute()
+                if profile_res.data:
+                    telegram_chat_id = profile_res.data[0].get("telegram_chat_id")
+            except Exception as db_err:
+                print(f"   -> [ERROR] Profiles lookup for telegram_chat_id failed: {str(db_err)}", flush=True)
+
             # --- 2.5 TRIGGER BACKGROUND TELEGRAM NOTIFICATION TASK ---
             lead_data = deep_search_lead(payload)
             customer_phone = (
@@ -217,7 +225,8 @@ async def handle_vapi_webhook(request: Request, background_tasks: BackgroundTask
                     customer_phone,
                     duration,
                     sentiment,
-                    transcript
+                    transcript,
+                    telegram_chat_id
                 )
                 print(f"   -> [SUCCESS] Enqueued background Telegram notification for {customer_phone}", flush=True)
             except Exception as e:
@@ -418,12 +427,12 @@ async def handle_vapi_webhook(request: Request):
         try:
             agent_res = supabase_admin.table("user_agents").select("user_id").eq("vapi_agent_id", assistant_id).execute()
             if not agent_res.data:
-                print(f"[VAPI WEBHOOK INFO] No agent found matching vapi_agent_id: {assistant_id}", flush=True)
+                print("Skipping Telegram alert: No chat ID configured or Demo call", flush=True)
                 return {"status": "success", "message": f"No agent matching vapi_agent_id {assistant_id} found"}
             
             user_id = agent_res.data[0].get("user_id")
             if not user_id:
-                print(f"[VAPI WEBHOOK ERROR] user_id is null for agent with vapi_agent_id: {assistant_id}", flush=True)
+                print("Skipping Telegram alert: No chat ID configured or Demo call", flush=True)
                 return {"status": "success", "message": "user_id mapping is empty"}
         except Exception as db_err:
             print(f"[VAPI WEBHOOK DATABASE ERROR] Supabase user_agents lookup failed: {str(db_err)}", flush=True)
@@ -490,6 +499,8 @@ async def handle_vapi_webhook(request: Request):
                     traceback.print_exc()
             else:
                 print("[VAPI WEBHOOK ERROR] TELEGRAM_BOT_TOKEN environment variable not set", flush=True)
+        else:
+            print("Skipping Telegram alert: No chat ID configured or Demo call", flush=True)
 
         return {"status": "success", "message": "Webhook processed successfully"}
 
