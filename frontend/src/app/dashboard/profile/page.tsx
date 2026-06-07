@@ -94,6 +94,12 @@ export default function ProfilePage() {
           }
           setProfileState(fallback)
           setProfile(fallback as any)
+
+          // Onboarding nudge for fallback (no DB profile yet)
+          toast('Welcome to Your Command Center', {
+            description: "Please take a brief moment to complete your contact details. This ensures your AI agent's live lead alerts and call notifications are routed correctly to you.",
+            duration: 8000,
+          })
         } else {
           const loaded = {
             id: user.id,
@@ -111,6 +117,14 @@ export default function ProfilePage() {
           }
           setProfileState(loaded)
           setProfile(loaded as any)
+
+          // Onboarding nudge if contact details are incomplete
+          if (!loaded.phone || !loaded.full_name) {
+            toast('Welcome to Your Command Center', {
+              description: "Please take a brief moment to complete your contact details. This ensures your AI agent's live lead alerts and call notifications are routed correctly to you.",
+              duration: 8000,
+            })
+          }
         }
       } catch (err) {
         console.error('Error loading profile:', err)
@@ -175,29 +189,63 @@ export default function ProfilePage() {
     e.preventDefault()
     if (!userId) return
 
+    const cleanedName = (profile.full_name || '').trim()
+    const cleanedPhone = (profile.phone || '').trim()
+
+    if (!cleanedName) {
+      toast.error('Please enter your full name')
+      return
+    }
+
+    if (!cleanedPhone) {
+      toast.error('Please enter your phone number')
+      return
+    }
+
+    // Phone format validation (starts with + followed by 7 to 15 digits)
+    const phoneRegex = /^\+[1-9]\d{7,14}$/
+    if (!phoneRegex.test(cleanedPhone)) {
+      toast.error('Phone number must start with + followed by country code (e.g. +19876543210)')
+      return
+    }
+
     setSaving(true)
     try {
       const { error } = await supabase
         .from('profiles')
         .update({
-          full_name: profile.full_name,
+          full_name: cleanedName,
           email: profile.email,
           company_name: profile.company_name,
           business_type: profile.business_type,
           avatar_url: profile.avatar_url,
-          phone: profile.phone,
+          phone: cleanedPhone,
           city: profile.city,
           state: profile.state,
           preferred_language: profile.preferred_language,
           timezone: profile.timezone,
+          onboarding_complete: true,
           updated_at: new Date().toISOString()
         })
         .eq('id', userId)
 
       if (error) throw error
 
-      setProfile({ ...profile, id: userId } as any)
+      const updated = {
+        ...profile,
+        id: userId,
+        full_name: cleanedName,
+        phone: cleanedPhone,
+        onboarding_complete: true
+      }
+      setProfileState(updated)
+      setProfile(updated as any)
       toast.success('Profile updated successfully!')
+      
+      // Delay slightly and force router push/reload to clean layout guard state
+      setTimeout(() => {
+        window.location.href = '/dashboard'
+      }, 500)
     } catch (err: any) {
       console.error('Save profile error:', err)
       toast.error(err.message || 'Failed to save profile.')

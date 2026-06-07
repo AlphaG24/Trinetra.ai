@@ -10,6 +10,7 @@ export function QuotaBanner() {
   const [usedMinutes, setUsedMinutes] = useState<number | null>(null)
   const [limitMinutes, setLimitMinutes] = useState<number | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [isPaid, setIsPaid] = useState(false)
 
   useEffect(() => {
     async function fetchQuota() {
@@ -17,16 +18,38 @@ export function QuotaBanner() {
       
       const supabase = createClient()
       try {
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('demo_minutes_used, demo_minutes_limit, total_minutes_limit')
-          .eq('id', profile.id)
-          .single()
+        // Safe check for purchased agents in user_agents
+        const { data: agentData } = await supabase
+          .from('user_agents')
+          .select('id')
+          .eq('user_id', profile.id)
 
-        if (data && !error) {
-          setUsedMinutes(data.demo_minutes_used ?? 0)
-          const limit = data.total_minutes_limit ?? data.demo_minutes_limit ?? 100
-          setLimitMinutes(limit)
+        const hasPaidAgent = agentData && agentData.length > 0
+        setIsPaid(!!hasPaidAgent)
+
+        if (hasPaidAgent) {
+          const { data, error } = await supabase
+            .from('profiles')
+            .select('paid_minutes_used, paid_minutes_limit')
+            .eq('id', profile.id)
+            .single()
+
+          if (data && !error) {
+            setUsedMinutes(data.paid_minutes_used ?? 0)
+            setLimitMinutes(data.paid_minutes_limit ?? 100)
+          }
+        } else {
+          const { data, error } = await supabase
+            .from('profiles')
+            .select('demo_minutes_used, demo_minutes_limit, total_minutes_limit')
+            .eq('id', profile.id)
+            .single()
+
+          if (data && !error) {
+            setUsedMinutes(data.demo_minutes_used ?? 0)
+            const limit = data.total_minutes_limit ?? data.demo_minutes_limit ?? 100
+            setLimitMinutes(limit)
+          }
         }
       } catch (err) {
         console.error('Failed to fetch quota details:', err)
@@ -58,16 +81,27 @@ export function QuotaBanner() {
             <div>
               <h4 className="text-sm font-semibold text-white">⛔ Agents Paused</h4>
               <p className="text-xs text-red-200/70">
-                Your AI minutes are exhausted ({usedMinutes}/{limitMinutes} mins used). Top up immediately to resume processing calls.
+                Your AI minutes are exhausted ({usedMinutes?.toFixed(1)}/{limitMinutes} mins used). Top up immediately to resume processing calls.
               </p>
             </div>
           </div>
-          <button
-            onClick={() => console.log('Stripe Checkout Triggered')}
-            className="w-full sm:w-auto flex items-center justify-center px-4 py-2 bg-gradient-to-r from-red-600 to-rose-500 text-white text-xs sm:text-sm font-semibold rounded-lg hover:shadow-[0_0_15px_rgba(239,68,68,0.4)] transition-all whitespace-nowrap"
-          >
-            Top-Up Credits
-          </button>
+          {isPaid ? (
+            <a
+              href="https://wa.me/919452045499?text=Hi,%20my%20AI%20agents%20are%20paused%20due%20to%20usage%20limits.%20I%20would%20like%20to%20purchase%20more%20minutes"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-full sm:w-auto flex items-center justify-center px-4 py-2 bg-gradient-to-r from-red-600 to-rose-500 text-white text-xs sm:text-sm font-semibold rounded-lg hover:shadow-[0_0_15px_rgba(239,68,68,0.4)] transition-all whitespace-nowrap cursor-pointer text-center"
+            >
+              Contact for Top-Up
+            </a>
+          ) : (
+            <button
+              onClick={() => console.log('Stripe Checkout Triggered')}
+              className="w-full sm:w-auto flex items-center justify-center px-4 py-2 bg-gradient-to-r from-red-600 to-rose-500 text-white text-xs sm:text-sm font-semibold rounded-lg hover:shadow-[0_0_15px_rgba(239,68,68,0.4)] transition-all whitespace-nowrap"
+            >
+              Top-Up Credits
+            </button>
+          )}
         </div>
       </div>
     )
@@ -87,16 +121,27 @@ export function QuotaBanner() {
             <div>
               <h4 className="text-sm font-semibold text-white">Low Balance</h4>
               <p className="text-xs text-amber-200/70">
-                You have used {usagePercent}% of your AI minutes ({usedMinutes}/{limitMinutes} mins used). Top up soon to keep your agents online.
+                You have used {usagePercent}% of your AI minutes ({usedMinutes?.toFixed(1)}/{limitMinutes} mins used). Top up soon to keep your agents online.
               </p>
             </div>
           </div>
-          <button
-            onClick={() => console.log('Stripe Checkout Triggered')}
-            className="w-full sm:w-auto flex items-center justify-center px-4 py-2 bg-gradient-to-r from-amber-600 to-yellow-500 text-white text-xs sm:text-sm font-semibold rounded-lg hover:shadow-[0_0_15px_rgba(245,158,11,0.4)] transition-all whitespace-nowrap"
-          >
-            Top-Up Credits
-          </button>
+          {isPaid ? (
+            <a
+              href="https://wa.me/919452045499?text=Hi,%20my%20AI%20agents%20are%20paused%20due%20to%20usage%20limits.%20I%20would%20like%20to%20purchase%20more%20minutes"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-full sm:w-auto flex items-center justify-center px-4 py-2 bg-gradient-to-r from-amber-600 to-yellow-500 text-white text-xs sm:text-sm font-semibold rounded-lg hover:shadow-[0_0_15px_rgba(245,158,11,0.4)] transition-all whitespace-nowrap cursor-pointer text-center"
+            >
+              Contact for Top-Up
+            </a>
+          ) : (
+            <button
+              onClick={() => console.log('Stripe Checkout Triggered')}
+              className="w-full sm:w-auto flex items-center justify-center px-4 py-2 bg-gradient-to-r from-amber-600 to-yellow-500 text-white text-xs sm:text-sm font-semibold rounded-lg hover:shadow-[0_0_15px_rgba(245,158,11,0.4)] transition-all whitespace-nowrap"
+            >
+              Top-Up Credits
+            </button>
+          )}
         </div>
       </div>
     )

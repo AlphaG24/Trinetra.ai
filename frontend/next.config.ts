@@ -22,10 +22,7 @@ const nextConfig: NextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
-  // @ts-ignore
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
+
   experimental: {
     cpus: 1,
     staticGenerationMaxConcurrency: 1,

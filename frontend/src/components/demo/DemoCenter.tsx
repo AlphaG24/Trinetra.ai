@@ -29,10 +29,18 @@ interface DemoCenterProps {
 }
 
 export function DemoCenter({ agents }: DemoCenterProps) {
-  const [minutesUsed, setMinutesUsed] = useState<number>(0)
-  const [minutesLimit, setMinutesLimit] = useState<number>(20)
+  const [demoMinutesUsed, setDemoMinutesUsed] = useState<number>(0)
+  const [demoMinutesLimit, setDemoMinutesLimit] = useState<number>(0)
+  const [paidMinutesUsed, setPaidMinutesUsed] = useState<number>(0)
+  const [paidMinutesLimit, setPaidMinutesLimit] = useState<number>(0)
   const [assignedVapiAgentId, setAssignedVapiAgentId] = useState<string | null>(null)
+  const [hasPurchasedAgent, setHasPurchasedAgent] = useState<boolean>(false)
   const [userId, setUserId] = useState<string | null>(null)
+  const [isQuotaLoading, setIsQuotaLoading] = useState<boolean>(true)
+
+  const isPaid = hasPurchasedAgent || !!assignedVapiAgentId
+  const minutesUsed = isPaid ? paidMinutesUsed : demoMinutesUsed
+  const minutesLimit = isPaid ? paidMinutesLimit : demoMinutesLimit
   
   // Real Call History States
   const [demoHistory, setDemoHistory] = useState<CallLog[]>([])
@@ -44,26 +52,56 @@ export function DemoCenter({ agents }: DemoCenterProps) {
   const warned80Ref = useRef(false)
   const audioRef = useRef<HTMLAudioElement | null>(null)
 
-  // Fetch demo quota
+  // Fetch quota
   const fetchQuota = async (activeUserId?: string) => {
     try {
+      setIsQuotaLoading(true)
       const targetUserId = activeUserId || userId
-      if (!targetUserId || targetUserId === 'undefined' || targetUserId === 'null') return
+      if (!targetUserId || targetUserId === 'undefined' || targetUserId === 'null') {
+        setIsQuotaLoading(false)
+        return
+      }
 
       const supabase = createClient()
+      
+      // Fetch quotas from profiles
       const { data, error } = await supabase
         .from('profiles')
-        .select('demo_minutes_used, demo_minutes_limit, assigned_vapi_agent_id')
+        .select('demo_minutes_used, demo_minutes_limit, paid_minutes_used, paid_minutes_limit')
         .eq('id', targetUserId)
         .single()
 
       if (data && !error) {
-        setMinutesUsed(data.demo_minutes_used ?? 0)
-        setMinutesLimit(data.demo_minutes_limit ?? 20)
-        setAssignedVapiAgentId(data.assigned_vapi_agent_id ?? null)
+        setDemoMinutesUsed(data.demo_minutes_used ?? 0)
+        setDemoMinutesLimit(data.demo_minutes_limit ?? 0)
+        setPaidMinutesUsed(data.paid_minutes_used ?? 0)
+        setPaidMinutesLimit(data.paid_minutes_limit ?? 0)
+      } else if (error) {
+        console.error('Error fetching profile quota:', error)
+      }
+
+      // Check user_agents table safely handling empty results
+      const { data: agentData, error: agentError } = await supabase
+        .from('user_agents')
+        .select('vapi_agent_id')
+        .eq('user_id', targetUserId)
+
+      if (agentError) {
+        console.error('Error checking user_agents table:', agentError)
+        setHasPurchasedAgent(false)
+        setAssignedVapiAgentId(null)
+      } else if (!agentData || agentData.length === 0) {
+        setHasPurchasedAgent(false)
+        setAssignedVapiAgentId(null)
+      } else {
+        setHasPurchasedAgent(true)
+        const activeVapiId = agentData.find(a => a.vapi_agent_id)?.vapi_agent_id || agentData[0].vapi_agent_id || null
+        setAssignedVapiAgentId(activeVapiId)
       }
     } catch (err) {
-      console.error('Error fetching demo quota:', err)
+      console.error('Error fetching quota and agents:', err)
+    } finally {
+      setIsQuotaLoading(false)
     }
   }
 
@@ -176,7 +214,7 @@ export function DemoCenter({ agents }: DemoCenterProps) {
     }
   }, [])
 
-  const isLimitReached = minutesUsed >= minutesLimit
+  const isLimitReached = minutesLimit > 0 && minutesUsed >= minutesLimit
 
   // Format created_at to a human readable UI format (e.g., "Today, 2:30 PM" or "May 1, 10:15 AM")
   const formatCreatedAt = (dateString: string) => {
@@ -281,32 +319,44 @@ export function DemoCenter({ agents }: DemoCenterProps) {
         </p>
       </div>
 
-      {/* Demo Quota Progress Bar (Hidden for Paid Users) */}
-      {!assignedVapiAgentId && (
-        <div className="bg-[#0f1117]/80 backdrop-blur-md border border-white/5 p-5 rounded-2xl flex flex-col gap-3 shadow-xl">
-          <div className="flex items-center justify-between text-xs font-mono">
-            <span className="text-zinc-400 uppercase tracking-widest font-bold">Demo Quota</span>
-            <span className="text-white font-semibold">
-              {minutesUsed.toFixed(1)} / {minutesLimit} Minutes Used
-            </span>
+      {/* Quota Progress Bar */}
+      <div className="bg-[#0f1117]/80 backdrop-blur-md border border-white/5 p-5 rounded-2xl flex flex-col gap-3 shadow-xl min-h-[78px] justify-center">
+        {isQuotaLoading ? (
+          <div className="flex flex-col gap-2.5 animate-pulse">
+            <div className="flex justify-between">
+              <div className="h-3 w-20 bg-zinc-700/80 rounded" />
+              <div className="h-3 w-24 bg-zinc-700/80 rounded" />
+            </div>
+            <div className="h-2 w-full bg-zinc-800 rounded-full" />
           </div>
-          <div className="h-2 w-full bg-zinc-800/80 rounded-full overflow-hidden">
-            <div
-              className={`h-full rounded-full transition-all duration-500 ${
-                (minutesUsed / (minutesLimit || 20)) >= 0.8
-                  ? 'bg-gradient-to-r from-red-500 to-pink-600'
-                  : (minutesUsed / (minutesLimit || 20)) >= 0.5
-                  ? 'bg-gradient-to-r from-amber-500 to-orange-500'
-                  : 'bg-gradient-to-r from-purple-600 to-blue-600'
-              }`}
-              style={{ width: `${Math.min(100, (minutesUsed / (minutesLimit || 20)) * 100)}%` }}
-            />
-          </div>
-        </div>
-      )}
+        ) : (
+          <>
+            <div className="flex items-center justify-between text-xs font-mono">
+              <span className="text-zinc-400 uppercase tracking-widest font-bold">
+                {assignedVapiAgentId ? "Usage Quota" : "Demo Quota"}
+              </span>
+              <span className="text-white font-semibold">
+                {minutesUsed.toFixed(1)} / {minutesLimit} Minutes Used
+              </span>
+            </div>
+            <div className="h-2 w-full bg-zinc-800/80 rounded-full overflow-hidden">
+              <div
+                className={`h-full rounded-full transition-all duration-500 ${
+                  minutesLimit > 0 && (minutesUsed / minutesLimit) >= 0.8
+                    ? 'bg-gradient-to-r from-red-500 to-pink-600'
+                    : minutesLimit > 0 && (minutesUsed / minutesLimit) >= 0.5
+                    ? 'bg-gradient-to-r from-amber-500 to-orange-500'
+                    : 'bg-gradient-to-r from-purple-600 to-blue-600'
+                }`}
+                style={{ width: `${minutesLimit > 0 ? Math.min(100, (minutesUsed / minutesLimit) * 100) : 0}%` }}
+              />
+            </div>
+          </>
+        )}
+      </div>
 
       {/* Trial Complete Overlay Banner (Hidden for Paid Users) */}
-      {!assignedVapiAgentId && isLimitReached && (
+      {!isPaid && isLimitReached && (
         <div className="relative overflow-hidden bg-gradient-to-r from-red-950/40 to-amber-950/40 border border-red-500/20 backdrop-blur-md rounded-2xl p-6 flex flex-col md:flex-row items-center justify-between gap-6 shadow-2xl animate-in slide-in-from-top duration-300">
           <div className="flex items-center gap-4 text-left">
             <div className="w-12 h-12 rounded-full bg-red-500/10 border border-red-500/20 flex items-center justify-center shrink-0">
@@ -338,17 +388,23 @@ export function DemoCenter({ agents }: DemoCenterProps) {
 
       <VoiceDemo 
         agentPhone="+1 (341) 441-8499" 
-        disabled={!assignedVapiAgentId && isLimitReached}
+        disabled={isQuotaLoading || (!isPaid && isLimitReached)}
         assignedVapiAgentId={assignedVapiAgentId}
         onCallStarted={(used: number, limit: number) => {
-          setMinutesUsed(used)
-          setMinutesLimit(limit)
+          setDemoMinutesUsed(used)
+          setDemoMinutesLimit(limit)
         }}
         onCallEnded={() => {
           // Fetch after 3 seconds (when webhook usually completes)
-          setTimeout(() => fetchHistory(userId || undefined), 3000);
+          setTimeout(() => {
+            fetchQuota(userId || undefined);
+            fetchHistory(userId || undefined);
+          }, 3000);
           // Fetch again after 7 seconds as a safety fallback
-          setTimeout(() => fetchHistory(userId || undefined), 7000);
+          setTimeout(() => {
+            fetchQuota(userId || undefined);
+            fetchHistory(userId || undefined);
+          }, 7000);
         }}
       />
 

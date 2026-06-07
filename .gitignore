@@ -38,3 +38,13 @@ backend/Venv/
 # Local Backend Environment Credentials
 backend/.env
 backend/.env.local
+
+mock_call.json
+
+test_*.json
+
+test_*.py
+
+*.log
+
+__pycache__/
