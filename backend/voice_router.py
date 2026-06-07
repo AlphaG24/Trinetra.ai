@@ -109,6 +109,21 @@ def send_telegram_notification(
             print(f"[TELEGRAM ERROR] Hot Lead Siren network failure: {str(e)}", flush=True)
             traceback.print_exc()
 
+def send_quota_telegram_alert(chat_id: str, text: str):
+    bot_token = os.getenv("TELEGRAM_BOT_TOKEN")
+    if not bot_token or not chat_id:
+        print("[QUOTA ALERT] Skipping Telegram alert: Missing credentials or chat ID", flush=True)
+        return
+    url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+    try:
+        response = httpx.post(url, json={"chat_id": chat_id, "text": text, "parse_mode": "Markdown"}, timeout=10.0)
+        if response.status_code == 200:
+            print(f"[QUOTA ALERT SUCCESS] Sent alert to Telegram", flush=True)
+        else:
+            print(f"[QUOTA ALERT ERROR] Telegram API rejected: {response.text}", flush=True)
+    except Exception as e:
+        print(f"[QUOTA ALERT ERROR] Network failure: {str(e)}", flush=True)
+
 class StartDemoRequest(BaseModel):
     user_id: str
     assigned_vapi_agent_id: str | None = None
@@ -355,13 +370,63 @@ async def handle_vapi_webhook(request: Request, background_tasks: BackgroundTask
 
             # --- 4. UPDATE USER QUOTA (BYPASSING RLS) ---
             try:
-                current_user = supabase_admin.table('profiles').select('demo_minutes_used').eq('id', user_id).execute()
-                if current_user.data:
-                    new_usage = current_user.data[0]['demo_minutes_used'] + quota_cost
-                    supabase_admin.table('profiles').update({"demo_minutes_used": new_usage}).eq('id', user_id).execute()
-                    print(f"   -> [SUCCESS] Quota updated. Used: {new_usage} mins.", flush=True)
+                # Retrieve the user's total_minutes_limit (default to 100 if the column doesn't exist yet) and their current used_minutes
+                total_limit = 100
+                previous_used_minutes = 0
+                
+                try:
+                    # Select demo_minutes_used and total_minutes_limit
+                    user_q = supabase_admin.table('profiles').select('demo_minutes_used, total_minutes_limit').eq('id', user_id).execute()
+                    if user_q.data:
+                        user_data = user_q.data[0]
+                        previous_used_minutes = user_data.get('demo_minutes_used', 0)
+                        total_limit = user_data.get('total_minutes_limit')
+                        if total_limit is None:
+                            total_limit = user_data.get('demo_minutes_limit', 100)
+                except Exception:
+                    # Fallback if total_minutes_limit column does not exist
+                    user_q = supabase_admin.table('profiles').select('demo_minutes_used, demo_minutes_limit').eq('id', user_id).execute()
+                    if user_q.data:
+                        user_data = user_q.data[0]
+                        previous_used_minutes = user_data.get('demo_minutes_used', 0)
+                        total_limit = user_data.get('demo_minutes_limit', 100)
+
+                # Ensure total_limit is a positive number to avoid ZeroDivisionError
+                if not total_limit or total_limit <= 0:
+                    total_limit = 100
+
+                new_usage = previous_used_minutes + quota_cost
+
+                # Calculate usage percentages
+                prev_pct = (previous_used_minutes / total_limit) * 100
+                new_pct = (new_usage / total_limit) * 100
+
+                # Perform the database update
+                supabase_admin.table('profiles').update({"demo_minutes_used": new_usage}).eq('id', user_id).execute()
+                print(f"   -> [SUCCESS] Quota updated. Used: {new_usage} mins.", flush=True)
+
+                # Check if threshold crossed exactly
+                crossed_80 = (prev_pct < 80 <= new_pct)
+                crossed_100 = (prev_pct < 100 <= new_pct)
+
+                if telegram_chat_id and (crossed_80 or crossed_100):
+                    if crossed_100:
+                        critical_msg = (
+                            "⛔ **CRITICAL ALERT: AGENTS PAUSED**\n"
+                            "Your AI minutes are 100% exhausted. Incoming calls will no longer be processed. Please top up immediately."
+                        )
+                        background_tasks.add_task(send_quota_telegram_alert, telegram_chat_id, critical_msg)
+                        print(f"   -> [QUOTA ALERT] Enqueued 100% critical usage alert.", flush=True)
+                    elif crossed_80:
+                        warning_msg = (
+                            "⚠️ **USAGE WARNING**\n"
+                            "You have reached 80% of your AI minutes limit. Top up soon to ensure your agents stay online!"
+                        )
+                        background_tasks.add_task(send_quota_telegram_alert, telegram_chat_id, warning_msg)
+                        print(f"   -> [QUOTA ALERT] Enqueued 80% usage warning alert.", flush=True)
+
             except Exception as e:
-                print(f"   -> [ERROR] Quota Update Failed: {str(e)}", flush=True)
+                print(f"   -> [ERROR] Quota Update and Alert Failed: {str(e)}", flush=True)
                 
         print("========== REPORT PROCESSING COMPLETE ==========\n", flush=True)
                 
