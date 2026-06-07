@@ -1,0 +1,13 @@
+{
+    "message": {
+        "type": "end-of-call-report",
+        "call": {
+            "id": "test_mock_12345",
+            "customer": {
+                "number": "+19876543210"
+            },
+            "duration": 65,
+            "transcript": "AI: नमस्ते, मैं त्रिनेत्र से अनिका बोल रही हूँ. मैं आपकी किस तरह से मदद कर सकती हूं?\nUser: Hi, my name is Ragab. My number is 9 8 7 6 5 4 3 2 1 0. I want to buy a voice agent for my dental clinic. My budget is 500 dollars.\nAI: Thank you, Ragab. I will save this lead and our team will contact you."
+        }
+    }
+}

@@ -68,9 +68,9 @@ def send_telegram_notification(
 
     # --- Message 2: Hot Lead Siren (only if is_lead) ---
     if is_lead:
-        dynamic_vars = ""
-        if extracted_data:
-            items = []
+        # Normalize extracted_data to a flat dict (lead_data)
+        lead_data = {}
+        if isinstance(extracted_data, list):
             for item in extracted_data:
                 if isinstance(item, dict):
                     k = item.get("key", "")
@@ -78,13 +78,25 @@ def send_telegram_notification(
                 else:
                     k = getattr(item, "key", "")
                     v = getattr(item, "value", "")
-                items.append(f"🔹 **{k.replace('_', ' ').title()}:** {v}")
-            dynamic_vars = "\n".join(items)
+                if k:
+                    lead_data[k] = v
+        elif isinstance(extracted_data, dict):
+            lead_data = extracted_data
+
+        dynamic_vars_list = []
+        for k, v in lead_data.items():
+            if k not in ["is_lead", "intent_summary"] and v:
+                dynamic_vars_list.append(f"🔹 **{k.replace('_', ' ').title()}:** {v}")
+        dynamic_vars = "\n".join(dynamic_vars_list)
+
+        summary = lead_data.get("intent_summary", "Customer expressed interest and provided contact details.")
+        if not summary:
+            summary = intent_summary or "Customer expressed interest and provided contact details."
 
         hot_lead_message = (
             f"🚨 **HOT LEAD CAPTURED!** 🚨\n"
             f"{dynamic_vars}\n"
-            f"📝 **Summary:** {intent_summary}"
+            f"📝 **Summary:** {summary}"
         )
 
         try:
