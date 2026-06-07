@@ -263,6 +263,12 @@ async def handle_vapi_webhook_logic(body: dict, background_tasks: BackgroundTask
         body.get("assistantId") or
         body.get("assistant", {}).get("id")
     )
+    provider_call_id = (
+        call.get("id") or
+        message.get("id") or
+        body.get("id") or
+        body.get("callId")
+    )
 
     # 1. Determine Branch: Check if agent is Paid (exists in user_agents)
     is_paid_agent = False
@@ -281,6 +287,15 @@ async def handle_vapi_webhook_logic(body: dict, background_tasks: BackgroundTask
     if is_paid_agent:
         print(f"[VAPI ROUTING] BRANCH A: Paid Agent detected (assistant_id={assistant_id}, user_id={user_id})", flush=True)
         
+        # --- Fallback user_id check ---
+        if user_id is None or str(user_id).strip() == "" or str(user_id).lower() == "none":
+            user_id = body.get('message', {}).get('call', {}).get('metadata', {}).get('userId')
+            print(f"[VAPI ROUTING] Branch A: user_id was missing/invalid. Falling back to payload metadata: {user_id}", flush=True)
+        
+        # Guard Clause
+        if user_id is None or str(user_id).strip() == "" or str(user_id).lower() == "none":
+            return {"status": "error", "message": "Missing user_id in database and payload"}
+            
         # Retrieve paid quota limits and telegram chat ID
         paid_used = 0
         paid_limit = 100
@@ -343,7 +358,9 @@ async def handle_vapi_webhook_logic(body: dict, background_tasks: BackgroundTask
                     "duration_seconds": duration_seconds,
                     "transcript": transcript,
                     "recording_url": recording_url,
-                    "sentiment": "Neutral"
+                    "sentiment": "Neutral",
+                    "provider_call_id": provider_call_id,
+                    "vapi_agent_id": assistant_id
                 }).execute()
                 print(f"[VAPI WEBHOOK SUCCESS] Paid Call Log saved for User {user_id}", flush=True)
             except Exception as insert_err:
@@ -490,11 +507,15 @@ async def handle_vapi_webhook_logic(body: dict, background_tasks: BackgroundTask
             body.get('metadata', {}).get('userId')
         )
         
+        # Fallback Source: If user_id is None, fall back to extracting it from the webhook payload (payload.get('message', {}).get('call', {}).get('metadata', {}).get('userId')).
+        if user_id is None or str(user_id).strip() == "" or str(user_id).lower() == "none":
+            user_id = body.get('message', {}).get('call', {}).get('metadata', {}).get('userId')
+            
         print(f"[VAPI ROUTING] BRANCH B: Demo Agent detected (assistant_id={assistant_id}, resolved_user_id={user_id})", flush=True)
 
-        if not user_id:
-            print("ERROR: No user_id found in webhook payload metadata for demo branch.", flush=True)
-            return {"status": "success", "detail": "Missing user_id ignored"}
+        # Guard Clause
+        if user_id is None or str(user_id).strip() == "" or str(user_id).lower() == "none":
+            return {"status": "error", "message": "Missing user_id in database and payload"}
 
         # Fetch demo profile limit and used
         demo_used = 0
@@ -546,7 +567,9 @@ async def handle_vapi_webhook_logic(body: dict, background_tasks: BackgroundTask
                     "duration_seconds": duration_seconds,
                     "transcript": transcript,
                     "recording_url": recording_url,
-                    "sentiment": "Neutral"
+                    "sentiment": "Neutral",
+                    "provider_call_id": provider_call_id,
+                    "vapi_agent_id": assistant_id
                 }).execute()
                 print(f"[VAPI WEBHOOK SUCCESS] Demo Call Log saved for User {user_id}", flush=True)
             except Exception as insert_err:
