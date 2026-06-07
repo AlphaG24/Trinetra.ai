@@ -250,6 +250,349 @@ async def check_limits_and_get_keys(req: StartDemoRequest):
         "minutes_limit": user_data['demo_minutes_limit']
     }
 
+async def handle_vapi_webhook_logic(body: dict, background_tasks: BackgroundTasks):
+    message_type = body.get("message", {}).get("type")
+    if message_type != "assistant-request" and message_type != "end-of-call-report":
+        return {"status": "ignored", "reason": f"Not a handled event type: {message_type}"}
+
+    message = body.get("message", {})
+    call = message.get("call", {}) or body.get("call", {})
+    assistant_id = (
+        call.get("assistantId") or
+        message.get("assistantId") or
+        body.get("assistantId") or
+        body.get("assistant", {}).get("id")
+    )
+
+    # 1. Determine Branch: Check if agent is Paid (exists in user_agents)
+    is_paid_agent = False
+    user_id = None
+
+    if assistant_id:
+        try:
+            agent_res = supabase_admin.table("user_agents").select("user_id").eq("vapi_agent_id", assistant_id).execute()
+            if agent_res.data:
+                is_paid_agent = True
+                user_id = agent_res.data[0].get("user_id")
+        except Exception as e:
+            print(f"[VAPI WEBHOOK ERROR] Supabase user_agents lookup failed: {str(e)}", flush=True)
+
+    # BRANCH A: Paid Agent
+    if is_paid_agent:
+        print(f"[VAPI ROUTING] BRANCH A: Paid Agent detected (assistant_id={assistant_id}, user_id={user_id})", flush=True)
+        
+        # Retrieve paid quota limits and telegram chat ID
+        paid_used = 0
+        paid_limit = 100
+        telegram_chat_id = None
+        
+        try:
+            try:
+                # Try selecting paid columns
+                profile_res = supabase_admin.table("profiles").select("paid_minutes_used, paid_minutes_limit, telegram_chat_id").eq("id", user_id).execute()
+                if profile_res.data:
+                    user_profile = profile_res.data[0]
+                    paid_used = user_profile.get("paid_minutes_used", 0) or 0
+                    paid_limit = user_profile.get("paid_minutes_limit")
+                    if paid_limit is None:
+                        paid_limit = user_profile.get("demo_minutes_limit", 100)
+                    telegram_chat_id = user_profile.get("telegram_chat_id")
+            except Exception:
+                # Fallback to demo columns if paid columns do not exist
+                profile_res = supabase_admin.table("profiles").select("demo_minutes_used, demo_minutes_limit, telegram_chat_id").eq("id", user_id).execute()
+                if profile_res.data:
+                    user_profile = profile_res.data[0]
+                    paid_used = user_profile.get("demo_minutes_used", 0) or 0
+                    paid_limit = user_profile.get("demo_minutes_limit", 100)
+                    telegram_chat_id = user_profile.get("telegram_chat_id")
+        except Exception as e:
+            print(f"[VAPI WEBHOOK ERROR] Paid profile fetch failed: {str(e)}", flush=True)
+
+        if not paid_limit or paid_limit <= 0:
+            paid_limit = 100
+
+        # For Pre-Calls (assistant-request)
+        if message_type == "assistant-request":
+            if paid_used >= paid_limit:
+                print(f"[KILL SWITCH] Paid user {user_id} has exhausted minutes. used={paid_used}, limit={paid_limit}", flush=True)
+                return JSONResponse(
+                    status_code=402,
+                    content={"error": "Payment Required", "message": "AI minutes limit exhausted. Please top up to reactivate your agents."}
+                )
+            return {}
+
+        # For End-Calls (end-of-call-report)
+        try:
+            duration_seconds = int(message.get('durationSeconds') or call.get('durationSeconds') or message.get('duration', 0))
+            quota_cost = math.ceil(duration_seconds / 60) if duration_seconds > 0 else 0
+            
+            transcript = message.get('transcript') or call.get('transcript', '')
+            if not transcript and message.get('artifact', {}).get('messages'):
+                messages_list = message.get('artifact', {}).get('messages', [])
+                transcript = "\n".join([
+                    f"{m.get('role', 'unknown').upper()}: {m.get('message', '')}" 
+                    for m in messages_list if m.get('message')
+                ])
+            
+            recording_url = message.get('artifact', {}).get('recordingUrl', '') or call.get('recordingUrl', '')
+
+            # Save Call Log
+            try:
+                supabase_admin.table("agent_call_logs").insert({
+                    "user_id": user_id,
+                    "duration_seconds": duration_seconds,
+                    "transcript": transcript,
+                    "recording_url": recording_url,
+                    "sentiment": "Neutral"
+                }).execute()
+                print(f"[VAPI WEBHOOK SUCCESS] Paid Call Log saved for User {user_id}", flush=True)
+            except Exception as insert_err:
+                print(f"[VAPI WEBHOOK DATABASE ERROR] Saving call logs failed: {str(insert_err)}", flush=True)
+                traceback.print_exc()
+
+            # Update paid quota
+            new_paid_used = paid_used + quota_cost
+            try:
+                supabase_admin.table('profiles').update({"paid_minutes_used": new_paid_used}).eq('id', user_id).execute()
+            except Exception:
+                supabase_admin.table('profiles').update({"demo_minutes_used": new_paid_used}).eq('id', user_id).execute()
+            print(f"   -> [SUCCESS] Paid quota updated. Used: {new_paid_used} mins.", flush=True)
+
+            # Evaluate 80%/100% Paid threshold alerts
+            prev_pct = (paid_used / paid_limit) * 100
+            new_pct = (new_paid_used / paid_limit) * 100
+            crossed_80 = (prev_pct < 80 <= new_pct)
+            crossed_100 = (prev_pct < 100 <= new_pct)
+            
+            if telegram_chat_id and (crossed_80 or crossed_100):
+                if crossed_100:
+                    critical_msg = (
+                        "⛔ **CRITICAL ALERT: AGENTS PAUSED**\n"
+                        "Your AI minutes are 100% exhausted. Incoming calls will no longer be processed. Please top up immediately."
+                    )
+                    background_tasks.add_task(send_quota_telegram_alert, telegram_chat_id, critical_msg)
+                elif crossed_80:
+                    warning_msg = (
+                        "⚠️ **USAGE WARNING**\n"
+                        "You have reached 80% of your AI minutes limit. Top up soon to ensure your agents stay online!"
+                    )
+                    background_tasks.add_task(send_quota_telegram_alert, telegram_chat_id, warning_msg)
+
+            # Deep JSON Lead Extraction (Gemini)
+            extracted_is_lead = False
+            extracted_intent_summary = ""
+            extracted_data_list = []
+            
+            if transcript and transcript.strip():
+                try:
+                    print("[VAPI WEBHOOK] Starting Gemini Deep Native Lead Extraction...", flush=True)
+                    response = genai_client.models.generate_content(
+                        model='gemini-2.5-flash',
+                        contents=f"Analyze this transcript (which may contain mixed Hindi/English) to find booking intent, name, phone number (often spoken digit-by-digit), and requested service. Act as an unconstrained key-value extractor. Look for core data (name, phone number) but also dynamically capture any industry-specific variables mentioned in the transcript (e.g., budget, preferences, service types, timeline) and place them inside the extracted_data dictionary. If the user wants to book or request a service, set is_lead = true. \n\nTranscript: {transcript}",
+                        config=genai.types.GenerateContentConfig(
+                            response_mime_type="application/json",
+                            response_schema=DynamicLeadExtraction,
+                        ),
+                    )
+                    extracted = response.parsed
+                    print(f"[VAPI WEBHOOK] Gemini extraction result: {extracted}", flush=True)
+                    
+                    if extracted:
+                        extracted_is_lead = extracted.is_lead
+                        extracted_intent_summary = extracted.intent_summary
+                        if extracted.extracted_data:
+                            extracted_data_list = [kv.model_dump() for kv in extracted.extracted_data]
+                        
+                        if extracted_is_lead:
+                            print(f"[VAPI WEBHOOK] Hot Lead detected! Saving to appointments table...", flush=True)
+                            scheduled_at = datetime.utcnow().isoformat() + "Z"
+                            
+                            contact_name = "Valued Customer"
+                            contact_phone = "Unknown"
+                            contact_email = None
+                            
+                            for item in extracted_data_list:
+                                k = item.get("key", "").lower().replace("_", "").replace(" ", "")
+                                v = item.get("value", "")
+                                if k in ["name", "contactname", "customername", "fullname"]:
+                                    if v: contact_name = v
+                                elif k in ["phone", "contactphone", "customerphone", "phonenumber"]:
+                                    if v: contact_phone = v
+                                elif k in ["email", "contactemail", "customeremail", "emailaddress"]:
+                                    if v: contact_email = v
+
+                            customer_phone = (
+                                call.get("customer", {}).get("number") or
+                                call.get("customer", {}).get("phone") or
+                                call.get("customerPhone") or
+                                message.get("customer", {}).get("number") or
+                                "Unknown"
+                            )
+                            if contact_phone == "Unknown":
+                                contact_phone = customer_phone
+
+                            supabase_admin.table("appointments").insert({
+                                "user_id": user_id,
+                                "contact_name": contact_name,
+                                "contact_phone": contact_phone,
+                                "contact_email": contact_email,
+                                "notes": extracted_intent_summary,
+                                "extracted_data": extracted_data_list,
+                                "booked_via": "voice",
+                                "scheduled_at": scheduled_at,
+                                "status": "pending"
+                            }).execute()
+                            print(f"[VAPI WEBHOOK] Lead successfully saved to appointments table.", flush=True)
+                except Exception as lead_err:
+                    print(f"[VAPI WEBHOOK] Extraction Error: {lead_err}", flush=True)
+                    traceback.print_exc()
+
+            # Dispatch Telegram Notifications
+            try:
+                customer_phone = (
+                    call.get("customer", {}).get("number") or
+                    call.get("customer", {}).get("phone") or
+                    call.get("customerPhone") or
+                    message.get("customer", {}).get("number") or
+                    "Unknown"
+                )
+                background_tasks.add_task(
+                    send_telegram_notification,
+                    customer_phone,
+                    duration_seconds,
+                    transcript,
+                    telegram_chat_id,
+                    extracted_is_lead,
+                    extracted_intent_summary,
+                    extracted_data_list,
+                )
+                print(f"[VAPI WEBHOOK SUCCESS] Enqueued background Telegram notification for {customer_phone} (is_lead={extracted_is_lead})", flush=True)
+            except Exception as tg_err:
+                print(f"[VAPI WEBHOOK ERROR] Failed to queue background Telegram notification: {tg_err}", flush=True)
+                traceback.print_exc()
+
+            return {"status": "success", "message": "Webhook processed successfully"}
+
+        except Exception as e:
+            print(f"[VAPI WEBHOOK ERROR] Paid end-call process failed: {str(e)}", flush=True)
+            traceback.print_exc()
+            return {"status": "error", "message": "Internal server error acknowledged"}
+
+    # BRANCH B: Demo Agent
+    else:
+        # Extract user_id from metadata
+        user_id = (
+            call.get('assistantOverrides', {}).get('metadata', {}).get('userId') or
+            call.get('assistantOverrides', {}).get('variableValues', {}).get('user_id') or
+            call.get('assistant', {}).get('metadata', {}).get('userId') or
+            call.get('metadata', {}).get('userId') or
+            message.get('metadata', {}).get('userId') or
+            body.get('metadata', {}).get('userId')
+        )
+        
+        print(f"[VAPI ROUTING] BRANCH B: Demo Agent detected (assistant_id={assistant_id}, resolved_user_id={user_id})", flush=True)
+
+        if not user_id:
+            print("ERROR: No user_id found in webhook payload metadata for demo branch.", flush=True)
+            return {"status": "success", "detail": "Missing user_id ignored"}
+
+        # Fetch demo profile limit and used
+        demo_used = 0
+        demo_limit = 100
+        telegram_chat_id = None
+        
+        try:
+            profile_res = supabase_admin.table("profiles").select("demo_minutes_used, demo_minutes_limit, telegram_chat_id").eq("id", user_id).execute()
+            if profile_res.data:
+                user_profile = profile_res.data[0]
+                demo_used = user_profile.get("demo_minutes_used", 0) or 0
+                demo_limit = user_profile.get("demo_minutes_limit", 100)
+                telegram_chat_id = user_profile.get("telegram_chat_id")
+        except Exception as e:
+            print(f"[VAPI WEBHOOK ERROR] Demo profile fetch failed: {str(e)}", flush=True)
+
+        if not demo_limit or demo_limit <= 0:
+            demo_limit = 100
+
+        # For Pre-Calls (assistant-request)
+        if message_type == "assistant-request":
+            if demo_used >= demo_limit:
+                print(f"[KILL SWITCH] Demo user {user_id} has exhausted minutes. used={demo_used}, limit={demo_limit}", flush=True)
+                return JSONResponse(
+                    status_code=402,
+                    content={"error": "Payment Required", "message": "Demo minutes limit exhausted. Please top up to reactivate your agents."}
+                )
+            return {}
+
+        # For End-Calls (end-of-call-report)
+        try:
+            duration_seconds = int(message.get('durationSeconds') or call.get('durationSeconds') or message.get('duration', 0))
+            quota_cost = math.ceil(duration_seconds / 60) if duration_seconds > 0 else 0
+            
+            transcript = message.get('transcript') or call.get('transcript', '')
+            if not transcript and message.get('artifact', {}).get('messages'):
+                messages_list = message.get('artifact', {}).get('messages', [])
+                transcript = "\n".join([
+                    f"{m.get('role', 'unknown').upper()}: {m.get('message', '')}" 
+                    for m in messages_list if m.get('message')
+                ])
+            
+            recording_url = message.get('artifact', {}).get('recordingUrl', '') or call.get('recordingUrl', '')
+
+            # Save Call Log
+            try:
+                supabase_admin.table("agent_call_logs").insert({
+                    "user_id": user_id,
+                    "duration_seconds": duration_seconds,
+                    "transcript": transcript,
+                    "recording_url": recording_url,
+                    "sentiment": "Neutral"
+                }).execute()
+                print(f"[VAPI WEBHOOK SUCCESS] Demo Call Log saved for User {user_id}", flush=True)
+            except Exception as insert_err:
+                print(f"[VAPI WEBHOOK DATABASE ERROR] Saving call logs failed: {str(insert_err)}", flush=True)
+                traceback.print_exc()
+
+            # Update demo quota
+            new_demo_used = demo_used + quota_cost
+            try:
+                supabase_admin.table('profiles').update({"demo_minutes_used": new_demo_used}).eq('id', user_id).execute()
+                print(f"   -> [SUCCESS] Demo quota updated. Used: {new_demo_used} mins.", flush=True)
+            except Exception as e:
+                print(f"   -> [ERROR] Demo Quota Update Failed: {str(e)}", flush=True)
+
+            # Trigger the original simple Demo Telegram notification (no JSONB extraction, no paid alerts)
+            if telegram_chat_id:
+                try:
+                    customer_phone = (
+                        call.get("customer", {}).get("number") or
+                        call.get("customer", {}).get("phone") or
+                        call.get("customerPhone") or
+                        message.get("customer", {}).get("number") or
+                        "Unknown"
+                    )
+                    background_tasks.add_task(
+                        send_telegram_notification,
+                        customer_phone,
+                        duration_seconds,
+                        transcript,
+                        telegram_chat_id,
+                        False, # is_lead is always False for demo
+                        "",    # intent_summary is empty
+                        None,  # extracted_data is None
+                    )
+                    print(f"[VAPI WEBHOOK SUCCESS] Enqueued Demo Telegram notification for {customer_phone}", flush=True)
+                except Exception as tg_err:
+                    print(f"[VAPI WEBHOOK ERROR] Failed to queue demo Telegram alert: {tg_err}", flush=True)
+                    traceback.print_exc()
+
+            return {"status": "success", "message": "Demo webhook processed successfully"}
+
+        except Exception as e:
+            print(f"[VAPI WEBHOOK ERROR] Demo end-call process failed: {str(e)}", flush=True)
+            traceback.print_exc()
+            return {"status": "error", "message": "Internal server error acknowledged"}
+
 @router.post("/vapi-webhook")
 async def handle_vapi_webhook(request: Request, background_tasks: BackgroundTasks):
     try:
@@ -257,259 +600,7 @@ async def handle_vapi_webhook(request: Request, background_tasks: BackgroundTask
     except Exception:
         print("CRITICAL: VAPI SENT NON-JSON PAYLOAD", flush=True)
         return {"status": "error", "detail": "Invalid JSON"}
-
-    message_type = body.get("message", {}).get("type")
-    
-    # Check for assistant-request (inbound call gatekeeper / LLM override routing)
-    if message_type == "assistant-request":
-        user_id = resolve_user_id_from_body(body)
-        if user_id:
-            if await is_user_overusage(user_id):
-                return JSONResponse(
-                    status_code=402,
-                    content={"error": "Payment Required", "message": "AI minutes limit exhausted. Please top up to reactivate your agents."}
-                )
-        return {}
-
-    if message_type != "end-of-call-report":
-        return {"status": "ignored", "reason": f"Not a handled event type: {message_type}"}
-
-    message = body.get("message", {})
-    event_type = message_type
-    
-    # --- DEEP SEARCH HELPER FUNCTION ---
-    # This recursively scans the entire webhook to find the lead data, 
-    # no matter where Vapi decides to nest it.
-    def deep_search_lead(obj):
-        if isinstance(obj, dict):
-            # Did we find the actual lead data folder?
-            if 'phone' in obj and 'is_lead' in obj:
-                return obj
-            # Did we find the UUID wrapper containing the 'result' folder?
-            if 'result' in obj and isinstance(obj['result'], dict):
-                if 'phone' in obj['result'] and 'is_lead' in obj['result']:
-                    return obj['result']
-            # Otherwise, keep digging deeper
-            for k, v in obj.items():
-                found = deep_search_lead(v)
-                if found: return found
-        elif isinstance(obj, list):
-            for item in obj:
-                found = deep_search_lead(item)
-                if found: return found
-        return None
-
-    if event_type == "end-of-call-report":
-        print("\n========== END OF CALL REPORT RECEIVED ==========", flush=True)
-        
-        call_data = message.get('call', {})
-        user_id = (
-            call_data.get('assistantOverrides', {}).get('metadata', {}).get('userId') or
-            call_data.get('assistantOverrides', {}).get('variableValues', {}).get('user_id') or
-            call_data.get('assistant', {}).get('metadata', {}).get('userId') or
-            call_data.get('metadata', {}).get('userId')
-        )
-        
-        if not user_id:
-            print("ERROR: No user_id found in webhook payload.", flush=True)
-            return {"status": "success", "detail": "Missing user_id ignored"}
-
-        # Extract user's email from payload metadata
-        user_email = (
-            call_data.get('assistantOverrides', {}).get('metadata', {}).get('userEmail') or
-            call_data.get('assistantOverrides', {}).get('variableValues', {}).get('user_email') or
-            call_data.get('assistant', {}).get('metadata', {}).get('userEmail') or
-            call_data.get('metadata', {}).get('userEmail')
-        )
-            
-        analysis = message.get('analysis', {})
-        artifact = message.get('artifact', {})
-        
-        # --- 1. EXTRACT ANALYTICS & ARTIFACTS ---
-        recording_url = artifact.get('recordingUrl', '')
-        
-        transcript = message.get('transcript', '')
-        if not transcript and artifact.get('messages'):
-            messages_list = artifact.get('messages', [])
-            transcript = "\n".join([
-                f"{m.get('role', 'unknown').upper()}: {m.get('message', '')}" 
-                for m in messages_list if m.get('message')
-            ])
-            
-        summary = analysis.get('summary', '')
-        raw_success = str(analysis.get('successEvaluation', 'Neutral')).lower()
-        sentiment = "Positive" if raw_success == "true" else "Neutral"
-
-        duration_seconds = int(message.get('durationSeconds') or call_data.get('durationSeconds') or message.get('duration', 0))
-        quota_cost = math.ceil(duration_seconds / 60) if duration_seconds > 0 else 0
-        
-        if user_id and is_valid_uuid(user_id):
-            # --- 2. INSERT CALL LOGS (BYPASSING RLS) ---
-            try:
-                supabase_admin.table("agent_call_logs").insert({
-                    "user_id": user_id,
-                    "duration_seconds": duration_seconds,
-                    "transcript": transcript,
-                    "recording_url": recording_url,
-                    "sentiment": sentiment
-                }).execute()
-                print("   -> [SUCCESS] Call Log saved to Supabase via admin.", flush=True)
-            except Exception as e:
-                print(f"   -> [ERROR] Call Log Save Failed: {str(e)}", flush=True)
-
-            # --- 2.3 RETRIEVE TELEGRAM CHAT ID DYNAMICALLY ---
-            telegram_chat_id = None
-            try:
-                profile_res = supabase_admin.table("profiles").select("telegram_chat_id").eq("id", user_id).execute()
-                if profile_res.data:
-                    telegram_chat_id = profile_res.data[0].get("telegram_chat_id")
-            except Exception as db_err:
-                print(f"   -> [ERROR] Profiles lookup for telegram_chat_id failed: {str(db_err)}", flush=True)
-
-            # --- 2.5 EXTRACT CUSTOMER PHONE & LEAD DATA ---
-            lead_data = deep_search_lead(body)
-            customer_phone = (
-                call_data.get('customer', {}).get('number') or 
-                call_data.get('customer', {}).get('phone') or
-                call_data.get('customerPhone') or 
-                message.get('customer', {}).get('number') or
-                (lead_data or {}).get('phone') or
-                "Unknown"
-            )
-            duration = duration_seconds
-                
-            # --- 3. DEEP NATIVE LEAD EXTRACTION ---
-            print("--- RUNNING DEEP NATIVE LEAD EXTRACTION ---", flush=True)
-            
-            # These will be populated by extraction and passed to the notification
-            extraction_is_lead = False
-            extraction_intent_summary = ""
-            extraction_data_dicts: list[dict] = []
-            
-            if java_lead := lead_data:
-                print(f"   -> [FOUND] Deep Search extracted lead: {java_lead}", flush=True)
-                
-                extracted_name = java_lead.get('name', "Demo User")
-                extracted_phone = java_lead.get('phone')
-                extracted_email = java_lead.get('email')
-                if not extracted_email or extracted_email == 'none@provided.com':
-                    extracted_email = user_email or "none@provided.com"
-                
-                # Handle boolean safely
-                raw_is_lead = java_lead.get('is_lead', False)
-                is_lead = raw_is_lead is True or str(raw_is_lead).lower() == 'true'
-                extraction_is_lead = is_lead
-                extraction_intent_summary = java_lead.get('intent_summary', '')
-                
-                # Serialize extracted_data for notification if present
-                raw_extracted = java_lead.get('extracted_data', [])
-                if isinstance(raw_extracted, list):
-                    extraction_data_dicts = [
-                        kv if isinstance(kv, dict) else {"key": str(kv), "value": ""}
-                        for kv in raw_extracted
-                    ]
-                
-                if extracted_phone and is_lead:
-                    print(f"   -> [LEAD DETECTED] Saving phone: {extracted_phone}", flush=True)
-                    try:
-                        supabase_admin.table("leads").insert({
-                            "user_id": user_id,
-                            "full_name": extracted_name,
-                            "contact_name": extracted_name,
-                            "email": extracted_email,           
-                            "contact_email": extracted_email,   
-                            "contact_phone": extracted_phone,
-                            "message": summary,
-                            "status": "new",
-                            "source": "voice_demo"
-                        }).execute()
-                        print("   -> [SUCCESS] Lead saved to Supabase via admin.", flush=True)
-                    except Exception as e:
-                        print(f"   -> [ERROR] Lead Save Failed: {str(e)}", flush=True)
-                else:
-                    print("   -> [INFO] is_lead was false or phone was missing.", flush=True)
-            else:
-                print("   -> [INFO] Deep Search found NO lead data anywhere in payload.", flush=True)
-
-            # --- 3.5 TRIGGER BACKGROUND TELEGRAM NOTIFICATION (AFTER EXTRACTION) ---
-            try:
-                background_tasks.add_task(
-                    send_telegram_notification,
-                    customer_phone,
-                    duration,
-                    transcript,
-                    telegram_chat_id,
-                    extraction_is_lead,
-                    extraction_intent_summary,
-                    extraction_data_dicts,
-                )
-                print(f"   -> [SUCCESS] Enqueued background Telegram notification for {customer_phone} (is_lead={extraction_is_lead})", flush=True)
-            except Exception as e:
-                print(f"   -> [ERROR] Failed to queue background Telegram notification: {str(e)}", flush=True)
-
-            # --- 4. UPDATE USER QUOTA (BYPASSING RLS) ---
-            try:
-                # Retrieve the user's total_minutes_limit (default to 100 if the column doesn't exist yet) and their current used_minutes
-                total_limit = 100
-                previous_used_minutes = 0
-                
-                try:
-                    # Select demo_minutes_used and total_minutes_limit
-                    user_q = supabase_admin.table('profiles').select('demo_minutes_used, total_minutes_limit').eq('id', user_id).execute()
-                    if user_q.data:
-                        user_data = user_q.data[0]
-                        previous_used_minutes = user_data.get('demo_minutes_used', 0)
-                        total_limit = user_data.get('total_minutes_limit')
-                        if total_limit is None:
-                            total_limit = user_data.get('demo_minutes_limit', 100)
-                except Exception:
-                    # Fallback if total_minutes_limit column does not exist
-                    user_q = supabase_admin.table('profiles').select('demo_minutes_used, demo_minutes_limit').eq('id', user_id).execute()
-                    if user_q.data:
-                        user_data = user_q.data[0]
-                        previous_used_minutes = user_data.get('demo_minutes_used', 0)
-                        total_limit = user_data.get('demo_minutes_limit', 100)
-
-                # Ensure total_limit is a positive number to avoid ZeroDivisionError
-                if not total_limit or total_limit <= 0:
-                    total_limit = 100
-
-                new_usage = previous_used_minutes + quota_cost
-
-                # Calculate usage percentages
-                prev_pct = (previous_used_minutes / total_limit) * 100
-                new_pct = (new_usage / total_limit) * 100
-
-                # Perform the database update
-                supabase_admin.table('profiles').update({"demo_minutes_used": new_usage}).eq('id', user_id).execute()
-                print(f"   -> [SUCCESS] Quota updated. Used: {new_usage} mins.", flush=True)
-
-                # Check if threshold crossed exactly
-                crossed_80 = (prev_pct < 80 <= new_pct)
-                crossed_100 = (prev_pct < 100 <= new_pct)
-
-                if telegram_chat_id and (crossed_80 or crossed_100):
-                    if crossed_100:
-                        critical_msg = (
-                            "⛔ **CRITICAL ALERT: AGENTS PAUSED**\n"
-                            "Your AI minutes are 100% exhausted. Incoming calls will no longer be processed. Please top up immediately."
-                        )
-                        background_tasks.add_task(send_quota_telegram_alert, telegram_chat_id, critical_msg)
-                        print(f"   -> [QUOTA ALERT] Enqueued 100% critical usage alert.", flush=True)
-                    elif crossed_80:
-                        warning_msg = (
-                            "⚠️ **USAGE WARNING**\n"
-                            "You have reached 80% of your AI minutes limit. Top up soon to ensure your agents stay online!"
-                        )
-                        background_tasks.add_task(send_quota_telegram_alert, telegram_chat_id, warning_msg)
-                        print(f"   -> [QUOTA ALERT] Enqueued 80% usage warning alert.", flush=True)
-
-            except Exception as e:
-                print(f"   -> [ERROR] Quota Update and Alert Failed: {str(e)}", flush=True)
-                
-        print("========== REPORT PROCESSING COMPLETE ==========\n", flush=True)
-                
-    return {"status": "webhook received"}
+    return await handle_vapi_webhook_logic(body, background_tasks)
 
 @router.get("/history/{user_id}")
 async def get_user_call_history(user_id: str):
@@ -624,182 +715,10 @@ async def handle_telegram_webhook(request: Request):
 
 
 @telegram_router.post("/vapi")
-async def handle_vapi_webhook(request: Request, background_tasks: BackgroundTasks):
+async def handle_vapi_webhook_telegram(request: Request, background_tasks: BackgroundTasks):
     try:
         body = await request.json()
     except Exception:
         print("[VAPI WEBHOOK ERROR] Received non-JSON body", flush=True)
         return {"status": "error", "message": "Invalid JSON body"}
-
-    message_type = body.get("message", {}).get("type")
-    
-    # Check for assistant-request (inbound call gatekeeper / LLM override routing)
-    if message_type == "assistant-request":
-        user_id = resolve_user_id_from_body(body)
-        if user_id:
-            if await is_user_overusage(user_id):
-                return JSONResponse(
-                    status_code=402,
-                    content={"error": "Payment Required", "message": "AI minutes limit exhausted. Please top up to reactivate your agents."}
-                )
-        return {}
-
-    if message_type != "end-of-call-report":
-        return {"status": "ignored", "reason": f"Not a handled event type: {message_type}"}
-
-    try:
-        message = body.get("message", {})
-        event_type = message_type
-
-        call = message.get("call", {})
-        assistant_id = call.get("assistantId") or message.get("assistantId")
-        if not assistant_id:
-            print("[VAPI WEBHOOK ERROR] Missing assistantId in webhook", flush=True)
-            return {"status": "ignored", "message": "Missing assistantId"}
-
-        transcript = call.get("transcript", "")
-        recording_url = call.get("recordingUrl", "")
-        duration = call.get("duration", 0)
-
-        customer_phone = (
-            call.get("customer", {}).get("number") or
-            call.get("customer", {}).get("phone") or
-            call.get("customerPhone") or
-            message.get("customer", {}).get("number") or
-            "Unknown"
-        )
-
-        # Declare extraction variables at the start
-        extracted_is_lead = False
-        extracted_intent_summary = ""
-        extracted_data_list = []
-
-        # Database Match 1: Query the Supabase user_agents table.
-        # Select the user_id where vapi_agent_id equals the extracted assistantId.
-        try:
-            agent_res = supabase_admin.table("user_agents").select("user_id").eq("vapi_agent_id", assistant_id).execute()
-            if not agent_res.data:
-                print("Skipping Telegram alert: No chat ID configured or Demo call", flush=True)
-                return {"status": "success", "message": f"No agent matching vapi_agent_id {assistant_id} found"}
-            
-            user_id = agent_res.data[0].get("user_id")
-            if not user_id:
-                print("Skipping Telegram alert: No chat ID configured or Demo call", flush=True)
-                return {"status": "success", "message": "user_id mapping is empty"}
-        except Exception as db_err:
-            print(f"[VAPI WEBHOOK DATABASE ERROR] Supabase user_agents lookup failed: {str(db_err)}", flush=True)
-            traceback.print_exc()
-            return {"status": "success", "message": "Internal query database failure"}
-
-        # Database Match 2: Query the Supabase profiles table using user_id to retrieve telegram_chat_id
-        telegram_chat_id = None
-        try:
-            profile_res = supabase_admin.table("profiles").select("telegram_chat_id").eq("id", user_id).execute()
-            if profile_res.data:
-                telegram_chat_id = profile_res.data[0].get("telegram_chat_id")
-        except Exception as db_err2:
-            print(f"[VAPI WEBHOOK DATABASE ERROR] Supabase profiles lookup failed: {str(db_err2)}", flush=True)
-            traceback.print_exc()
-            # Don't fail the webhook, continue to logging the call even if profiles query failed
-
-        # Save Data: Insert a new row into the agent_call_logs table
-        try:
-            supabase_admin.table("agent_call_logs").insert({
-                "user_id": user_id,
-                "duration_seconds": int(duration) if duration is not None else 0,
-                "transcript": transcript,
-                "recording_url": recording_url,
-                "sentiment": "Neutral"
-            }).execute()
-            print(f"[VAPI WEBHOOK SUCCESS] Call log saved for User {user_id}", flush=True)
-        except Exception as insert_err:
-            print(f"[VAPI WEBHOOK DATABASE ERROR] Saving call logs failed: {str(insert_err)}", flush=True)
-            traceback.print_exc()
-
-        # --- 3. DEEP NATIVE LEAD EXTRACTION & HOT LEAD ALERT ---
-        if transcript and transcript.strip():
-            try:
-                print("[VAPI WEBHOOK] Starting Gemini Deep Native Lead Extraction...", flush=True)
-                response = genai_client.models.generate_content(
-                    model='gemini-2.5-flash',
-                    contents=f"Analyze this transcript (which may contain mixed Hindi/English) to find booking intent, name, phone number (often spoken digit-by-digit), and requested service. Act as an unconstrained key-value extractor. Look for core data (name, phone number) but also dynamically capture any industry-specific variables mentioned in the transcript (e.g., budget, preferences, service types, timeline) and place them inside the extracted_data dictionary. If the user wants to book or request a service, set is_lead = true. \n\nTranscript: {transcript}",
-                    config=genai.types.GenerateContentConfig(
-                        response_mime_type="application/json",
-                        response_schema=DynamicLeadExtraction,
-                    ),
-                )
-                extracted = response.parsed
-                print(f"[VAPI WEBHOOK] Gemini extraction result: {extracted}", flush=True)
-                
-                if extracted:
-                    extracted_is_lead = extracted.is_lead
-                    extracted_intent_summary = extracted.intent_summary
-                    if extracted.extracted_data:
-                        extracted_data_list = [kv.model_dump() for kv in extracted.extracted_data]
-                    
-                    if extracted_is_lead:
-                        print(f"[VAPI WEBHOOK] Hot Lead detected! Saving to appointments table...", flush=True)
-                        scheduled_at = datetime.utcnow().isoformat() + "Z"
-                        
-                        # Extract details from dynamic variables to avoid database constraint errors
-                        contact_name = "Valued Customer"
-                        contact_phone = customer_phone
-                        contact_email = None
-                        
-                        for item in extracted_data_list:
-                            k = item.get("key", "").lower().replace("_", "").replace(" ", "")
-                            v = item.get("value", "")
-                            if k in ["name", "contactname", "customername", "fullname"]:
-                                if v:
-                                    contact_name = v
-                            elif k in ["phone", "contactphone", "customerphone", "phonenumber"]:
-                                if v:
-                                    contact_phone = v
-                            elif k in ["email", "contactemail", "customeremail", "emailaddress"]:
-                                if v:
-                                    contact_email = v
-
-                        supabase_admin.table("appointments").insert({
-                            "user_id": user_id,
-                            "contact_name": contact_name,
-                            "contact_phone": contact_phone,
-                            "contact_email": contact_email,
-                            "notes": extracted_intent_summary,
-                            "extracted_data": extracted_data_list,
-                            "booked_via": "voice",
-                            "scheduled_at": scheduled_at,
-                            "status": "pending"
-                        }).execute()
-                        
-                        print(f"[VAPI WEBHOOK] Lead successfully saved to appointments table.", flush=True)
-                    else:
-                        print("[VAPI WEBHOOK] Transcript was not identified as a Hot Lead.", flush=True)
-            except Exception as lead_err:
-                print(f"[VAPI WEBHOOK] Extraction Error: {lead_err}", flush=True)
-                traceback.print_exc()
-        else:
-            print("[VAPI WEBHOOK] Skipping Gemini extraction: Transcript is empty or null.", flush=True)
-
-        # Dispatch Unified Telegram Alert
-        try:
-            background_tasks.add_task(
-                send_telegram_notification,
-                customer_phone,
-                int(duration) if duration is not None else 0,
-                transcript,
-                telegram_chat_id,
-                extracted_is_lead,
-                extracted_intent_summary,
-                extracted_data_list,
-            )
-            print(f"[VAPI WEBHOOK SUCCESS] Enqueued background Telegram notification for {customer_phone} (is_lead={extracted_is_lead})", flush=True)
-        except Exception as tg_err:
-            print(f"[VAPI WEBHOOK ERROR] Failed to queue background Telegram notification: {tg_err}", flush=True)
-            traceback.print_exc()
-
-        return {"status": "success", "message": "Webhook processed successfully"}
-
-    except Exception as e:
-        print(f"[VAPI WEBHOOK UNHANDLED ERROR] Webhook execution failed: {str(e)}", flush=True)
-        traceback.print_exc()
-        return {"status": "error", "message": "Internal server error acknowledged"}
+    return await handle_vapi_webhook_logic(body, background_tasks)
