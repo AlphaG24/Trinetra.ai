@@ -3,6 +3,7 @@ import { createClient } from '@/lib/server'
 import { Topbar } from '@/src/components/dashboard/Topbar'
 import { Sidebar } from '@/src/components/dashboard/Sidebar'
 import { DashboardInitializer } from '@/src/components/dashboard/DashboardInitializer'
+import { QuotaBanner } from '@/src/components/dashboard/QuotaBanner'
 
 export default async function DashboardLayout({
   children,
@@ -34,6 +35,7 @@ export default async function DashboardLayout({
         <Sidebar agents={agents || []} />
         <main className="flex-1 overflow-y-auto pt-16 p-6 lg:ml-60 transition-all duration-300">
           <div className="max-w-[1400px] mx-auto w-full">
+            <QuotaBanner />
             {children}
           </div>
         </main>

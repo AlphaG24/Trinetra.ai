@@ -7,6 +7,7 @@ import traceback
 from datetime import datetime
 from typing import Dict, Any
 from fastapi import APIRouter, HTTPException, Request, BackgroundTasks
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from database import supabase, supabase_admin
 from google import genai
@@ -124,6 +125,72 @@ def send_quota_telegram_alert(chat_id: str, text: str):
     except Exception as e:
         print(f"[QUOTA ALERT ERROR] Network failure: {str(e)}", flush=True)
 
+def resolve_user_id_from_body(body: dict) -> str | None:
+    message = body.get("message", {})
+    call_data = message.get("call", {}) or body.get("call", {})
+    
+    # 1. Try metadata/assistantOverrides
+    user_id = (
+        call_data.get('assistantOverrides', {}).get('metadata', {}).get('userId') or
+        call_data.get('assistantOverrides', {}).get('variableValues', {}).get('user_id') or
+        call_data.get('assistant', {}).get('metadata', {}).get('userId') or
+        call_data.get('metadata', {}).get('userId') or
+        body.get('metadata', {}).get('userId')
+    )
+    if user_id:
+        return user_id
+
+    # 2. Try assistantId lookup in user_agents
+    assistant_id = (
+        call_data.get("assistantId") or
+        message.get("assistantId") or
+        body.get("assistantId") or
+        body.get("assistant", {}).get("id")
+    )
+    if assistant_id:
+        try:
+            agent_res = supabase_admin.table("user_agents").select("user_id").eq("vapi_agent_id", assistant_id).execute()
+            if agent_res.data:
+                return agent_res.data[0].get("user_id")
+        except Exception as e:
+            print(f"[RESOLVE USER ERROR] user_agents lookup failed: {str(e)}", flush=True)
+
+    return None
+
+async def is_user_overusage(user_id: str) -> bool:
+    if not user_id:
+        return False
+    try:
+        total_limit = 100
+        used_minutes = 0
+        try:
+            # Perform Supabase lookup
+            res = supabase_admin.table("profiles").select("demo_minutes_used, total_minutes_limit").eq("id", user_id).execute()
+            if res.data:
+                user_data = res.data[0]
+                used_minutes = user_data.get("demo_minutes_used", 0)
+                total_limit = user_data.get("total_minutes_limit")
+                if total_limit is None:
+                    total_limit = user_data.get("demo_minutes_limit", 100)
+        except Exception:
+            # Fallback if total_minutes_limit column does not exist
+            res = supabase_admin.table("profiles").select("demo_minutes_used, demo_minutes_limit").eq("id", user_id).execute()
+            if res.data:
+                user_data = res.data[0]
+                used_minutes = user_data.get("demo_minutes_used", 0)
+                total_limit = user_data.get("demo_minutes_limit", 100)
+        
+        # Ensure total_limit is positive to prevent ZeroDivisionError or weird comparison issues
+        if not total_limit or total_limit <= 0:
+            total_limit = 100
+
+        if used_minutes >= total_limit:
+            print(f"[KILL SWITCH] User {user_id} has exhausted minutes. used_minutes={used_minutes}, total_limit={total_limit}", flush=True)
+            return True
+    except Exception as e:
+        print(f"[KILL SWITCH ERROR] Failed to check usage limits: {str(e)}", flush=True)
+    return False
+
 class StartDemoRequest(BaseModel):
     user_id: str
     assigned_vapi_agent_id: str | None = None
@@ -192,8 +259,20 @@ async def handle_vapi_webhook(request: Request, background_tasks: BackgroundTask
         return {"status": "error", "detail": "Invalid JSON"}
 
     message_type = body.get("message", {}).get("type")
+    
+    # Check for assistant-request (inbound call gatekeeper / LLM override routing)
+    if message_type == "assistant-request":
+        user_id = resolve_user_id_from_body(body)
+        if user_id:
+            if await is_user_overusage(user_id):
+                return JSONResponse(
+                    status_code=402,
+                    content={"error": "Payment Required", "message": "AI minutes limit exhausted. Please top up to reactivate your agents."}
+                )
+        return {}
+
     if message_type != "end-of-call-report":
-        return {"status": "ignored", "reason": "Not the final end-of-call report"}
+        return {"status": "ignored", "reason": f"Not a handled event type: {message_type}"}
 
     message = body.get("message", {})
     event_type = message_type
@@ -553,8 +632,20 @@ async def handle_vapi_webhook(request: Request, background_tasks: BackgroundTask
         return {"status": "error", "message": "Invalid JSON body"}
 
     message_type = body.get("message", {}).get("type")
+    
+    # Check for assistant-request (inbound call gatekeeper / LLM override routing)
+    if message_type == "assistant-request":
+        user_id = resolve_user_id_from_body(body)
+        if user_id:
+            if await is_user_overusage(user_id):
+                return JSONResponse(
+                    status_code=402,
+                    content={"error": "Payment Required", "message": "AI minutes limit exhausted. Please top up to reactivate your agents."}
+                )
+        return {}
+
     if message_type != "end-of-call-report":
-        return {"status": "ignored", "reason": "Not the final end-of-call report"}
+        return {"status": "ignored", "reason": f"Not a handled event type: {message_type}"}
 
     try:
         message = body.get("message", {})

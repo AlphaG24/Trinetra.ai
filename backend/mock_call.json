@@ -1,13 +1,12 @@
 {
     "message": {
         "type": "end-of-call-report",
-        "transcript": "AI: नमस्ते, मैं त्रिनेत्र से अनिका बोल रही हूँ. मैं आपकी किस तरह से मदद कर सकती हूं?\nUser: Hi, my name is Ragab. My number is 9 8 7 6 5 4 3 2 1 0. I want to buy a voice agent for my clinic. My budget is 500 dollars.\nAI: Thank you, Ragab. I will save this lead and our team will contact you.",
-        "artifact": {
-            "transcript": "AI: नमस्ते, मैं त्रिनेत्र से अनिका बोल रही हूँ. मैं आपकी किस तरह से मदद कर सकती हूं?\nUser: Hi, my name is Ragab. My number is 9 8 7 6 5 4 3 2 1 0. I want to buy a voice agent for my clinic. My budget is 500 dollars.\nAI: Thank you, Ragab. I will save this lead and our team will contact you."
-        },
+        "duration": 1500,
+        "transcript": "AI: This is the final 25-minute test call to trigger the 100% critical alert.",
         "call": {
-            "id": "test_mock_12345",
+            "id": "test_mock_100_percent",
             "assistantId": "4d469133-7d25-4e2b-9d72-e4a0a6fe4eb7",
+            "duration": 1500,
             "metadata": {
                 "userId": "b9862043-d82f-4a10-9def-0d82ee0ed59d",
                 "userEmail": "test@example.com"
@@ -15,8 +14,7 @@
             "customer": {
                 "number": "+19876543210"
             },
-            "duration": 65,
-            "transcript": "AI: नमस्ते, मैं त्रिनेत्र से अनिका बोल रही हूँ. मैं आपकी किस तरह से मदद कर सकती हूं?\nUser: Hi, my name is Ragab. My number is 9 8 7 6 5 4 3 2 1 0. I want to buy a voice agent for my clinic. My budget is 500 dollars.\nAI: Thank you, Ragab. I will save this lead and our team will contact you."
+            "transcript": "AI: This is the final 25-minute test call to trigger the 100% critical alert."
         }
     }
 }
