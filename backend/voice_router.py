@@ -28,12 +28,11 @@ class DynamicLeadExtraction(BaseModel):
 def send_telegram_notification(
     phone: str,
     duration: int,
-    sentiment: str,
     transcript: str,
     chat_id: str | None = None,
     is_lead: bool = False,
     intent_summary: str = "",
-    extracted_data: list[dict] | None = None,
+    extracted_data: list | None = None,
 ):
     bot_token = os.getenv("TELEGRAM_BOT_TOKEN")
 
@@ -48,15 +47,13 @@ def send_telegram_notification(
     seconds = duration % 60
     duration_str = f"{minutes}m {seconds}s" if minutes > 0 else f"{seconds}s"
 
-    # Truncate transcript preview to stay within Telegram's 4096 char limit
-    safe_transcript = transcript[:3500] + "..." if transcript and len(transcript) > 3500 else (transcript or "No transcript available.")
+    snippet = transcript[:250] + "..." if transcript and len(transcript) > 250 else (transcript or "No transcript available.")
 
     summary_message = (
-        f"🚨 *New AI Call Log*\n\n"
-        f"📞 *Phone:* `{phone}`\n"
-        f"⏱ *Duration:* {duration_str}\n"
-        f"🧠 *Sentiment:* {sentiment}\n\n"
-        f"📝 *Transcript:*\n{safe_transcript}"
+        f"📞 **New AI Call Log**\n"
+        f"📱 **Phone:** {phone}\n"
+        f"⏱️ **Duration:** {duration_str}\n"
+        f"📝 **Transcript Preview:** {snippet}"
     )
 
     try:
@@ -73,15 +70,21 @@ def send_telegram_notification(
     if is_lead:
         dynamic_vars = ""
         if extracted_data:
-            dynamic_vars = "\n".join([
-                f"🔹 *{kv.get('key', '').replace('_', ' ').title()}:* {kv.get('value', '')}"
-                for kv in extracted_data
-            ])
+            items = []
+            for item in extracted_data:
+                if isinstance(item, dict):
+                    k = item.get("key", "")
+                    v = item.get("value", "")
+                else:
+                    k = getattr(item, "key", "")
+                    v = getattr(item, "value", "")
+                items.append(f"🔹 **{k.replace('_', ' ').title()}:** {v}")
+            dynamic_vars = "\n".join(items)
 
         hot_lead_message = (
-            f"🚨🔥 *HOT LEAD CAPTURED!* 🔥🚨\n\n"
-            f"{dynamic_vars}\n\n"
-            f"📝 *Intent Summary:* {intent_summary}"
+            f"🚨 **HOT LEAD CAPTURED!** 🚨\n"
+            f"{dynamic_vars}\n"
+            f"📝 **Summary:** {intent_summary}"
         )
 
         try:
@@ -156,13 +159,17 @@ async def check_limits_and_get_keys(req: StartDemoRequest):
 @router.post("/vapi-webhook")
 async def handle_vapi_webhook(request: Request, background_tasks: BackgroundTasks):
     try:
-        payload = await request.json()
+        body = await request.json()
     except Exception:
         print("CRITICAL: VAPI SENT NON-JSON PAYLOAD", flush=True)
         return {"status": "error", "detail": "Invalid JSON"}
 
-    message = payload.get("message", {})
-    event_type = message.get("type", "UNKNOWN_EVENT")
+    message_type = body.get("message", {}).get("type")
+    if message_type != "end-of-call-report":
+        return {"status": "ignored", "reason": "Not the final end-of-call report"}
+
+    message = body.get("message", {})
+    event_type = message_type
     
     # --- DEEP SEARCH HELPER FUNCTION ---
     # This recursively scans the entire webhook to find the lead data, 
@@ -254,7 +261,7 @@ async def handle_vapi_webhook(request: Request, background_tasks: BackgroundTask
                 print(f"   -> [ERROR] Profiles lookup for telegram_chat_id failed: {str(db_err)}", flush=True)
 
             # --- 2.5 EXTRACT CUSTOMER PHONE & LEAD DATA ---
-            lead_data = deep_search_lead(payload)
+            lead_data = deep_search_lead(body)
             customer_phone = (
                 call_data.get('customer', {}).get('number') or 
                 call_data.get('customer', {}).get('phone') or
@@ -324,7 +331,6 @@ async def handle_vapi_webhook(request: Request, background_tasks: BackgroundTask
                     send_telegram_notification,
                     customer_phone,
                     duration,
-                    sentiment,
                     transcript,
                     telegram_chat_id,
                     extraction_is_lead,
@@ -462,20 +468,20 @@ async def handle_telegram_webhook(request: Request):
 
 
 @telegram_router.post("/vapi")
-async def handle_vapi_webhook(request: Request):
+async def handle_vapi_webhook(request: Request, background_tasks: BackgroundTasks):
     try:
-        payload = await request.json()
+        body = await request.json()
     except Exception:
         print("[VAPI WEBHOOK ERROR] Received non-JSON body", flush=True)
         return {"status": "error", "message": "Invalid JSON body"}
 
+    message_type = body.get("message", {}).get("type")
+    if message_type != "end-of-call-report":
+        return {"status": "ignored", "reason": "Not the final end-of-call report"}
+
     try:
-        message = payload.get("message", {})
-        message_type = message.get("type")
-        
-        if message_type != "end-of-call-report":
-            print(f"[VAPI WEBHOOK INFO] Ignored event type: {message_type}", flush=True)
-            return {"status": "ignored", "message": "Only end-of-call-report processed"}
+        message = body.get("message", {})
+        event_type = message_type
 
         call = message.get("call", {})
         assistant_id = call.get("assistantId") or message.get("assistantId")
@@ -494,6 +500,11 @@ async def handle_vapi_webhook(request: Request):
             message.get("customer", {}).get("number") or
             "Unknown"
         )
+
+        # Declare extraction variables at the start
+        extracted_is_lead = False
+        extracted_intent_summary = ""
+        extracted_data_list = []
 
         # Database Match 1: Query the Supabase user_agents table.
         # Select the user_id where vapi_agent_id equals the extracted assistantId.
@@ -538,8 +549,8 @@ async def handle_vapi_webhook(request: Request):
             traceback.print_exc()
 
         # --- 3. DEEP NATIVE LEAD EXTRACTION & HOT LEAD ALERT ---
-        try:
-            if transcript:
+        if transcript and transcript.strip():
+            try:
                 print("[VAPI WEBHOOK] Starting Gemini Deep Native Lead Extraction...", flush=True)
                 response = genai_client.models.generate_content(
                     model='gemini-2.5-flash',
@@ -552,95 +563,70 @@ async def handle_vapi_webhook(request: Request):
                 extracted = response.parsed
                 print(f"[VAPI WEBHOOK] Gemini extraction result: {extracted}", flush=True)
                 
-                if extracted and extracted.is_lead:
-                    print(f"[VAPI WEBHOOK] Hot Lead detected! Saving to appointments table...", flush=True)
-                    # Serialize list[KeyValuePair] to list[dict] for Supabase JSON column
-                    serialized_data = [kv.model_dump() for kv in extracted.extracted_data]
-                    scheduled_at = datetime.utcnow().isoformat() + "Z"
+                if extracted:
+                    extracted_is_lead = extracted.is_lead
+                    extracted_intent_summary = extracted.intent_summary
+                    if extracted.extracted_data:
+                        extracted_data_list = [kv.model_dump() for kv in extracted.extracted_data]
                     
-                    supabase_admin.table("appointments").insert({
-                        "user_id": user_id,
-                        "extracted_data": serialized_data,
-                        "booked_via": "voice",
-                        "scheduled_at": scheduled_at,
-                        "status": "pending"
-                    }).execute()
-                    
-                    print(f"[VAPI WEBHOOK] Lead successfully saved to appointments table.", flush=True)
-                    
-                    # Dispatch Hot Lead Telegram alert if chat ID exists
-                    try:
-                        if telegram_chat_id:
-                            bot_token = os.getenv("TELEGRAM_BOT_TOKEN")
-                            if bot_token:
-                                dynamic_vars = "\n".join([f"🔹 *{kv.key.replace('_', ' ').title()}:* {kv.value}" for kv in extracted.extracted_data])
-                                hot_lead_message = (
-                                    f"🚨 *HOT LEAD CAPTURED!* 🚨\n"
-                                    f"{dynamic_vars}\n"
-                                    f"📝 *Summary:* {extracted.intent_summary}"
-                                )
-                                
-                                telegram_url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
-                                telegram_payload = {
-                                    "chat_id": telegram_chat_id,
-                                    "text": hot_lead_message,
-                                    "parse_mode": "Markdown"
-                                }
-                                
-                                async with httpx.AsyncClient() as client:
-                                    res = await client.post(telegram_url, json=telegram_payload, timeout=10.0)
-                                    if res.status_code == 200:
-                                        print(f"[VAPI WEBHOOK SUCCESS] Hot Lead Alert sent to Chat ID {telegram_chat_id}", flush=True)
-                                    else:
-                                        print(f"[VAPI WEBHOOK ERROR] Telegram API returned code {res.status_code} for Hot Lead alert: {res.text}", flush=True)
-                            else:
-                                print("[VAPI WEBHOOK ERROR] TELEGRAM_BOT_TOKEN not configured for Hot Lead alert", flush=True)
-                    except Exception as tg_lead_err:
-                        print(f"Extraction or Alert Error: {tg_lead_err}", flush=True)
-                        traceback.print_exc()
-                else:
-                    print("[VAPI WEBHOOK] Transcript was not identified as a Hot Lead.", flush=True)
-        except Exception as lead_err:
-            print(f"Extraction or Alert Error: {lead_err}", flush=True)
-            traceback.print_exc()
+                    if extracted_is_lead:
+                        print(f"[VAPI WEBHOOK] Hot Lead detected! Saving to appointments table...", flush=True)
+                        scheduled_at = datetime.utcnow().isoformat() + "Z"
+                        
+                        # Extract details from dynamic variables to avoid database constraint errors
+                        contact_name = "Valued Customer"
+                        contact_phone = customer_phone
+                        contact_email = None
+                        
+                        for item in extracted_data_list:
+                            k = item.get("key", "").lower().replace("_", "").replace(" ", "")
+                            v = item.get("value", "")
+                            if k in ["name", "contactname", "customername", "fullname"]:
+                                if v:
+                                    contact_name = v
+                            elif k in ["phone", "contactphone", "customerphone", "phonenumber"]:
+                                if v:
+                                    contact_phone = v
+                            elif k in ["email", "contactemail", "customeremail", "emailaddress"]:
+                                if v:
+                                    contact_email = v
 
-        # Send Alert: If a telegram_chat_id exists, format message and send POST to Telegram API
+                        supabase_admin.table("appointments").insert({
+                            "user_id": user_id,
+                            "contact_name": contact_name,
+                            "contact_phone": contact_phone,
+                            "contact_email": contact_email,
+                            "notes": extracted_intent_summary,
+                            "extracted_data": extracted_data_list,
+                            "booked_via": "voice",
+                            "scheduled_at": scheduled_at,
+                            "status": "pending"
+                        }).execute()
+                        
+                        print(f"[VAPI WEBHOOK] Lead successfully saved to appointments table.", flush=True)
+                    else:
+                        print("[VAPI WEBHOOK] Transcript was not identified as a Hot Lead.", flush=True)
+            except Exception as lead_err:
+                print(f"[VAPI WEBHOOK] Extraction Error: {lead_err}", flush=True)
+                traceback.print_exc()
+        else:
+            print("[VAPI WEBHOOK] Skipping Gemini extraction: Transcript is empty or null.", flush=True)
+
+        # Dispatch Unified Telegram Alert
         try:
-            if telegram_chat_id:
-                bot_token = os.getenv("TELEGRAM_BOT_TOKEN")
-                if bot_token:
-                    minutes = int(duration) // 60
-                    seconds = int(duration) % 60
-                    duration_str = f"{minutes}m {seconds}s" if minutes > 0 else f"{seconds}s"
-                    
-                    snippet = transcript[:250] + "..." if transcript and len(transcript) > 250 else (transcript or "No transcript available.")
-                    
-                    telegram_message = (
-                        f"📞 *New AI Call Log*\n"
-                        f"📱 *Phone:* {customer_phone}\n"
-                        f"⏱️ *Duration:* {duration_str}\n"
-                        f"📝 *Transcript Preview:* {snippet}"
-                    )
-                    
-                    telegram_url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
-                    telegram_payload = {
-                        "chat_id": telegram_chat_id,
-                        "text": telegram_message,
-                        "parse_mode": "Markdown"
-                    }
-
-                    async with httpx.AsyncClient() as client:
-                        res = await client.post(telegram_url, json=telegram_payload, timeout=10.0)
-                        if res.status_code == 200:
-                            print(f"[VAPI WEBHOOK SUCCESS] Alert sent to Chat ID {telegram_chat_id}", flush=True)
-                        else:
-                            print(f"[VAPI WEBHOOK ERROR] Telegram API returned code {res.status_code}: {res.text}", flush=True)
-                else:
-                    print("[VAPI WEBHOOK ERROR] TELEGRAM_BOT_TOKEN environment variable not set", flush=True)
-            else:
-                print("Skipping Telegram alert: No chat ID configured or Demo call", flush=True)
+            background_tasks.add_task(
+                send_telegram_notification,
+                customer_phone,
+                int(duration) if duration is not None else 0,
+                transcript,
+                telegram_chat_id,
+                extracted_is_lead,
+                extracted_intent_summary,
+                extracted_data_list,
+            )
+            print(f"[VAPI WEBHOOK SUCCESS] Enqueued background Telegram notification for {customer_phone} (is_lead={extracted_is_lead})", flush=True)
         except Exception as tg_err:
-            print(f"Extraction or Alert Error: {tg_err}", flush=True)
+            print(f"[VAPI WEBHOOK ERROR] Failed to queue background Telegram notification: {tg_err}", flush=True)
             traceback.print_exc()
 
         return {"status": "success", "message": "Webhook processed successfully"}
