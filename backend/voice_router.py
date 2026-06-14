@@ -158,7 +158,7 @@ def resolve_user_id_from_body(body: dict) -> str | None:
     return None
 
 async def is_user_overusage(user_id: str) -> bool:
-    if not user_id:
+    if not user_id or not is_valid_uuid(user_id):
         return False
     try:
         total_limit = 100
@@ -316,6 +316,10 @@ async def handle_vapi_webhook_logic(body: dict, background_tasks: BackgroundTask
         # Guard Clause
         if user_id is None or str(user_id).strip() == "" or str(user_id).lower() == "none":
             return {"status": "error", "message": "Missing user_id in database and payload"}
+            
+        if not is_valid_uuid(user_id):
+            print(f"[VAPI ROUTING] Branch A: user_id '{user_id}' is not a valid UUID. Failing gracefully.", flush=True)
+            return {"status": "error", "message": "Invalid user_id format"}
             
         # Retrieve paid quota limits and telegram chat ID
         paid_used = 0
@@ -544,15 +548,18 @@ async def handle_vapi_webhook_logic(body: dict, background_tasks: BackgroundTask
         demo_limit = 100
         telegram_chat_id = None
         
-        try:
-            profile_res = supabase_admin.table("profiles").select("demo_minutes_used, demo_minutes_limit, telegram_chat_id").eq("id", user_id).execute()
-            if profile_res.data:
-                user_profile = profile_res.data[0]
-                demo_used = user_profile.get("demo_minutes_used", 0) or 0
-                demo_limit = user_profile.get("demo_minutes_limit", 100)
-                telegram_chat_id = user_profile.get("telegram_chat_id")
-        except Exception as e:
-            print(f"[VAPI WEBHOOK ERROR] Demo profile fetch failed: {str(e)}", flush=True)
+        if is_valid_uuid(user_id):
+            try:
+                profile_res = supabase_admin.table("profiles").select("demo_minutes_used, demo_minutes_limit, telegram_chat_id").eq("id", user_id).execute()
+                if profile_res.data:
+                    user_profile = profile_res.data[0]
+                    demo_used = user_profile.get("demo_minutes_used", 0) or 0
+                    demo_limit = user_profile.get("demo_minutes_limit", 100)
+                    telegram_chat_id = user_profile.get("telegram_chat_id")
+            except Exception as e:
+                print(f"[VAPI WEBHOOK ERROR] Demo profile fetch failed: {str(e)}", flush=True)
+        else:
+            print(f"[VAPI ROUTING] Skipping demo profile fetch for non-UUID user_id: {user_id}", flush=True)
 
         if not demo_limit or demo_limit <= 0:
             demo_limit = 100
@@ -583,28 +590,34 @@ async def handle_vapi_webhook_logic(body: dict, background_tasks: BackgroundTask
             recording_url = message.get('artifact', {}).get('recordingUrl', '') or call.get('recordingUrl', '')
 
             # Save Call Log
-            try:
-                supabase_admin.table("agent_call_logs").insert({
-                    "user_id": user_id,
-                    "duration_seconds": duration_seconds,
-                    "transcript": transcript,
-                    "recording_url": recording_url,
-                    "sentiment": "Neutral",
-                    "provider_call_id": provider_call_id,
-                    "vapi_agent_id": assistant_id
-                }).execute()
-                print(f"[VAPI WEBHOOK SUCCESS] Demo Call Log saved for User {user_id}", flush=True)
-            except Exception as insert_err:
-                print(f"[VAPI WEBHOOK DATABASE ERROR] Saving call logs failed: {str(insert_err)}", flush=True)
-                traceback.print_exc()
+            if is_valid_uuid(user_id):
+                try:
+                    supabase_admin.table("agent_call_logs").insert({
+                        "user_id": user_id,
+                        "duration_seconds": duration_seconds,
+                        "transcript": transcript,
+                        "recording_url": recording_url,
+                        "sentiment": "Neutral",
+                        "provider_call_id": provider_call_id,
+                        "vapi_agent_id": assistant_id
+                    }).execute()
+                    print(f"[VAPI WEBHOOK SUCCESS] Demo Call Log saved for User {user_id}", flush=True)
+                except Exception as insert_err:
+                    print(f"[VAPI WEBHOOK DATABASE ERROR] Saving call logs failed: {str(insert_err)}", flush=True)
+                    traceback.print_exc()
+            else:
+                print(f"[VAPI ROUTING] Skipping call log insertion for non-UUID user_id: {user_id}", flush=True)
 
             # Update demo quota
-            new_demo_used = demo_used + quota_cost
-            try:
-                supabase_admin.table('profiles').update({"demo_minutes_used": new_demo_used}).eq('id', user_id).execute()
-                print(f"   -> [SUCCESS] Demo quota updated. Used: {new_demo_used} mins.", flush=True)
-            except Exception as e:
-                print(f"   -> [ERROR] Demo Quota Update Failed: {str(e)}", flush=True)
+            if is_valid_uuid(user_id):
+                new_demo_used = demo_used + quota_cost
+                try:
+                    supabase_admin.table('profiles').update({"demo_minutes_used": new_demo_used}).eq('id', user_id).execute()
+                    print(f"   -> [SUCCESS] Demo quota updated. Used: {new_demo_used} mins.", flush=True)
+                except Exception as e:
+                    print(f"   -> [ERROR] Demo Quota Update Failed: {str(e)}", flush=True)
+            else:
+                print(f"[VAPI ROUTING] Skipping demo quota update for non-UUID user_id: {user_id}", flush=True)
 
             # Trigger the original simple Demo Telegram notification (no JSONB extraction, no paid alerts)
             if telegram_chat_id:

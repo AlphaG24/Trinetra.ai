@@ -145,6 +145,11 @@ export function VoiceDemo({
       vapiInstance.on('error', (err) => {
         console.error("/// VAPI ERROR EVENT TRIGGERED ///");
         console.error("Raw Error:", err);
+        try {
+          console.error("Vapi Error Event Detailed:", JSON.stringify(err, null, 2));
+        } catch (e) {
+          console.error("Vapi Error Event Detailed (non-JSON):", String(err));
+        }
         let errorMsg = "Voice connection failed.";
         
         if (err && typeof err === 'object') {
@@ -169,27 +174,29 @@ export function VoiceDemo({
         if (vapiRef.current === vapiInstance) vapiRef.current = null
       })
 
+      const sanitizedUserId = userId || "anonymous"
+      const sanitizedUserEmail = user.email || "no-email"
+
       // 5. Start the call and pass the user ID and user email context
       await vapiInstance.start(finalAgentId, {
         metadata: {
-          userId: userId,
-          userEmail: user.email
+          userId: sanitizedUserId,
+          userEmail: sanitizedUserEmail
         },
         variableValues: {
-          user_id: userId,
-          user_email: user.email
-        },
-        assistantOverrides: {
-          variableValues: {
-            user_id: userId,
-            user_email: user.email
-          }
+          user_id: sanitizedUserId,
+          user_email: sanitizedUserEmail
         }
-      } as any);
+      });
       console.log("5. Vapi Connection Request Sent Successfully!");
 
     } catch (error: any) {
       console.error("Connection Sequence Failed:", error);
+      try {
+        console.error("Connection Sequence Failed Detailed:", JSON.stringify(error, null, 2));
+      } catch (e) {
+        console.error("Connection Sequence Failed Detailed (non-JSON):", String(error));
+      }
       toast.error("Failed to connect to the voice server.")
       setCallState('idle')
     }

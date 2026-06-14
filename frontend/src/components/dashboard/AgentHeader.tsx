@@ -132,31 +132,32 @@ export function AgentHeader({ agent }: { agent: AgentLike }) {
             const supabase = createClient()
             const { data: { user } } = await supabase.auth.getUser()
 
-            const metadata: any = {}
-            const variableValues: any = {}
-            const assistantOverrides: any = {
-                variableValues: {}
-            }
+            const userId = user?.id || "anonymous"
+            const userEmail = user?.email || "no-email"
 
-            if (user?.id) {
-                metadata.userId = user.id
-                metadata.userEmail = user.email
-                variableValues.user_id = user.id
-                variableValues.user_email = user.email
-                assistantOverrides.variableValues.user_id = user.id
-                assistantOverrides.variableValues.user_email = user.email
+            const metadata = {
+                userId,
+                userEmail
+            }
+            const variableValues = {
+                user_id: userId,
+                user_email: userEmail
             }
 
             console.log('Attempting vapi.start() with ID:', agent.vapi_assistant_id);
             await vapi.start(agent.vapi_assistant_id, {
                 metadata,
-                variableValues,
-                assistantOverrides
-            } as any);
+                variableValues
+            });
             console.log('vapi.start() called successfully.');
         } catch (error: unknown) {
             const message = getVapiErrorMessage(error);
             console.error('CRITICAL: Failed to start call:', error);
+            try {
+                console.error('CRITICAL: Detailed start call error payload:', JSON.stringify(error, null, 2));
+            } catch (e) {
+                console.error('CRITICAL: Detailed start call error (non-JSON):', String(error));
+            }
             setCallStatus('idle');
             alert(`Failed to connect: ${message}`);
         }

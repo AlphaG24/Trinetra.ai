@@ -162,6 +162,11 @@ export function useVapi() {
             }
 
             console.error("[Vapi] Error:", err);
+            try {
+                console.error("[Vapi] Detailed error event payload:", JSON.stringify(err, null, 2));
+            } catch (e) {
+                console.error("[Vapi] Detailed error event (non-JSON):", String(err));
+            }
             setError(message || "Voice connection error.");
         };
 
@@ -201,33 +206,40 @@ export function useVapi() {
                 // Retrieve user auth info from Supabase if available
                 let metadata: any = {};
                 let variableValues: any = {};
-                let assistantOverrides: any = {
-                    variableValues: {}
-                };
+
+                let userId = "anonymous";
+                let userEmail = "no-email";
 
                 try {
                     const { createClient } = await import("@/utils/supabase/client");
                     const supabase = createClient();
                     const { data: { user } } = await supabase.auth.getUser();
                     if (user?.id) {
-                        metadata.userId = user.id;
-                        metadata.userEmail = user.email;
-                        variableValues.user_id = user.id;
-                        variableValues.user_email = user.email;
-                        assistantOverrides.variableValues.user_id = user.id;
-                        assistantOverrides.variableValues.user_email = user.email;
+                        userId = user.id;
+                        if (user.email) {
+                            userEmail = user.email;
+                        }
                     }
                 } catch (authErr) {
                     console.warn("[Vapi Hook] Could not fetch authenticated user:", authErr);
                 }
 
+                metadata.userId = userId;
+                metadata.userEmail = userEmail;
+                variableValues.user_id = userId;
+                variableValues.user_email = userEmail;
+
                 await vapiRef.current.start(VAPI_ASSISTANT_ID, {
                     metadata,
-                    variableValues,
-                    assistantOverrides
-                } as any);
+                    variableValues
+                });
             } catch (err: unknown) {
                 console.error("[Vapi] Failed to start call:", err);
+                try {
+                    console.error("[Vapi] Detailed start call error payload:", JSON.stringify(err, null, 2));
+                } catch (e) {
+                    console.error("[Vapi] Detailed start call error (non-JSON):", String(err));
+                }
                 setError(err instanceof Error ? err.message : "Connection failed");
                 setIsConnecting(false);
             }
