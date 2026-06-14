@@ -33,7 +33,7 @@ def send_telegram_notification(
     chat_id: str | None = None,
     is_lead: bool = False,
     intent_summary: str = "",
-    extracted_data: list | None = None,
+    extracted_data: dict | list | None = None,
 ):
     bot_token = os.getenv("TELEGRAM_BOT_TOKEN")
 
@@ -41,74 +41,101 @@ def send_telegram_notification(
         print("Skipping Telegram alert: No chat ID configured or Demo call", flush=True)
         return
 
-    url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+    # Normalize extracted_data to a flat dict (lead_data)
+    lead_data = {}
+    if isinstance(extracted_data, list):
+        for item in extracted_data:
+            if isinstance(item, dict):
+                k = item.get("key", "")
+                v = item.get("value", "")
+            else:
+                k = getattr(item, "key", "")
+                v = getattr(item, "value", "")
+            if k:
+                lead_data[k] = v
+    elif isinstance(extracted_data, dict):
+        lead_data = extracted_data
 
-    # --- Message 1: Call Log Summary ---
+    # Phone Fallback: If caller ID is Unknown, look inside Gemini's extracted JSON data.
+    alert_phone = phone
+    if not alert_phone or alert_phone.strip() == "" or alert_phone.lower() in ["unknown", "null", "none"]:
+        for k, v in lead_data.items():
+            k_lower = k.lower().replace("_", "").replace(" ", "")
+            if any(term in k_lower for term in ["phone", "number", "contact"]):
+                if v and str(v).strip():
+                    alert_phone = str(v)
+                    break
+
     minutes = duration // 60
     seconds = duration % 60
     duration_str = f"{minutes}m {seconds}s" if minutes > 0 else f"{seconds}s"
 
-    snippet = transcript[:250] + "..." if transcript and len(transcript) > 250 else (transcript or "No transcript available.")
+    url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
 
-    summary_message = (
-        f"📞 **New AI Call Log**\n"
-        f"📱 **Phone:** {phone}\n"
-        f"⏱️ **Duration:** {duration_str}\n"
-        f"📝 **Transcript Preview:** {snippet}"
-    )
-
-    try:
-        response = httpx.post(url, json={"chat_id": chat_id, "text": summary_message, "parse_mode": "Markdown"}, timeout=10.0)
-        if response.status_code == 200:
-            print(f"[TELEGRAM SUCCESS] Call log summary sent for {phone}", flush=True)
-        else:
-            print(f"[TELEGRAM ERROR] Call log summary rejected: {response.text}", flush=True)
-    except Exception as e:
-        print(f"[TELEGRAM ERROR] Call log summary network failure: {str(e)}", flush=True)
-        traceback.print_exc()
-
-    # --- Message 2: Hot Lead Siren (only if is_lead) ---
     if is_lead:
-        # Normalize extracted_data to a flat dict (lead_data)
-        lead_data = {}
-        if isinstance(extracted_data, list):
-            for item in extracted_data:
-                if isinstance(item, dict):
-                    k = item.get("key", "")
-                    v = item.get("value", "")
-                else:
-                    k = getattr(item, "key", "")
-                    v = getattr(item, "value", "")
-                if k:
-                    lead_data[k] = v
-        elif isinstance(extracted_data, dict):
-            lead_data = extracted_data
-
+        # Rule A: Lead Found / Positive Sentiment (Bypass all truncation limits, print entire uncut call transcript)
         dynamic_vars_list = []
         for k, v in lead_data.items():
             if k not in ["is_lead", "intent_summary"] and v:
-                dynamic_vars_list.append(f"🔹 **{k.replace('_', ' ').title()}:** {v}")
+                key_display = k.replace('_', ' ').replace('-', ' ').title()
+                dynamic_vars_list.append(f"🔹 **{key_display}:** {v}")
         dynamic_vars = "\n".join(dynamic_vars_list)
 
-        summary = lead_data.get("intent_summary", "Customer expressed interest and provided contact details.")
+        summary = lead_data.get("intent_summary", "")
         if not summary:
-            summary = intent_summary or "Customer expressed interest and provided contact details."
+            summary = intent_summary or "Customer expressed interest."
 
         hot_lead_message = (
-            f"🚨 **HOT LEAD CAPTURED!** 🚨\n"
-            f"{dynamic_vars}\n"
-            f"📝 **Summary:** {summary}"
+            f"🚨 **HOT LEAD CAPTURED!** 🚨\n\n"
+            f"📱 **Phone:** {alert_phone}\n"
+            f"⏱️ **Duration:** {duration_str}\n\n"
+            f"{dynamic_vars}\n\n"
+            f"📝 **Summary:** {summary}\n\n"
+            f"📜 **Full Call Transcript**\n"
+            f"{transcript or 'No transcript available.'}"
         )
 
         try:
             response = httpx.post(url, json={"chat_id": chat_id, "text": hot_lead_message, "parse_mode": "Markdown"}, timeout=10.0)
             if response.status_code == 200:
-                print(f"[TELEGRAM SUCCESS] Hot Lead Siren sent for {phone}", flush=True)
+                print(f"[TELEGRAM SUCCESS] Hot Lead Siren sent for {alert_phone}", flush=True)
             else:
-                print(f"[TELEGRAM ERROR] Hot Lead Siren rejected: {response.text}", flush=True)
+                print(f"[TELEGRAM WARNING] Hot Lead Siren markdown failed ({response.text}), retrying with plain text...", flush=True)
+                response = httpx.post(url, json={"chat_id": chat_id, "text": hot_lead_message}, timeout=10.0)
+                if response.status_code == 200:
+                    print(f"[TELEGRAM SUCCESS] Hot Lead Siren sent as plain text for {alert_phone}", flush=True)
+                else:
+                    print(f"[TELEGRAM ERROR] Hot Lead Siren rejected: {response.text}", flush=True)
         except Exception as e:
             print(f"[TELEGRAM ERROR] Hot Lead Siren network failure: {str(e)}", flush=True)
             traceback.print_exc()
+
+    else:
+        # Rule B: No Lead / Neutral / Junk (Format a compact, muted notification, include truncated preview)
+        snippet = transcript[:250] + "..." if transcript and len(transcript) > 250 else (transcript or "No transcript available.")
+        summary_message = (
+            f"📞 **New Call Log**\n"
+            f"📱 **Phone:** {alert_phone}\n"
+            f"⏱️ **Duration:** {duration_str}\n"
+            f"📝 **Transcript Preview:** {snippet}"
+        )
+
+        try:
+            response = httpx.post(url, json={"chat_id": chat_id, "text": summary_message, "parse_mode": "Markdown"}, timeout=10.0)
+            if response.status_code == 200:
+                print(f"[TELEGRAM SUCCESS] Call log summary sent for {alert_phone}", flush=True)
+            else:
+                print(f"[TELEGRAM WARNING] Call log summary markdown failed ({response.text}), retrying with plain text...", flush=True)
+                response = httpx.post(url, json={"chat_id": chat_id, "text": summary_message}, timeout=10.0)
+                if response.status_code == 200:
+                    print(f"[TELEGRAM SUCCESS] Call log summary sent as plain text for {alert_phone}", flush=True)
+                else:
+                    print(f"[TELEGRAM ERROR] Call log summary rejected: {response.text}", flush=True)
+        except Exception as e:
+            print(f"[TELEGRAM ERROR] Call log summary network failure: {str(e)}", flush=True)
+            traceback.print_exc()
+
+
 
 def send_quota_telegram_alert(chat_id: str, text: str):
     bot_token = os.getenv("TELEGRAM_BOT_TOKEN")
@@ -423,14 +450,29 @@ async def handle_vapi_webhook_logic(body: dict, background_tasks: BackgroundTask
             # Deep JSON Lead Extraction (Gemini)
             extracted_is_lead = False
             extracted_intent_summary = ""
-            extracted_data_list = []
+            extracted_dict = {}
             
             if transcript and transcript.strip():
                 try:
                     print("[VAPI WEBHOOK] Starting Gemini Deep Native Lead Extraction...", flush=True)
+                    
+                    prompt = (
+                        f"You are an advanced, multilingual lead extraction assistant. Analyze the following transcript of a voice call. "
+                        f"The transcript may contain mixed-language inputs (such as English, Hindi, Hinglish, or regional Indian dialects/phrasing). "
+                        f"First, translate any non-English terms, phrases, or speech into English context to accurately evaluate the conversation. "
+                        f"Analyze the caller's intent. If the caller expresses interest, wants to book/schedule an appointment, or requests a service/product, "
+                        f"set `is_lead` to `true`. Otherwise, set it to `false`.\n"
+                        f"Compile a clear and concise `intent_summary` in English.\n"
+                        f"Parse and extract any valuable custom fields mentioned in the transcript (e.g., spoken contact name, spoken phone number, appointment time, budget, symptoms, preferences, service types, timeline) "
+                        f"and place them into the `extracted_data` list of objects with `key` and `value` fields where both `key` and `value` are strings.\n"
+                        f"CRITICAL: Be extremely thorough. Make sure to catch spoken contact details (like spoken name, spoken phone number, or email) if the caller provides them verbally, "
+                        f"and place them under descriptive keys (e.g. 'spoken_name', 'spoken_phone', 'spoken_email').\n\n"
+                        f"Transcript:\n{transcript}"
+                    )
+                    
                     response = genai_client.models.generate_content(
                         model='gemini-2.5-flash',
-                        contents=f"Analyze this transcript (which may contain mixed Hindi/English) to find booking intent, name, phone number (often spoken digit-by-digit), and requested service. Act as an unconstrained key-value extractor. Look for core data (name, phone number) but also dynamically capture any industry-specific variables mentioned in the transcript (e.g., budget, preferences, service types, timeline) and place them inside the extracted_data dictionary. If the user wants to book or request a service, set is_lead = true. \n\nTranscript: {transcript}",
+                        contents=prompt,
                         config=genai.types.GenerateContentConfig(
                             response_mime_type="application/json",
                             response_schema=DynamicLeadExtraction,
@@ -442,8 +484,14 @@ async def handle_vapi_webhook_logic(body: dict, background_tasks: BackgroundTask
                     if extracted:
                         extracted_is_lead = extracted.is_lead
                         extracted_intent_summary = extracted.intent_summary
+                        
+                        extracted_dict = {}
                         if extracted.extracted_data:
-                            extracted_data_list = [kv.model_dump() for kv in extracted.extracted_data]
+                            for item in extracted.extracted_data:
+                                if hasattr(item, 'key') and hasattr(item, 'value'):
+                                    extracted_dict[item.key] = item.value
+                                elif isinstance(item, dict):
+                                    extracted_dict[item.get('key', '')] = item.get('value', '')
                         
                         if extracted_is_lead:
                             print(f"[VAPI WEBHOOK] Hot Lead detected! Saving to appointments table...", flush=True)
@@ -453,14 +501,13 @@ async def handle_vapi_webhook_logic(body: dict, background_tasks: BackgroundTask
                             contact_phone = "Unknown"
                             contact_email = None
                             
-                            for item in extracted_data_list:
-                                k = item.get("key", "").lower().replace("_", "").replace(" ", "")
-                                v = item.get("value", "")
-                                if k in ["name", "contactname", "customername", "fullname"]:
+                            for k, v in extracted_dict.items():
+                                k_norm = k.lower().replace("_", "").replace(" ", "")
+                                if k_norm in ["name", "contactname", "customername", "fullname", "spokenname"]:
                                     if v: contact_name = v
-                                elif k in ["phone", "contactphone", "customerphone", "phonenumber"]:
+                                elif k_norm in ["phone", "contactphone", "customerphone", "phonenumber", "spokenphone"]:
                                     if v: contact_phone = v
-                                elif k in ["email", "contactemail", "customeremail", "emailaddress"]:
+                                elif k_norm in ["email", "contactemail", "customeremail", "emailaddress", "spokenemail"]:
                                     if v: contact_email = v
 
                             customer_phone = (
@@ -479,7 +526,7 @@ async def handle_vapi_webhook_logic(body: dict, background_tasks: BackgroundTask
                                 "contact_phone": contact_phone,
                                 "contact_email": contact_email,
                                 "notes": extracted_intent_summary,
-                                "extracted_data": extracted_data_list,
+                                "extracted_data": extracted_dict,
                                 "booked_via": "voice",
                                 "scheduled_at": scheduled_at,
                                 "status": "pending"
@@ -506,7 +553,7 @@ async def handle_vapi_webhook_logic(body: dict, background_tasks: BackgroundTask
                     telegram_chat_id,
                     extracted_is_lead,
                     extracted_intent_summary,
-                    extracted_data_list,
+                    extracted_dict,
                 )
                 print(f"[VAPI WEBHOOK SUCCESS] Enqueued background Telegram notification for {customer_phone} (is_lead={extracted_is_lead})", flush=True)
             except Exception as tg_err:
