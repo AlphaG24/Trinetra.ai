@@ -198,7 +198,34 @@ export function useVapi() {
                     throw new Error("Missing Assistant ID in env vars");
                 }
 
-                await vapiRef.current.start(VAPI_ASSISTANT_ID);
+                // Retrieve user auth info from Supabase if available
+                let metadata: any = {};
+                let variableValues: any = {};
+                let assistantOverrides: any = {
+                    variableValues: {}
+                };
+
+                try {
+                    const { createClient } = await import("@/utils/supabase/client");
+                    const supabase = createClient();
+                    const { data: { user } } = await supabase.auth.getUser();
+                    if (user?.id) {
+                        metadata.userId = user.id;
+                        metadata.userEmail = user.email;
+                        variableValues.user_id = user.id;
+                        variableValues.user_email = user.email;
+                        assistantOverrides.variableValues.user_id = user.id;
+                        assistantOverrides.variableValues.user_email = user.email;
+                    }
+                } catch (authErr) {
+                    console.warn("[Vapi Hook] Could not fetch authenticated user:", authErr);
+                }
+
+                await vapiRef.current.start(VAPI_ASSISTANT_ID, {
+                    metadata,
+                    variableValues,
+                    assistantOverrides
+                } as any);
             } catch (err: unknown) {
                 console.error("[Vapi] Failed to start call:", err);
                 setError(err instanceof Error ? err.message : "Connection failed");

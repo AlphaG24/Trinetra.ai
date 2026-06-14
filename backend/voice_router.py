@@ -270,18 +270,39 @@ async def handle_vapi_webhook_logic(body: dict, background_tasks: BackgroundTask
         body.get("callId")
     )
 
-    # 1. Determine Branch: Check if agent is Paid (exists in user_agents)
+    # 1. Override check: traverse the incoming JSON payload to extract the injected user ID
+    payload_user_id = (
+        call.get('assistantOverrides', {}).get('metadata', {}).get('userId') or
+        call.get('assistantOverrides', {}).get('variableValues', {}).get('user_id') or
+        call.get('assistantOverrides', {}).get('metadata', {}).get('user_id') or
+        call.get('assistant', {}).get('metadata', {}).get('userId') or
+        call.get('metadata', {}).get('userId') or
+        message.get('metadata', {}).get('userId') or
+        body.get('metadata', {}).get('userId')
+    )
+    if payload_user_id is None or str(payload_user_id).strip() == "" or str(payload_user_id).lower() == "none":
+        payload_user_id = body.get('message', {}).get('call', {}).get('metadata', {}).get('userId')
+
+    # 2. Determine Branch: Check if agent is Paid (exists in user_agents)
     is_paid_agent = False
-    user_id = None
+    db_owner_user_id = None
 
     if assistant_id:
         try:
             agent_res = supabase_admin.table("user_agents").select("user_id").eq("vapi_agent_id", assistant_id).execute()
             if agent_res.data:
                 is_paid_agent = True
-                user_id = agent_res.data[0].get("user_id")
+                db_owner_user_id = agent_res.data[0].get("user_id")
         except Exception as e:
             print(f"[VAPI WEBHOOK ERROR] Supabase user_agents lookup failed: {str(e)}", flush=True)
+
+    # 3. Apply the override logic: prioritize payload user_id strictly if it exists
+    if payload_user_id and str(payload_user_id).strip() != "" and str(payload_user_id).lower() != "none":
+        user_id = payload_user_id
+        print(f"[VAPI ROUTING] Override exists in payload. Prioritizing user_id={user_id} over DB owner={db_owner_user_id}", flush=True)
+    else:
+        user_id = db_owner_user_id
+        print(f"[VAPI ROUTING] Using DB owner user_id={user_id}", flush=True)
 
     # BRANCH A: Paid Agent
     if is_paid_agent:
@@ -497,19 +518,20 @@ async def handle_vapi_webhook_logic(body: dict, background_tasks: BackgroundTask
 
     # BRANCH B: Demo Agent
     else:
-        # Extract user_id from metadata
-        user_id = (
-            call.get('assistantOverrides', {}).get('metadata', {}).get('userId') or
-            call.get('assistantOverrides', {}).get('variableValues', {}).get('user_id') or
-            call.get('assistant', {}).get('metadata', {}).get('userId') or
-            call.get('metadata', {}).get('userId') or
-            message.get('metadata', {}).get('userId') or
-            body.get('metadata', {}).get('userId')
-        )
-        
-        # Fallback Source: If user_id is None, fall back to extracting it from the webhook payload (payload.get('message', {}).get('call', {}).get('metadata', {}).get('userId')).
+        # Extract user_id from metadata if not already resolved
         if user_id is None or str(user_id).strip() == "" or str(user_id).lower() == "none":
-            user_id = body.get('message', {}).get('call', {}).get('metadata', {}).get('userId')
+            user_id = (
+                call.get('assistantOverrides', {}).get('metadata', {}).get('userId') or
+                call.get('assistantOverrides', {}).get('variableValues', {}).get('user_id') or
+                call.get('assistant', {}).get('metadata', {}).get('userId') or
+                call.get('metadata', {}).get('userId') or
+                message.get('metadata', {}).get('userId') or
+                body.get('metadata', {}).get('userId')
+            )
+            
+            # Fallback Source: If user_id is None, fall back to extracting it from the webhook payload (payload.get('message', {}).get('call', {}).get('metadata', {}).get('userId')).
+            if user_id is None or str(user_id).strip() == "" or str(user_id).lower() == "none":
+                user_id = body.get('message', {}).get('call', {}).get('metadata', {}).get('userId')
             
         print(f"[VAPI ROUTING] BRANCH B: Demo Agent detected (assistant_id={assistant_id}, resolved_user_id={user_id})", flush=True)
 

@@ -48,3 +48,8 @@ test_*.py
 *.log
 
 __pycache__/
+
+# Local Testing Scripts
+test_webhook.py
+mock_payload.json
+test_*.py

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/utils/supabase/client'
@@ -129,72 +129,91 @@ export default function AgentDetailPage() {
     }
   }, [audioElement])
 
+  // Core data-fetching logic extracted into a reusable callback.
+  // `silent` = true skips the loading spinner (used for background polls).
+  const fetchAgentData = useCallback(async (silent: boolean) => {
+    try {
+      if (!silent) setLoading(true)
+      const supabase = createClient()
+
+      // 1. Get current authenticated user
+      const { data: { user }, error: userError } = await supabase.auth.getUser()
+      if (userError || !user) {
+        if (!silent) router.push('/login')
+        return
+      }
+
+      // 2. Fetch agent from user_agents
+      const { data: agentData, error: agentErr } = await supabase
+        .from('user_agents')
+        .select('id, agent_name, agent_type, status, vapi_agent_id')
+        .eq('vapi_agent_id', agentId)
+        .eq('user_id', user.id)
+        .maybeSingle()
+
+      if (agentErr) throw agentErr
+      
+      if (!agentData) {
+        if (!silent) {
+          toast.error("Agent not found or unauthorized access.")
+          router.push('/dashboard')
+        }
+        return
+      }
+
+      setAgent(agentData)
+
+      // 3. Fetch call logs matching this agent
+      const { data: logsData, error: logsErr } = await supabase
+        .from('agent_call_logs')
+        .select('id, duration_seconds, sentiment, transcript, recording_url, created_at')
+        .eq('vapi_agent_id', agentId)
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+
+      if (logsErr) throw logsErr
+      setCallLogs(logsData || [])
+
+      // 4. Fetch paid quota from profiles
+      const { data: profileData, error: profileErr } = await supabase
+        .from('profiles')
+        .select('paid_minutes_used, paid_minutes_limit')
+        .eq('id', user.id)
+        .single()
+
+      if (!profileErr && profileData) {
+        setPaidUsed(profileData.paid_minutes_used ?? 0)
+        setPaidLimit(profileData.paid_minutes_limit ?? 100)
+      }
+
+    } catch (err) {
+      // Only surface errors on the initial (non-silent) load.
+      // Background polls fail silently to avoid spamming the user.
+      if (!silent) {
+        console.error("Error loading agent details:", err)
+        toast.error("Failed to load agent metrics and history.")
+      }
+    } finally {
+      if (!silent) setLoading(false)
+    }
+  }, [agentId, router])
+
+  // Initial data fetch on mount
+  useEffect(() => {
+    if (!agentId) return
+    fetchAgentData(false)
+  }, [agentId, fetchAgentData])
+
+  // Background polling heartbeat — silently refreshes every 5 seconds
   useEffect(() => {
     if (!agentId) return
 
-    const fetchAgentDetails = async () => {
-      try {
-        setLoading(true)
-        const supabase = createClient()
+    const intervalId = setInterval(() => {
+      fetchAgentData(true)
+    }, 5000)
 
-        // 1. Get current authenticated user
-        const { data: { user }, error: userError } = await supabase.auth.getUser()
-        if (userError || !user) {
-          router.push('/login')
-          return
-        }
-
-        // 2. Fetch agent from user_agents
-        const { data: agentData, error: agentErr } = await supabase
-          .from('user_agents')
-          .select('id, agent_name, agent_type, status, vapi_agent_id')
-          .eq('vapi_agent_id', agentId)
-          .eq('user_id', user.id)
-          .maybeSingle()
-
-        if (agentErr) throw agentErr
-        
-        if (!agentData) {
-          toast.error("Agent not found or unauthorized access.")
-          router.push('/dashboard')
-          return
-        }
-
-        setAgent(agentData)
-
-        // 3. Fetch call logs matching this agent
-        const { data: logsData, error: logsErr } = await supabase
-          .from('agent_call_logs')
-          .select('id, duration_seconds, sentiment, transcript, recording_url, created_at')
-          .eq('vapi_agent_id', agentId)
-          .eq('user_id', user.id)
-          .order('created_at', { ascending: false })
-
-        if (logsErr) throw logsErr
-        setCallLogs(logsData || [])
-
-        // 4. Fetch paid quota from profiles
-        const { data: profileData, error: profileErr } = await supabase
-          .from('profiles')
-          .select('paid_minutes_used, paid_minutes_limit')
-          .eq('id', user.id)
-          .single()
-
-        if (!profileErr && profileData) {
-          setPaidUsed(profileData.paid_minutes_used ?? 0)
-          setPaidLimit(profileData.paid_minutes_limit ?? 100)
-        }
-
-      } catch (err) {
-        console.error("Error loading agent details:", err)
-        toast.error("Failed to load agent metrics and history.")
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    fetchAgentDetails()
-  }, [agentId, router])
+    return () => clearInterval(intervalId)
+  }, [agentId, fetchAgentData])
 
   // Aggregate stats
   const totalInteractions = callLogs.length

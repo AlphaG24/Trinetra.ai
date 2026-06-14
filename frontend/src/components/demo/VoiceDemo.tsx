@@ -178,8 +178,14 @@ export function VoiceDemo({
         variableValues: {
           user_id: userId,
           user_email: user.email
+        },
+        assistantOverrides: {
+          variableValues: {
+            user_id: userId,
+            user_email: user.email
+          }
         }
-      });
+      } as any);
       console.log("5. Vapi Connection Request Sent Successfully!");
 
     } catch (error: any) {

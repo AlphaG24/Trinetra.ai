@@ -134,19 +134,25 @@ export function AgentHeader({ agent }: { agent: AgentLike }) {
 
             const metadata: any = {}
             const variableValues: any = {}
+            const assistantOverrides: any = {
+                variableValues: {}
+            }
 
             if (user?.id) {
                 metadata.userId = user.id
                 metadata.userEmail = user.email
                 variableValues.user_id = user.id
                 variableValues.user_email = user.email
+                assistantOverrides.variableValues.user_id = user.id
+                assistantOverrides.variableValues.user_email = user.email
             }
 
             console.log('Attempting vapi.start() with ID:', agent.vapi_assistant_id);
             await vapi.start(agent.vapi_assistant_id, {
                 metadata,
-                variableValues
-            });
+                variableValues,
+                assistantOverrides
+            } as any);
             console.log('vapi.start() called successfully.');
         } catch (error: unknown) {
             const message = getVapiErrorMessage(error);
