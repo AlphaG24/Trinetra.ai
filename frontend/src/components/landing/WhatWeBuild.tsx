@@ -30,10 +30,10 @@ const cards = [
     hoverShadow: "hover:shadow-[0_0_40px_rgba(245,158,11,0.08)]",
     title: "Smart Education",
     description: "Adaptive exam platforms that understand each student's cognitive profile and personalize every question.",
-    linkText: "Trinetra Shiksha (In Stealth)",
-    linkRef: "#",
-    linkStyle: "text-[#6B6088] cursor-default",
-    clickable: false
+    linkText: "Explore Trinetra Shiksha →",
+    linkRef: "https://shiksha.trinetraedu-ai.com",
+    linkStyle: "text-[#FDE68A] hover:text-[#FAF7FF] transition-colors",
+    clickable: true
   },
   {
     id: "human",
@@ -129,9 +129,20 @@ export function WhatWeBuild() {
 
               {/* Link */}
               {card.clickable ? (
-                <Link href={card.linkRef} className={`font-sans font-medium text-[14px] ${card.linkStyle}`}>
-                  {card.linkText}
-                </Link>
+                card.linkRef.startsWith("http") ? (
+                  <a
+                    href={card.linkRef}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={`font-sans font-medium text-[14px] ${card.linkStyle}`}
+                  >
+                    {card.linkText}
+                  </a>
+                ) : (
+                  <Link href={card.linkRef} className={`font-sans font-medium text-[14px] ${card.linkStyle}`}>
+                    {card.linkText}
+                  </Link>
+                )
               ) : (
                 <span className={`font-sans font-medium text-[14px] ${card.linkStyle}`}>
                   {card.linkText}

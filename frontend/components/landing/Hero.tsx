@@ -4,7 +4,7 @@ import Link from "next/link";
 
 import { motion } from "framer-motion";
 import NextImage from "next/image";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, GraduationCap } from "lucide-react";
 
 import { VOICE_AGENT_NAME } from "@/lib/agent-branding";
 import { getConfigString, useSiteConfig } from "@/lib/site-content";
@@ -109,10 +109,9 @@ export function Hero() {
           initial={{ opacity: 0, y: 25 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.7, delay: 0.6, ease: "easeOut" }}
-          className="mx-auto mb-[36px] max-w-[540px] font-sans text-[16px] font-normal leading-[1.7] text-[#B8B0D1] md:text-[18px]"
+          className="mx-auto mb-[36px] max-w-[580px] font-sans text-[16px] font-normal leading-[1.7] text-[#B8B0D1] md:text-[18px]"
         >
-          Trinetra is the autonomous workforce for the modern era. Manage complex operations with
-          self-healing AI agents.
+          Trinetra bridges autonomous operations and cognitive learning — powering self-healing workflows and AI-driven education.
         </motion.p>
 
         <motion.div
@@ -121,16 +120,18 @@ export function Hero() {
           transition={{ duration: 0.6, delay: 0.8, ease: "easeOut" }}
           className="flex w-full max-w-[400px] flex-col justify-center gap-[16px] sm:max-w-none sm:flex-row"
         >
-          <Link
-            href="/contact"
-            className="group relative flex items-center justify-center rounded-full bg-[#0C0118] px-[36px] py-[16px] font-sans text-[18px] font-medium text-[#FAF7FF] shadow-[0_0_25px_rgba(139,92,246,0.3)] transition-all duration-300 hover:-translate-y-[2px] hover:shadow-[0_0_45px_rgba(139,92,246,0.5)]"
+          <a
+            href="https://shiksha.trinetraedu-ai.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="group relative flex items-center justify-center font-sans text-[19px] font-bold bg-[#0C0118] text-white rounded-full px-[42px] py-[18px] shadow-[0_0_25px_rgba(139,92,246,0.25)] transition-all duration-200 ease-out hover:-translate-y-[2px] hover:shadow-[0_0_45px_rgba(139,92,246,0.45)]"
           >
-            <div className="absolute inset-0 rounded-full border border-[rgba(139,92,246,0.4)] transition-colors duration-300 group-hover:border-[#8B5CF6]" />
-            Deploy Agent
-            <span className="ml-[10px] font-normal transition-transform duration-300 group-hover:translate-x-1">
+            <div className="absolute inset-0 rounded-full border border-[rgba(139,92,246,0.25)] transition-colors duration-200 ease-out group-hover:border-[#A78BFA]" />
+            <span className="relative z-10">Trinetra Shiksha</span>
+            <span className="relative z-10 ml-[10px] font-normal text-[#8B5CF6] transition-all duration-200 ease-out group-hover:text-[#FAF7FF] group-hover:translate-x-1">
               {"->"}
             </span>
-          </Link>
+          </a>
 
           <button
             type="button"
