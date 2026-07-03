@@ -7,17 +7,37 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 
+interface PlatformService {
+  id: string
+  name: string
+  slug: string
+  description: string | null
+  type: string
+  icon_url: string | null
+  subdomain_url: string | null
+  ui_config: any
+  created_at: string
+  is_active: boolean
+  is_visible_in_marketplace: boolean
+  is_demo_allowed: boolean
+  demo_limit_config: any
+  marketplace_metadata: any
+}
+
 interface DeployPageClientProps {
   user: {
     id: string
     email?: string
   }
+  services: PlatformService[]
 }
 
-export function DeployPageClient({ user }: DeployPageClientProps) {
-  const [useCase, setUseCase] = useState('Customer Support')
-  const [callVolume, setCallVolume] = useState('1,000-10,000')
-  const [crmStack, setCrmStack] = useState('')
+export function DeployPageClient({ user, services }: DeployPageClientProps) {
+  const [selectedAgentId, setSelectedAgentId] = useState(() => {
+    return services.length > 0 ? services[0].id : ''
+  })
+  const [estimatedScale, setEstimatedScale] = useState('1,000 - 10,000 monthly executions / tasks')
+  const [currentStack, setCurrentStack] = useState('')
   const [requirements, setRequirements] = useState('')
 
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -30,6 +50,8 @@ export function DeployPageClient({ user }: DeployPageClientProps) {
     // Formspree endpoint (prioritize Env var, fallback to current endpoint)
     const formspreeEndpoint = process.env.NEXT_PUBLIC_FORMSPREE_ENDPOINT || "https://formspree.io/f/xwvryvag"
 
+    const selectedAgent = services.find(s => s.id === selectedAgentId)
+
     try {
       const response = await fetch(formspreeEndpoint, {
         method: 'POST',
@@ -40,15 +62,15 @@ export function DeployPageClient({ user }: DeployPageClientProps) {
         body: JSON.stringify({
           userId: user.id,
           userEmail: user.email,
-          useCase,
-          callVolume,
-          crmStack,
+          agentId: selectedAgentId,
+          agentName: selectedAgent?.name || '',
+          estimatedScale,
+          currentStack,
           requirements
         })
       })
 
       if (response.ok) {
-        setIsSuccess(false)
         setIsSuccess(true)
         toast.success("Deployment request submitted successfully!")
       } else {
@@ -86,7 +108,7 @@ export function DeployPageClient({ user }: DeployPageClientProps) {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           
           {/* Left Column: Form Card */}
-          <div className="lg:col-span-7 bg-[#0f1117]/80 backdrop-blur-xl border border-amber-500/10 rounded-2xl p-6 lg:p-8 shadow-xl shadow-black/40 relative overflow-hidden group">
+          <div className="lg:col-span-7 bg-[#0f1117]/80 backdrop-blur-xl border border-zinc-800 rounded-2xl p-6 lg:p-8 shadow-xl shadow-black/40 relative overflow-hidden group">
             <div className="absolute inset-0 bg-gradient-to-br from-amber-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none duration-500" />
             
             {!isSuccess ? (
@@ -100,20 +122,21 @@ export function DeployPageClient({ user }: DeployPageClientProps) {
 
                 <form onSubmit={handleSubmit} className="space-y-5">
                   
-                  {/* Primary Use Case */}
+                  {/* Select Autonomous Agent */}
                   <div className="space-y-2">
-                    <label className="text-xs font-semibold text-gray-300 uppercase tracking-wider">Primary Use Case</label>
+                    <label className="text-xs font-semibold text-gray-300 uppercase tracking-wider">SELECT AUTONOMOUS AGENT</label>
                     <div className="relative">
                       <Target className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-amber-500/60 pointer-events-none" />
                       <select
-                        value={useCase}
-                        onChange={(e) => setUseCase(e.target.value)}
+                        value={selectedAgentId}
+                        onChange={(e) => setSelectedAgentId(e.target.value)}
                         className="w-full py-3 pl-11 pr-10 bg-black/40 border border-white/10 rounded-xl text-white text-sm focus:outline-none focus:border-amber-500/50 appearance-none cursor-pointer"
                       >
-                        <option value="Outbound Sales">Outbound Sales (Lead Qualification & Cold Calls)</option>
-                        <option value="Customer Support">Customer Support (Inbound FAQ & Ticketing)</option>
-                        <option value="Appointment Booking">Appointment Booking & Live Transfers</option>
-                        <option value="Other">Other / Custom Integration</option>
+                        {services.map((service) => (
+                          <option key={service.id} value={service.id}>
+                            {service.name}
+                          </option>
+                        ))}
                       </select>
                       <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-gray-400">
                         <ChevronRight className="w-4 h-4 rotate-90" />
@@ -121,19 +144,20 @@ export function DeployPageClient({ user }: DeployPageClientProps) {
                     </div>
                   </div>
 
-                  {/* Estimated Call Volume */}
+                  {/* Estimated Monthly Execution Scale */}
                   <div className="space-y-2">
-                    <label className="text-xs font-semibold text-gray-300 uppercase tracking-wider">Estimated Monthly Call Volume</label>
+                    <label className="text-xs font-semibold text-gray-300 uppercase tracking-wider">ESTIMATED MONTHLY EXECUTION SCALE</label>
                     <div className="relative">
                       <Activity className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-amber-500/60 pointer-events-none" />
                       <select
-                        value={callVolume}
-                        onChange={(e) => setCallVolume(e.target.value)}
+                        value={estimatedScale}
+                        onChange={(e) => setEstimatedScale(e.target.value)}
                         className="w-full py-3 pl-11 pr-10 bg-black/40 border border-white/10 rounded-xl text-white text-sm focus:outline-none focus:border-amber-500/50 appearance-none cursor-pointer"
                       >
-                        <option value="0-1,000">0 - 1,000 calls / month</option>
-                        <option value="1,000-10,000">1,000 - 10,000 calls / month</option>
-                        <option value="10,000+">10,000+ calls / month</option>
+                        <option value="1,000 - 10,000 monthly executions / tasks">1,000 - 10,000 monthly executions / tasks</option>
+                        <option value="10,000 - 50,000 monthly executions / tasks">10,000 - 50,000 monthly executions / tasks</option>
+                        <option value="50,000 - 250,000 monthly executions / tasks">50,000 - 250,000 monthly executions / tasks</option>
+                        <option value="250,000+ (Enterprise Volume)">250,000+ (Enterprise Volume)</option>
                       </select>
                       <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-gray-400">
                         <ChevronRight className="w-4 h-4 rotate-90" />
@@ -141,16 +165,16 @@ export function DeployPageClient({ user }: DeployPageClientProps) {
                     </div>
                   </div>
 
-                  {/* CRM Stack */}
+                  {/* Current CRM / Software Stack */}
                   <div className="space-y-2">
-                    <label className="text-xs font-semibold text-gray-300 uppercase tracking-wider">Current CRM / Software Stack</label>
+                    <label className="text-xs font-semibold text-gray-300 uppercase tracking-wider">CURRENT SOFTWARE / DATA STACK</label>
                     <div className="relative">
                       <Box className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-amber-500/60 pointer-events-none" />
                       <input
                         type="text"
-                        value={crmStack}
-                        onChange={(e) => setCrmStack(e.target.value)}
-                        placeholder="e.g., HubSpot, Salesforce, or Custom"
+                        value={currentStack}
+                        onChange={(e) => setCurrentStack(e.target.value)}
+                        placeholder="e.g., Salesforce, HubSpot, Custom ERP, AWS S3, or REST APIs..."
                         required
                         className="w-full py-3 pl-11 pr-4 bg-black/40 border border-white/10 rounded-xl text-white text-sm placeholder:text-gray-600 focus:outline-none focus:border-amber-500/50 transition-colors"
                       />
@@ -159,14 +183,14 @@ export function DeployPageClient({ user }: DeployPageClientProps) {
 
                   {/* Additional Requirements */}
                   <div className="space-y-2">
-                    <label className="text-xs font-semibold text-gray-300 uppercase tracking-wider">Additional Requirements</label>
+                    <label className="text-xs font-semibold text-gray-300 uppercase tracking-wider">CUSTOM WORKFLOW & INTEGRATION REQUIREMENTS</label>
                     <div className="relative">
                       <AlignLeft className="absolute left-4 top-4 w-4 h-4 text-amber-500/60 pointer-events-none" />
                       <textarea
                         rows={4}
                         value={requirements}
                         onChange={(e) => setRequirements(e.target.value)}
-                        placeholder="Tell us about your specific workflows or required features..."
+                        placeholder="Describe your specific operational bottlenecks, target subdomains, or required SLAs..."
                         className="w-full py-3 pl-11 pr-4 bg-black/40 border border-white/10 rounded-xl text-white text-sm placeholder:text-gray-600 focus:outline-none focus:border-amber-500/50 transition-colors resize-none"
                       />
                     </div>
@@ -189,8 +213,7 @@ export function DeployPageClient({ user }: DeployPageClientProps) {
                       </>
                     ) : (
                       <>
-                        Submit Deployment Request
-                        <ArrowRight className="w-4 h-4" />
+                        Submit Deployment Request &rarr;
                       </>
                     )}
                   </button>
@@ -219,7 +242,7 @@ export function DeployPageClient({ user }: DeployPageClientProps) {
 
           {/* Right Column: Fast Track Discovery */}
           <div className="lg:col-span-5 space-y-6">
-            <div className="bg-[#0f1117]/80 backdrop-blur-xl border border-amber-500/10 rounded-2xl p-6 shadow-xl relative overflow-hidden group hover:border-amber-500/40 transition-all duration-300">
+            <div className="bg-[#0f1117]/80 backdrop-blur-xl border border-zinc-800 rounded-2xl p-6 shadow-xl relative overflow-hidden group hover:border-amber-500/40 transition-all duration-300">
               <div className="absolute inset-0 bg-gradient-to-br from-purple-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none duration-500" />
               
               <div className="space-y-4">
@@ -234,15 +257,15 @@ export function DeployPageClient({ user }: DeployPageClientProps) {
                 <div className="space-y-3 pt-3 border-t border-white/5">
                   <div className="flex items-start gap-3">
                     <div className="w-1.5 h-1.5 rounded-full bg-amber-500 mt-2 shrink-0" />
-                    <p className="text-xs text-gray-400">Seamlessly connect the AI to your existing software</p>
+                    <p className="text-xs text-gray-400">Seamlessly connect the autonomous agents to your existing workflows</p>
                   </div>
                   <div className="flex items-start gap-3">
                     <div className="w-1.5 h-1.5 rounded-full bg-amber-500 mt-2 shrink-0" />
-                    <p className="text-xs text-gray-400">Customize the agent&apos;s voice, script, and personality</p>
+                    <p className="text-xs text-gray-400">Configure custom triggers, thresholds, and self-healing heuristics</p>
                   </div>
                   <div className="flex items-start gap-3">
                     <div className="w-1.5 h-1.5 rounded-full bg-amber-500 mt-2 shrink-0" />
-                    <p className="text-xs text-gray-400">Design a custom call flow tailored to your business</p>
+                    <p className="text-xs text-gray-400">Design tailored execution paths optimized for your business operations</p>
                   </div>
                 </div>
 
@@ -269,27 +292,27 @@ export function DeployPageClient({ user }: DeployPageClientProps) {
             <div className="grid grid-cols-2 gap-4">
               
               {/* Card 1: Ultra-Low Latency */}
-              <div className="bg-white/5 border border-white/10 hover:border-amber-500/20 hover:bg-white/10 rounded-xl p-4 flex flex-col items-center justify-center text-center transition-all duration-300 group">
+              <div className="bg-white/5 border border-zinc-800 hover:border-amber-500/20 hover:bg-white/10 rounded-xl p-4 flex flex-col items-center justify-center text-center transition-all duration-300 group min-h-[96px]">
                 <Zap className="w-5 h-5 text-amber-500 mb-2 group-hover:scale-110 transition-transform duration-300" />
                 <span className="text-xs font-semibold text-white">Ultra-Low Latency</span>
               </div>
 
-              {/* Card 2: Multilingual */}
-              <div className="bg-white/5 border border-white/10 hover:border-amber-500/20 hover:bg-white/10 rounded-xl p-4 flex flex-col items-center justify-center text-center transition-all duration-300 group">
-                <Globe className="w-5 h-5 text-amber-500 mb-2 group-hover:scale-110 transition-transform duration-300" />
-                <span className="text-xs font-semibold text-white">Multilingual (Hinglish)</span>
+              {/* Card 2: Custom Integration */}
+              <div className="bg-white/5 border border-zinc-800 hover:border-amber-500/20 hover:bg-white/10 rounded-xl p-4 flex flex-col items-center justify-center text-center transition-all duration-300 group min-h-[96px]">
+                <Cpu className="w-5 h-5 text-amber-500 mb-2 group-hover:scale-110 transition-transform duration-300" />
+                <span className="text-xs font-semibold text-white">Custom Integration</span>
               </div>
 
-              {/* Card 3: Custom CRM Sync */}
-              <div className="bg-white/5 border border-white/10 hover:border-amber-500/20 hover:bg-white/10 rounded-xl p-4 flex flex-col items-center justify-center text-center transition-all duration-300 group">
-                <Database className="w-5 h-5 text-amber-500 mb-2 group-hover:scale-110 transition-transform duration-300" />
-                <span className="text-xs font-semibold text-white">Custom CRM Sync</span>
-              </div>
-
-              {/* Card 4: Enterprise Security */}
-              <div className="bg-white/5 border border-white/10 hover:border-amber-500/20 hover:bg-white/10 rounded-xl p-4 flex flex-col items-center justify-center text-center transition-all duration-300 group">
+              {/* Card 3: Enterprise Security */}
+              <div className="bg-white/5 border border-zinc-800 hover:border-amber-500/20 hover:bg-white/10 rounded-xl p-4 flex flex-col items-center justify-center text-center transition-all duration-300 group min-h-[96px]">
                 <Shield className="w-5 h-5 text-amber-500 mb-2 group-hover:scale-110 transition-transform duration-300" />
                 <span className="text-xs font-semibold text-white">Enterprise Security</span>
+              </div>
+
+              {/* Card 4: Dedicated Engineering Support */}
+              <div className="bg-white/5 border border-zinc-800 hover:border-amber-500/20 hover:bg-white/10 rounded-xl p-4 flex flex-col items-center justify-center text-center transition-all duration-300 group min-h-[96px]">
+                <Activity className="w-5 h-5 text-amber-500 mb-2 group-hover:scale-110 transition-transform duration-300" />
+                <span className="text-xs font-semibold text-white">Dedicated Engineering Support</span>
               </div>
 
             </div>

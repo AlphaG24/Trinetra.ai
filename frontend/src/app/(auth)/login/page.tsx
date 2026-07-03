@@ -1,17 +1,18 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { Eye, EyeOff, Mail, Lock, ArrowRight } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { createClient } from '@/lib/client'
-import { getBaseUrl } from '@/src/utils/url'
+import { getURL } from '@/src/utils/helpers'
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const supabase = createClient()
-  
+
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -31,7 +32,7 @@ export default function LoginPage() {
     window.addEventListener('mousemove', handleMouseMove)
     return () => window.removeEventListener('mousemove', handleMouseMove)
   }, [])
-  
+
   if (!isMounted) {
     return <div className="flex h-screen w-full bg-[#06040A]" />
   }
@@ -49,7 +50,7 @@ export default function LoginPage() {
       if (error) {
         setIsShaking(true)
         setTimeout(() => setIsShaking(false), 500)
-        
+
         if (error.message.includes('Invalid login credentials')) {
           toast.error('Invalid credentials. Please try again.')
         } else if (error.message.includes('Failed to fetch')) {
@@ -62,7 +63,18 @@ export default function LoginPage() {
 
       if (data.user) {
         toast.success('Successfully logged in!')
-        router.push('/dashboard')
+        
+        // Parse custom post-login redirect subdomain parameter
+        const redirectParam = searchParams.get('redirect')
+        if (redirectParam) {
+          let target = redirectParam.trim()
+          if (!target.startsWith('http://') && !target.startsWith('https://')) {
+            target = `https://${target}`
+          }
+          window.location.href = target
+        } else {
+          router.push('/dashboard')
+        }
       }
     } catch (err) {
       toast.error('An unexpected error occurred')
@@ -76,7 +88,8 @@ export default function LoginPage() {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${getBaseUrl()}/api/auth/callback`,
+          // No variables. No query parameters. Exact string match only.
+          redirectTo: 'http://localhost:3000/auth/callback',
         },
       })
       if (error) throw error
@@ -87,9 +100,9 @@ export default function LoginPage() {
 
   return (
     <div className="flex h-screen w-full bg-[#06040A] overflow-hidden font-sans text-white selection:bg-amber-500/30 relative">
-      
+
       {/* Static elegant dark grid overlay */}
-      <div 
+      <div
         className="pointer-events-none absolute inset-0 z-0 opacity-[0.04]"
         style={{
           backgroundImage: "linear-gradient(rgba(255, 255, 255, 0.4) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.4) 1px, transparent 1px)",
@@ -98,7 +111,7 @@ export default function LoginPage() {
       />
 
       {/* Smooth linear gradient mesh */}
-      <div 
+      <div
         className="pointer-events-none absolute inset-0 z-0"
         style={{
           background: "radial-gradient(circle at 30% 30%, rgba(139, 92, 246, 0.08) 0%, rgba(6, 4, 10, 0) 50%), radial-gradient(circle at 70% 70%, rgba(251, 191, 36, 0.04) 0%, rgba(6, 4, 10, 0) 55%)"
@@ -107,9 +120,9 @@ export default function LoginPage() {
 
       {/* Left Half - Abstract Visualization (Hidden on Mobile) */}
       <div className="hidden lg:flex w-1/2 relative flex-col justify-center items-center p-12 overflow-hidden border-r border-white/5 z-10">
-        
+
         {/* Glowing Core following mouse */}
-        <motion.div 
+        <motion.div
           animate={{
             x: mousePos.x * 30,
             y: mousePos.y * 30,
@@ -120,7 +133,7 @@ export default function LoginPage() {
 
         {/* Brand visual & Logo - perfectly centered */}
         <div className="relative z-10 w-full max-w-lg flex flex-col items-center text-center">
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.8, ease: "easeOut" }}
@@ -130,19 +143,19 @@ export default function LoginPage() {
             <img src="/trident.png" alt="Trinetra Logo" className="w-36 h-36 xl:w-52 xl:h-52 object-contain drop-shadow-[0_0_50px_rgba(139,92,246,0.6)] relative z-10" />
           </motion.div>
 
-          <motion.h1 
+          <motion.h1
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.7, delay: 0.2 }}
             className="text-6xl xl:text-7xl font-black tracking-tighter leading-none mb-6"
           >
-            Trinetra <br/>
+            Trinetra <br />
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-violet-300 via-violet-400 to-amber-300">
               Intelligence
             </span>
           </motion.h1>
-          
-          <motion.p 
+
+          <motion.p
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.8, delay: 0.4 }}
@@ -160,7 +173,7 @@ export default function LoginPage() {
 
       {/* Right Half - Login Form */}
       <div className="w-full lg:w-1/2 flex flex-col justify-center items-center p-6 sm:p-12 relative z-10">
-        
+
         {/* Mobile View Elements */}
         <div className="flex lg:hidden flex-col items-center mb-10 w-full">
           <div className="relative mb-6">
@@ -170,7 +183,7 @@ export default function LoginPage() {
           <h1 className="text-4xl font-black tracking-tighter">Trinetra</h1>
         </div>
 
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.5, ease: "easeOut" }}
@@ -268,10 +281,10 @@ export default function LoginPage() {
               className="w-full flex items-center justify-center gap-3 rounded-2xl bg-black/40 border border-white/5 py-4 text-sm font-semibold text-zinc-300 hover:bg-white/5 hover:text-white transition-all group"
             >
               <svg className="w-5 h-5 transition-transform group-hover:scale-110" viewBox="0 0 24 24">
-                <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
-                <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-                <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
-                <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+                <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
+                <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
+                <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" />
+                <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
               </svg>
               Google Workspace
             </button>
@@ -286,11 +299,20 @@ export default function LoginPage() {
         </motion.div>
       </div>
 
-      <style dangerouslySetInnerHTML={{__html: `
+      <style dangerouslySetInnerHTML={{
+        __html: `
         @keyframes shimmer {
           100% { transform: translateX(100%); }
         }
       `}} />
     </div>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="flex h-screen w-full bg-[#06040A] items-center justify-center text-zinc-500 font-mono text-sm">Initializing...</div>}>
+      <LoginForm />
+    </Suspense>
   )
 }

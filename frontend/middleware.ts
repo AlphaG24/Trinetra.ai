@@ -2,47 +2,48 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 export async function middleware(request: NextRequest) {
-  if (request.nextUrl.pathname.startsWith('/api/auth/callback') || request.nextUrl.pathname.startsWith('/auth/callback')) {
+  // 1. Immediately bypass the callback to prevent code consumption
+  if (request.nextUrl.pathname.startsWith('/auth/callback') || request.nextUrl.pathname.startsWith('/api/auth/callback')) {
     return NextResponse.next()
   }
 
-  let supabaseResponse = NextResponse.next()
+  // 2. Initialize the exact response object we will return
+  let supabaseResponse = NextResponse.next({
+    request: { headers: request.headers },
+  })
 
+  // 3. Create client with STRICT cookie mirroring
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        getAll() {
-          return request.cookies.getAll()
-        },
-        setAll(cookiesToSet: any[]) {
-          cookiesToSet.forEach(({ name, value }: any) => request.cookies.set(name, value))
-          supabaseResponse = NextResponse.next()
-          cookiesToSet.forEach(({ name, value, options }: any) =>
-            supabaseResponse.cookies.set(name, value, options)
-          )
+        getAll() { return request.cookies.getAll() },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value, options }) => {
+            const domain = process.env.NODE_ENV === 'development' ? undefined : process.env.NEXT_PUBLIC_COOKIE_DOMAIN
+            // We MUST set the cookie on BOTH the request and the response
+            request.cookies.set(name, value)
+            supabaseResponse.cookies.set({ name, value, ...options, domain })
+          })
         },
       },
     }
   )
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  // 4. Validate the session
+  const { data: { user } } = await supabase.auth.getUser()
 
-  const pathname = request.nextUrl.pathname
-
-  // Protected routes
-  if (pathname.startsWith('/dashboard') && !user) {
-    return NextResponse.redirect(new URL('/login', request.url))
+  // 5. Protect the dashboard
+  if (!user && request.nextUrl.pathname.startsWith('/dashboard')) {
+    console.log("🚨 TRIPWIRE 1 TRIGGERED: Middleware could not read the user session!");
+    console.log("MIDDLEWARE SEES THESE COOKIES:", request.cookies.getAll());
+    const url = request.nextUrl.clone()
+    url.pathname = '/'
+    return NextResponse.redirect(url)
   }
 
-  // Auth routes (don't show login if already logged in)
-  if (pathname.startsWith('/login') && user) {
-    return NextResponse.redirect(new URL('/dashboard', request.url))
-  }
-
+  // MUST return this specific response object
   return supabaseResponse
 }
 

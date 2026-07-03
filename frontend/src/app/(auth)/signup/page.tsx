@@ -6,7 +6,7 @@ import { motion } from 'framer-motion'
 import { Eye, EyeOff, Mail, Lock, ArrowRight, UserPlus, PhoneCall, MessageSquare, Bot } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { createClient } from '@/lib/client'
-import { getBaseUrl } from '@/src/utils/url'
+import { getURL } from '@/src/utils/helpers'
 
 export default function SignupPage() {
   const router = useRouter()
@@ -62,7 +62,7 @@ export default function SignupPage() {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${getBaseUrl()}/api/auth/callback`,
+          redirectTo: `${getURL()}auth/callback?next=/dashboard`,
         },
       })
       if (error) throw error

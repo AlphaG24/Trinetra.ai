@@ -38,16 +38,13 @@ export function Topbar({ user, profile: initialProfile, plan }: { user: any, pro
         </button>
 
         <Link href="/dashboard" className="relative group flex items-center justify-center ml-6 -mt-2">
-          {/* Glowing Aura background */}
-          <div className="absolute w-24 h-24 bg-amber-500/25 rounded-full blur-xl opacity-85 group-hover:opacity-100 group-hover:scale-125 transition-all duration-500 pointer-events-none" />
-
           <div className="w-20 h-20 relative flex items-center justify-center z-10">
             <Image
               src="/trident.png"
               alt="Trinetra Logo"
               width={78}
               height={78}
-              className="object-contain drop-shadow-[0_0_12px_rgba(245,158,11,0.65)] scale-110 transition-all duration-300 group-hover:scale-120"
+              className="object-contain scale-110 transition-all duration-300 group-hover:scale-120"
             />
           </div>
         </Link>

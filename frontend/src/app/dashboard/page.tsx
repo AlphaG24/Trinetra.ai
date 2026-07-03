@@ -4,15 +4,15 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/utils/supabase/client'
-import { 
-  Activity, 
-  Bot, 
-  Clock, 
-  Sparkles, 
-  Phone, 
-  ArrowUpRight, 
-  ChevronRight, 
-  Plus, 
+import {
+  Activity,
+  Bot,
+  Clock,
+  Sparkles,
+  Phone,
+  ArrowUpRight,
+  ChevronRight,
+  Plus,
   Volume2
 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -48,7 +48,7 @@ export default function DashboardPage() {
 
       const now = new Date()
       const isToday = date.toDateString() === now.toDateString()
-      
+
       const yesterday = new Date()
       yesterday.setDate(now.getDate() - 1)
       const isYesterday = date.toDateString() === yesterday.toDateString()
@@ -97,6 +97,7 @@ export default function DashboardPage() {
           .single()
 
         if (!profileData?.phone || !profileData?.full_name) {
+          console.log("🚨 TRIPWIRE 2 TRIGGERED: The Dashboard component kicked the user!");
           router.push('/dashboard/profile')
           return
         }
@@ -136,7 +137,7 @@ export default function DashboardPage() {
 
   // Aggregate stats from real state arrays
   const totalInteractions = callLogs.length
-  
+
   const activeAgentsCount = userAgents.filter(agent => agent.status === 'active').length
 
   const totalDurationSeconds = callLogs.reduce((acc, log) => acc + (log.duration_seconds || 0), 0)
@@ -175,7 +176,7 @@ export default function DashboardPage() {
 
   if (hasPurchasedAgent) {
     return (
-      <PaidAgentDashboard 
+      <PaidAgentDashboard
         userName={userName}
         userAgents={userAgents}
         callLogs={callLogs}
@@ -269,7 +270,7 @@ export default function DashboardPage() {
             <h2 className="text-xl font-bold text-white">Your AI Agents</h2>
           </div>
           {userAgents.length > 0 && (
-            <button 
+            <button
               onClick={() => router.push('/dashboard/deploy')}
               className="text-xs font-semibold text-amber-500 hover:text-amber-400 flex items-center gap-1 transition-colors"
             >
@@ -311,20 +312,18 @@ export default function DashboardPage() {
                   </div>
                   {/* Status Badge */}
                   <div className="flex items-center gap-2">
-                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wider uppercase border ${
-                      agent.status === 'active' 
-                        ? 'bg-green-500/10 text-green-400 border-green-500/20' 
+                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wider uppercase border ${agent.status === 'active'
+                        ? 'bg-green-500/10 text-green-400 border-green-500/20'
                         : agent.status === 'training'
-                        ? 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20'
-                        : 'bg-zinc-500/10 text-zinc-400 border-white/10'
-                    }`}>
-                      <span className={`w-1.5 h-1.5 rounded-full ${
-                        agent.status === 'active' 
-                          ? 'bg-green-500 animate-pulse' 
+                          ? 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20'
+                          : 'bg-zinc-500/10 text-zinc-400 border-white/10'
+                      }`}>
+                      <span className={`w-1.5 h-1.5 rounded-full ${agent.status === 'active'
+                          ? 'bg-green-500 animate-pulse'
                           : agent.status === 'training'
-                          ? 'bg-yellow-500 animate-pulse'
-                          : 'bg-zinc-500'
-                      }`} />
+                            ? 'bg-yellow-500 animate-pulse'
+                            : 'bg-zinc-500'
+                        }`} />
                       {agent.status}
                     </span>
                   </div>
@@ -332,7 +331,7 @@ export default function DashboardPage() {
 
                 <div className="flex items-center justify-between border-t border-white/[0.03] pt-2.5">
                   <span className="text-zinc-500 text-[11px] font-mono">ID: {agent.vapi_agent_id ? agent.vapi_agent_id.slice(0, 8) : agent.id.slice(0, 8)}...</span>
-                  <button 
+                  <button
                     onClick={(e) => {
                       e.preventDefault();
                       e.stopPropagation();

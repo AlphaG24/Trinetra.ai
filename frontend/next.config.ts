@@ -50,6 +50,11 @@ const nextConfig: NextConfig = {
         destination: '/contact',
         permanent: false,
       },
+      {
+        source: '/dashboard/deploy-agent',
+        destination: '/dashboard/deploy',
+        permanent: false,
+      },
     ];
   },
   async headers() {

@@ -21,7 +21,7 @@ export function Sidebar({ agents }: { agents: any[] }) {
 
   const topLinks = [
     { name: 'Overview', href: '/dashboard', icon: Home },
-    { name: 'Demo', href: '/dashboard/demo', icon: FlaskConical, badge: 'NEW' },
+    { name: 'Demo', href: '/dashboard/demo', icon: FlaskConical },
     { name: 'Agents', href: '/dashboard/agents', icon: Bot },
     { name: 'Appointments', href: '/dashboard/appointments', icon: Calendar },
     { name: 'Leads', href: '/dashboard/leads', icon: Target },

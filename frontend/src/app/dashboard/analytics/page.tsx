@@ -12,5 +12,17 @@ export default async function AnalyticsPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  return <AnalyticsPageClient />
+  // Fetch all active platform services
+  const { data: services } = await supabase
+    .from('platform_services')
+    .select('*')
+    .eq('is_active', true)
+    .order('name', { ascending: true })
+
+  return (
+    <AnalyticsPageClient 
+      userId={user.id} 
+      initialServices={services || []} 
+    />
+  )
 }

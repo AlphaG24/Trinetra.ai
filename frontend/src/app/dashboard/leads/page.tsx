@@ -13,11 +13,24 @@ export default async function LeadsPage() {
 
   if (!user) redirect('/login')
 
+  // Fetch active platform services
+  const { data: services } = await supabase
+    .from('platform_services')
+    .select('*')
+    .eq('is_active', true)
+    .order('name', { ascending: true })
+
+  // Fetch leads for the current user
   const { data: leads } = await supabase
     .from('leads')
     .select('*')
     .eq('user_id', user.id)
     .order('created_at', { ascending: false })
 
-  return <LeadsPageClient initialLeads={leads || []} />
+  return (
+    <LeadsPageClient 
+      initialLeads={leads || []} 
+      services={services || []} 
+    />
+  )
 }

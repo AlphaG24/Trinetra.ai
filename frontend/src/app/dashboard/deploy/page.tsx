@@ -12,5 +12,12 @@ export default async function DeployPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  return <DeployPageClient user={user} />
+  // Fetch active platform services
+  const { data: services } = await supabase
+    .from('platform_services')
+    .select('*')
+    .eq('is_visible_in_marketplace', true)
+    .order('name', { ascending: true })
+
+  return <DeployPageClient user={user} services={services || []} />
 }

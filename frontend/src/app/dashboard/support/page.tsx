@@ -8,24 +8,20 @@ const WHATSAPP_NUMBER = "919452045499";
 
 const FAQS = [
   {
-    question: "How do I update the instructions or script for my AI agent?",
-    answer: "Currently, agent prompts and knowledge bases are managed by our engineering team to ensure high-quality conversations. Please open a Support Ticket with your requested script changes, and we will update your agent within 24 hours."
+    question: "How does the JIT (Just-In-Time) quota provisioning work?",
+    answer: "When you launch a new agent from the marketplace, our engine automatically provisions a secure sandbox with a default allocation of free compute credits (documents, minutes, or tasks) so you can test the deployment instantly."
   },
   {
-    question: "Can the AI transfer a caller to a real human?",
-    answer: "Yes! Your agent is equipped with intelligent escalation. If a caller asks for a human, it will seamlessly transfer the call to the emergency business number you provided during onboarding."
+    question: "Are my documents and telemetry data secure?",
+    answer: "Yes. All agents operate on isolated, multi-tenant architectures. Event telemetry and processed data are encrypted at rest and strictly partitioned by your workspace ID."
   },
   {
-    question: "Where do I view the leads and appointments booked by the AI?",
-    answer: "All captured leads, call summaries, and booked appointments are automatically logged in your 'Leads' dashboard. We will also send an instant email if you have Lead Alerts enabled in Settings."
+    question: "How do I upgrade an agent to a production tier?",
+    answer: "Navigate to the marketplace product page of the specific agent and select an enterprise or pay-as-you-go tier, or submit a Custom Deployment Request for tailored integration."
   },
   {
-    question: "Can I use my existing business phone number?",
-    answer: "Yes, you can port your existing business number to our platform, or we can provide you with a new local number. Contact our helpdesk to initiate a number port."
-  },
-  {
-    question: "What languages does the AI support?",
-    answer: "Our agents natively speak both English and Hindi. They can dynamically detect the caller's language and switch between them mid-conversation effortlessly."
+    question: "Can I connect these autonomous agents to my existing software?",
+    answer: "Absolutely. Our deployment team specializes in custom API bridges, allowing agents to seamlessly sync with your current CRM, ERP, or proprietary databases."
   }
 ]
 
@@ -96,7 +92,7 @@ export default function SupportPage() {
       <div className="space-y-6 pt-8 border-t border-white/5">
         <div>
           <h2 className="text-xl font-bold text-white">Frequently Asked Questions</h2>
-          <p className="text-xs text-violet-300/40 mt-1">Quick self-help answers for Voice AI operations.</p>
+          <p className="text-xs text-violet-300/40 mt-1">Quick self-help answers for autonomous agent operations.</p>
         </div>
 
         <div className="space-y-3">

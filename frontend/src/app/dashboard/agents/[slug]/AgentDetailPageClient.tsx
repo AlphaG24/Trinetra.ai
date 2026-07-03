@@ -40,10 +40,10 @@ interface CallLog {
   created_at: string
 }
 
-export default function AgentDetailPage() {
+export function AgentDetailPageClient() {
   const router = useRouter()
   const params = useParams()
-  const agentId = params?.agentId as string
+  const agentId = (params?.slug || params?.agentId) as string
 
   const [loading, setLoading] = useState(true)
   const [agent, setAgent] = useState<UserAgent | null>(null)

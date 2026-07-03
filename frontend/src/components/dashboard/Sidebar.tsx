@@ -39,7 +39,7 @@ export function Sidebar({ agents: propAgents }: { agents?: any[] }) {
   ]
 
   if (showDemo) {
-    topLinks.push({ name: 'Demo', href: '/dashboard/demo', icon: FlaskConical, badge: 'NEW' })
+    topLinks.push({ name: 'Demo', href: '/dashboard/demo', icon: FlaskConical })
   }
 
   topLinks.push(
