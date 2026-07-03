@@ -265,7 +265,7 @@ function ExternalDataWorkspace({ tool, quota, user, logs, router }: ExternalData
 
   // Safe URL Construction to prevent fatal page crashes
   const finalLaunchUrl = useMemo(() => {
-    let rawUrl = tool.marketplace_metadata?.subdomain_url || tool.subdomain_url || 'https://structurer.trinetra.ai'
+    let rawUrl = tool.marketplace_metadata?.subdomain_url || tool.subdomain_url || process.env.NEXT_PUBLIC_STRUCTURER_URL || 'https://structurer.trinetra.ai'
     rawUrl = rawUrl.trim()
     
     // Ensure rawUrl has correct protocol prefix
