@@ -37,6 +37,12 @@ export async function GET(request: Request) {
 
     const { error } = await supabase.auth.exchangeCodeForSession(code)
     if (!error) {
+      // If the 'next' parameter is one of our subdomains but lacks http/https, append it
+      let targetUrl = `${origin}${next}`
+      if (next.includes('trinetraedu-ai.com')) {
+        targetUrl = next.startsWith('http') ? next : `https://${next}`
+      }
+
       // THE NUCLEAR FIX: 
       // Return a 200 OK to force the browser to save the cookie immediately.
       // Use native HTML to force a hard page load, bypassing the Next.js SPA router.
@@ -44,10 +50,10 @@ export async function GET(request: Request) {
         <!DOCTYPE html>
         <html>
           <head>
-            <meta http-equiv="refresh" content="0;url=${origin}${next}">
+            <meta http-equiv="refresh" content="0;url=${targetUrl}">
           </head>
           <body>
-            <script>window.location.href = "${origin}${next}";</script>
+            <script>window.location.href = "${targetUrl}";</script>
             <p>Authenticating... Redirecting to dashboard.</p>
           </body>
         </html>
@@ -62,5 +68,5 @@ export async function GET(request: Request) {
   }
 
   // If there is no code or an error occurred, return home
-  return NextResponse.redirect(`${origin}/`)
+  return NextResponse.redirect(`${origin}/?error=auth_failed`)
 }

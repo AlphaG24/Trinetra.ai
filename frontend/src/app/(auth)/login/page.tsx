@@ -100,11 +100,16 @@ function LoginForm() {
 
   const handleGoogleLogin = async () => {
     try {
+      const redirectUrl = searchParams ? searchParams.get('redirect') : null
+      // Build the callback URL, appending the target destination if it exists
+      const callbackPath = redirectUrl 
+        ? `auth/callback?next=${encodeURIComponent(redirectUrl)}` 
+        : 'auth/callback';
+
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          // No variables. No query parameters. Exact string match only.
-          redirectTo: getURL('auth/callback'),
+          redirectTo: getURL(callbackPath)
         },
       })
       if (error) throw error

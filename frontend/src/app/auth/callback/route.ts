@@ -40,6 +40,10 @@ export async function GET(request: Request) {
         const { error } = await supabase.auth.exchangeCodeForSession(code)
 
         if (!error) {
+            // If the 'next' parameter is one of our subdomains but lacks http/https, append it
+            if (next.includes('trinetraedu-ai.com') && !next.startsWith('http')) {
+                return NextResponse.redirect(`https://${next}`, { status: 303 })
+            }
             // 303 Redirect forces the browser to wait for the cookie to save
             return NextResponse.redirect(`${origin}${next}`, { status: 303 })
         }
