@@ -21,10 +21,18 @@ export async function middleware(request: NextRequest) {
         getAll() { return request.cookies.getAll() },
         setAll(cookiesToSet) {
           cookiesToSet.forEach(({ name, value, options }) => {
-            const domain = process.env.NODE_ENV === 'development' ? undefined : process.env.NEXT_PUBLIC_COOKIE_DOMAIN
+            const domain = process.env.NODE_ENV === 'development' ? undefined : '.trinetraedu-ai.com'
             // We MUST set the cookie on BOTH the request and the response
             request.cookies.set(name, value)
-            supabaseResponse.cookies.set({ name, value, ...options, domain })
+            supabaseResponse.cookies.set({
+              name,
+              value,
+              ...options,
+              domain,
+              path: '/',
+              sameSite: 'lax',
+              secure: true,
+            })
           })
         },
       },

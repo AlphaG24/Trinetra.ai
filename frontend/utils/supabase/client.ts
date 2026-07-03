@@ -2,9 +2,8 @@
 import { createBrowserClient } from '@supabase/ssr'
 
 export function createClient() {
-    const cookieDomain = typeof window !== 'undefined' && window.location.hostname === 'localhost'
-        ? undefined
-        : (process.env.NEXT_PUBLIC_COOKIE_DOMAIN || undefined)
+    const isLocalhost = typeof window !== 'undefined' && window.location.hostname === 'localhost'
+    const cookieDomain = isLocalhost ? undefined : '.trinetraedu-ai.com'
 
     return createBrowserClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -13,6 +12,8 @@ export function createClient() {
             cookieOptions: {
                 domain: cookieDomain,
                 path: '/',
+                sameSite: 'lax',
+                secure: true,
             }
         }
     )

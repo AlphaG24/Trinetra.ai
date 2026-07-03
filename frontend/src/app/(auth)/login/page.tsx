@@ -65,80 +65,31 @@ function LoginForm() {
         toast.success('Successfully logged in!')
         
         const redirectParam = searchParams ? searchParams.get('redirect') : null
-        const structurerUrl = process.env.NEXT_PUBLIC_STRUCTURER_URL || 'https://structurer.trinetra.ai'
         
-        // Allowed domains/subdomains from env, defaulting to structurerUrl domain if empty
-        const authorizedListStr = process.env.NEXT_PUBLIC_AUTHORIZED_SUBDOMAINS || ''
-        const authorizedSubdomains = authorizedListStr
-          .split(',')
-          .map(s => s.trim().toLowerCase())
-          .filter(Boolean)
-        
-        // Helper to extract hostname
-        const getHostName = (urlStr: string) => {
-          try {
-            let temp = urlStr
-            if (!temp.startsWith('http://') && !temp.startsWith('https://')) {
-              temp = `https://${temp}`
-            }
-            return new URL(temp).hostname.toLowerCase()
-          } catch {
-            return urlStr.toLowerCase()
-          }
-        }
-
-        const currentOriginHost = typeof window !== 'undefined' ? window.location.hostname.toLowerCase() : ''
-        
-        let targetRedirectUrl: string | null = null
-
-        // Check if redirect query parameter or window.location.origin matches
         if (redirectParam) {
-          const redirectHost = getHostName(redirectParam)
-          const structurerHost = getHostName(structurerUrl)
+          let target = redirectParam.trim()
           
-          // Check if redirect query parameter matches our authorized subdomain list
-          const isAuthorized = authorizedSubdomains.some(sub => redirectHost.includes(sub)) || 
-                               redirectHost === structurerHost ||
-                               redirectHost.includes('trinetra.ai') ||
-                               redirectHost.includes('trinetraedu-ai.com')
-          
-          if (isAuthorized) {
-            // When launching the tool, ensure they are sent to the correct production environment URL, not localhost
-            if (redirectHost === structurerHost || redirectHost.includes('structurer')) {
-              targetRedirectUrl = structurerUrl
-            } else {
-              targetRedirectUrl = redirectParam.trim()
+          // Check if it contains authorized domain (trinetraedu-ai.com)
+          if (target.toLowerCase().includes('trinetraedu-ai.com')) {
+            // Sanitize redirect: Ensure it starts with https:// to prevent open redirect/javascript scheme vulnerabilities
+            if (!target.startsWith('http://') && !target.startsWith('https://')) {
+              target = `https://${target}`
             }
-          }
-        } else {
-          // If no redirect param, check if window origin matches
-          const structurerHost = getHostName(structurerUrl)
-          const isOriginAuthorized = authorizedSubdomains.some(sub => currentOriginHost.includes(sub)) ||
-                                     currentOriginHost === structurerHost
-          
-          if (isOriginAuthorized && (currentOriginHost === structurerHost || currentOriginHost.includes('structurer'))) {
-            targetRedirectUrl = structurerUrl
+            
+            // Append user_id parameter safely for seamless session handoff
+            try {
+              const urlObj = new URL(target)
+              urlObj.searchParams.set('user_id', data.user.id)
+              window.location.href = urlObj.toString()
+            } catch {
+              const separator = target.includes('?') ? '&' : '?'
+              window.location.href = `${target}${separator}user_id=${data.user.id}`
+            }
+            return
           }
         }
-
-        if (targetRedirectUrl) {
-          let sanitizedUrl = targetRedirectUrl.trim()
-          if (!sanitizedUrl.startsWith('http://') && !sanitizedUrl.startsWith('https://')) {
-            sanitizedUrl = `https://${sanitizedUrl}`
-          }
-          
-          // Safely append user_id parameter for authorization handoff
-          try {
-            const urlObj = new URL(sanitizedUrl)
-            urlObj.searchParams.set('user_id', data.user.id)
-            window.location.href = urlObj.toString()
-          } catch {
-            const separator = sanitizedUrl.includes('?') ? '&' : '?'
-            window.location.href = `${sanitizedUrl}${separator}user_id=${data.user.id}`
-          }
-        } else {
-          router.push('/dashboard')
-        }
+        
+        router.push('/dashboard')
       }
     } catch (err) {
       toast.error('An unexpected error occurred')

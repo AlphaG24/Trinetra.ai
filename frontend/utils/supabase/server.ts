@@ -6,7 +6,7 @@ export async function createClient() {
     const cookieStore = await cookies()
     const headerList = await headers()
     const host = headerList.get('host') || ''
-    const cookieDomain = host.includes('localhost') ? undefined : (process.env.NEXT_PUBLIC_COOKIE_DOMAIN || undefined)
+    const cookieDomain = host.includes('localhost') ? undefined : '.trinetraedu-ai.com'
 
     return createServerClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -22,6 +22,9 @@ export async function createClient() {
                             cookieStore.set(name, value, {
                                 ...options,
                                 domain: cookieDomain,
+                                path: '/',
+                                sameSite: 'lax',
+                                secure: true,
                             })
                         )
                     } catch {
