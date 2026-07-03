@@ -20,7 +20,8 @@ export async function GET() {
         let ollamaStatus = 'unknown';
         let ollamaModels = [];
         try {
-            const ollamaRes = await fetch('http://localhost:11434/api/tags', { method: 'GET' });
+            const endpoint = process.env.OLLAMA_URL ? `${process.env.OLLAMA_URL.replace(/\/$/, '')}/api/tags` : 'http://localhost:11434/api/tags';
+            const ollamaRes = await fetch(endpoint, { method: 'GET' });
             if (ollamaRes.ok) {
                 const data = await ollamaRes.json();
                 ollamaStatus = 'ok';

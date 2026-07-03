@@ -5,7 +5,7 @@ import { NextResponse } from 'next/server';
 export const runtime = 'nodejs';
 
 const openai = new OpenAI({
-    baseURL: 'http://127.0.0.1:11434/v1',
+    baseURL: process.env.OLLAMA_URL ? `${process.env.OLLAMA_URL.replace(/\/$/, '')}/v1` : 'http://127.0.0.1:11434/v1',
     apiKey: 'ollama',
 });
 

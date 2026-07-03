@@ -2,8 +2,8 @@
 import { createBrowserClient } from '@supabase/ssr'
 
 export function createClient() {
-    const isLocalhost = typeof window !== 'undefined' && window.location.hostname === 'localhost'
-    const cookieDomain = isLocalhost ? undefined : '.trinetraedu-ai.com'
+    const isProd = process.env.NODE_ENV === 'production'
+    const cookieDomain = isProd ? '.trinetraedu-ai.com' : undefined
 
     return createBrowserClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,

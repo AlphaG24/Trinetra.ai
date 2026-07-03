@@ -7,7 +7,7 @@ import { TranscriptModal } from '../modals/TranscriptModal'
 import { createClient } from '@/utils/supabase/client'
 import { toast } from 'sonner'
 
-const FASTAPI_URL = process.env.NEXT_PUBLIC_FASTAPI_URL || process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000"
+const FASTAPI_URL = process.env.NEXT_PUBLIC_BACKEND_URL || process.env.NEXT_PUBLIC_FASTAPI_URL || process.env.NEXT_PUBLIC_API_URL || ""
 
 interface Agent {
   agent_type: string

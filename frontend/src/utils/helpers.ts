@@ -1,12 +1,23 @@
-export const getURL = () => {
+export const getURL = (path: string = '') => {
   let url =
-    process?.env?.NEXT_PUBLIC_SITE_URL ?? // Set this to your site URL in production env.
-    process?.env?.NEXT_PUBLIC_VERCEL_URL ?? // Automatically set by Vercel.
-    'http://localhost:3000/';
+    process?.env?.NEXT_PUBLIC_APP_URL && process.env.NEXT_PUBLIC_APP_URL !== ''
+      ? process.env.NEXT_PUBLIC_APP_URL
+      : process?.env?.NEXT_PUBLIC_VERCEL_URL && process.env.NEXT_PUBLIC_VERCEL_URL !== ''
+      ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}`
+      : process?.env?.NEXT_PUBLIC_SITE_URL && process.env.NEXT_PUBLIC_SITE_URL !== ''
+      ? process.env.NEXT_PUBLIC_SITE_URL
+      : typeof window !== 'undefined'
+      ? window.location.origin
+      : 'https://trinetraedu-ai.com';
 
-  // Make sure we include `https://` when not localhost.
-  url = url.startsWith('http') ? url : `https://${url}`;
-  // Make sure it includes a trailing `/`.
-  url = url.endsWith('/') ? url : `${url}/`;
-  return url;
+  // Include web protocol if missing
+  url = url.includes('http') ? url : `https://${url}`;
+  
+  // Ensure trailing slash is removed before appending path
+  url = url.charAt(url.length - 1) === '/' ? url.slice(0, -1) : url;
+  
+  // Format path (add leading slash if missing)
+  const formattedPath = path && path.charAt(0) !== '/' ? `/${path}` : path;
+  
+  return `${url}${formattedPath}`;
 };

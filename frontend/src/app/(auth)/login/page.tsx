@@ -104,7 +104,7 @@ function LoginForm() {
         provider: 'google',
         options: {
           // No variables. No query parameters. Exact string match only.
-          redirectTo: 'http://localhost:3000/auth/callback',
+          redirectTo: getURL('auth/callback'),
         },
       })
       if (error) throw error

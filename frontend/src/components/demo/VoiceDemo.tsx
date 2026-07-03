@@ -6,7 +6,7 @@ import Vapi from '@vapi-ai/web'
 import { createClient } from '@/utils/supabase/client'
 import { toast } from 'sonner'
 
-const FASTAPI_URL = process.env.NEXT_PUBLIC_FASTAPI_URL || "http://localhost:8000"
+const FASTAPI_URL = process.env.NEXT_PUBLIC_BACKEND_URL || process.env.NEXT_PUBLIC_FASTAPI_URL || ""
 
 export function VoiceDemo({
   agentPhone,
@@ -65,7 +65,7 @@ export function VoiceDemo({
       const userId = user.id
 
       // 1. Fetch credentials from backend
-      const apiUrl = process.env.NEXT_PUBLIC_FASTAPI_URL || process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
+      const apiUrl = process.env.NEXT_PUBLIC_BACKEND_URL || process.env.NEXT_PUBLIC_FASTAPI_URL || process.env.NEXT_PUBLIC_API_URL || "";
       console.log("Target Backend URL:", apiUrl);
 
       const response = await fetch(`${apiUrl}/api/voice/start-demo`, {

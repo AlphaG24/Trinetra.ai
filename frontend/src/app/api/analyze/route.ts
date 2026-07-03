@@ -19,13 +19,14 @@ const supabaseAdmin = createClient(
 );
 
 const openai = new OpenAI({
-    baseURL: 'http://localhost:11434/v1',
+    baseURL: process.env.OLLAMA_URL ? `${process.env.OLLAMA_URL.replace(/\/$/, '')}/v1` : 'http://localhost:11434/v1',
     apiKey: 'ollama',
 });
 
 async function getEmbedding(text: string): Promise<number[] | null> {
     try {
-        const response = await fetch('http://127.0.0.1:11434/api/embeddings', {
+        const endpoint = process.env.OLLAMA_URL ? `${process.env.OLLAMA_URL.replace(/\/$/, '')}/api/embeddings` : 'http://127.0.0.1:11434/api/embeddings';
+        const response = await fetch(endpoint, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({

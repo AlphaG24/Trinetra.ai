@@ -5,8 +5,8 @@ import { cookies, headers } from 'next/headers'
 export async function createClient() {
     const cookieStore = await cookies()
     const headerList = await headers()
-    const host = headerList.get('host') || ''
-    const cookieDomain = host.includes('localhost') ? undefined : '.trinetraedu-ai.com'
+    const isProd = process.env.NODE_ENV === 'production'
+    const cookieDomain = isProd ? '.trinetraedu-ai.com' : undefined
 
     return createServerClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,

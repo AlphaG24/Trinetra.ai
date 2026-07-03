@@ -99,8 +99,9 @@ export async function POST(request: Request) {
                 // Debug log for first chunk to verify loop entry
                 if (index === 0) console.log(`[Vault] Processing first chunk... sending to Ollama.`);
 
-                // Using 127.0.0.1 instead of localhost to prevent IPv6 resolution issues
-                const embeddingResponse = await fetch('http://127.0.0.1:11434/api/embeddings', {
+                // Using OLLAMA_URL if configured, fallback to 127.0.0.1
+                const endpoint = process.env.OLLAMA_URL ? `${process.env.OLLAMA_URL.replace(/\/$/, '')}/api/embeddings` : 'http://127.0.0.1:11434/api/embeddings';
+                const embeddingResponse = await fetch(endpoint, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -147,7 +148,7 @@ export async function POST(request: Request) {
                 // If it's a connection error, fail fast and warn user
                 if (embedError.cause?.code === 'ECONNREFUSED' || embedError.message?.includes('fetch failed')) {
                     return NextResponse.json({
-                        error: "Embedding engine unreachable. Is Ollama running? (Connection Refused 127.0.0.1:11434)"
+                        error: `Embedding engine unreachable. Is Ollama running? (Connection Refused ${process.env.OLLAMA_URL || '127.0.0.1:11434'})`
                     }, { status: 503 });
                 }
             }

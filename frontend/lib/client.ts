@@ -11,9 +11,8 @@ export function createClient() {
   const proxy = new Proxy({}, {
     get(target, prop) {
       if (!globalClient) {
-        const cookieDomain = typeof window !== 'undefined' && window.location.hostname === 'localhost'
-          ? undefined
-          : (process.env.NEXT_PUBLIC_COOKIE_DOMAIN || undefined)
+        const isProd = process.env.NODE_ENV === 'production'
+        const cookieDomain = isProd ? '.trinetraedu-ai.com' : undefined
 
         globalClient = createBrowserClient(
           process.env.NEXT_PUBLIC_SUPABASE_URL!,

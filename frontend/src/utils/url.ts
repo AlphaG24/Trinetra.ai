@@ -5,6 +5,11 @@ export function getBaseUrl(): string {
   }
   
   // Server-side fallback hierarchy
+  if (process.env.NEXT_PUBLIC_APP_URL) {
+    const url = process.env.NEXT_PUBLIC_APP_URL;
+    return url.startsWith('http') ? url : `https://${url}`;
+  }
+
   if (process.env.NEXT_PUBLIC_SITE_URL) {
     const url = process.env.NEXT_PUBLIC_SITE_URL;
     return url.startsWith('http') ? url : `https://${url}`;
@@ -15,5 +20,10 @@ export function getBaseUrl(): string {
     return url.startsWith('http') ? url : `https://${url}`;
   }
   
-  return 'http://localhost:3000';
+  if (process.env.NEXT_PUBLIC_VERCEL_URL) {
+    const url = process.env.NEXT_PUBLIC_VERCEL_URL;
+    return url.startsWith('http') ? url : `https://${url}`;
+  }
+
+  return 'https://trinetraedu-ai.com';
 }
