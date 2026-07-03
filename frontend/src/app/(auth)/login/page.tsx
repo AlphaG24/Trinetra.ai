@@ -58,6 +58,7 @@ function LoginForm() {
         } else {
           toast.error(error.message || 'No account found. Did you mean to sign up?')
         }
+        console.error("Supabase password auth failed:", error)
         return
       }
 
@@ -81,7 +82,8 @@ function LoginForm() {
               const urlObj = new URL(target)
               urlObj.searchParams.set('user_id', data.user.id)
               window.location.href = urlObj.toString()
-            } catch {
+            } catch (err) {
+              console.error("Redirect URL format validation error, falling back to manual query append:", err)
               const separator = target.includes('?') ? '&' : '?'
               window.location.href = `${target}${separator}user_id=${data.user.id}`
             }
@@ -92,19 +94,23 @@ function LoginForm() {
         router.push('/dashboard')
       }
     } catch (err) {
+      console.error("Unexpected login failure caught:", err)
       toast.error('An unexpected error occurred')
     } finally {
       setIsLoading(false)
     }
   }
 
-  const handleGoogleLogin = async () => {
+  const handleGoogleLogin = async (e: React.MouseEvent) => {
+    e.preventDefault()
     try {
       const redirectUrl = searchParams ? searchParams.get('redirect') : null
       // Build the callback URL, appending the target destination if it exists
       const callbackPath = redirectUrl 
         ? `auth/callback?next=${encodeURIComponent(redirectUrl)}` 
         : 'auth/callback';
+
+      console.log("Initiating Google Login. Callback target path:", callbackPath)
 
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
@@ -114,6 +120,7 @@ function LoginForm() {
       })
       if (error) throw error
     } catch (err) {
+      console.error("Google Login redirect failed:", err)
       toast.error('Failed to initialize Google login')
     }
   }
