@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { 
   Play, Pause, FileText, Database, ShieldAlert, Sparkles, Sliders, Settings, 
   Terminal, Activity, ArrowRight, Phone, MessageSquare, Share2, Copy, Check, RefreshCw, Download, ExternalLink
@@ -263,33 +264,6 @@ interface ExternalDataWorkspaceProps {
 function ExternalDataWorkspace({ tool, quota, user, logs, router }: ExternalDataWorkspaceProps) {
   const [isRefreshing, setIsRefreshing] = useState(false)
 
-  // Safe URL Construction to prevent fatal page crashes
-  const finalLaunchUrl = useMemo(() => {
-    let rawUrl = process.env.NEXT_PUBLIC_STRUCTURER_URL || tool.marketplace_metadata?.subdomain_url || tool.subdomain_url;
-    
-    if (!rawUrl) {
-      console.error("Structurer URL environment variable (NEXT_PUBLIC_STRUCTURER_URL) is missing, and no tool metadata fallback exists. Using default fallback.");
-      rawUrl = 'https://structurer.trinetraedu-ai.com';
-    } else {
-      rawUrl = rawUrl.trim();
-    }
-    
-    // Ensure rawUrl has correct protocol prefix
-    if (!rawUrl.startsWith('http://') && !rawUrl.startsWith('https://')) {
-      rawUrl = `https://${rawUrl}`
-    }
-
-    try {
-      const urlObj = new URL(rawUrl)
-      urlObj.searchParams.set('user_id', user.id)
-      return urlObj.toString()
-    } catch (err) {
-      console.error("Safe URL parser failed, performing fallback concatenation:", err)
-      const separator = rawUrl.includes('?') ? '&' : '?'
-      return `${rawUrl}${separator}user_id=${user.id}`
-    }
-  }, [tool, user])
-
   const handleRefresh = () => {
     setIsRefreshing(true)
     router.refresh()
@@ -336,14 +310,12 @@ function ExternalDataWorkspace({ tool, quota, user, logs, router }: ExternalData
             <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
             Refresh Quotas
           </button>
-          <a
-            href={finalLaunchUrl}
-            target="_blank"
-            rel="noopener noreferrer"
+          <Link
+            href={`/dashboard/tools/${tool.slug}`}
             className="bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 border border-violet-400/20 shadow-[0_0_20px_rgba(139,92,246,0.25)] text-white font-semibold tracking-wide uppercase text-xs px-6 py-2.5 rounded-xl text-center transition-all duration-200 flex items-center gap-1.5 cursor-pointer hover:scale-[1.02] active:scale-[0.98]"
           >
             Launch Console ↗
-          </a>
+          </Link>
         </div>
       </div>
 
