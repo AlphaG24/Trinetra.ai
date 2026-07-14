@@ -18,24 +18,20 @@ import {
 
 const fallbackProductLinks = [
   { name: "AI Voice Agent", href: "/products/voice-agent", isComingSoon: false },
-  { name: "AI Chat Agent", href: "/products/chat-agent", isComingSoon: false },
-  { name: "AI Social Agent", href: "/products/social-agent", isComingSoon: false },
   { name: "AI Workflow Agent", href: "/products/workflow-agent", isComingSoon: true },
 ];
 
 const companyLinks = [
   { name: "About Us", href: "/about" },
-  { name: "Partners", href: "/partners" },
-  { name: "Careers", href: "#" },
   { name: "Blog", href: "/blog" },
-  { name: "Press Kit", href: "#" },
   { name: "Contact", href: "/contact" },
+  { name: "Grievance", href: "/grievance" },
 ];
 
 const legalLinks = [
   { name: "Privacy Policy", href: "/privacy" },
   { name: "Terms of Service", href: "/terms" },
-  { name: "Cookie Policy", href: "#" },
+  { name: "Cookie Policy", href: "/cookies" },
   { name: "Refund Policy", href: "/refund" },
 ];
 
@@ -61,6 +57,7 @@ function FooterIconButton({
         title="Coming Soon"
         onClick={() => toast("Coming Soon! We're working on it.")}
         className={`${baseClass} ${muted ? "opacity-50" : ""}`}
+        suppressHydrationWarning={true}
       >
         {children}
       </button>
@@ -89,7 +86,7 @@ export function Footer() {
     return null;
   }
 
-  const companyName = getConfigString(siteConfig, "company_name", "Trinetra AI");
+  const companyName = getConfigString(siteConfig, "company_name", "Trinetraedu-ai");
   const linkedinUrl = getConfigString(siteConfig, "social_linkedin");
   const instagramUrl = getConfigString(siteConfig, "social_instagram");
   const twitterUrl = getConfigString(siteConfig, "social_twitter");
@@ -99,10 +96,10 @@ export function Footer() {
   const productLinks =
     products.length > 0
       ? products.map((product) => ({
-          name: product.name,
-          href: `/products/${product.slug}`,
-          isComingSoon: product.status === "coming_soon",
-        }))
+        name: product.name,
+        href: `/products/${product.slug}`,
+        isComingSoon: product.status === "coming_soon",
+      }))
       : productsError
         ? fallbackProductLinks
         : [];
@@ -236,7 +233,7 @@ export function Footer() {
 
         <div className="mt-[48px] flex flex-col items-center justify-between gap-[16px] border-t border-[#1E0A35] pt-[24px] md:flex-row">
           <p className="text-center font-sans text-[13px] font-normal text-[#6B6088] md:text-left">
-            &copy; 2025 {companyName}. All rights reserved.
+            &copy; 2026 trinetraedu-ai. All rights reserved.
           </p>
           <p className="flex items-center justify-center gap-[6px] font-sans text-[13px] font-normal text-[#6B6088] md:justify-end">
             Made in India.

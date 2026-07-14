@@ -5,7 +5,6 @@ import Link from 'next/link'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
   Search, 
-  Sparkles, 
   Bot, 
   Phone, 
   MessageSquare, 
@@ -16,7 +15,8 @@ import {
   ArrowRight,
   ShieldAlert,
   Activity,
-  Coins
+  Coins,
+  Box
 } from 'lucide-react'
 import { PlatformService } from '@/types/supabase'
 
@@ -73,6 +73,27 @@ const getTypeIconAndStyle = (type: string) => {
   }
 }
 
+function ToolLogo({ iconUrl, name }: { iconUrl: string | null; name: string }) {
+  const [imgError, setImgError] = useState(!iconUrl)
+
+  if (imgError || !iconUrl) {
+    return (
+      <div className="w-12 h-12 rounded-md bg-zinc-800 border border-zinc-700 flex items-center justify-center shrink-0">
+        <Box className="w-6 h-6 text-zinc-400" />
+      </div>
+    )
+  }
+
+  return (
+    <img
+      src={iconUrl}
+      alt={name}
+      onError={() => setImgError(true)}
+      className="w-12 h-12 rounded-md object-cover border border-zinc-850 shrink-0"
+    />
+  )
+}
+
 export function MarketplaceGrid({ tools }: MarketplaceGridProps) {
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedType, setSelectedType] = useState('All')
@@ -112,17 +133,17 @@ export function MarketplaceGrid({ tools }: MarketplaceGridProps) {
   return (
     <div className="space-y-8 py-2">
       {/* Premium Header & Search Section */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 pb-6 border-b border-[var(--border-subtle)]">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 pb-6 border-b border-zinc-800">
         <div>
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[var(--violet-600)]/10 border border-[var(--violet-500)]/20 mb-3">
-            <Sparkles className="w-4 h-4 text-[var(--gold-400)] animate-pulse" />
-            <span className="text-xs font-semibold text-[var(--text-primary)] tracking-wide uppercase">Autonomous Business OS</span>
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-md bg-zinc-900 border border-zinc-800 mb-3">
+            <Box className="w-4 h-4 text-zinc-400" />
+            <span className="text-xs font-medium text-zinc-300 tracking-wide uppercase">Autonomous Business OS</span>
           </div>
-          <h1 className="text-4xl font-extrabold tracking-tight text-white font-heading bg-gradient-to-r from-white via-[var(--violet-300)] to-[var(--gold-300)] bg-clip-text text-transparent">
+          <h1 className="text-3xl font-semibold tracking-tight text-white font-heading">
             AI Tool Marketplace
           </h1>
-          <p className="text-[var(--text-secondary)] text-sm mt-2 max-w-xl">
-            Browse, test, and deploy production-grade self-healing AI agents and workflows directly into your subdomains.
+          <p className="text-zinc-400 text-sm mt-2 max-w-xl">
+            Browse and deploy production-grade self-healing AI agents and workflows directly into your subdomains.
           </p>
         </div>
 
@@ -137,6 +158,7 @@ export function MarketplaceGrid({ tools }: MarketplaceGridProps) {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full bg-[var(--bg-surface)]/80 border border-[var(--border-medium)] hover:border-[var(--border-active)]/50 focus:border-[var(--border-active)] rounded-xl pl-12 pr-4 py-3 text-sm text-[var(--text-primary)] placeholder-[var(--text-tertiary)] focus:outline-none focus:ring-1 focus:ring-[var(--violet-500)]/30 transition-all backdrop-blur-md"
+              suppressHydrationWarning={true}
             />
           </div>
         </div>
@@ -153,6 +175,7 @@ export function MarketplaceGrid({ tools }: MarketplaceGridProps) {
                 ? 'text-white'
                 : 'text-[var(--text-secondary)] hover:text-white bg-white/5 border border-white/5 hover:bg-white/10'
             }`}
+            suppressHydrationWarning={true}
           >
             {selectedType.toLowerCase() === type.toLowerCase() && (
               <motion.div
@@ -200,7 +223,7 @@ export function MarketplaceGrid({ tools }: MarketplaceGridProps) {
                   key={tool.id}
                   variants={cardVariants}
                   layout
-                  className="group relative bg-[var(--bg-surface)] border border-[var(--border-medium)] hover:border-[var(--border-active)]/40 rounded-2xl p-6 flex flex-col justify-between hover:shadow-2xl hover:shadow-[var(--violet-600)]/5 transition-all duration-300 overflow-hidden min-h-[280px]"
+                  className="group relative bg-[var(--bg-surface)] border border-zinc-800 hover:border-zinc-700 rounded-xl p-6 flex flex-col justify-between hover:shadow-xl transition-all duration-300 overflow-hidden min-h-[280px]"
                 >
                   {/* Subtle Background Card Gradients */}
                   <div className={`absolute -top-12 -left-12 w-32 h-32 bg-gradient-to-br ${glowClass} blur-2xl opacity-40 group-hover:opacity-60 transition-opacity duration-300 pointer-events-none`} />
@@ -209,34 +232,22 @@ export function MarketplaceGrid({ tools }: MarketplaceGridProps) {
                   <div className="space-y-4 relative z-10">
                     {/* Top Row: Icon & Status Badge */}
                     <div className="flex items-center justify-between">
-                      {tool.icon_url ? (
-                        <div className="relative">
-                          <img
-                            src={tool.icon_url}
-                            alt={tool.name}
-                            className="w-12 h-12 rounded-xl object-cover border border-white/10"
-                          />
-                        </div>
-                      ) : (
-                        <div className={`w-12 h-12 rounded-xl border flex items-center justify-center ${bgClass}`}>
-                          <Icon className="w-6 h-6" />
-                        </div>
-                      )}
+                      <ToolLogo iconUrl={tool.icon_url} name={tool.name} />
 
                       <div className="flex items-center gap-2">
                         {/* Type Badge */}
-                        <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-bold tracking-wider uppercase border ${badgeClass}`}>
+                        <span className={`px-2.5 py-0.5 rounded-md text-[9px] font-semibold tracking-wider uppercase border ${badgeClass}`}>
                           {tool.type}
                         </span>
 
                         {/* Status Badge */}
                         {tool.is_active ? (
-                          <span className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
+                          <span className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-[9px] font-semibold tracking-wider uppercase bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
                             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
                             Active
                           </span>
                         ) : (
-                          <span className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider bg-red-500/10 border border-red-500/20 text-red-400">
+                          <span className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-[9px] font-semibold tracking-wider uppercase bg-red-500/10 border border-red-500/20 text-red-400">
                             Maintenance
                           </span>
                         )}
@@ -286,10 +297,10 @@ export function MarketplaceGrid({ tools }: MarketplaceGridProps) {
 
                     <Link
                       href={`/dashboard/agents/${tool.slug}`}
-                      className={`py-2 px-4 rounded-xl text-xs font-bold transition-all duration-300 flex items-center gap-1.5 ${
+                      className={`px-4 py-2 rounded-md text-xs font-semibold transition-all duration-300 flex items-center gap-1.5 ${
                         tool.is_active
-                          ? 'bg-violet-600 hover:bg-violet-500 text-white border border-violet-500/30 hover:border-violet-500/50 shadow-[0_0_15px_rgba(139,92,246,0.2)] hover:shadow-[0_0_20px_rgba(139,92,246,0.4)]'
-                          : 'bg-white/5 text-zinc-500 border border-white/5 cursor-not-allowed'
+                          ? 'bg-zinc-100 text-zinc-900 hover:bg-white border border-transparent shadow-sm'
+                          : 'bg-zinc-800 text-zinc-500 border border-zinc-700 cursor-not-allowed'
                       }`}
                       onClick={(e) => {
                         if (!tool.is_active) {
@@ -299,7 +310,7 @@ export function MarketplaceGrid({ tools }: MarketplaceGridProps) {
                     >
                       {tool.is_active ? (
                         <>
-                          Deploy <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
+                          Explore <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
                         </>
                       ) : (
                         'Offline'

@@ -14,9 +14,13 @@ interface PageProps {
 
 export async function generateMetadata({ params }: PageProps) {
   const { slug } = await params
-  const formatName = (s: string) => s.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
+  const formatName = (s: string) => {
+    if (s === 'structurer') return 'Triscrap'
+    return s.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
+  }
+  const siteName = slug === 'structurer' ? 'Triscrap' : 'Trinetra'
   return {
-    title: `${formatName(slug)} — Trinetra Autonomous OS`,
+    title: `${formatName(slug)} — ${siteName} Autonomous OS`,
     description: `Access and manage your autonomous AI tool: ${formatName(slug)}.`,
   }
 }
@@ -62,29 +66,63 @@ export default async function ToolGatekeeperPage({ params }: PageProps) {
     redirect('/login')
   }
 
-  // 3. Query user_service_quotas joined with platform_services
-  const { data: quota, error: quotaError } = await supabase
+  // 3. Query platform_services first
+  const { data: service, error: serviceError } = await supabase
+    .from('platform_services')
+    .select('*')
+    .eq('slug', slug)
+    .maybeSingle()
+
+  if (!service || serviceError) {
+    redirect('/dashboard/marketplace')
+  }
+
+  // 4. Query or JIT-provision user_service_quotas
+  let { data: quota, error: quotaError } = await supabase
     .from('user_service_quotas')
-    .select(`
-      *,
-      platform_services!inner(*)
-    `)
+    .select('*')
     .eq('service_slug', slug)
     .eq('user_id', user.id)
     .maybeSingle()
 
-  // 4. Redirect unauthorized users natively to marketplace
-  if (!quota || quotaError) {
+  if (!quota && !quotaError) {
+    const demoLimitConfig = service.demo_limit_config || {}
+    const usageMetricType = demoLimitConfig.type || 'runs'
+    const quotaAllocated = demoLimitConfig.value ?? 10
+
+    const { data: newQuota, error: insertError } = await supabase
+      .from('user_service_quotas')
+      .insert({
+        user_id: user.id,
+        service_slug: slug,
+        is_demo: true,
+        usage_metric_type: usageMetricType,
+        quota_allocated: quotaAllocated,
+        quota_used: 0
+      })
+      .select('*')
+      .single()
+
+    if (!insertError && newQuota) {
+      quota = newQuota
+    } else {
+      console.error('Failed to auto-provision quota:', insertError)
+      quota = {
+        user_id: user.id,
+        service_slug: slug,
+        is_demo: true,
+        usage_metric_type: usageMetricType,
+        quota_allocated: quotaAllocated,
+        quota_used: 0
+      } as any
+    }
+  }
+
+  if (!quota) {
     redirect('/dashboard/marketplace')
   }
 
-  // Handle potential nested platform_services data structures gracefully
-  const rawService = quota.platform_services
-  const service = Array.isArray(rawService) ? rawService[0] : rawService
-
-  if (!service) {
-    redirect('/dashboard/marketplace')
-  }
+  const displayName = service.name === 'Trinetra Structurer' ? 'Triscrap' : service.name
 
   const quotaUsed = quota.quota_used || 0
   const quotaAllocated = quota.quota_allocated || 0
@@ -178,10 +216,10 @@ export default async function ToolGatekeeperPage({ params }: PageProps) {
             <ChevronRight className="w-3.5 h-3.5" />
             <Link href="/dashboard/marketplace" className="hover:text-zinc-300 transition-colors">Tools</Link>
             <ChevronRight className="w-3.5 h-3.5" />
-            <span className="text-orange-500">{service.name}</span>
+            <span className="text-orange-500">{displayName}</span>
           </div>
           <h1 className="text-3xl font-extrabold tracking-tight text-white mt-1">
-            {service.name}
+            {displayName}
           </h1>
         </div>
 

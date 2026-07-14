@@ -1,0 +1,30 @@
+# ============================================================================
+# SECURITY: Automated dependency updates via Dependabot
+# Creates PRs for security patches and version bumps weekly.
+# ============================================================================
+
+version: 2
+updates:
+  # npm ecosystem (frontend)
+  - package-ecosystem: "npm"
+    directory: "/frontend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Asia/Kolkata"
+    open-pull-requests-limit: 10
+    labels:
+      - "dependencies"
+      - "security"
+    # Auto-approve and merge patch updates
+    versioning-strategy: increase
+
+  # GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "ci"
+      - "dependencies"

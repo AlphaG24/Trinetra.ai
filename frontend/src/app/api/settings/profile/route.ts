@@ -3,9 +3,11 @@ import { createClient } from '@/lib/server'
 
 export async function PATCH(req: Request) {
   const supabase = await createClient()
-  const { data: { session } } = await supabase.auth.getSession()
+  // SECURITY: Use getUser() instead of getSession() — getSession() trusts
+  // the client JWT without server validation, making it vulnerable to forgery.
+  const { data: { user } } = await supabase.auth.getUser()
 
-  if (!session) {
+  if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
@@ -25,7 +27,7 @@ export async function PATCH(req: Request) {
         gst_number: body.gst_number,
         updated_at: new Date().toISOString(),
       })
-      .eq('id', session.user.id)
+      .eq('id', user.id)
 
     if (error) throw error
 

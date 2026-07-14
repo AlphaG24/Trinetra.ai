@@ -2,6 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 import { createClient as createServerClient } from "@/utils/supabase/server";
 import { NextResponse } from "next/server";
 import OpenAI from "openai";
+import { requireAuth } from "../../../../utils/apiAuth";
 
 export const runtime = 'nodejs';
 
@@ -50,6 +51,10 @@ async function getEmbedding(text: string): Promise<number[] | null> {
 
 export async function POST(request: Request) {
     try {
+        // SECURITY: Verify the caller is authenticated
+        const authResult = await requireAuth();
+        if (authResult instanceof Response) return authResult;
+
         const { filePath, text, fileName } = await request.json();
 
         let extractedText = "";
@@ -234,6 +239,7 @@ export async function POST(request: Request) {
 
     } catch (error: any) {
         console.error("Analysis Server Error:", error);
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        // SECURITY: Never expose internal error details
+        return NextResponse.json({ error: "Analysis service encountered an error." }, { status: 500 });
     }
 }

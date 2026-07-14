@@ -104,7 +104,8 @@ export async function POST(req: Request) {
 
     if (error) {
       console.error("Supabase Insert Error:", error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      // SECURITY: Never expose internal error details
+      return NextResponse.json({ error: "Ingestion failed." }, { status: 500 });
     }
 
     return NextResponse.json({

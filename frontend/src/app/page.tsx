@@ -7,7 +7,6 @@ import { WhatWeBuild } from "@/components/landing/WhatWeBuild";
 import { ProductsShowcase } from "@/components/landing/ProductsShowcase";
 import { HowItWorks } from "@/components/landing/HowItWorks";
 import { PartnerProgram } from "@/components/landing/PartnerProgram";
-import { RoiDashboardPreview } from "@/components/landing/RoiDashboardPreview";
 import { WhyTrinetra } from "@/components/landing/WhyTrinetra";
 import { IndustriesWeServe } from "@/components/landing/IndustriesWeServe";
 import { Testimonials } from "@/components/landing/Testimonials";
@@ -90,9 +89,6 @@ export default async function Home() {
 
         {/* Partner Program */}
         <PartnerProgram />
-
-        {/* ROI Dashboard Visualization */}
-        <RoiDashboardPreview />
 
         {/* Why Trinetra (Differentiators) */}
         <WhyTrinetra />

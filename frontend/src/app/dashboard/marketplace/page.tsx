@@ -2,7 +2,7 @@ import React from 'react'
 import { createClient } from '@/utils/supabase/server'
 import { redirect } from 'next/navigation'
 import { MarketplaceCard } from './components/MarketplaceCard'
-import { Sparkles, Terminal, Cpu, ShieldCheck } from 'lucide-react'
+import { Box, Terminal, Cpu, ShieldCheck } from 'lucide-react'
 
 export const metadata = {
   title: 'AI Tool Marketplace — Trinetra OS',
@@ -29,17 +29,17 @@ export default async function MarketplacePage() {
   return (
     <main className="min-h-screen bg-[#0a0a0f] py-4 space-y-8 animate-fade-in">
       {/* Premium Header Banner */}
-      <section className="relative overflow-hidden border border-zinc-800/80 bg-zinc-950/60 p-8 md:p-10 rounded-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+      <section className="relative overflow-hidden border border-zinc-800 bg-zinc-950/60 p-8 md:p-10 rounded-xl flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
         {/* Banner Glowing Backdrops */}
-        <div className="absolute top-0 right-0 w-80 h-80 bg-gradient-to-br from-orange-500/5 to-amber-500/5 blur-3xl opacity-60 pointer-events-none" />
+        <div className="absolute top-0 right-0 w-80 h-80 bg-gradient-to-br from-zinc-800/5 to-transparent blur-3xl opacity-60 pointer-events-none" />
         
         <div className="space-y-3 max-w-2xl relative z-10">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-orange-500/15 bg-orange-500/5 text-orange-400 text-xs font-semibold">
-            <Sparkles className="w-3.5 h-3.5" />
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-md border border-zinc-800 bg-zinc-900 text-zinc-300 text-xs font-medium">
+            <Box className="w-3.5 h-3.5" />
             <span>Neural Sandboxing Sandbox Live</span>
           </div>
           
-          <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight text-white leading-tight">
+          <h1 className="text-3xl md:text-4xl font-semibold tracking-tight text-white leading-tight">
             AI Tool Marketplace
           </h1>
           <p className="text-sm text-zinc-400 leading-relaxed">
@@ -73,8 +73,8 @@ export default async function MarketplacePage() {
       {/* Grid of Marketplace Cards */}
       <section className="space-y-6">
         <div className="flex items-center gap-2">
-          <Terminal className="w-4 h-4 text-orange-500" />
-          <h2 className="text-lg font-bold text-white tracking-wide">
+          <Terminal className="w-4 h-4 text-zinc-400" />
+          <h2 className="text-lg font-semibold tracking-tight text-white">
             Autonomous Workloads & Cognitive Engines
           </h2>
         </div>

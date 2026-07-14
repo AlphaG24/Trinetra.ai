@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/utils/supabase/client'
@@ -9,15 +9,14 @@ import {
   Activity, 
   Bot, 
   Clock, 
-  Sparkles, 
-  Phone, 
   ChevronRight, 
   Volume2,
   Calendar,
   Copy,
   Check,
   Play,
-  Pause
+  Pause,
+  Box
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { TranscriptModal } from '@/src/components/modals/TranscriptModal'
@@ -227,7 +226,7 @@ export function AgentDetailPageClient() {
       <div className="space-y-6 animate-pulse p-2">
         <div className="h-6 w-32 bg-zinc-800 rounded mb-6" />
         <div className="flex items-center gap-4 mb-8">
-          <div className="w-16 h-16 bg-zinc-800 rounded-full" />
+          <div className="w-16 h-16 bg-zinc-800 rounded-md" />
           <div className="space-y-2">
             <div className="h-6 w-48 bg-zinc-800 rounded" />
             <div className="h-4 w-32 bg-zinc-800 rounded" />
@@ -235,10 +234,10 @@ export function AgentDetailPageClient() {
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
           {[...Array(3)].map((_, i) => (
-            <div key={i} className="h-28 bg-[#0f1117] border border-white/5 rounded-2xl p-5" />
+            <div key={i} className="h-28 bg-[#0f1117] border border-white/5 rounded-xl p-5" />
           ))}
         </div>
-        <div className="h-96 bg-[#0f1117] border border-white/5 rounded-2xl" />
+        <div className="h-96 bg-[#0f1117] border border-white/5 rounded-xl" />
       </div>
     )
   }
@@ -259,13 +258,13 @@ export function AgentDetailPageClient() {
       </div>
 
       {/* Agent Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-[#0f1117]/60 border border-white/5 p-6 rounded-2xl backdrop-blur-md">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-[#0f1117]/60 border border-zinc-800 p-6 rounded-xl backdrop-blur-md">
         <div className="flex items-center gap-4">
-          <div className="w-16 h-16 rounded-full bg-gradient-to-tr from-amber-500/20 to-orange-500/20 border border-amber-500/20 flex items-center justify-center text-amber-500 shadow-lg shadow-amber-500/5">
+          <div className="w-16 h-16 rounded-md bg-zinc-800 border border-zinc-700 flex items-center justify-center text-zinc-300 shadow-md">
             <Bot className="w-8 h-8" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-white tracking-tight font-display">{agent.agent_name}</h1>
+            <h1 className="text-2xl font-semibold text-white tracking-tight font-display">{agent.agent_name}</h1>
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-xs text-zinc-400 font-mono">
               <div className="flex items-center gap-1.5">
                 <span>ID: {agentId}</span>
@@ -282,19 +281,19 @@ export function AgentDetailPageClient() {
 
         {/* Status Badge */}
         <div>
-          <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold tracking-wider uppercase border ${
+          <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold tracking-wider uppercase border ${
             agent.status === 'active' 
               ? 'bg-green-500/10 text-green-400 border-green-500/20' 
               : agent.status === 'training'
               ? 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20'
-              : 'bg-zinc-500/10 text-zinc-400 border-white/10'
+              : 'bg-zinc-500/10 text-zinc-400 border-zinc-800'
           }`}>
-            <span className={`w-2 h-2 rounded-full ${
+            <span className={`w-2 h-2 rounded-md ${
               agent.status === 'active' 
                 ? 'bg-green-500 animate-pulse' 
                 : agent.status === 'training'
                 ? 'bg-yellow-500 animate-pulse'
-                : 'bg-zinc-500'
+                : 'bg-zinc-550'
             }`} />
             {agent.status === 'active' ? 'ONLINE' : agent.status.toUpperCase()}
           </span>
@@ -306,23 +305,23 @@ export function AgentDetailPageClient() {
 
       {/* Quota Progress Bar */}
       {paidUsed !== null && paidLimit !== null && (
-        <div className="bg-[#0f1117]/80 backdrop-blur-md border border-white/5 p-5 rounded-2xl flex flex-col gap-3 shadow-xl min-h-[78px] justify-center animate-in fade-in duration-300">
+        <div className="bg-[#0f1117]/80 backdrop-blur-md border border-zinc-800 p-5 rounded-xl flex flex-col gap-3 shadow-xl min-h-[78px] justify-center animate-in fade-in duration-300">
           <div className="flex items-center justify-between text-xs font-mono">
-            <span className="text-zinc-400 uppercase tracking-widest font-bold">
+            <span className="text-zinc-400 uppercase tracking-widest font-semibold">
               Usage Quota
             </span>
             <span className="text-white font-semibold">
               {paidUsed.toFixed(1)} / {paidLimit} Minutes Used
             </span>
           </div>
-          <div className="h-2 w-full bg-zinc-800/80 rounded-full overflow-hidden">
+          <div className="h-2 w-full bg-zinc-800/80 rounded-md overflow-hidden">
             <div
-              className={`h-full rounded-full transition-all duration-500 ${
+              className={`h-full rounded-md transition-all duration-500 ${
                 paidLimit > 0 && (paidUsed / paidLimit) >= 0.8
                   ? 'bg-gradient-to-r from-red-500 to-pink-600'
                   : paidLimit > 0 && (paidUsed / paidLimit) >= 0.5
                   ? 'bg-gradient-to-r from-amber-500 to-orange-500'
-                  : 'bg-gradient-to-r from-purple-600 to-blue-600'
+                  : 'bg-gradient-to-r from-zinc-700 to-zinc-400'
               }`}
               style={{ width: `${paidLimit > 0 ? Math.min(100, (paidUsed / paidLimit) * 100) : 0}%` }}
             />
@@ -333,11 +332,11 @@ export function AgentDetailPageClient() {
       {/* KPI Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {/* KPI 1: Total Interactions */}
-        <div className="bg-[#0f1117]/90 border border-amber-500/10 rounded-2xl p-5 relative overflow-hidden group hover:border-amber-500/20 transition-all duration-300 shadow-xl shadow-black/40">
-          <div className="absolute inset-0 bg-gradient-to-br from-amber-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
+        <div className="bg-[#0f1117]/90 border border-zinc-800 rounded-xl p-5 relative overflow-hidden group hover:border-zinc-750 transition-all duration-300 shadow-xl">
+          <div className="absolute inset-0 bg-gradient-to-br from-zinc-800/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
           <div className="flex justify-between items-start">
             <span className="text-xs font-mono uppercase tracking-widest text-zinc-400">Total Interactions</span>
-            <div className="p-2 bg-amber-500/10 rounded-xl text-amber-500">
+            <div className="p-2 bg-zinc-800 border border-zinc-700 rounded-md text-zinc-300">
               <Activity className="w-5 h-5" />
             </div>
           </div>
@@ -348,11 +347,11 @@ export function AgentDetailPageClient() {
         </div>
 
         {/* KPI 2: Average Duration */}
-        <div className="bg-[#0f1117]/90 border border-purple-500/10 rounded-2xl p-5 relative overflow-hidden group hover:border-purple-500/20 transition-all duration-300 shadow-xl shadow-black/40">
-          <div className="absolute inset-0 bg-gradient-to-br from-purple-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
+        <div className="bg-[#0f1117]/90 border border-zinc-800 rounded-xl p-5 relative overflow-hidden group hover:border-zinc-750 transition-all duration-300 shadow-xl">
+          <div className="absolute inset-0 bg-gradient-to-br from-zinc-800/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
           <div className="flex justify-between items-start">
             <span className="text-xs font-mono uppercase tracking-widest text-zinc-400">Average Duration</span>
-            <div className="p-2 bg-purple-500/10 rounded-xl text-purple-400">
+            <div className="p-2 bg-zinc-800 border border-zinc-700 rounded-md text-zinc-300">
               <Clock className="w-5 h-5" />
             </div>
           </div>
@@ -363,12 +362,12 @@ export function AgentDetailPageClient() {
         </div>
 
         {/* KPI 3: Positive Outcomes */}
-        <div className="bg-[#0f1117]/90 border border-emerald-500/10 rounded-2xl p-5 relative overflow-hidden group hover:border-emerald-500/20 transition-all duration-300 shadow-xl shadow-black/40">
-          <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
+        <div className="bg-[#0f1117]/90 border border-zinc-800 rounded-xl p-5 relative overflow-hidden group hover:border-zinc-750 transition-all duration-300 shadow-xl">
+          <div className="absolute inset-0 bg-gradient-to-br from-zinc-800/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
           <div className="flex justify-between items-start">
             <span className="text-xs font-mono uppercase tracking-widest text-zinc-400">Positive Outcomes</span>
-            <div className="p-2 bg-emerald-500/10 rounded-xl text-emerald-400">
-              <Sparkles className="w-5 h-5" />
+            <div className="p-2 bg-zinc-800 border border-zinc-700 rounded-md text-zinc-300">
+              <Check className="w-5 h-5" />
             </div>
           </div>
           <div className="mt-4">
@@ -379,24 +378,24 @@ export function AgentDetailPageClient() {
       </div>
 
       {/* Call History */}
-      <div className="bg-[#0f1117]/90 border border-white/5 rounded-2xl p-6 shadow-xl relative overflow-hidden">
+      <div className="bg-[#0f1117]/90 border border-zinc-800 rounded-xl p-6 shadow-xl relative overflow-hidden">
         <div className="flex items-center gap-2 mb-6">
-          <Volume2 className="w-5 h-5 text-amber-500" />
+          <Volume2 className="w-5 h-5 text-zinc-450" />
           <div>
-            <h2 className="text-xl font-bold text-white">Call History</h2>
+            <h2 className="text-xl font-semibold text-white">Call History</h2>
             <span className="text-zinc-500 text-[10px] block font-mono uppercase mt-0.5">Recent log sessions for this agent</span>
           </div>
         </div>
 
         {callLogs.length === 0 ? (
-          <div className="h-[280px] border border-dashed border-white/10 rounded-xl flex flex-col items-center justify-center p-8 text-center text-zinc-500 font-mono text-sm">
+          <div className="h-[280px] border border-dashed border-zinc-800 rounded-md flex flex-col items-center justify-center p-8 text-center text-zinc-500 font-mono text-sm">
             No call records registered under this agent yet.
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="border-b border-white/5 text-zinc-500 text-xs font-mono uppercase tracking-wider">
+                <tr className="border-b border-zinc-800 text-zinc-500 text-xs font-mono uppercase tracking-wider">
                   <th className="pb-3 pt-1 pl-2 font-medium">Session Time</th>
                   <th className="pb-3 pt-1 font-medium">Duration</th>
                   <th className="pb-3 pt-1 font-medium">Sentiment</th>
@@ -404,7 +403,7 @@ export function AgentDetailPageClient() {
                   <th className="pb-3 pt-1 pr-2 font-medium text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-white/[0.03] text-sm">
+              <tbody className="divide-y divide-zinc-800/40 text-sm">
                 {callLogs.map((log) => (
                   <tr key={log.id} className="hover:bg-white/[0.01] transition-colors group">
                     <td className="py-4 pl-2 font-medium text-white">
@@ -417,12 +416,12 @@ export function AgentDetailPageClient() {
                       {formatDuration(log.duration_seconds || 0)}
                     </td>
                     <td className="py-4">
-                      <span className={`inline-flex px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
+                      <span className={`inline-flex px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider ${
                         log.sentiment?.toLowerCase() === 'positive'
                           ? 'bg-green-500/10 text-green-400 border border-green-500/20'
                           : log.sentiment?.toLowerCase() === 'negative'
                           ? 'bg-red-500/10 text-red-400 border border-red-500/20'
-                          : 'bg-zinc-500/10 text-zinc-400 border border-white/5'
+                          : 'bg-zinc-500/10 text-zinc-400 border border-zinc-800'
                       }`}>
                         {log.sentiment || 'Neutral'}
                       </span>
@@ -431,11 +430,11 @@ export function AgentDetailPageClient() {
                       {log.recording_url ? (
                         <button
                           onClick={() => handlePlayAudio(log.id, log.recording_url!)}
-                          className="flex items-center gap-1.5 px-3 py-1 bg-zinc-900 border border-zinc-800 hover:border-zinc-700 rounded-lg text-xs font-semibold text-zinc-300 hover:text-white transition-all cursor-pointer animate-in fade-in"
+                          className="flex items-center gap-1.5 px-3 py-1 bg-zinc-900 border border-zinc-800 hover:border-zinc-700 rounded-md text-xs font-semibold text-zinc-300 hover:text-white transition-all cursor-pointer animate-in fade-in"
                         >
                           {playingAudioId === log.id ? (
                             <>
-                              <Pause className="w-3 h-3 text-amber-500 animate-pulse" />
+                              <Pause className="w-3 h-3 text-zinc-450 animate-pulse" />
                               Playing
                             </>
                           ) : (
@@ -446,7 +445,7 @@ export function AgentDetailPageClient() {
                           )}
                         </button>
                       ) : (
-                        <span className="text-zinc-600 text-xs font-mono italic">No Audio</span>
+                        <span className="text-zinc-650 text-xs font-mono italic">No Audio</span>
                       )}
                     </td>
                     <td className="py-4 pr-2 text-right">
@@ -455,7 +454,7 @@ export function AgentDetailPageClient() {
                           setSelectedLog(log)
                           setIsModalOpen(true)
                         }}
-                        className="px-3 py-1.5 bg-amber-500/10 border border-amber-500/20 hover:bg-amber-500/20 text-amber-400 rounded-lg text-xs font-semibold tracking-wide transition-all cursor-pointer"
+                        className="px-3 py-1.5 bg-zinc-900 border border-zinc-850 hover:bg-zinc-800 hover:border-zinc-700 text-zinc-300 rounded-md text-xs font-semibold tracking-wide transition-all cursor-pointer"
                       >
                         View Transcript
                       </button>

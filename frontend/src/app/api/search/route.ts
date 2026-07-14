@@ -1,9 +1,14 @@
 import { createClient } from "@/utils/supabase/server";
 import { NextResponse } from "next/server";
+import { requireAuth } from "../../../../utils/apiAuth";
 
 export const runtime = 'nodejs'; // or edge, but nodejs is safe
 
 export async function GET(req: Request) {
+    // SECURITY: Verify the caller is authenticated
+    const authResult = await requireAuth();
+    if (authResult instanceof Response) return authResult;
+
     const { searchParams } = new URL(req.url);
     const query = searchParams.get('q');
 

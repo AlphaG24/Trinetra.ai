@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
+import { requireAuth } from "../../../../../utils/apiAuth";
 
 // Force Node.js runtime
 export const runtime = 'nodejs';
@@ -31,6 +32,10 @@ function chunkText(text: string, chunkSize: number = 1000, overlap: number = 100
 
 export async function POST(request: Request) {
     try {
+        // SECURITY: Verify the caller is authenticated before processing
+        const authResult = await requireAuth();
+        if (authResult instanceof Response) return authResult;
+
         const { filePath, fileName } = await request.json();
 
         if (!filePath) {
@@ -171,6 +176,10 @@ export async function POST(request: Request) {
 
     } catch (error: any) {
         console.error("Vault Ingestion System Error:", error);
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        // SECURITY: Never expose internal error details to the client
+        return NextResponse.json(
+            { error: "An internal error occurred during ingestion." },
+            { status: 500 }
+        );
     }
 }

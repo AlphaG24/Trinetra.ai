@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Globe, Zap, BarChart3, Shield, Clock } from "lucide-react";
+import { Globe, Zap, GraduationCap, Shield, PhoneCall, Database } from "lucide-react";
 
 const features = [
   {
@@ -19,11 +19,25 @@ const features = [
     desc: "Our AI agents detect and fix their own errors. They get smarter with every interaction.",
   },
   {
-    id: "roi",
-    icon: <BarChart3 size={28} className="text-[#8B5CF6]" />,
+    id: "shiksha",
+    icon: <GraduationCap size={28} className="text-[#8B5CF6]" />,
     colorBg: "bg-[rgba(139,92,246,0.08)]",
-    title: "ROI Dashboard",
-    desc: "See exactly how much time, money, and effort your AI is saving. Real metrics, not vanity numbers.",
+    title: "AI-Powered Education",
+    desc: "Empowering institutions with smart assessment engines, dynamic lesson plans, and localized teaching aids aligned with national guidelines.",
+  },
+  {
+    id: "voice",
+    icon: <PhoneCall size={28} className="text-[#22D3EE]" />,
+    colorBg: "bg-[rgba(34,211,238,0.08)]",
+    title: "Autonomous Voice Workflows",
+    desc: "Deploy custom voice receptionists to manage inbound/outbound calls, schedule appointments, and coordinate workflows in multiple regional languages.",
+  },
+  {
+    id: "data",
+    icon: <Database size={28} className="text-[#FBBF24]" />,
+    colorBg: "bg-[rgba(251,191,36,0.08)]",
+    title: "Intelligent Data Extraction",
+    desc: "Automate document classification and entity extraction. Pull structured datasets from complex tables, PDFs, and invoices with absolute precision.",
   },
   {
     id: "sec",
@@ -31,13 +45,6 @@ const features = [
     colorBg: "bg-[rgba(245,158,11,0.08)]",
     title: "Enterprise Security",
     desc: "End-to-end encryption, DPDPA compliant, role-based access. Your data never leaves India.",
-  },
-  {
-    id: "deploy",
-    icon: <Clock size={28} className="text-[#22D3EE]" />,
-    colorBg: "bg-[rgba(34,211,238,0.08)]",
-    title: "24-Hour Deployment",
-    desc: "From signup to live AI agent in under 24 hours. Not weeks. Not months. One day.",
   },
 ];
 

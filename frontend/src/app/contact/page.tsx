@@ -29,8 +29,7 @@ import {
   useVisibleProducts,
 } from "@/lib/site-content";
 
-const FORMSPREE_ENDPOINT =
-  process.env.NEXT_PUBLIC_FORMSPREE_ENDPOINT || "https://formspree.io/f/placeholder";
+const FORMSPREE_ENDPOINT = "https://formspree.io/f/mjgnkbay";
 
 export default function ContactPage() {
   const { data: siteConfig } = useSiteConfig();
@@ -320,9 +319,9 @@ export default function ContactPage() {
                     placeholder="Full Name"
                     value={formData.name}
                     onChange={handleInputChange}
-                    className={`w-full rounded-[10px] border px-[16px] py-[14px] font-sans text-[16px] font-normal text-[#FAF7FF] placeholder:text-[#6B6088] transition-all duration-300 focus:border-[#8B5CF6] focus:outline-none focus:shadow-[0_0_0_3px_rgba(139,92,246,0.15)] ${
-                      errors.name ? "border-[#EF4444]" : "border-[#1E0A35]"
-                    } bg-[#130224]`}
+                    className={`w-full rounded-[10px] border px-[16px] py-[14px] font-sans text-[16px] font-normal text-[#FAF7FF] placeholder:text-[#6B6088] transition-all duration-300 focus:border-[#8B5CF6] focus:outline-none focus:shadow-[0_0_0_3px_rgba(139,92,246,0.15)] ${errors.name ? "border-[#EF4444]" : "border-[#1E0A35]"
+                      } bg-[#130224]`}
+                    suppressHydrationWarning={true}
                   />
                   {errors.name ? (
                     <span className="px-[4px] font-sans text-[13px] text-[#EF4444]">
@@ -338,9 +337,9 @@ export default function ContactPage() {
                     placeholder="Email Address"
                     value={formData.email}
                     onChange={handleInputChange}
-                    className={`w-full rounded-[10px] border px-[16px] py-[14px] font-sans text-[16px] font-normal text-[#FAF7FF] placeholder:text-[#6B6088] transition-all duration-300 focus:border-[#8B5CF6] focus:outline-none focus:shadow-[0_0_0_3px_rgba(139,92,246,0.15)] ${
-                      errors.email ? "border-[#EF4444]" : "border-[#1E0A35]"
-                    } bg-[#130224]`}
+                    className={`w-full rounded-[10px] border px-[16px] py-[14px] font-sans text-[16px] font-normal text-[#FAF7FF] placeholder:text-[#6B6088] transition-all duration-300 focus:border-[#8B5CF6] focus:outline-none focus:shadow-[0_0_0_3px_rgba(139,92,246,0.15)] ${errors.email ? "border-[#EF4444]" : "border-[#1E0A35]"
+                      } bg-[#130224]`}
+                    suppressHydrationWarning={true}
                   />
                   {errors.email ? (
                     <span className="px-[4px] font-sans text-[13px] text-[#EF4444]">
@@ -358,9 +357,9 @@ export default function ContactPage() {
                     placeholder="Phone Number"
                     value={formData.phone}
                     onChange={handleInputChange}
-                    className={`w-full rounded-[10px] border px-[16px] py-[14px] font-sans text-[16px] font-normal text-[#FAF7FF] placeholder:text-[#6B6088] transition-all duration-300 focus:border-[#8B5CF6] focus:outline-none focus:shadow-[0_0_0_3px_rgba(139,92,246,0.15)] ${
-                      errors.phone ? "border-[#EF4444]" : "border-[#1E0A35]"
-                    } bg-[#130224]`}
+                    className={`w-full rounded-[10px] border px-[16px] py-[14px] font-sans text-[16px] font-normal text-[#FAF7FF] placeholder:text-[#6B6088] transition-all duration-300 focus:border-[#8B5CF6] focus:outline-none focus:shadow-[0_0_0_3px_rgba(139,92,246,0.15)] ${errors.phone ? "border-[#EF4444]" : "border-[#1E0A35]"
+                      } bg-[#130224]`}
+                    suppressHydrationWarning={true}
                   />
                   {errors.phone ? (
                     <span className="px-[4px] font-sans text-[13px] text-[#EF4444]">
@@ -377,6 +376,7 @@ export default function ContactPage() {
                     value={formData.company}
                     onChange={handleInputChange}
                     className="w-full rounded-[10px] border border-[#1E0A35] bg-[#130224] px-[16px] py-[14px] font-sans text-[16px] font-normal text-[#FAF7FF] placeholder:text-[#6B6088] transition-all duration-300 focus:border-[#8B5CF6] focus:outline-none focus:shadow-[0_0_0_3px_rgba(139,92,246,0.15)]"
+                    suppressHydrationWarning={true}
                   />
                 </div>
               </div>
@@ -387,9 +387,9 @@ export default function ContactPage() {
                     name="interest"
                     value={formData.interest}
                     onChange={handleInputChange}
-                    className={`w-full cursor-pointer appearance-none rounded-[10px] border px-[16px] py-[14px] font-sans text-[16px] font-normal transition-all duration-300 focus:border-[#8B5CF6] focus:outline-none focus:shadow-[0_0_0_3px_rgba(139,92,246,0.15)] ${
-                      errors.interest ? "border-[#EF4444]" : "border-[#1E0A35]"
-                    } ${formData.interest ? "text-[#FAF7FF]" : "text-[#6B6088]"} bg-[#130224]`}
+                    className={`w-full cursor-pointer appearance-none rounded-[10px] border px-[16px] py-[14px] font-sans text-[16px] font-normal transition-all duration-300 focus:border-[#8B5CF6] focus:outline-none focus:shadow-[0_0_0_3px_rgba(139,92,246,0.15)] ${errors.interest ? "border-[#EF4444]" : "border-[#1E0A35]"
+                      } ${formData.interest ? "text-[#FAF7FF]" : "text-[#6B6088]"} bg-[#130224]`}
+                    suppressHydrationWarning={true}
                   >
                     <option value="" disabled>
                       What are you interested in?
@@ -434,9 +434,9 @@ export default function ContactPage() {
                   rows={4}
                   value={formData.message}
                   onChange={handleInputChange}
-                  className={`w-full resize-none rounded-[10px] border px-[16px] py-[14px] font-sans text-[16px] font-normal text-[#FAF7FF] placeholder:text-[#6B6088] transition-all duration-300 focus:border-[#8B5CF6] focus:outline-none focus:shadow-[0_0_0_3px_rgba(139,92,246,0.15)] ${
-                    errors.message ? "border-[#EF4444]" : "border-[#1E0A35]"
-                  } bg-[#130224]`}
+                  className={`w-full resize-none rounded-[10px] border px-[16px] py-[14px] font-sans text-[16px] font-normal text-[#FAF7FF] placeholder:text-[#6B6088] transition-all duration-300 focus:border-[#8B5CF6] focus:outline-none focus:shadow-[0_0_0_3px_rgba(139,92,246,0.15)] ${errors.message ? "border-[#EF4444]" : "border-[#1E0A35]"
+                    } bg-[#130224]`}
+                  suppressHydrationWarning={true}
                 />
                 {errors.message ? (
                   <span className="px-[4px] font-sans text-[13px] text-[#EF4444]">
@@ -467,6 +467,7 @@ export default function ContactPage() {
                 type="submit"
                 disabled={buttonDisabled || isSubmitting}
                 className="group mt-[12px] flex w-full items-center justify-center gap-[8px] rounded-[12px] bg-[#F59E0B] px-[32px] py-[15px] font-sans text-[16px] font-semibold text-[#080010] shadow-[0_0_30px_rgba(245,158,11,0.25)] transition-all duration-300 hover:-translate-y-[2px] hover:bg-[#D97706] hover:shadow-[0_0_30px_rgba(245,158,11,0.4)] disabled:cursor-not-allowed disabled:bg-[#B8B0D1] disabled:hover:translate-y-0 disabled:hover:bg-[#B8B0D1] disabled:hover:shadow-none"
+                suppressHydrationWarning={true}
               >
                 {isSubmitting ? (
                   <>
@@ -577,6 +578,7 @@ export default function ContactPage() {
                   title="Coming Soon"
                   onClick={showComingSoonToast}
                   className="flex h-[36px] w-[36px] items-center justify-center rounded-full bg-transparent text-[#6B6088] opacity-50 transition-colors duration-300 hover:bg-[rgba(139,92,246,0.1)] hover:text-[#FAF7FF]"
+                  suppressHydrationWarning={true}
                 >
                   <Instagram size={18} />
                 </button>
@@ -598,6 +600,7 @@ export default function ContactPage() {
                   title="Coming Soon"
                   onClick={showComingSoonToast}
                   className="flex h-[36px] w-[36px] items-center justify-center rounded-full bg-transparent text-[#6B6088] opacity-50 transition-colors duration-300 hover:bg-[rgba(139,92,246,0.1)] hover:text-[#FAF7FF]"
+                  suppressHydrationWarning={true}
                 >
                   <Twitter size={18} />
                 </button>
@@ -619,6 +622,7 @@ export default function ContactPage() {
                   title="Coming Soon"
                   onClick={showComingSoonToast}
                   className="flex h-[36px] w-[36px] items-center justify-center rounded-full bg-transparent text-[#6B6088] opacity-50 transition-colors duration-300 hover:bg-[rgba(139,92,246,0.1)] hover:text-[#FAF7FF]"
+                  suppressHydrationWarning={true}
                 >
                   <FacebookIcon size={18} />
                 </button>
@@ -640,6 +644,7 @@ export default function ContactPage() {
                   title="Coming Soon"
                   onClick={showComingSoonToast}
                   className="flex h-[36px] w-[36px] items-center justify-center rounded-full bg-transparent text-[#6B6088] opacity-50 transition-colors duration-300 hover:bg-[rgba(139,92,246,0.1)] hover:text-[#FAF7FF]"
+                  suppressHydrationWarning={true}
                 >
                   <RedditIcon size={18} />
                 </button>
@@ -656,21 +661,14 @@ export default function ContactPage() {
               respond quickly.
             </p>
 
-            <button
-              type="button"
-              onClick={scrollToForm}
+            <a
+              href="https://wa.me/919580619562?text=Hi%2C+I+want+to+know+more+about+Trinetraedu-+AI"
+              target="_blank"
+              rel="noopener noreferrer"
               className="group flex w-full items-center justify-center gap-[8px] rounded-[10px] border border-[#8B5CF6] bg-transparent px-[24px] py-[13px] font-sans text-[15px] font-medium text-[#D7C4F7] shadow-[0_0_20px_rgba(139,92,246,0.1)] transition-all duration-300 hover:bg-[#8B5CF6] hover:text-[#080010] hover:shadow-[0_0_30px_rgba(139,92,246,0.25)]"
             >
               Get In Touch
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setIsModalOpen(true)}
-              className="mt-4 flex w-full items-center justify-center font-sans text-[14px] font-medium text-[#6B6088] transition-colors hover:text-[#B8B0D1]"
-            >
-              Prefer a callback instead?
-            </button>
+            </a>
           </motion.div>
         </div>
       </div>
@@ -693,13 +691,7 @@ export default function ContactPage() {
                 <X size={20} />
               </button>
 
-              <h3 className="mb-2 font-display text-[22px] font-semibold text-[#FAF7FF]">
-                Schedule a Demo Call
-              </h3>
-              <p className="mb-6 font-sans text-[15px] leading-[1.6] text-[#B8B0D1]">
-                Prefer to talk to a human later? Leave your number and our sales team will call
-                you back within 2 hours.
-              </p>
+
 
               <form onSubmit={handleCallbackSubmit} className="flex flex-col gap-4">
                 <input

@@ -35,18 +35,6 @@ const fallbackProducts: ProductNavItem[] = [
     status: "live",
   },
   {
-    slug: "chat-agent",
-    name: "AI Chat Agent",
-    tagline: "Website chat support and lead capture.",
-    status: "live",
-  },
-  {
-    slug: "social-agent",
-    name: "AI Social Agent",
-    tagline: "AI-assisted social publishing workflows.",
-    status: "beta",
-  },
-  {
     slug: "workflow-agent",
     name: "AI Workflow Agent",
     tagline: "Cross-tool automations for business operations.",

@@ -35,34 +35,34 @@ export function MarketplaceCard({ tool }: MarketplaceCardProps) {
   }
 
   return (
-    <div className="group relative bg-[#0c0c12] border border-zinc-800/80 hover:border-orange-500/35 rounded-2xl p-6 flex flex-col justify-between hover:shadow-2xl hover:shadow-orange-500/[0.03] transition-all duration-300 overflow-hidden min-h-[380px]">
+    <div className="group relative bg-[#0c0c12] border border-zinc-800 hover:border-zinc-700 rounded-xl p-6 flex flex-col justify-between hover:shadow-xl transition-all duration-300 overflow-hidden min-h-[380px]">
       {/* Visual Glowing Accent on Hover */}
-      <div className="absolute -top-12 -left-12 w-28 h-28 bg-gradient-to-br from-orange-500/10 to-amber-500/10 blur-2xl opacity-40 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
+      <div className="absolute -top-12 -left-12 w-28 h-28 bg-gradient-to-br from-zinc-800/10 to-transparent blur-2xl opacity-40 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
       
       <div className="space-y-5 relative z-10">
         {/* Top Header Row */}
         <div className="flex items-center justify-between">
-          <div className="w-12 h-12 rounded-xl border border-zinc-800 bg-zinc-950 flex items-center justify-center">
+          <div className="w-12 h-12 rounded-md border border-zinc-800 bg-zinc-950 flex items-center justify-center">
             {getToolIcon()}
           </div>
-
+ 
           <div className="flex items-center gap-2">
             {/* Tool Category Badge */}
-            <span className="px-2.5 py-0.5 rounded-full text-[9px] font-bold tracking-wider uppercase border border-zinc-800 bg-zinc-900/60 text-zinc-400">
+            <span className="px-2.5 py-0.5 rounded-md text-[9px] font-semibold tracking-wider uppercase border border-zinc-800 bg-zinc-900/60 text-zinc-400">
               {tool.type || 'AI Service'}
             </span>
-
+ 
             {/* Active Status Badge */}
-            <span className="flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
+            <span className="flex items-center gap-1 px-2.5 py-0.5 rounded-md text-[9px] font-semibold uppercase tracking-wider bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
               Active
             </span>
           </div>
         </div>
-
+ 
         {/* Title, Tagline & Description */}
         <div className="space-y-1.5">
-          <h3 className="text-lg font-bold text-white group-hover:text-orange-400 transition-colors duration-200">
+          <h3 className="text-lg font-semibold text-white group-hover:text-zinc-200 transition-colors duration-200">
             {tool.name}
           </h3>
           {tagline && (
@@ -115,7 +115,7 @@ export function MarketplaceCard({ tool }: MarketplaceCardProps) {
 
       {/* Deploy Button Container */}
       <div className="border-t border-zinc-800/50 pt-4 mt-6">
-        <DeployButton slug={tool.slug} />
+        <DeployButton slug={tool.slug} subdomainUrl={tool.subdomain_url} />
       </div>
     </div>
   )

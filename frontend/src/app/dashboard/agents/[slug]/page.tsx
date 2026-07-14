@@ -1,7 +1,7 @@
 import { createClient } from '@/utils/supabase/server'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
-import { Check, ShieldAlert, ArrowLeft, Bot, Sparkles, Zap } from 'lucide-react'
+import { Check, ShieldAlert, ArrowLeft, Bot, Zap, Box } from 'lucide-react'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card'
 import { AgentDetailPageClient } from './AgentDetailPageClient'
 import { MarketplaceIcon } from './MarketplaceIcon'
@@ -57,40 +57,40 @@ export default async function ToolOrAgentPage({ params }: PageProps) {
         </div>
 
         {/* Hero Section */}
-        <div className="relative border border-[var(--border-medium)] rounded-3xl p-8 md:p-12 overflow-hidden bg-[var(--bg-surface)]/40 backdrop-blur-sm shadow-2xl">
-          <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-gradient-to-br from-[var(--violet-600)]/10 to-transparent blur-3xl rounded-full -z-10 pointer-events-none" />
-          <div className="absolute bottom-0 left-0 w-[300px] h-[300px] bg-gradient-to-tr from-[var(--gold-600)]/5 to-transparent blur-2xl rounded-full -z-10 pointer-events-none" />
+        <div className="relative border border-zinc-850 rounded-xl p-8 md:p-12 overflow-hidden bg-[var(--bg-surface)]/40 backdrop-blur-sm shadow-xl">
+          <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-gradient-to-br from-zinc-800/10 to-transparent blur-3xl rounded-full -z-10 pointer-events-none" />
+          <div className="absolute bottom-0 left-0 w-[300px] h-[300px] bg-gradient-to-tr from-zinc-800/5 to-transparent blur-2xl rounded-full -z-10 pointer-events-none" />
 
           <div className="flex flex-col md:flex-row gap-8 items-start md:items-center">
             {/* Tool Icon with client-side fallback */}
             <div className="relative group">
-              <div className="absolute inset-0 bg-[var(--violet-500)]/20 rounded-2xl blur-md group-hover:blur-lg opacity-70 transition-all pointer-events-none" />
+              <div className="absolute inset-0 bg-zinc-800/20 rounded-md blur-md group-hover:blur-lg opacity-70 transition-all pointer-events-none" />
               <MarketplaceIcon iconUrl={tool.icon_url} type={tool.type} name={tool.name} className="w-24 h-24 relative z-10" />
             </div>
 
             {/* Title / Header */}
             <div className="flex-1 space-y-3">
               <div className="flex flex-wrap items-center gap-3">
-                <span className="px-3 py-1 rounded-full text-xs font-bold tracking-wider uppercase bg-[var(--violet-600)]/15 border border-[var(--violet-500)]/30 text-[var(--violet-300)]">
+                <span className="px-3 py-1 rounded-md text-xs font-semibold tracking-wider uppercase bg-zinc-900 border border-zinc-800 text-zinc-300">
                   {tool.type} Agent
                 </span>
                 {isActive ? (
-                  <span className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
+                  <span className="flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-semibold tracking-wider uppercase bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
                     <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
                     Active
                   </span>
                 ) : (
-                  <span className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-red-500/10 border border-red-500/20 text-red-400">
+                  <span className="flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-semibold tracking-wider uppercase bg-red-500/10 border border-red-500/20 text-red-400">
                     Maintenance
                   </span>
                 )}
               </div>
               
-              <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold tracking-tight text-white font-heading">
+              <h1 className="text-3xl sm:text-4xl md:text-5xl font-semibold tracking-tight text-white font-heading">
                 {tool.name}
               </h1>
               
-              <p className="text-lg text-[var(--text-secondary)] font-medium leading-relaxed max-w-3xl">
+              <p className="text-lg text-zinc-400 font-normal leading-relaxed max-w-3xl">
                 {tagline}
               </p>
             </div>
@@ -100,21 +100,32 @@ export default async function ToolOrAgentPage({ params }: PageProps) {
               {!isActive ? (
                 <button
                   disabled
-                  className="w-full py-4 px-6 rounded-xl text-sm font-bold uppercase tracking-wider bg-amber-500/10 text-amber-500 border border-amber-500/20 cursor-not-allowed text-center transition-all"
+                  className="w-full px-6 py-3.5 bg-zinc-800 text-zinc-500 font-medium rounded-md border border-zinc-700 transition-all text-sm text-center cursor-not-allowed"
                 >
                   Down for Maintenance
                 </button>
               ) : isDemoAllowed ? (
-                <Link
-                  href={`/dashboard/agents/${slug}/workspace`}
-                  className="w-full py-4 px-6 rounded-xl text-sm font-bold uppercase tracking-wider bg-violet-600 hover:bg-violet-500 text-white border border-violet-500/30 hover:border-violet-500/50 shadow-[0_0_15px_rgba(139,92,246,0.2)] hover:shadow-[0_0_20px_rgba(139,92,246,0.4)] text-center transition-all inline-block hover:scale-[1.02] active:scale-[0.98]"
-                >
-                  Start Free Demo
-                </Link>
+                tool.subdomain_url ? (
+                  <a
+                    href={tool.subdomain_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full px-6 py-3.5 bg-zinc-100 text-zinc-900 hover:bg-white font-semibold rounded-md shadow-sm transition-all text-sm border border-transparent text-center transition-all inline-block hover:scale-[1.02] active:scale-[0.98]"
+                  >
+                    Open Application
+                  </a>
+                ) : (
+                  <Link
+                    href={`/dashboard/tools/${slug}`}
+                    className="w-full px-6 py-3.5 bg-zinc-100 text-zinc-900 hover:bg-white font-semibold rounded-md shadow-sm transition-all text-sm border border-transparent text-center transition-all inline-block hover:scale-[1.02] active:scale-[0.98]"
+                  >
+                    Launch Workspace
+                  </Link>
+                )
               ) : (
                 <Link
                   href="/contact"
-                  className="w-full py-4 px-6 rounded-xl text-sm font-bold uppercase tracking-wider bg-gradient-to-r from-[var(--gold-600)] to-[var(--gold-500)] text-zinc-950 hover:from-[var(--gold-500)] hover:to-[var(--gold-400)] shadow-lg shadow-[var(--gold-600)]/20 text-center font-heading transition-all inline-block hover:scale-[1.02] active:scale-[0.98]"
+                  className="w-full px-6 py-3.5 bg-zinc-800 text-zinc-200 hover:bg-zinc-700 font-medium rounded-md border border-zinc-700 transition-all text-sm text-center transition-all inline-block hover:scale-[1.02] active:scale-[0.98]"
                 >
                   Contact Sales to Access
                 </Link>
@@ -132,14 +143,14 @@ export default async function ToolOrAgentPage({ params }: PageProps) {
         {/* Dynamic Features Checklist */}
         {features.length > 0 && (
           <div className="space-y-6">
-            <h2 className="text-2xl font-bold font-heading text-white flex items-center gap-2">
-              <Sparkles className="w-5 h-5 text-[var(--gold-400)]" /> Powerful Capabilities
+            <h2 className="text-xl font-semibold tracking-tight text-white flex items-center gap-2">
+              <Box className="w-5 h-5 text-zinc-400" /> Powerful Capabilities
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {features.map((feature: string, index: number) => (
                 <div 
                   key={index}
-                  className="flex items-start gap-3 p-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)]/20 hover:bg-[var(--bg-surface)]/40 transition-colors"
+                  className="flex items-start gap-3 p-4 rounded-md border border-zinc-800 bg-[var(--bg-surface)]/20 hover:bg-[var(--bg-surface)]/40 transition-colors"
                 >
                   <div className="p-1 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 mt-0.5">
                     <Check className="w-4 h-4" />
@@ -158,8 +169,8 @@ export default async function ToolOrAgentPage({ params }: PageProps) {
           {pricingTiers && pricingTiers.length > 0 ? (
             <>
               <div className="text-center md:text-left space-y-2">
-                <h2 className="text-2xl font-bold font-heading text-white flex items-center justify-center md:justify-start gap-2">
-                  <Zap className="w-5 h-5 text-[var(--violet-400)]" /> Simple, Transparent Pricing
+                <h2 className="text-xl font-semibold tracking-tight text-white flex items-center justify-center md:justify-start gap-2">
+                  <Zap className="w-5 h-5 text-zinc-400" /> Simple, Transparent Pricing
                 </h2>
                 <p className="text-sm text-[var(--text-secondary)]">Choose a plan tailored to your operation scale</p>
               </div>
@@ -208,20 +219,35 @@ export default async function ToolOrAgentPage({ params }: PageProps) {
 
                       <CardFooter className="pt-4 border-t border-[var(--border-subtle)] bg-white/[0.01]">
                         {isActive && isDemoAllowed ? (
-                          <Link
-                            href={`/dashboard/agents/${slug}/workspace`}
-                            className={`w-full py-2.5 px-4 rounded-xl text-xs font-bold text-center transition-all ${
-                              isPopular
-                                ? 'bg-violet-600 hover:bg-violet-500 text-white border border-violet-500/30 hover:border-violet-500/50 shadow-[0_0_15px_rgba(139,92,246,0.2)] hover:shadow-[0_0_20px_rgba(139,92,246,0.4)]'
-                                : 'bg-transparent hover:bg-white/5 text-zinc-300 hover:text-white border border-zinc-800 hover:border-zinc-700'
-                            }`}
-                          >
-                            Select {tier.name}
-                          </Link>
+                          tool.subdomain_url ? (
+                            <a
+                              href={tool.subdomain_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className={`w-full py-2.5 px-4 rounded-md text-xs font-semibold text-center transition-all ${
+                                isPopular
+                                  ? 'bg-zinc-100 text-zinc-900 hover:bg-white border border-transparent shadow-sm'
+                                  : 'bg-zinc-800 text-zinc-200 hover:bg-zinc-700 border border-zinc-700'
+                              }`}
+                            >
+                              Select {tier.name}
+                            </a>
+                          ) : (
+                            <Link
+                              href={`/dashboard/tools/${slug}`}
+                              className={`w-full py-2.5 px-4 rounded-md text-xs font-semibold text-center transition-all ${
+                                isPopular
+                                  ? 'bg-zinc-100 text-zinc-900 hover:bg-white border border-transparent shadow-sm'
+                                  : 'bg-zinc-800 text-zinc-200 hover:bg-zinc-700 border border-zinc-700'
+                              }`}
+                            >
+                              Select {tier.name}
+                            </Link>
+                          )
                         ) : (
                           <button
                             disabled
-                            className="w-full py-2.5 px-4 rounded-xl text-xs font-bold text-center bg-zinc-800/40 text-zinc-500 cursor-not-allowed border border-zinc-800/50"
+                            className="w-full py-2.5 px-4 rounded-md text-xs font-semibold text-center bg-zinc-800/40 text-zinc-500 cursor-not-allowed border border-zinc-800"
                           >
                             {!isActive ? 'Unavailable' : 'Enterprise SLA'}
                           </button>
@@ -234,10 +260,10 @@ export default async function ToolOrAgentPage({ params }: PageProps) {
             </>
           ) : (
             <div className="max-w-2xl mx-auto">
-              <Card className="border-[var(--border-medium)] bg-[var(--bg-surface)]/40 backdrop-blur-sm relative overflow-hidden p-6 md:p-8 text-center flex flex-col items-center justify-center gap-4">
-                <div className="absolute inset-0 bg-gradient-to-br from-[var(--violet-600)]/5 to-transparent pointer-events-none" />
+              <Card className="border border-zinc-800 bg-[var(--bg-surface)]/40 backdrop-blur-sm relative overflow-hidden p-6 md:p-8 text-center flex flex-col items-center justify-center gap-4 rounded-xl">
+                <div className="absolute inset-0 bg-gradient-to-br from-zinc-800/5 to-transparent pointer-events-none" />
                 <CardHeader className="space-y-2 p-0">
-                  <CardTitle className="text-2xl font-bold font-heading text-white">Custom Enterprise Provisioning</CardTitle>
+                  <CardTitle className="text-xl font-semibold tracking-tight text-white">Custom Enterprise Provisioning</CardTitle>
                   <CardDescription className="text-zinc-400 text-sm max-w-md mx-auto leading-relaxed">
                     This autonomous agent requires custom configuration for your business subdomains. Contact our deployment team for volume pricing and integration details.
                   </CardDescription>
@@ -245,7 +271,7 @@ export default async function ToolOrAgentPage({ params }: PageProps) {
                 <CardContent className="p-0 mt-2">
                   <Link
                     href="/dashboard/support"
-                    className="inline-block py-3 px-8 rounded-xl text-sm font-bold uppercase tracking-wider bg-violet-600 hover:bg-violet-500 text-white border border-violet-500/30 hover:border-violet-500/50 shadow-[0_0_15px_rgba(139,92,246,0.2)] hover:shadow-[0_0_20px_rgba(139,92,246,0.4)] transition-all hover:scale-[1.02] active:scale-[0.98]"
+                    className="inline-block px-4 py-2 bg-zinc-900 border border-zinc-700 text-zinc-300 hover:bg-zinc-800 font-medium rounded-md transition-all text-sm tracking-wide"
                   >
                     Contact Sales to Deploy
                   </Link>

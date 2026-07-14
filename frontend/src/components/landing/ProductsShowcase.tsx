@@ -17,7 +17,7 @@ import {
 import Link from "next/link";
 import { toast } from "sonner";
 
-import { SocialAgentGallery } from "@/components/social/SocialAgentGallery";
+
 import { VOICE_AGENT_NAME } from "@/lib/agent-branding";
 import { ProductRecord, useVisibleProducts } from "@/lib/site-content";
 
@@ -40,41 +40,9 @@ const VoiceVisual = () => (
   </div>
 );
 
-const ChatVisual = () => (
-  <div className="mx-auto flex w-full max-w-[420px] flex-col overflow-hidden rounded-[20px] border border-[#1E0A35] bg-[#130224] shadow-[0_20px_60px_rgba(122,63,145,0.1)]">
-    <div className="flex items-center gap-[14px] border-b border-[#1E0A35] bg-[#2B0D3E] p-[20px]">
-      <div className="flex h-[44px] w-[44px] items-center justify-center rounded-full bg-[rgba(122,63,145,0.15)] text-[#7A3F91]">
-        <Bot size={24} />
-      </div>
-      <div>
-        <div className="text-[16px] font-medium text-[#F2EAF7]">Trinetra Support</div>
-        <div className="flex items-center gap-[6px] text-[13px] text-[#10B981]">
-          <span className="h-[8px] w-[8px] animate-pulse rounded-full bg-[#10B981] shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
-          Online actively
-        </div>
-      </div>
-    </div>
 
-    <div className="flex min-h-[300px] flex-col gap-[20px] p-[24px]">
-      <div className="max-w-[85%] self-end rounded-[14px] rounded-tr-sm border border-[rgba(122,63,145,0.2)] bg-[rgba(122,63,145,0.15)] px-[16px] py-[12px] text-[15px] text-[#E5E7EB]">
-        Do you integrate with my existing CRM out of the box?
-      </div>
-      <div className="max-w-[85%] self-start rounded-[14px] rounded-tl-sm border border-[#2D1255] bg-[#1E0A35] px-[16px] py-[12px] text-[15px] leading-relaxed text-[#A8A0C0]">
-        Yes! We natively integrate with Salesforce, HubSpot, and 50+ other CRMs instantly.
-        We also support custom generic webhooks if needed!
-      </div>
-    </div>
 
-    <div className="border-t border-[#1E0A35] bg-[#1E0A35] p-[16px]">
-      <div className="flex w-full items-center justify-between rounded-full border border-[#2D1255] bg-[#080010] px-[20px] py-[12px] text-[14px] text-[#6B6088]">
-        Type a message...
-        <Send size={16} className="text-[#C59DD9]" />
-      </div>
-    </div>
-  </div>
-);
 
-const SocialVisual = () => <SocialAgentGallery />;
 
 const WorkflowVisual = () => (
   <div className="relative mx-auto flex w-full max-w-[400px] flex-col overflow-hidden rounded-[20px] border border-[#1E0A35] bg-[#130224] p-[24px] shadow-[0_20px_60px_rgba(122,63,145,0.1)]">
@@ -154,36 +122,6 @@ const fallbackProducts = [
     ],
   },
   {
-    slug: "chat-agent",
-    name: "AI Chat Agent",
-    tagline: "Website chat support and lead capture.",
-    description:
-      "Embed an intelligent chatbot on your website that understands your business, answers questions, captures leads, and never sleeps.",
-    status: "coming_soon",
-    agentType: "chat",
-    features: [
-      { title: "Learns from your docs and FAQs", description: "" },
-      { title: "Captures leads automatically", description: "" },
-      { title: "Escalates complex queries", description: "" },
-      { title: "Embeds in 2 minutes", description: "" },
-    ],
-  },
-  {
-    slug: "social-agent",
-    name: "AI Social Agent",
-    tagline: "AI-assisted social publishing workflows.",
-    description:
-      "Generate, schedule, and post content across Instagram and social platforms. AI creates captions, suggests hashtags, and maintains your brand voice.",
-    status: "beta",
-    agentType: "social",
-    features: [
-      { title: "Auto-generates captions & hashtags", description: "" },
-      { title: "Maintains brand voice consistency", description: "" },
-      { title: "Schedules posts automatically", description: "" },
-      { title: "Performance analytics", description: "" },
-    ],
-  },
-  {
     slug: "workflow-agent",
     name: "AI Workflow Agent",
     tagline: "Cross-tool automations for business operations.",
@@ -228,9 +166,9 @@ function getVisualComponent(agentType: ProductRecord["agentType"]) {
     case "voice":
       return VoiceVisual;
     case "chat":
-      return ChatVisual;
+      return VoiceVisual;
     case "social":
-      return SocialVisual;
+      return VoiceVisual;
     case "workflow":
       return WorkflowVisual;
     default:
@@ -248,7 +186,8 @@ function formatFeatureText(feature: { title: string; description: string }) {
 
 export function ProductsShowcase() {
   const { data, error } = useVisibleProducts();
-  const products = data.length > 0 ? data : error ? fallbackProducts : [];
+  const rawProducts = data.length > 0 ? data : error ? fallbackProducts : [];
+  const products = rawProducts.filter(p => p.agentType !== 'chat' && p.agentType !== 'social');
 
   if (products.length === 0) {
     return null;

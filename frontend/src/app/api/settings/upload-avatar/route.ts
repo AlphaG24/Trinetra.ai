@@ -49,7 +49,8 @@ export async function POST(req: Request) {
 
     if (uploadError) {
       console.error('Storage upload error:', uploadError)
-      return NextResponse.json({ error: uploadError.message }, { status: 500 })
+      // SECURITY: Never expose storage error details
+      return NextResponse.json({ error: 'Failed to upload avatar.' }, { status: 500 })
     }
 
     const { data: { publicUrl } } = supabaseAdmin.storage
@@ -59,6 +60,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ publicUrl })
   } catch (err: any) {
     console.error('Upload avatar API error:', err)
-    return NextResponse.json({ error: err.message || 'Server error during upload' }, { status: 500 })
+    // SECURITY: Never expose internal error details
+    return NextResponse.json({ error: 'Server error during upload.' }, { status: 500 })
   }
 }

@@ -423,12 +423,12 @@ export default function PostEditor({ post, isEditing, onSave, onCancel, onAutoSa
             </div>
 
             {formData.coverImage && (
-              <div className="w-full rounded-xl overflow-hidden mb-10"
-                   style={{ height: '200px' }}>
+              <div className="w-full rounded-xl overflow-hidden mb-10 border border-white/10 bg-black/20 flex items-center justify-center"
+                   style={{ height: 'auto', minHeight: '180px', maxHeight: '380px' }}>
                 <img
                   src={formData.coverImage}
                   alt="Cover"
-                  className="w-full h-full object-cover"
+                  className="max-w-full max-h-[380px] object-contain"
                   onError={(e) => {
                     // Hide broken image gracefully
                     e.target.parentElement.style.display = 'none';

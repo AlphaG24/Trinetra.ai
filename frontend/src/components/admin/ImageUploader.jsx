@@ -246,12 +246,12 @@ export default function ImageUploader({
                  }}>
               
               {/* Image Preview */}
-              <div className="relative" 
+              <div className="relative flex items-center justify-center bg-black/20" 
                    style={{ height: '180px' }}>
                 <img
                   src={uploadedUrl}
                   alt="Cover preview"
-                  className="w-full h-full object-cover"
+                  className="max-w-full max-h-full object-contain"
                   onError={(e) => {
                     // If image fails to load, show error
                     e.target.style.display = 'none';
@@ -539,15 +539,15 @@ export default function ImageUploader({
 
           {/* URL Image Preview */}
           {uploadedUrl && activeTab === 'url' && (
-            <div className="mt-3 rounded-xl overflow-hidden"
+            <div className="mt-3 rounded-xl overflow-hidden flex items-center justify-center bg-black/20"
                  style={{
-                   border: '1px solid rgba(255,255,255,0.08)'
+                   border: '1px solid rgba(255,255,255,0.08)',
+                   height: '150px'
                  }}>
               <img
                 src={uploadedUrl}
                 alt="URL preview"
-                className="w-full object-cover"
-                style={{ maxHeight: '150px' }}
+                className="max-w-full max-h-full object-contain"
                 onLoad={() => setPasteError(false)}
                 onError={() => setPasteError(true)}
               />

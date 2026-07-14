@@ -1,10 +1,15 @@
 import { createClient } from "@/utils/supabase/server";
 import { NextResponse } from "next/server";
+import { requireAuth } from "../../../../../utils/apiAuth";
 
 export const runtime = 'nodejs';
 
 export async function POST(req: Request) {
     try {
+        // SECURITY: Verify the caller is authenticated
+        const authResult = await requireAuth();
+        if (authResult instanceof Response) return authResult;
+
         const { auditId, original, fix, reason } = await req.json();
 
         if (!auditId || !fix) {
@@ -55,6 +60,7 @@ export async function POST(req: Request) {
 
     } catch (error: any) {
         console.error("Save Fix Error:", error);
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        // SECURITY: Never expose internal error details
+        return NextResponse.json({ error: "Failed to save fix." }, { status: 500 });
     }
 }

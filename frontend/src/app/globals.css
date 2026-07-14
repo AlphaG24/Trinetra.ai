@@ -6,34 +6,34 @@
 
 :root {
   /* ── Backgrounds ── */
-  --bg-deep:       #080010;
-  --bg-primary:    #0C0118;
-  --bg-secondary:  #130224;
-  --bg-tertiary:   #1A0530;
-  --bg-surface:    #10021E;
+  --bg-deep: #080010;
+  --bg-primary: #0C0118;
+  --bg-secondary: #130224;
+  --bg-tertiary: #1A0530;
+  --bg-surface: #10021E;
 
   /* ── Violet ── */
-  --violet-300:    #C4B5FD;
-  --violet-400:    #A78BFA;
-  --violet-500:    #8B5CF6;
-  --violet-600:    #7C3AED;
-  --violet-700:    #6D28D9;
+  --violet-300: #C4B5FD;
+  --violet-400: #A78BFA;
+  --violet-500: #8B5CF6;
+  --violet-600: #7C3AED;
+  --violet-700: #6D28D9;
 
   /* ── Gold ── */
-  --gold-300:      #FDE68A;
-  --gold-400:      #FBBF24;
-  --gold-500:      #F59E0B;
-  --gold-600:      #D97706;
+  --gold-300: #FDE68A;
+  --gold-400: #FBBF24;
+  --gold-500: #F59E0B;
+  --gold-600: #D97706;
 
   /* ── Cyan ── */
-  --cyan-400:      #22D3EE;
-  --cyan-500:      #06B6D4;
+  --cyan-400: #22D3EE;
+  --cyan-500: #06B6D4;
 
   /* ── Text ── */
-  --text-primary:  #F5F3FF;
-  --text-secondary:#A8A0C0;
+  --text-primary: #F5F3FF;
+  --text-secondary: #A8A0C0;
   --text-tertiary: #6B6088;
-  --text-accent:   #FBBF24;
+  --text-accent: #FBBF24;
 
   /* ── Borders ── */
   --border-subtle: #1E0A35;
@@ -41,9 +41,9 @@
   --border-active: #8B5CF6;
 
   /* ── Fonts ── */
-  --font-heading:  "Space Grotesk", "Inter", "Segoe UI", system-ui, sans-serif;
-  --font-body:     "Inter", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-  --font-mono:     "JetBrains Mono", "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  --font-heading: "Space Grotesk", "Inter", "Segoe UI", system-ui, sans-serif;
+  --font-body: "Inter", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: "JetBrains Mono", "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
 }
 
 /* ─────────────────────────────────────────────
@@ -51,6 +51,7 @@
    ───────────────────────────────────────────── */
 
 @layer base {
+
   *,
   *::before,
   *::after {
@@ -77,7 +78,12 @@
   }
 
   /* ── Headings ── */
-  h1, h2, h3, h4, h5, h6 {
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
     font-family: var(--font-heading);
     color: var(--text-primary);
     line-height: 1.2;
@@ -101,6 +107,7 @@
    ───────────────────────────────────────────── */
 
 @layer base {
+
   /* Firefox */
   * {
     scrollbar-width: thin;
@@ -133,8 +140,15 @@
 
 /* ── Entrance animation ── */
 @keyframes navbar-slide-down {
-  from { transform: translateY(-72px); opacity: 0; }
-  to   { transform: translateY(0);     opacity: 1; }
+  from {
+    transform: translateY(-72px);
+    opacity: 0;
+  }
+
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
 }
 
 .navbar {
@@ -271,7 +285,8 @@
 
 /* ── Hamburger ── */
 .navbar__hamburger {
-  display: none;          /* shown via media query */
+  display: none;
+  /* shown via media query */
   flex-direction: column;
   justify-content: center;
   align-items: center;
@@ -405,6 +420,7 @@
 
 /* ── Responsive ── */
 @media (max-width: 767px) {
+
   .navbar__links,
   .navbar__actions {
     display: none;
@@ -426,8 +442,13 @@
    ───────────────────────────────────────────── */
 
 @keyframes marquee {
-  0% { transform: translateX(0); }
-  100% { transform: translateX(-100%); }
+  0% {
+    transform: translateX(0);
+  }
+
+  100% {
+    transform: translateX(-100%);
+  }
 }
 
 .animate-marquee {
@@ -435,18 +456,24 @@
   will-change: transform;
 }
 
+.animate-marquee:hover,
+.group:hover .animate-marquee {
+  animation-play-state: paused;
+}
+
 /* ── Skeleton Loading ── */
 @keyframes shimmer {
-  0% { background-position: -1000px 0; }
-  100% { background-position: 1000px 0; }
+  0% {
+    background-position: -1000px 0;
+  }
+
+  100% {
+    background-position: 1000px 0;
+  }
 }
 
 .skeleton {
-  background: linear-gradient(90deg, rgba(255,255,255,0.03) 25%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0.03) 75%);
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.03) 25%, rgba(255, 255, 255, 0.08) 50%, rgba(255, 255, 255, 0.03) 75%);
   background-size: 1000px 100%;
   animation: shimmer 2s infinite linear;
 }
-
-
-
-
