@@ -4,8 +4,6 @@ import { Banknote, Users, Bot, History, ShieldAlert, Activity } from 'lucide-rea
 
 export const dynamic = 'force-dynamic'
 
-const ADMIN_EMAIL = 'raghav00424@gmail.com' // Replace with your actual admin email
-
 export default async function AdminPage() {
     const supabase = await createClient()
 
@@ -14,7 +12,17 @@ export default async function AdminPage() {
         data: { user },
     } = await supabase.auth.getUser()
 
-    if (!user || user.email !== ADMIN_EMAIL) {
+    if (!user) {
+        redirect('/login')
+    }
+
+    const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single()
+
+    if (profile?.role !== 'admin') {
         redirect('/dashboard')
     }
 

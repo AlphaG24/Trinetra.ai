@@ -64,8 +64,8 @@ export default async function ToolOrAgentPage({ params }: PageProps) {
           <div className="flex flex-col md:flex-row gap-8 items-start md:items-center">
             {/* Tool Icon with client-side fallback */}
             <div className="relative group">
-              <div className="absolute inset-0 bg-zinc-800/20 rounded-md blur-md group-hover:blur-lg opacity-70 transition-all pointer-events-none" />
-              <MarketplaceIcon iconUrl={tool.icon_url} type={tool.type} name={tool.name} className="w-24 h-24 relative z-10" />
+              <div className="absolute inset-0 bg-zinc-800/20 rounded-full blur-md group-hover:blur-lg opacity-70 transition-all pointer-events-none" />
+              <MarketplaceIcon iconUrl={tool.icon_url} type={tool.type} name={tool.name} className="w-32 h-32 relative z-10" />
             </div>
 
             {/* Title / Header */}
@@ -116,7 +116,7 @@ export default async function ToolOrAgentPage({ params }: PageProps) {
                   </a>
                 ) : (
                   <Link
-                    href={`/dashboard/tools/${slug}`}
+                    href={slug === 'anika-voice' ? `/dashboard/agents/${slug}/workspace` : `/dashboard/tools/${slug}`}
                     className="w-full px-6 py-3.5 bg-zinc-100 text-zinc-900 hover:bg-white font-semibold rounded-md shadow-sm transition-all text-sm border border-transparent text-center transition-all inline-block hover:scale-[1.02] active:scale-[0.98]"
                   >
                     Launch Workspace

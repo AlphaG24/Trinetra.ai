@@ -53,3 +53,23 @@ __pycache__/
 test_webhook.py
 mock_payload.json
 test_*.py
+
+# Security Audit Added Patterns
+.npm-cache/
+out/
+.vercel/
+.turbo/
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+serviceAccount.json
+credentials.json
+*.db
+*.sqlite
+*.sql.bak
+*.key
+*.pem
+.gemini/

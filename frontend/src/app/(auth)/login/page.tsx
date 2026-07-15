@@ -51,12 +51,10 @@ function LoginForm() {
         setIsShaking(true)
         setTimeout(() => setIsShaking(false), 500)
 
-        if (error.message.includes('Invalid login credentials')) {
-          toast.error('Invalid credentials. Please try again.')
-        } else if (error.message.includes('Failed to fetch')) {
+        if (error.message.includes('Failed to fetch')) {
           toast.error('Connection failed. Check your internet.')
         } else {
-          toast.error(error.message || 'No account found. Did you mean to sign up?')
+          toast.error('Invalid email or password.')
         }
         console.error("Supabase password auth failed:", error)
         return

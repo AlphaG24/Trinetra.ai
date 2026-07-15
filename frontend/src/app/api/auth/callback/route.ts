@@ -2,9 +2,11 @@ import { createServerClient } from '@supabase/ssr'
 import { cookies, headers } from 'next/headers'
 import { NextResponse } from 'next/server'
 
+import { safeApiHandler } from '@/utils/apiAuth'
+
 export const dynamic = 'force-dynamic';
 
-export async function GET(request: Request) {
+export const GET = safeApiHandler(async (request: Request) => {
   const { searchParams, origin } = new URL(request.url)
   const code = searchParams.get('code')
   let next = searchParams.get('next') ?? '/dashboard'
@@ -69,4 +71,4 @@ export async function GET(request: Request) {
 
   // If there is no code or an error occurred, return home
   return NextResponse.redirect(`${origin}/?error=auth_failed`)
-}
+})

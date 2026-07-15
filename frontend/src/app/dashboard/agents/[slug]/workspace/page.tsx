@@ -27,8 +27,8 @@ export default async function WorkspacePage({ params }: PageProps) {
     .eq('slug', slug)
     .maybeSingle()
 
-  if (!tool) {
-    notFound()
+  if (!tool || !tool.is_active || !tool.is_demo_allowed) {
+    redirect('/dashboard/agents')
   }
 
   // 3. Fetch user service quota
@@ -104,50 +104,65 @@ export default async function WorkspacePage({ params }: PageProps) {
   return (
     <div className="min-h-screen bg-[var(--bg-deep)] text-zinc-100 flex flex-col relative overflow-hidden">
       
-      {/* Dynamic Ribbon Banner (Sticky) */}
-      <div className={`sticky top-0 z-50 w-full border-b backdrop-blur-md px-4 py-3 sm:px-6 lg:px-8 transition-colors duration-300 ${ribbonBgClass}`}>
-        <div className="max-w-6xl mx-auto flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <span className="text-xs uppercase font-bold tracking-wider text-[var(--text-secondary)]">Demo Mode:</span>
-            <span className={`text-xs font-bold ${textColorClass}`}>
-              Demo Usage: {quotaUsed} / {quotaAllocated} {quotaType} used
-            </span>
-          </div>
-
-          {/* Progress Bar Container */}
-          <div className="flex-1 max-w-md w-full bg-zinc-950/60 border border-zinc-800/80 rounded-full h-2.5 overflow-hidden">
-            <div 
-              className={`h-full rounded-full transition-all duration-500 ${progressColorClass}`}
-              style={{ width: `${percentUsed}%` }}
-            />
-          </div>
-
-          <div className="flex items-center gap-1.5 text-[10px] text-[var(--text-tertiary)] uppercase font-semibold">
-            {percentUsed >= 100 ? (
-              <span className="text-red-400 flex items-center gap-1">Quota Exceeded</span>
-            ) : percentUsed >= 80 ? (
-              <span className="text-amber-400 flex items-center gap-1">Warning: Nearing Limit</span>
-            ) : (
-              <span>Quota In Good Standing</span>
-            )}
-          </div>
-        </div>
-      </div>
-
       {/* Main Canvas Area */}
       <div className="flex-1 w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex flex-col gap-6 relative z-10">
         
         {/* Navigation & Header */}
-        <div className="flex items-center justify-between">
-          <Link 
-            href={`/dashboard/agents/${slug}`}
-            className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-[var(--text-secondary)] hover:text-white transition-colors"
-          >
-            <ArrowLeft className="w-4.5 h-4.5" /> Back to Product Page
-          </Link>
-          
+        <div className="flex items-center justify-between border-b border-zinc-800/80 pb-5">
+          <div className="flex items-center gap-4">
+            {/* Tool Circular Logo */}
+            {tool.icon_url && (
+              <img
+                src={tool.icon_url}
+                alt={tool.name}
+                className="w-12 h-12 rounded-full object-cover shrink-0"
+              />
+            )}
+            <div className="space-y-1">
+              <h1 className="text-2xl font-bold text-white leading-none flex items-center gap-2 font-heading">
+                {tool.name} <span className="text-xs font-normal text-zinc-500">Demo Sandbox</span>
+              </h1>
+              <Link 
+                href={`/dashboard/agents/${slug}`}
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-zinc-400 hover:text-white transition-colors"
+              >
+                <ArrowLeft className="w-3.5 h-3.5" /> Back to Product Page
+              </Link>
+            </div>
+          </div>
+
           <div className="text-[10px] uppercase font-bold tracking-wider text-[var(--text-tertiary)] bg-white/5 border border-white/[0.03] px-3 py-1 rounded">
             Agent Config: {slug}
+          </div>
+        </div>
+
+        {/* Demo Usage Display (below back button/header) */}
+        <div className={`w-full border rounded-2xl px-5 py-4 transition-colors duration-300 ${ribbonBgClass}`}>
+          <div className="max-w-6xl mx-auto flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-2">
+              <span className="text-xs uppercase font-bold tracking-wider text-[var(--text-secondary)]">Demo Mode:</span>
+              <span className={`text-xs font-bold ${textColorClass}`}>
+                Demo Usage: {quotaUsed} / {quotaAllocated} {quotaType} used
+              </span>
+            </div>
+
+            {/* Progress Bar Container */}
+            <div className="flex-grow max-w-md w-full bg-zinc-950/60 border border-zinc-800/80 rounded-full h-2.5 overflow-hidden">
+              <div 
+                className={`h-full rounded-full transition-all duration-500 ${progressColorClass}`}
+                style={{ width: `${percentUsed}%` }}
+              />
+            </div>
+
+            <div className="flex items-center gap-1.5 text-[10px] text-[var(--text-tertiary)] uppercase font-semibold">
+              {percentUsed >= 100 ? (
+                <span className="text-red-400 flex items-center gap-1">Quota Exceeded</span>
+              ) : percentUsed >= 80 ? (
+                <span className="text-amber-400 flex items-center gap-1">Warning: Nearing Limit</span>
+              ) : (
+                <span>Quota In Good Standing</span>
+              )}
+            </div>
           </div>
         </div>
 

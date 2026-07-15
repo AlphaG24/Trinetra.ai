@@ -66,14 +66,14 @@ export function ActivityFeed() {
     let channel: any = null
 
     const setupRealtime = async () => {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session?.user?.id) return
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user?.id) return
 
       // Fetch initial data
       const { data: initialActivities } = await supabase
         .from('activity_log')
         .select('*')
-        .eq('user_id', session.user.id)
+        .eq('user_id', user.id)
         .order('created_at', { ascending: false })
         .limit(50)
 
@@ -91,7 +91,7 @@ export function ActivityFeed() {
             event: 'INSERT',
             schema: 'public',
             table: 'activity_log',
-            filter: `user_id=eq.${session.user.id}`
+            filter: `user_id=eq.${user.id}`
           },
           (payload: any) => {
             const newActivity = payload.new as ActivityItem

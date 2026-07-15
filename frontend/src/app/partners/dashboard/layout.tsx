@@ -12,14 +12,14 @@ export default async function DashboardLayout({
 }) {
   const supabase = await createServerClient()
   const {
-    data: { session },
-  } = await supabase.auth.getSession()
+    data: { user },
+  } = await supabase.auth.getUser()
 
-  if (!session) {
+  if (!user) {
     redirect('/partners/login')
   }
 
-  const partner = await findOrCreatePartnerForUser(session.user)
+  const partner = await findOrCreatePartnerForUser(user)
 
   return (
     <div className="min-h-screen bg-[#0a0a0f]">

@@ -128,7 +128,7 @@ function VoiceWorkspace({ tool, quota, user, logs, router }: VoiceWorkspaceProps
       <div className="bg-[var(--bg-surface)]/30 border border-zinc-800 rounded-2xl p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-xl font-bold font-heading text-white flex items-center gap-2">
-            <Sparkles className="w-5 h-5 text-amber-400" /> Deployed Sandbox: {tool.name}
+            Deployed Sandbox: {tool.name}
           </h2>
           <p className="text-xs text-zinc-400 mt-1">
             You are inside the isolated demo sandbox. Free limit remains active.

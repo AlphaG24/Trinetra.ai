@@ -51,7 +51,7 @@ export default function ToolError({ error, reset }: ErrorProps) {
           </button>
           
           <Link
-            href="/dashboard/marketplace"
+            href="/dashboard/agents"
             className="flex-1 py-3 px-4 border border-zinc-800 bg-[#0e0e15] hover:bg-[#14141f] text-zinc-300 font-semibold rounded-xl text-sm transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer"
           >
             <LayoutGrid className="w-4 h-4" />

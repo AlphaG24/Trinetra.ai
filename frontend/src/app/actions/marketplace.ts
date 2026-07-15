@@ -27,7 +27,7 @@ export async function joinWaitlist(agentName: string) {
         return { error: error.message };
     }
 
-    revalidatePath('/dashboard/marketplace');
+    revalidatePath('/dashboard/agents');
     return { success: true };
 }
 
@@ -85,7 +85,7 @@ export async function deployDemoService(serviceSlug: string) {
     }
 
     // 4. Revalidate cache
-    revalidatePath('/dashboard/marketplace');
+    revalidatePath('/dashboard/agents');
     revalidatePath(`/dashboard/tools/${serviceSlug}`);
 
     // 5. Redirect the user to the dynamic tool page

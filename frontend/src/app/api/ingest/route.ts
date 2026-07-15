@@ -50,6 +50,13 @@ function splitTextIntoChunks(text: string, chunkSize = 1000, chunkOverlap = 200)
 
 export async function POST(req: Request) {
   try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const formData = await req.formData();
     const file = formData.get("file") as File;
     const documentId = formData.get("document_id") as string;
@@ -90,15 +97,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "No text chunks could be created from the PDF." }, { status: 400 });
     }
 
-    const supabase = await createClient();
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
 
     const { error } = await supabase.from("document_sections").insert(chunksToInsert);
 

@@ -1,9 +1,8 @@
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
-import { redirect } from 'next/navigation'
+import { redirect, notFound } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Lock, Sparkles, ChevronRight, Activity } from 'lucide-react'
-import { VoiceAgentConsole } from './components/VoiceAgentConsole'
 import { StructurerConsole } from './components/StructurerConsole'
 
 interface PageProps {
@@ -14,6 +13,12 @@ interface PageProps {
 
 export async function generateMetadata({ params }: PageProps) {
   const { slug } = await params
+  if (slug === 'anika-voice') {
+    return {
+      title: 'Not Found',
+      description: 'Page not found.',
+    }
+  }
   const formatName = (s: string) => {
     if (s === 'structurer') return 'Triscrap'
     return s.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
@@ -27,6 +32,11 @@ export async function generateMetadata({ params }: PageProps) {
 
 export default async function ToolGatekeeperPage({ params }: PageProps) {
   const { slug } = await params
+
+  // SECURITY: Disable /dashboard/tools/anika-voice route entirely
+  if (slug === 'anika-voice') {
+    notFound()
+  }
   
   // 1. Initialize Supabase SSR Server Client with cookies
   const cookieStore = await cookies()
@@ -73,8 +83,8 @@ export default async function ToolGatekeeperPage({ params }: PageProps) {
     .eq('slug', slug)
     .maybeSingle()
 
-  if (!service || serviceError) {
-    redirect('/dashboard/marketplace')
+  if (!service || serviceError || !service.is_active || !service.is_demo_allowed) {
+    redirect('/dashboard/agents')
   }
 
   // 4. Query or JIT-provision user_service_quotas
@@ -119,7 +129,7 @@ export default async function ToolGatekeeperPage({ params }: PageProps) {
   }
 
   if (!quota) {
-    redirect('/dashboard/marketplace')
+    redirect('/dashboard/agents')
   }
 
   const displayName = service.name === 'Trinetra Structurer' ? 'Triscrap' : service.name
@@ -127,6 +137,21 @@ export default async function ToolGatekeeperPage({ params }: PageProps) {
   const quotaUsed = quota.quota_used || 0
   const quotaAllocated = quota.quota_allocated || 0
   const isQuotaExhausted = quotaUsed >= quotaAllocated
+
+  const percentUsed = Math.min((quotaUsed / quotaAllocated) * 100, 100)
+  let progressColorClass = 'bg-gradient-to-r from-orange-600 to-orange-500 shadow-[0_0_8px_rgba(245,158,11,0.3)]'
+  let textColorClass = 'text-orange-400 font-semibold'
+  let ribbonBgClass = 'bg-orange-950/20 border-orange-900/30'
+
+  if (percentUsed >= 100) {
+    progressColorClass = 'bg-gradient-to-r from-red-600 to-red-500 shadow-[0_0_10px_rgba(239,68,68,0.4)] animate-pulse'
+    textColorClass = 'text-red-400 font-semibold'
+    ribbonBgClass = 'bg-red-950/20 border-red-900/30'
+  } else if (percentUsed >= 80) {
+    progressColorClass = 'bg-gradient-to-r from-amber-600 to-amber-500 shadow-[0_0_10px_rgba(245,158,11,0.4)]'
+    textColorClass = 'text-amber-400 font-semibold'
+    ribbonBgClass = 'bg-amber-950/20 border-amber-900/30'
+  }
 
   // 5. Quota Exhausted blocking UI
   if (isQuotaExhausted) {
@@ -190,8 +215,6 @@ export default async function ToolGatekeeperPage({ params }: PageProps) {
   // 6. Dynamic Injection Switch
   const renderTool = () => {
     switch (slug) {
-      case 'anika-voice':
-        return <VoiceAgentConsole service={service} quota={quota} />
       case 'structurer':
         return <StructurerConsole service={service} quota={quota} />
       default:
@@ -208,29 +231,62 @@ export default async function ToolGatekeeperPage({ params }: PageProps) {
 
   return (
     <div className="space-y-6">
-      {/* Breadcrumb Header Dashboard / Tools / [Tool Name] */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-zinc-800/80 pb-5">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2 text-xs font-medium text-zinc-500">
-            <Link href="/dashboard" className="hover:text-zinc-300 transition-colors">Dashboard</Link>
-            <ChevronRight className="w-3.5 h-3.5" />
-            <Link href="/dashboard/marketplace" className="hover:text-zinc-300 transition-colors">Tools</Link>
-            <ChevronRight className="w-3.5 h-3.5" />
-            <span className="text-orange-500">{displayName}</span>
+      {/* Navigation & Header */}
+      <div className="flex items-center justify-between border-b border-zinc-800/80 pb-5">
+        <div className="flex items-center gap-4">
+          {/* Tool Circular Logo */}
+          {service.icon_url && (
+            <img
+              src={service.icon_url}
+              alt={service.name}
+              className="w-12 h-12 rounded-full object-cover shrink-0"
+            />
+          )}
+          <div className="space-y-1">
+            <h1 className="text-2xl font-bold text-white leading-none flex items-center gap-2 font-heading">
+              {displayName} <span className="text-xs font-normal text-zinc-500">Demo Sandbox</span>
+            </h1>
+            <Link 
+              href="/dashboard/demo"
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-zinc-400 hover:text-white transition-colors"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" /> Back to Dashboard
+            </Link>
           </div>
-          <h1 className="text-3xl font-extrabold tracking-tight text-white mt-1">
-            {displayName}
-          </h1>
         </div>
 
-        {/* Current Quota Allocated Badge */}
-        <div className="flex items-center gap-3 bg-[#0d0d14] border border-zinc-800 px-4 py-2 rounded-xl text-sm self-start md:self-auto">
-          <Activity className="w-4 h-4 text-orange-500" />
-          <span className="text-zinc-400">Usage:</span>
-          <span className="text-white font-semibold">{quotaUsed} / {quotaAllocated}</span>
-          <span className="text-zinc-500 text-xs px-2 py-0.5 bg-zinc-850 rounded">
-            {quota.usage_metric_type || 'units'}
-          </span>
+        <div className="text-[10px] uppercase font-bold tracking-wider text-zinc-500 bg-white/5 border border-white/[0.03] px-3 py-1 rounded">
+          Tool Config: {slug}
+        </div>
+      </div>
+
+      {/* Demo Usage Display (below back button/header) */}
+      <div className={`w-full border rounded-2xl px-5 py-4 transition-colors duration-300 ${ribbonBgClass}`}>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-2">
+            <span className="text-xs uppercase font-bold tracking-wider text-zinc-400">Demo Mode:</span>
+            <span className={`text-xs font-bold ${textColorClass}`}>
+              Demo Usage: {quotaUsed} / {quotaAllocated} {slug === 'structurer' ? 'documents' : (quota.usage_metric_type || 'units')} used
+            </span>
+          </div>
+
+          {/* Progress Bar Container */}
+          <div className="flex-grow max-w-md w-full bg-zinc-950/60 border border-zinc-800/80 rounded-full h-2.5 overflow-hidden">
+            <div 
+              className={`h-full rounded-full transition-all duration-500 ${progressColorClass}`}
+              style={{ width: `${percentUsed}%` }}
+            />
+          </div>
+
+          <div className="flex items-center gap-1.5 text-[10px] text-zinc-500 uppercase font-semibold">
+            {percentUsed >= 100 ? (
+              <span className="text-red-400 flex items-center gap-1">Quota Exceeded</span>
+            ) : percentUsed >= 80 ? (
+              <span className="text-amber-400 flex items-center gap-1">Warning: Nearing Limit</span>
+            ) : (
+              <span>Quota In Good Standing</span>
+            )}
+          </div>
         </div>
       </div>
 

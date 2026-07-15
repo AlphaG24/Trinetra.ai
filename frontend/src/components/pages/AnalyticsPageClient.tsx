@@ -205,10 +205,6 @@ export function AnalyticsPageClient({ userId, initialServices }: AnalyticsPageCl
       {/* Header and Tool Selector */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-6 border-b border-white/5">
         <div>
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-violet-500/10 border border-violet-500/20 mb-3">
-            <Sparkles className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
-            <span className="text-[10px] font-bold text-zinc-300 tracking-wider uppercase">Polymorphic Telemetry</span>
-          </div>
           <h1 className="text-3xl font-extrabold tracking-tight text-white font-display">
             Analytics Dashboard
           </h1>

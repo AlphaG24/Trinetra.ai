@@ -13,11 +13,19 @@ export default async function NotificationsPage() {
   if (!user) redirect('/login')
 
   const { data: notifications } = await supabase
-    .from('notifications')
-    .select('*')
-    .eq('user_id', user.id)
+    .from('official_notifications')
+    .select('*, user_read_notifications!left(read_at)')
     .order('created_at', { ascending: false })
     .limit(50)
 
-  return <NotificationsPageClient initialNotifications={notifications || []} />
+  const mappedNotifications = (notifications || []).map((n: any) => ({
+    id: n.id,
+    title: n.title,
+    message: n.message,
+    type: n.type,
+    created_at: n.created_at,
+    is_read: n.user_read_notifications && n.user_read_notifications.length > 0
+  }))
+
+  return <NotificationsPageClient initialNotifications={mappedNotifications} userId={user.id} />
 }

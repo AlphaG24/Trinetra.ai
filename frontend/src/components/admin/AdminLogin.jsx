@@ -11,20 +11,23 @@ export default function AdminLogin({ onLogin }) {
   const [error, setError] = useState("");
   const [status, setStatus] = useState("idle");
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     if (e) e.preventDefault();
     setStatus("submitting");
     setError("");
 
-    setTimeout(() => {
-      const result = onLogin(password);
+    try {
+      const result = await onLogin(password);
       if (result.success) {
         setStatus("success");
       } else {
-        setError(result.error);
+        setError(result.error || "Incorrect password");
         setStatus("idle");
       }
-    }, 600); // simulate network delay for effect
+    } catch (err) {
+      setError("An unexpected error occurred.");
+      setStatus("idle");
+    }
   };
 
   return (

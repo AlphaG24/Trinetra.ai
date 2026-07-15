@@ -91,11 +91,11 @@ export function MarketplaceClient({ services }: MarketplaceClientProps) {
                         src={service.icon_url}
                         alt={service.name}
                         onError={() => setImgErrors(prev => ({ ...prev, [service.id]: true }))}
-                        className="w-12 h-12 rounded-md object-cover border border-zinc-800"
+                        className="w-16 h-16 rounded-full object-cover shrink-0"
                       />
                     ) : (
-                      <div className="w-12 h-12 rounded-md bg-zinc-800 border border-zinc-700 flex items-center justify-center shrink-0">
-                        <Box className="w-6 h-6 text-zinc-400" />
+                      <div className="w-16 h-16 rounded-full bg-zinc-800 flex items-center justify-center shrink-0">
+                        <Box className="w-8 h-8 text-zinc-400" />
                       </div>
                     )}
 
@@ -167,11 +167,11 @@ export function MarketplaceClient({ services }: MarketplaceClientProps) {
                   src={selectedVoiceAgent.icon_url}
                   alt={selectedVoiceAgent.name}
                   onError={() => setImgErrors(prev => ({ ...prev, [selectedVoiceAgent.id]: true }))}
-                  className="w-14 h-14 rounded-md object-cover border border-zinc-800"
+                  className="w-20 h-20 rounded-full object-cover shrink-0"
                 />
               ) : (
-                <div className="w-14 h-14 rounded-md bg-zinc-800 border border-zinc-700 flex items-center justify-center shrink-0">
-                  <Phone className="w-8 h-8 text-zinc-400" />
+                <div className="w-20 h-20 rounded-full bg-zinc-800 flex items-center justify-center shrink-0">
+                  <Phone className="w-10 h-10 text-zinc-400" />
                 </div>
               )}
               <div>

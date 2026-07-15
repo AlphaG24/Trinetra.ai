@@ -303,7 +303,7 @@ export function DynamicProductPage({ slug }: { slug: string }) {
         ? chatDemoStatus === "loading"
           ? "Summoning Netra..."
           : chatDemoStatus === "open"
-            ? "Netra is Live ✦"
+            ? "Netra is Live"
             : chatDemoStatus === "closed"
               ? "Bring Netra Back"
               : chatDemoStatus === "error"

@@ -13,7 +13,7 @@ const TYPE_META: Record<string, { icon: any; color: string; label: string }> = {
   usage_alert: { icon: AlertTriangle, color: 'text-red-400 bg-red-500/10 border-red-500/30', label: 'Alert' },
 }
 
-export function NotificationsPageClient({ initialNotifications }: { initialNotifications: any[] }) {
+export function NotificationsPageClient({ initialNotifications, userId }: { initialNotifications: any[], userId: string }) {
   const [notifications, setNotifications] = useState(initialNotifications)
   const [markingAll, setMarkingAll] = useState(false)
   const supabase = createClient()
@@ -34,7 +34,7 @@ export function NotificationsPageClient({ initialNotifications }: { initialNotif
   }
 
   const markOneRead = async (id: string) => {
-    await supabase.from('notifications').update({ is_read: true }).eq('id', id)
+    await supabase.from('user_read_notifications').insert({ user_id: userId, notification_id: id })
     setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n))
   }
 

@@ -11,7 +11,7 @@ const cspHeader = `
     default-src 'self';
     script-src 'self' 'unsafe-eval' 'unsafe-inline' https://cdnjs.cloudflare.com https://apis.google.com https://accounts.google.com https://*.vapi.ai https://*.daily.co blob:;
     style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
-    img-src 'self' blob: data: https://lh3.googleusercontent.com https://*.supabase.co https://i.postimg.cc;
+    img-src 'self' blob: data: https://lh3.googleusercontent.com https://*.supabase.co https://i.postimg.cc https://assets.trinetraedu-ai.com;
     font-src 'self' data: https://fonts.gstatic.com;
     connect-src 'self' http://localhost:8000 http://127.0.0.1:8000 https://*.trycloudflare.com https://*.onrender.com https://api.vapi.ai https://*.supabase.co wss://*.supabase.co https://formspree.io https://*.googleapis.com https://*.vapi.ai wss://*.vapi.ai https://*.daily.co wss://*.daily.co wss://*.wss.daily.co https://*.pluot.blue wss://*.pluot.blue https://raw.githubusercontent.com blob: data: stun: turn:;
     media-src 'self' blob: https://storage.vapi.ai;
@@ -40,6 +40,18 @@ const nextConfig: NextConfig = {
       {
         protocol: 'https',
         hostname: 'i.postimg.cc',
+      },
+      {
+        protocol: 'https',
+        hostname: 'assets.trinetraedu-ai.com',
+      },
+      {
+        protocol: 'https',
+        hostname: 'lh3.googleusercontent.com',
+      },
+      {
+        protocol: 'https',
+        hostname: '*.supabase.co',
       },
     ],
   },

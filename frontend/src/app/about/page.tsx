@@ -74,7 +74,7 @@ export default function AboutPage() {
             className="relative z-10 max-w-[800px] mx-auto flex flex-col items-center"
           >
             <div className="inline-block bg-[rgba(139,92,246,0.1)] border border-[rgba(139,92,246,0.15)] text-[#D7C4F7] font-sans font-medium text-[13px] px-[16px] py-[6px] rounded-full mb-[24px]">
-              ✦ About Us
+              About Us
             </div>
             <h1 className="font-display font-bold text-[36px] md:text-[48px] text-[#FAF7FF] tracking-[-0.02em] leading-tight">
               Vision <span className="text-transparent bg-clip-text" style={{ backgroundImage: 'linear-gradient(135deg, #D7C4F7 0%, #FBBF24 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Beyond</span> the Surface

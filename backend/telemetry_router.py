@@ -49,7 +49,8 @@ async def get_current_user(request: Request, auth: HTTPAuthorizationCredentials 
             raise HTTPException(status_code=401, detail="Invalid session token")
         return user_res.user
     except Exception as e:
-        raise HTTPException(status_code=401, detail=f"Authentication failed: {str(e)}")
+        print(f"[Telemetry Auth Error] {str(e)}", flush=True)
+        raise HTTPException(status_code=401, detail="Authentication failed")
 
 @router.post("")
 async def log_telemetry(payload: TelemetryPayload, user: Any = Depends(get_current_user)):
@@ -73,4 +74,5 @@ async def log_telemetry(payload: TelemetryPayload, user: Any = Depends(get_curre
     except HTTPException as he:
         raise he
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Database insertion failed: {str(e)}")
+        print(f"[Telemetry Log Error] Database insertion failed: {str(e)}", flush=True)
+        raise HTTPException(status_code=500, detail="Database insertion failed")

@@ -22,13 +22,13 @@ export default function PartnerLoginPage() {
   useEffect(() => {
     const checkExistingSession = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession()
-        if (session) {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (user) {
           // Verify partner record exists in the database
           const { data: partner } = await supabase
             .from('partners')
             .select('id, full_name, status')
-            .or(`user_id.eq.${session.user.id},auth_user_id.eq.${session.user.id}`)
+            .or(`user_id.eq.${user.id},auth_user_id.eq.${user.id}`)
             .maybeSingle()
 
           if (partner) {
@@ -57,7 +57,7 @@ export default function PartnerLoginPage() {
       })
 
       if (signInError) {
-        setError(signInError.message)
+        setError('Invalid email or password.')
         setLoading(false)
         return
       }

@@ -50,7 +50,7 @@ export function IndustriesWeServe() {
             transition={{ duration: 0.6 }}
             className="inline-block bg-[rgba(139,92,246,0.1)] border border-[rgba(139,92,246,0.15)] text-[#D7C4F7] font-sans font-medium text-[13px] px-[16px] py-[6px] rounded-full mb-[20px]"
           >
-            ✦ Industries
+            Industries
           </motion.div>
 
           {/* Heading */}

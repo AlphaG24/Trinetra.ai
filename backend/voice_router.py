@@ -700,6 +700,12 @@ async def handle_vapi_webhook_logic(body: dict, background_tasks: BackgroundTask
 
 @router.post("/vapi-webhook")
 async def handle_vapi_webhook(request: Request, background_tasks: BackgroundTasks):
+    secret = request.headers.get("x-vapi-secret")
+    expected_secret = os.getenv("VAPI_WEBHOOK_SECRET")
+    if expected_secret and secret != expected_secret:
+        print("[VAPI WEBHOOK ERROR] Unauthorized access attempt.", flush=True)
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
     try:
         body = await request.json()
     except Exception:
@@ -821,6 +827,12 @@ async def handle_telegram_webhook(request: Request):
 
 @telegram_router.post("/vapi")
 async def handle_vapi_webhook_telegram(request: Request, background_tasks: BackgroundTasks):
+    secret = request.headers.get("x-vapi-secret")
+    expected_secret = os.getenv("VAPI_WEBHOOK_SECRET")
+    if expected_secret and secret != expected_secret:
+        print("[VAPI TELEGRAM WEBHOOK ERROR] Unauthorized access attempt.", flush=True)
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
     try:
         body = await request.json()
     except Exception:

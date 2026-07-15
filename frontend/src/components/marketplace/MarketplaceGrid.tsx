@@ -78,8 +78,8 @@ function ToolLogo({ iconUrl, name }: { iconUrl: string | null; name: string }) {
 
   if (imgError || !iconUrl) {
     return (
-      <div className="w-12 h-12 rounded-md bg-zinc-800 border border-zinc-700 flex items-center justify-center shrink-0">
-        <Box className="w-6 h-6 text-zinc-400" />
+      <div className="w-16 h-16 rounded-full bg-zinc-800 flex items-center justify-center shrink-0">
+        <Box className="w-8 h-8 text-zinc-400" />
       </div>
     )
   }
@@ -89,7 +89,7 @@ function ToolLogo({ iconUrl, name }: { iconUrl: string | null; name: string }) {
       src={iconUrl}
       alt={name}
       onError={() => setImgError(true)}
-      className="w-12 h-12 rounded-md object-cover border border-zinc-850 shrink-0"
+      className="w-16 h-16 rounded-full object-cover shrink-0"
     />
   )
 }

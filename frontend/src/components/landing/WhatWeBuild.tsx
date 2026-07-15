@@ -68,7 +68,7 @@ export function WhatWeBuild() {
             transition={{ duration: 0.6 }}
             className="inline-block bg-[rgba(139,92,246,0.1)] border border-[rgba(139,92,246,0.15)] text-[#D7C4F7] font-sans font-medium text-[13px] px-[16px] py-[6px] rounded-full mb-[20px]"
           >
-            ✦ What We Build
+            What We Build
           </motion.div>
 
           {/* Heading */}
@@ -166,7 +166,7 @@ export function WhatWeBuild() {
             {/* Left Column: Text & Features */}
             <div className="w-full lg:w-1/2 flex flex-col items-start text-left">
               <div className="mb-[16px] inline-block rounded-full border border-[rgba(245,158,11,0.15)] bg-[rgba(245,158,11,0.1)] px-[12px] py-[4px] font-sans text-[12px] font-medium text-[#FDE68A]">
-                ✦ Trinetra Shiksha Platform
+                Trinetra Shiksha Platform
               </div>
               
               <h3 className="font-display font-bold text-[32px] md:text-[38px] text-[#FAF7FF] leading-tight mb-[20px] tracking-tight">

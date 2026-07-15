@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/server'
 import { calculateROI } from '@/lib/utils/roiCalculator'
+import { safeApiHandler } from '@/utils/apiAuth'
 
-export async function GET() {
+export const GET = safeApiHandler(async () => {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
@@ -53,4 +54,4 @@ export async function GET() {
   }
 
   return NextResponse.json(stats)
-}
+})

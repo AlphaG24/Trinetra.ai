@@ -24,7 +24,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     )
 
     // Handle stale refresh token
-    supabase.auth.getSession().then(({ data: { session }, error }: any) => {
+    supabase.auth.getUser().then(({ data: { user }, error }: any) => {
       if (error && error.message.includes('Refresh Token')) {
         // Clear bad session and redirect
         supabase.auth.signOut()

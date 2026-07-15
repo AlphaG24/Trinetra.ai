@@ -13,15 +13,27 @@ export function useAdminAuth() {
     }
   }, []);
 
-  const login = (password) => {
-    if (password === process.env.NEXT_PUBLIC_ADMIN_PASSWORD || password === process.env.REACT_APP_ADMIN_PASSWORD) {
+  const login = async (password) => {
+    try {
+      const res = await fetch('/api/admin/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        return { success: false, error: data.error || 'Authentication failed' };
+      }
+
       if (typeof window !== "undefined") {
         sessionStorage.setItem("trinetra_admin", "true");
       }
       setIsAuthenticated(true);
       return { success: true };
+    } catch (err) {
+      return { success: false, error: 'Network error occurred' };
     }
-    return { success: false, error: "Incorrect password" };
   };
 
   const logout = () => {

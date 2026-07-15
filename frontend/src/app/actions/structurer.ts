@@ -120,7 +120,7 @@ export async function processDocument(formData: FormData) {
   }
 
   // 5. Revalidate cache
-  revalidatePath('/dashboard/marketplace')
+  revalidatePath('/dashboard/agents')
   revalidatePath('/dashboard/tools/structurer')
 
   return extractedData && typeof extractedData === 'object' && 'extracted_data' in extractedData
@@ -225,7 +225,7 @@ export async function saveExtraction({
     console.error("Quota consumption logging failed:", updateError)
   }
 
-  revalidatePath('/dashboard/marketplace')
+  revalidatePath('/dashboard/agents')
   revalidatePath('/dashboard/tools/structurer')
   return { ok: true, id: insertedData?.id }
 }

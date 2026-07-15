@@ -60,7 +60,7 @@ export function WhyTrinetra() {
             transition={{ duration: 0.6 }}
             className="mb-[20px] inline-block rounded-full border border-[rgba(139,92,246,0.15)] bg-[rgba(139,92,246,0.1)] px-[16px] py-[6px] font-sans text-[13px] font-medium text-[#D7C4F7]"
           >
-            ✦ Why Trinetra
+            Why Trinetra
           </motion.div>
 
           <motion.h2

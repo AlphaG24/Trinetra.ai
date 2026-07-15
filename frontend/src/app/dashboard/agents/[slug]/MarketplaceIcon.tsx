@@ -15,8 +15,8 @@ export function MarketplaceIcon({ iconUrl, type, name, className = "w-20 h-20" }
 
   if (hasError || !iconUrl) {
     return (
-      <div className={`rounded-md bg-zinc-800 border border-zinc-700 flex items-center justify-center shrink-0 ${className}`}>
-        <Box className="w-10 h-10 text-zinc-400" />
+      <div className={`rounded-full bg-zinc-800 flex items-center justify-center shrink-0 ${className}`}>
+        <Box className="w-[50%] h-[50%] text-zinc-400" />
       </div>
     )
   }
@@ -26,7 +26,7 @@ export function MarketplaceIcon({ iconUrl, type, name, className = "w-20 h-20" }
       src={iconUrl}
       alt={name}
       onError={() => setHasError(true)}
-      className={`rounded-md object-cover border border-zinc-800 shrink-0 ${className}`}
+      className={`rounded-full object-cover shrink-0 ${className}`}
     />
   )
 }

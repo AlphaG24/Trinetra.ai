@@ -47,6 +47,7 @@ export async function GET() {
         });
 
     } catch (error: any) {
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        console.error("Health Check Failed:", error);
+        return NextResponse.json({ error: "Health check service encountered an error." }, { status: 500 });
     }
 }

@@ -10,14 +10,14 @@ export const dynamic = 'force-dynamic'
 export default async function DashboardPage() {
   const supabase = await createServerClient()
   const {
-    data: { session },
-  } = await supabase.auth.getSession()
+    data: { user },
+  } = await supabase.auth.getUser()
 
-  if (!session) {
+  if (!user) {
     redirect('/partners/login')
   }
 
-  const partner = await findOrCreatePartnerForUser(session.user)
+  const partner = await findOrCreatePartnerForUser(user)
 
   const { data: policy } = await supabase
     .from('commission_policy')

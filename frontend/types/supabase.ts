@@ -23,6 +23,7 @@ export interface Database {
           is_active: boolean
           is_visible_in_marketplace: boolean
           is_demo_allowed: boolean
+          monthly_reset_enabled: boolean
           demo_limit_config: Record<string, any> | null
           marketplace_metadata: Record<string, any> | null
         }
@@ -39,6 +40,7 @@ export interface Database {
           is_active?: boolean
           is_visible_in_marketplace?: boolean
           is_demo_allowed?: boolean
+          monthly_reset_enabled?: boolean
           demo_limit_config?: Record<string, any> | null
           marketplace_metadata?: Record<string, any> | null
         }
@@ -55,6 +57,7 @@ export interface Database {
           is_active?: boolean
           is_visible_in_marketplace?: boolean
           is_demo_allowed?: boolean
+          monthly_reset_enabled?: boolean
           demo_limit_config?: Record<string, any> | null
           marketplace_metadata?: Record<string, any> | null
         }

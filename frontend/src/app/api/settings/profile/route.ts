@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/server'
+import { safeApiHandler } from '@/utils/apiAuth'
 
-export async function PATCH(req: Request) {
+export const PATCH = safeApiHandler(async (req: Request) => {
   const supabase = await createClient()
   // SECURITY: Use getUser() instead of getSession() — getSession() trusts
   // the client JWT without server validation, making it vulnerable to forgery.
@@ -36,4 +37,4 @@ export async function PATCH(req: Request) {
     console.error('[PATCH /api/settings/profile]', err)
     return NextResponse.json({ error: 'Failed to update profile' }, { status: 500 })
   }
-}
+})

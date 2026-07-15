@@ -61,10 +61,6 @@ export default async function DemoPage() {
         
         {/* Header */}
         <div className="space-y-3">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-violet-500/10 border border-violet-500/20">
-            <Sparkles className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
-            <span className="text-[10px] font-bold text-zinc-300 tracking-wider uppercase">Interactive Sandbox Environments</span>
-          </div>
           <h1 className="text-4xl font-extrabold tracking-tight text-white font-display">
             Interactive Demos
           </h1>
@@ -119,11 +115,11 @@ export default async function DemoPage() {
                         <img 
                           src={service.icon_url} 
                           alt={service.name} 
-                          className="w-12 h-12 rounded-xl object-cover border border-white/10"
+                          className="w-16 h-16 rounded-full object-cover shrink-0"
                         />
                       ) : (
-                        <div className="w-12 h-12 rounded-xl bg-violet-500/10 border border-violet-500/20 flex items-center justify-center text-violet-400">
-                          <FallbackIcon className="w-6 h-6" />
+                        <div className="w-16 h-16 rounded-full bg-violet-500/10 flex items-center justify-center text-violet-400 shrink-0">
+                          <FallbackIcon className="w-8 h-8" />
                         </div>
                       )}
 
@@ -146,7 +142,7 @@ export default async function DemoPage() {
                   <CardFooter className="p-6 pt-0">
                     <Link
                       href={`/dashboard/agents/${service.slug}/workspace`}
-                      className="w-full py-3 px-4 rounded-xl text-xs font-semibold tracking-wide uppercase bg-violet-600 hover:bg-violet-500 text-white border border-violet-500/30 hover:border-violet-500/50 shadow-[0_0_15px_rgba(139,92,246,0.2)] hover:shadow-[0_0_20px_rgba(139,92,246,0.4)] text-center transition-all duration-200 flex items-center justify-center gap-1.5 active:scale-[0.98]"
+                      className="w-full py-3 px-4 rounded-md text-xs font-bold tracking-wider uppercase bg-zinc-100 hover:bg-white text-zinc-900 border border-transparent shadow-sm text-center transition-all duration-200 flex items-center justify-center gap-1.5 hover:scale-[1.02] active:scale-[0.98]"
                     >
                       Launch Workspace 
                       <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
