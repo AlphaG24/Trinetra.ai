@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { Resend } from 'resend'
 import { safeApiHandler, requireAuth } from '@/utils/apiAuth'
 
-const resend = new Resend(process.env.RESEND_API_KEY || process.env.RESEND_PRIVATE_KEY)
+const resend = new Resend(process.env.RESEND_API_KEY)
 
 export const POST = safeApiHandler(async (req: Request) => {
   const authResult = await requireAuth()
@@ -16,7 +16,7 @@ export const POST = safeApiHandler(async (req: Request) => {
   }
 
   const { data, error } = await resend.emails.send({
-    from: 'Trinetra AI <welcome@trinetraedu-ai.com>',
+    from: 'Trinetra AI <support@trinetraedu-ai.com>',
     to: [user.email],
     subject: 'Welcome to Trinetra AI 🎉',
     html: `
@@ -47,7 +47,7 @@ export const POST = safeApiHandler(async (req: Request) => {
                     <table width="100%" cellpadding="0" cellspacing="0">
                       <tr>
                         <td align="center">
-                          <a href="https://trinetraedu-ai.com/dashboard" style="display:inline-block;background:linear-gradient(135deg,#8B5CF6,#6D28D9);color:#FFFFFF;font-size:15px;font-weight:600;padding:14px 36px;border-radius:10px;text-decoration:none;">
+                          <a href="https://www.trinetraedu-ai.com/dashboard" style="display:inline-block;background:linear-gradient(135deg,#8B5CF6,#6D28D9);color:#FFFFFF;font-size:15px;font-weight:600;padding:14px 36px;border-radius:10px;text-decoration:none;">
                             Go to Dashboard →
                           </a>
                         </td>
@@ -70,6 +70,7 @@ export const POST = safeApiHandler(async (req: Request) => {
   })
 
   if (error) {
+    console.error('Resend error:', error)
     return NextResponse.json({ error: error.message }, { status: 400 })
   }
 
