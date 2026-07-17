@@ -9,6 +9,7 @@ export const dynamic = 'force-dynamic';
 export const GET = safeApiHandler(async (request: Request) => {
   const { searchParams, origin } = new URL(request.url)
   const code = searchParams.get('code')
+  const type = searchParams.get('type')
   let next = searchParams.get('next') ?? '/dashboard'
 
   // SECURITY: Prevent Open Redirect attacks. Ensure `next` is a relative path.
@@ -39,9 +40,31 @@ export const GET = safeApiHandler(async (request: Request) => {
 
     const { error } = await supabase.auth.exchangeCodeForSession(code)
     if (!error) {
+      if (type === 'signup') {
+        try {
+          // Extract all cookies from the updated cookieStore to ensure the new session cookie is sent
+          const cookieStore = await cookies()
+          const cookieHeader = cookieStore.getAll()
+            .map(c => `${c.name}=${c.value}`)
+            .join('; ')
+
+          await fetch(`${origin}/api/email/welcome`, {
+            method: 'POST',
+            headers: { 
+              'Cookie': cookieHeader,
+              'Content-Type': 'application/json'
+            },
+          })
+        } catch (err) {
+          console.error('Failed to trigger welcome email:', err)
+        }
+      }
+
       // If the 'next' parameter is one of our subdomains but lacks http/https, append it
       let targetUrl = `${origin}${next}`
-      if (next.includes('trinetraedu-ai.com')) {
+      if (type === 'recovery') {
+        targetUrl = `${origin}/reset-password`
+      } else if (next.includes('trinetraedu-ai.com')) {
         targetUrl = next.startsWith('http') ? next : `https://${next}`
       }
 

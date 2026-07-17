@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
-import { Mail, ArrowRight, Bot, PhoneCall, MessageSquare } from 'lucide-react'
+import { Mail, ArrowRight, Bot, PhoneCall, MessageSquare, Lock, Eye, EyeOff } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { createClient } from '@/lib/client'
 
@@ -12,15 +12,34 @@ export default function ResetPasswordPage() {
   const supabase = createClient()
   
   const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+  
+  const [user, setUser] = useState<any>(null)
+  const [checkingSession, setCheckingSession] = useState(true)
   const [isLoading, setIsLoading] = useState(false)
   const [isMounted, setIsMounted] = useState(false)
 
   useEffect(() => {
     setIsMounted(true)
+    
+    const checkSession = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        setUser(user)
+      } catch (err) {
+        console.error('Failed to get session:', err)
+      } finally {
+        setCheckingSession(false)
+      }
+    }
+    checkSession()
   }, [])
   
-  if (!isMounted) {
-    return <div className="flex h-screen w-full bg-[#05050a]" />
+  if (!isMounted || checkingSession) {
+    return <div className="flex h-screen w-full bg-[#05050a] items-center justify-center text-zinc-500 font-mono text-sm">Initializing...</div>
   }
 
   const handleReset = async (e: React.FormEvent) => {
@@ -28,8 +47,9 @@ export default function ResetPasswordPage() {
     setIsLoading(true)
 
     try {
+      // Redirect to our PKCE auth callback first, which will then redirect to this page authenticated
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/dashboard/settings/password-update`,
+        redirectTo: `${window.location.origin}/auth/callback?next=/reset-password`,
       })
 
       if (error) {
@@ -39,6 +59,44 @@ export default function ResetPasswordPage() {
 
       toast.success('Password reset email sent! Check your inbox.')
       router.push('/login')
+    } catch (err) {
+      toast.error('An unexpected error occurred')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleUpdatePassword = async (e: React.FormEvent) => {
+    e.preventDefault()
+
+    if (password.length < 12) {
+      toast.error('Password must be at least 12 characters long.')
+      return
+    }
+
+    if (password !== confirmPassword) {
+      toast.error('Passwords do not match.')
+      return
+    }
+
+    setIsLoading(true)
+
+    try {
+      const { error } = await supabase.auth.updateUser({
+        password: password
+      })
+
+      if (error) {
+        toast.error(error.message || 'Failed to update password.')
+        return
+      }
+
+      toast.success('Password updated successfully!')
+      
+      // Delay and redirect to dashboard with a hard reload to ensure session sync
+      setTimeout(() => {
+        window.location.href = '/dashboard'
+      }, 1500)
     } catch (err) {
       toast.error('An unexpected error occurred')
     } finally {
@@ -128,7 +186,7 @@ export default function ResetPasswordPage() {
         </div>
       </div>
 
-      {/* Right Half - Reset Form */}
+      {/* Right Half - Form */}
       <div className="w-full lg:w-1/2 flex flex-col justify-center items-center p-6 sm:p-12 relative z-10">
         
         {/* Mobile View Elements */}
@@ -146,63 +204,154 @@ export default function ResetPasswordPage() {
           transition={{ duration: 0.6, type: "spring", bounce: 0.3 }}
           className="w-full max-w-[420px]"
         >
-          <div className="mb-10 text-center lg:text-left">
-            <h2 className="text-3xl font-bold tracking-tight mb-2">Reset Password</h2>
-            <p className="text-gray-400 text-sm">Enter your email and we'll send you a recovery link.</p>
-          </div>
-
-          <motion.div
-            className="bg-white/[0.02] backdrop-blur-3xl p-8 rounded-[2rem] border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.4)] relative"
-          >
-            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-3/4 h-px bg-gradient-to-r from-transparent via-amber-500/50 to-transparent"></div>
-
-            <form onSubmit={handleReset} className="space-y-6">
-              <div className="space-y-2 group">
-                <label className="text-[11px] font-bold text-gray-500 uppercase tracking-widest pl-1 transition-colors group-focus-within:text-amber-500">
-                  Email Address
-                </label>
-                <div className="relative">
-                  <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-500 transition-colors group-focus-within:text-amber-500" />
-                  <input
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
-                    className="w-full bg-black/40 border border-white/5 rounded-2xl py-4 pl-12 pr-4 text-white placeholder-gray-600 focus:outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500 focus:bg-amber-500/5 transition-all shadow-inner"
-                    placeholder="agent@trinetra.ai"
-                  />
-                </div>
+          {user ? (
+            /* --- UPDATE PASSWORD FORM (Authenticated State) --- */
+            <>
+              <div className="mb-10 text-center lg:text-left">
+                <h2 className="text-3xl font-bold tracking-tight mb-2">New Password</h2>
+                <p className="text-gray-400 text-sm">Set a secure new password for your account (minimum 12 characters).</p>
               </div>
 
-              <button
-                type="submit"
-                disabled={isLoading}
-                className="w-full mt-8 relative flex items-center justify-center gap-2 rounded-2xl bg-amber-500 py-4 font-bold text-black transition-all hover:bg-amber-400 hover:shadow-[0_0_40px_rgba(245,158,11,0.4)] active:scale-95 disabled:opacity-50 disabled:active:scale-100 disabled:cursor-not-allowed group overflow-hidden"
+              <motion.div
+                className="bg-white/[0.02] backdrop-blur-3xl p-8 rounded-[2rem] border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.4)] relative"
               >
-                {isLoading ? (
-                  <>
-                    <div className="w-5 h-5 border-2 border-black/30 border-t-black rounded-full animate-spin" />
-                    <span>Sending...</span>
-                  </>
-                ) : (
-                  <>
-                    <span>Send Reset Link</span>
-                    <ArrowRight className="w-5 h-5 transition-transform group-hover:translate-x-1" />
-                  </>
-                )}
-                <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/40 to-transparent group-hover:animate-[shimmer_1.5s_infinite]" />
-              </button>
-            </form>
-          </motion.div>
+                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-3/4 h-px bg-gradient-to-r from-transparent via-amber-500/50 to-transparent"></div>
 
-          <p className="mt-8 text-center text-[13px] text-gray-500">
-            Remember your password?{' '}
-            <a href="/login" className="text-amber-500 hover:text-amber-400 font-bold transition-colors">
-              Sign In →
-            </a>
-          </p>
+                <form onSubmit={handleUpdatePassword} className="space-y-6">
+                  <div className="space-y-2 group">
+                    <label className="text-[11px] font-bold text-gray-500 uppercase tracking-widest pl-1 transition-colors group-focus-within:text-amber-500">
+                      New Password
+                    </label>
+                    <div className="relative">
+                      <Lock className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-500 transition-colors group-focus-within:text-amber-500" />
+                      <input
+                        type={showPassword ? 'text' : 'password'}
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        required
+                        minLength={12}
+                        className="w-full bg-black/40 border border-white/5 rounded-2xl py-4 pl-12 pr-12 text-white placeholder-gray-600 focus:outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500 focus:bg-amber-500/5 transition-all shadow-inner"
+                        placeholder="••••••••••••"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-amber-500 transition-colors"
+                      >
+                        {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2 group">
+                    <label className="text-[11px] font-bold text-gray-500 uppercase tracking-widest pl-1 transition-colors group-focus-within:text-amber-500">
+                      Confirm New Password
+                    </label>
+                    <div className="relative">
+                      <Lock className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-500 transition-colors group-focus-within:text-amber-500" />
+                      <input
+                        type={showConfirmPassword ? 'text' : 'password'}
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        required
+                        minLength={12}
+                        className="w-full bg-black/40 border border-white/5 rounded-2xl py-4 pl-12 pr-12 text-white placeholder-gray-600 focus:outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500 focus:bg-amber-500/5 transition-all shadow-inner"
+                        placeholder="••••••••••••"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                        className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-amber-500 transition-colors"
+                      >
+                        {showConfirmPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={isLoading}
+                    className="w-full mt-8 relative flex items-center justify-center gap-2 rounded-2xl bg-amber-500 py-4 font-bold text-black transition-all hover:bg-amber-400 hover:shadow-[0_0_40px_rgba(245,158,11,0.4)] active:scale-95 disabled:opacity-50 disabled:active:scale-100 disabled:cursor-not-allowed group overflow-hidden"
+                  >
+                    {isLoading ? (
+                      <>
+                        <div className="w-5 h-5 border-2 border-black/30 border-t-black rounded-full animate-spin" />
+                        <span>Updating...</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>Update Password</span>
+                        <ArrowRight className="w-5 h-5 transition-transform group-hover:translate-x-1" />
+                      </>
+                    )}
+                    <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/40 to-transparent group-hover:animate-[shimmer_1.5s_infinite]" />
+                  </button>
+                </form>
+              </motion.div>
+            </>
+          ) : (
+            /* --- REQUEST RESET LINK FORM (Unauthenticated State) --- */
+            <>
+              <div className="mb-10 text-center lg:text-left">
+                <h2 className="text-3xl font-bold tracking-tight mb-2">Reset Password</h2>
+                <p className="text-gray-400 text-sm">Enter your email and we'll send you a recovery link.</p>
+              </div>
+
+              <motion.div
+                className="bg-white/[0.02] backdrop-blur-3xl p-8 rounded-[2rem] border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.4)] relative"
+              >
+                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-3/4 h-px bg-gradient-to-r from-transparent via-amber-500/50 to-transparent"></div>
+
+                <form onSubmit={handleReset} className="space-y-6">
+                  <div className="space-y-2 group">
+                    <label className="text-[11px] font-bold text-gray-500 uppercase tracking-widest pl-1 transition-colors group-focus-within:text-amber-500">
+                      Email Address
+                    </label>
+                    <div className="relative">
+                      <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-500 transition-colors group-focus-within:text-amber-500" />
+                      <input
+                        type="email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        required
+                        className="w-full bg-black/40 border border-white/5 rounded-2xl py-4 pl-12 pr-4 text-white placeholder-gray-600 focus:outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500 focus:bg-amber-500/5 transition-all shadow-inner"
+                        placeholder="agent@trinetra.ai"
+                      />
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={isLoading}
+                    className="w-full mt-8 relative flex items-center justify-center gap-2 rounded-2xl bg-amber-500 py-4 font-bold text-black transition-all hover:bg-amber-400 hover:shadow-[0_0_40px_rgba(245,158,11,0.4)] active:scale-95 disabled:opacity-50 disabled:active:scale-100 disabled:cursor-not-allowed group overflow-hidden"
+                  >
+                    {isLoading ? (
+                      <>
+                        <div className="w-5 h-5 border-2 border-black/30 border-t-black rounded-full animate-spin" />
+                        <span>Sending...</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>Send Reset Link</span>
+                        <ArrowRight className="w-5 h-5 transition-transform group-hover:translate-x-1" />
+                      </>
+                    )}
+                    <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/40 to-transparent group-hover:animate-[shimmer_1.5s_infinite]" />
+                  </button>
+                </form>
+              </motion.div>
+
+              <p className="mt-8 text-center text-[13px] text-gray-500">
+                Remember your password?{' '}
+                <a href="/login" className="text-amber-500 hover:text-amber-400 font-bold transition-colors">
+                  Sign In →
+                </a>
+              </p>
+            </>
+          )}
         </motion.div>
       </div>
     </div>
   )
 }
+

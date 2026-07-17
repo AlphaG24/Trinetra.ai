@@ -205,28 +205,28 @@ async function checkDatabaseRateLimit(
 
 function getDatabaseRateLimitConfig(pathname: string, userId: string, ip: string): { limit: number; windowSeconds: number; key: string } {
   if (pathname === '/api/admin/login') {
-    return { limit: 5, windowSeconds: 900, key: `rl:admin_login:${ip}` }
+    return { limit: 30, windowSeconds: 900, key: `rl:admin_login:${ip}` }
   }
   if (pathname.startsWith('/api/auth') || pathname.startsWith('/auth') || pathname === '/login' || pathname === '/signup') {
-    return { limit: 10, windowSeconds: 900, key: `rl:auth:${ip}` }
+    return { limit: 100, windowSeconds: 900, key: `rl:auth:${ip}` }
   }
   if (pathname === '/api/webhooks/vapi') {
-    return { limit: 100, windowSeconds: 60, key: `rl:vapi_webhook:${ip}` }
+    return { limit: 500, windowSeconds: 60, key: `rl:vapi_webhook:${ip}` }
   }
   if (pathname === '/api/ingest') {
     const userKey = userId || ip
-    return { limit: 20, windowSeconds: 3600, key: `rl:ingest:${userKey}` }
+    return { limit: 100, windowSeconds: 3600, key: `rl:ingest:${userKey}` }
   }
   if (pathname.startsWith('/api/audit')) {
     const userKey = userId || ip
-    return { limit: 30, windowSeconds: 60, key: `rl:audit:${userKey}` }
+    return { limit: 200, windowSeconds: 60, key: `rl:audit:${userKey}` }
   }
   // All other API routes
   if (pathname.startsWith('/api/')) {
     const userKey = userId || ip
-    return { limit: 100, windowSeconds: 60, key: `rl:other_api:${userKey}` }
+    return { limit: 300, windowSeconds: 60, key: `rl:other_api:${userKey}` }
   }
-  return { limit: 100, windowSeconds: 60, key: `rl:default:${ip}` }
+  return { limit: 500, windowSeconds: 60, key: `rl:default:${ip}` }
 }
 
 // ============================================================================

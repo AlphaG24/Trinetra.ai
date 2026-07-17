@@ -2,9 +2,12 @@ import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 import { type CookieOptions, createServerClient } from '@supabase/ssr'
 
-export async function GET(request: Request) {
+import { safeApiHandler } from '@/utils/apiAuth'
+
+export const GET = safeApiHandler(async (request: Request) => {
     const { searchParams, origin } = new URL(request.url)
     const code = searchParams.get('code')
+    const type = searchParams.get('type')
 
     // Default to dashboard if no parameter is passed
     const next = searchParams.get('next') ?? '/dashboard'
@@ -40,14 +43,54 @@ export async function GET(request: Request) {
         const { error } = await supabase.auth.exchangeCodeForSession(code)
 
         if (!error) {
-            // If the 'next' parameter is one of our subdomains but lacks http/https, append it
-            if (next.includes('trinetraedu-ai.com') && !next.startsWith('http')) {
-                return NextResponse.redirect(`https://${next}`, { status: 303 })
+            if (type === 'signup') {
+                try {
+                    // Extract all cookies from the updated cookieStore to ensure the new session cookie is sent
+                    const cookieStore = await cookies()
+                    const cookieHeader = cookieStore.getAll()
+                        .map(c => `${c.name}=${c.value}`)
+                        .join('; ')
+
+                    await fetch(`${origin}/api/email/welcome`, {
+                        method: 'POST',
+                        headers: { 
+                            'Cookie': cookieHeader,
+                            'Content-Type': 'application/json'
+                        },
+                    })
+                } catch (err) {
+                    console.error('Failed to trigger welcome email:', err)
+                }
             }
-            // 303 Redirect forces the browser to wait for the cookie to save
-            return NextResponse.redirect(`${origin}${next}`, { status: 303 })
+
+            let targetUrl = `${origin}${next}`
+            if (type === 'recovery') {
+                targetUrl = `${origin}/reset-password`
+            } else if (next.includes('trinetraedu-ai.com')) {
+                targetUrl = next.startsWith('http') ? next : `https://${next}`
+            }
+
+            // Return a 200 OK to force the browser to save the cookie immediately.
+            // Use native HTML to force a hard page load, bypassing the Next.js SPA router.
+            const html = `
+              <!DOCTYPE html>
+              <html>
+                <head>
+                  <meta http-equiv="refresh" content="0;url=${targetUrl}">
+                </head>
+                <body>
+                  <script>window.location.href = "${targetUrl}";</script>
+                  <p>Authenticating... Redirecting to dashboard.</p>
+                </body>
+              </html>
+            `;
+
+            return new NextResponse(html, {
+                status: 200,
+                headers: { 'Content-Type': 'text/html' },
+            });
         }
     }
 
     return NextResponse.redirect(`${origin}/?error=auth_failed`)
-}
+})
