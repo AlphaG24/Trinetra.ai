@@ -28,15 +28,15 @@ export interface ActivityItem {
 
 const getActivityIcon = (type: ActivityType) => {
   switch (type) {
-    case 'call_started': return <div className="p-2 bg-blue-500/10 text-blue-400 rounded-full"><Phone className="w-4 h-4" /></div>
-    case 'call_ended': return <div className="p-2 bg-emerald-500/10 text-emerald-400 rounded-full"><PhoneOff className="w-4 h-4" /></div>
-    case 'appointment_booked': return <div className="p-2 bg-orange-500/10 text-orange-400 rounded-full"><Calendar className="w-4 h-4" /></div>
-    case 'lead_captured': return <div className="p-2 bg-amber-500/10 text-amber-400 rounded-full"><Target className="w-4 h-4" /></div>
-    case 'chat_started': return <div className="p-2 bg-emerald-500/10 text-emerald-400 rounded-full"><MessageCircle className="w-4 h-4" /></div>
-    case 'missed_call': return <div className="p-2 bg-red-500/10 text-red-400 rounded-full"><PhoneMissed className="w-4 h-4" /></div>
-    case 'usage_alert': return <div className="p-2 bg-amber-500/10 text-amber-400 rounded-full"><AlertTriangle className="w-4 h-4" /></div>
-    case 'demo_call': return <div className="p-2 bg-purple-500/10 text-purple-400 rounded-full"><FlaskConical className="w-4 h-4" /></div>
-    default: return <div className="p-2 bg-gray-500/10 text-gray-400 rounded-full"><AlertTriangle className="w-4 h-4" /></div>
+    case 'call_started': return <div className="p-2 bg-blue-500/10 text-blue-600 dark:text-blue-400 rounded-full"><Phone className="w-4 h-4" /></div>
+    case 'call_ended': return <div className="p-2 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-full"><PhoneOff className="w-4 h-4" /></div>
+    case 'appointment_booked': return <div className="p-2 bg-orange-500/10 text-orange-600 dark:text-orange-400 rounded-full"><Calendar className="w-4 h-4" /></div>
+    case 'lead_captured': return <div className="p-2 bg-amber-500/10 text-amber-600 dark:text-amber-400 rounded-full"><Target className="w-4 h-4" /></div>
+    case 'chat_started': return <div className="p-2 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-full"><MessageCircle className="w-4 h-4" /></div>
+    case 'missed_call': return <div className="p-2 bg-red-500/10 text-red-600 dark:text-red-400 rounded-full"><PhoneMissed className="w-4 h-4" /></div>
+    case 'usage_alert': return <div className="p-2 bg-amber-500/10 text-amber-600 dark:text-amber-400 rounded-full"><AlertTriangle className="w-4 h-4" /></div>
+    case 'demo_call': return <div className="p-2 bg-purple-500/10 text-purple-600 dark:text-purple-400 rounded-full"><FlaskConical className="w-4 h-4" /></div>
+    default: return <div className="p-2 bg-gray-500/10 text-gray-600 dark:text-gray-400 rounded-full"><AlertTriangle className="w-4 h-4" /></div>
   }
 }
 

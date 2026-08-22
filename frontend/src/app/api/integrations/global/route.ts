@@ -44,7 +44,46 @@ export async function GET(req: Request) {
       .eq('id', user.id)
       .single()
 
-    if (profileErr || !profile?.organization_id) {
+    let orgId = profile?.organization_id
+
+    if (!orgId) {
+      try {
+        const { createClient: createSupabaseClient } = await import('@supabase/supabase-js')
+        const supabaseAdmin = createSupabaseClient(
+          process.env.NEXT_PUBLIC_SUPABASE_URL!,
+          process.env.SUPABASE_SERVICE_ROLE_KEY!
+        )
+
+        const { data: existingOrg } = await supabaseAdmin
+          .from('organizations')
+          .select('id')
+          .order('created_at', { ascending: true })
+          .limit(1)
+          .maybeSingle()
+        
+        orgId = existingOrg?.id
+
+        if (!orgId) {
+          const { data: newOrg } = await supabaseAdmin
+            .from('organizations')
+            .insert({ name: 'Default Org' })
+            .select('id')
+            .single()
+          orgId = newOrg?.id
+        }
+
+        if (orgId) {
+          await supabaseAdmin
+            .from('profiles')
+            .update({ organization_id: orgId })
+            .eq('id', user.id)
+        }
+      } catch (err) {
+        console.error('Failed to auto-heal organization in global integrations API:', err)
+      }
+    }
+
+    if (!orgId) {
       return NextResponse.json({ error: 'Profile organization not found' }, { status: 400 })
     }
 
@@ -52,7 +91,7 @@ export async function GET(req: Request) {
     const { data, error } = await supabase
       .from('integrations')
       .select('*')
-      .eq('organization_id', profile.organization_id)
+      .eq('organization_id', orgId)
       .is('agent_id', null)
       .maybeSingle()
 
@@ -148,7 +187,46 @@ export async function POST(req: Request) {
       .eq('id', user.id)
       .single()
 
-    if (!profile?.organization_id) {
+    let orgId = profile?.organization_id
+
+    if (!orgId) {
+      try {
+        const { createClient: createSupabaseClient } = await import('@supabase/supabase-js')
+        const supabaseAdmin = createSupabaseClient(
+          process.env.NEXT_PUBLIC_SUPABASE_URL!,
+          process.env.SUPABASE_SERVICE_ROLE_KEY!
+        )
+
+        const { data: existingOrg } = await supabaseAdmin
+          .from('organizations')
+          .select('id')
+          .order('created_at', { ascending: true })
+          .limit(1)
+          .maybeSingle()
+        
+        orgId = existingOrg?.id
+
+        if (!orgId) {
+          const { data: newOrg } = await supabaseAdmin
+            .from('organizations')
+            .insert({ name: 'Default Org' })
+            .select('id')
+            .single()
+          orgId = newOrg?.id
+        }
+
+        if (orgId) {
+          await supabaseAdmin
+            .from('profiles')
+            .update({ organization_id: orgId })
+            .eq('id', user.id)
+        }
+      } catch (err) {
+        console.error('Failed to auto-heal organization in global integrations POST API:', err)
+      }
+    }
+
+    if (!orgId) {
       return NextResponse.json({ error: 'Organization not found' }, { status: 400 })
     }
 

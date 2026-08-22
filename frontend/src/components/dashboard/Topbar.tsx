@@ -20,7 +20,9 @@ export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
 
   useEffect(() => {
     const supabase = createClient()
-    async function loadUser() {
+    let channel: any = null
+
+    async function loadUserAndSubscribe() {
       try {
         const { data: { user: currentUser } } = await supabase.auth.getUser()
         if (currentUser) {
@@ -32,24 +34,51 @@ export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
             .single()
           setProfile(data)
 
-          // Fetch latest 5 notifications
-          const { data: notifs } = await supabase
-            .from('notifications')
-            .select('*')
-            .eq('user_id', currentUser.id)
-            .order('created_at', { ascending: false })
-            .limit(5)
-          
-          if (notifs) {
-            setNotifications(notifs)
-            setUnreadCount(notifs.filter((n: any) => !n.is_read).length)
+          const fetchNotifs = async () => {
+            const { data: notifs } = await supabase
+              .from('notifications')
+              .select('*')
+              .eq('user_id', currentUser.id)
+              .order('created_at', { ascending: false })
+              .limit(5)
+            
+            if (notifs) {
+              setNotifications(notifs)
+              setUnreadCount(notifs.filter((n: any) => !n.is_read).length)
+            }
           }
+
+          await fetchNotifs()
+
+          // Subscribe to Postgres changes on notifications table
+          channel = supabase
+            .channel('topbar-notifications-realtime')
+            .on(
+              'postgres_changes',
+              {
+                event: '*',
+                schema: 'public',
+                table: 'notifications',
+                filter: `user_id=eq.${currentUser.id}`
+              },
+              () => {
+                fetchNotifs()
+              }
+            )
+            .subscribe()
         }
       } catch (err) {
-        console.error('Error loading user profile in Topbar:', err)
+        console.error('Error loading user profile or subscribing to notifications in Topbar:', err)
       }
     }
-    loadUser()
+
+    loadUserAndSubscribe()
+
+    return () => {
+      if (channel) {
+        supabase.removeChannel(channel)
+      }
+    }
   }, [])
 
   const handleSignOut = async () => {
@@ -57,23 +86,6 @@ export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
     await supabase.auth.signOut()
     router.push('/login')
     router.refresh()
-  }
-
-  const markOneRead = async (id: string) => {
-    try {
-      const supabase = createClient()
-      const { error } = await supabase
-        .from('notifications')
-        .update({ is_read: true, read_at: new Date().toISOString() })
-        .eq('id', id)
-
-      if (!error) {
-        setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n))
-        setUnreadCount(prev => Math.max(0, prev - 1))
-      }
-    } catch (err) {
-      console.error('Failed to mark notification as read in Topbar:', err)
-    }
   }
 
   const displayName = profile?.full_name || user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'User'
@@ -97,7 +109,7 @@ export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
             <img
               src="/trident.png"
               alt="Trinetra"
-              className="dynamic-logo h-12 w-auto object-contain"
+              className="dynamic-logo h-9 w-auto object-contain"
             />
           </Link>
         </div>
@@ -132,26 +144,15 @@ export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
                         No notifications yet.
                       </div>
                     ) : (
-                       notifications.map((n) => (
-                         <div
-                           key={n.id}
-                           onClick={() => !n.is_read && markOneRead(n.id)}
-                           className={`px-4 py-3 hover:bg-[var(--hover-bg)] transition-colors text-left flex items-start justify-between gap-2 cursor-pointer ${
-                             !n.is_read ? 'bg-[var(--primary-bg)]/10 font-semibold' : ''
-                           }`}
-                         >
-                           <div className="flex-1 min-w-0">
-                             <p className="text-xs font-semibold text-[var(--heading)] font-playfair">{n.title}</p>
-                             <p className="text-[10px] text-[var(--body)] mt-0.5 font-merriweather line-clamp-2">{n.message || n.body}</p>
-                             <span className="text-[9px] text-[var(--muted)] font-merriweather mt-1 block">
-                               {new Date(n.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
-                             </span>
-                           </div>
-                           {!n.is_read && (
-                             <span className="shrink-0 w-2 h-2 rounded-full bg-rose-500 mt-1.5" />
-                           )}
-                         </div>
-                       ))
+                      notifications.map((n) => (
+                        <div key={n.id} className={`px-4 py-3 hover:bg-[var(--hover-bg)] transition-colors text-left ${!n.is_read ? 'bg-violet-500/5 dark:bg-violet-500/10' : ''}`}>
+                          <p className="text-xs font-semibold text-[var(--heading)] font-playfair">{n.title}</p>
+                          <p className="text-[10px] text-[var(--body)] mt-0.5 font-merriweather line-clamp-2">{n.message || n.body}</p>
+                          <span className="text-[9px] text-[var(--muted)] font-merriweather mt-1 block">
+                            {new Date(n.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+                          </span>
+                        </div>
+                      ))
                     )}
                   </div>
                   
@@ -161,7 +162,7 @@ export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
                         setShowNotifDropdown(false)
                         router.push('/dashboard/notifications')
                       }}
-                      className="w-full text-center py-2 text-xs font-bold bg-violet-600 hover:bg-violet-700 text-white rounded-xl transition-all"
+                      className="w-full text-center py-2 text-xs font-bold bg-violet-600 hover:bg-violet-700 text-white rounded-xl transition-all cursor-pointer"
                     >
                       View all notifications
                     </button>
@@ -187,7 +188,7 @@ export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
                   displayName[0]?.toUpperCase()
                 )}
               </div>
-              <span className="text-sm font-bold text-[var(--heading)] hidden sm:block max-w-[120px] truncate font-playfair">
+              <span className="text-sm font-bold text-[var(--body)] hidden sm:block max-w-[120px] truncate font-playfair">
                 {displayName}
               </span>
             </button>

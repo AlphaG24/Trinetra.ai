@@ -132,16 +132,16 @@ h6 {
 /* Scoped headings styling */
 .dashboard-theme-root h1,
 .dashboard-theme-root h2,
-.dashboard-theme-root [class*="font-display"],
-.dashboard-theme-root [class*="font-playfair"] {
-  font-family: var(--font-playfair), "Playfair Display", Georgia, serif !important;
-  color: var(--heading);
-}
-
 .dashboard-theme-root h3,
 .dashboard-theme-root h4,
 .dashboard-theme-root h5,
 .dashboard-theme-root h6,
+.dashboard-theme-root [class*="font-display"],
+.dashboard-theme-root [class*="font-playfair"] {
+  font-family: var(--font-playfair), "Playfair Display", Georgia, serif !important;
+  color: var(--heading) !important;
+}
+
 .dashboard-theme-root [class*="font-montserrat"] {
   font-family: var(--font-montserrat), Montserrat, "Segoe UI", sans-serif !important;
   color: var(--heading);

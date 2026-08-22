@@ -153,7 +153,7 @@ export function Navbar() {
               alt={companyName}
               width={320}
               height={90}
-              className="h-24 w-auto"
+              className="h-10 w-auto object-contain"
               priority
             />
           </Link>

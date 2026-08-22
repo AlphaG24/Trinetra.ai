@@ -12,17 +12,17 @@ export default async function NotificationsPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const threeMonthsAgo = new Date()
-  threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3)
-  const threeMonthsAgoStr = threeMonthsAgo.toISOString()
+  const fiveMonthsAgo = new Date()
+  fiveMonthsAgo.setMonth(fiveMonthsAgo.getMonth() - 5)
+  const fiveMonthsAgoStr = fiveMonthsAgo.toISOString()
 
-  // Permanently delete notifications older than 3 months
+  // Permanently delete notifications older than 5 months
   try {
     await supabase
       .from('notifications')
       .delete()
       .eq('user_id', user.id)
-      .lt('created_at', threeMonthsAgoStr)
+      .lt('created_at', fiveMonthsAgoStr)
   } catch (err) {
     console.error('Failed to permanently delete old notifications:', err)
   }
@@ -31,7 +31,7 @@ export default async function NotificationsPage() {
     .from('notifications')
     .select('*')
     .eq('user_id', user.id)
-    .gte('created_at', threeMonthsAgoStr)
+    .gte('created_at', fiveMonthsAgoStr)
     .order('created_at', { ascending: false })
     .limit(50)
 

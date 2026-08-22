@@ -1,5 +1,6 @@
 'use client'
 
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
@@ -30,8 +31,14 @@ const bottomNavItems = [
 
 export function Sidebar({ isOpen, onClose }: { isOpen?: boolean; onClose?: () => void }) {
   const pathname = usePathname() || ''
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   const isActive = (href: string) => {
+    if (!mounted) return false
     if (href === '/dashboard') return pathname === '/dashboard'
     return pathname === href || pathname.startsWith(href + '/')
   }
