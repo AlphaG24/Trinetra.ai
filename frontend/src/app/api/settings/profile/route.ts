@@ -24,7 +24,7 @@ export const PATCH = safeApiHandler(async (req: Request) => {
         business_type: body.business_type,
         city: body.city,
         state: body.state,
-        language: body.language,
+        preferred_language: body.preferred_language || body.language,
         gst_number: body.gst_number,
         updated_at: new Date().toISOString(),
       })

@@ -2,130 +2,77 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { motion, AnimatePresence } from 'framer-motion'
-import { 
-  Home, FlaskConical, Bot, Target, BarChart3, 
-  Phone, MessageCircle, MessageSquare, Settings, 
-  HeadphonesIcon, Rocket 
+import {
+  LayoutDashboard, Bot, Users, Phone, Megaphone,
+  BarChart3, CreditCard, Settings, HelpCircle, Pencil, X
 } from 'lucide-react'
-import { useDashboardStore } from '@/store/dashboardStore'
-import { hasAgentType } from '@/lib/utils/agentDetection'
 
-interface SidebarAgent {
-  agent_type: string
-  [key: string]: unknown
-}
+/**
+ * Navigation items matching the reference image exactly:
+ * Upper section: Overview, Agents, Customers, Phone Numbers, Campaigns, Analytics, Billing
+ * Lower section: Custom Agent (Deploy), Settings, Support
+ */
+const topNavItems = [
+  { label: 'Overview', href: '/dashboard', icon: LayoutDashboard },
+  { label: 'Agents', href: '/dashboard/agents', icon: Bot },
+  { label: 'Customers', href: '/dashboard/customers', icon: Users },
+  { label: 'Phone Numbers', href: '/dashboard/phone-numbers', icon: Phone },
+  { label: 'Campaigns', href: '/dashboard/campaigns', icon: Megaphone },
+  { label: 'Analytics', href: '/dashboard/analytics', icon: BarChart3 },
+  { label: 'Billing', href: '/dashboard/billing', icon: CreditCard },
+]
 
-interface SidebarLink {
-  name: string
-  href: string
-  icon: React.ComponentType<{ className?: string }>
-  badge?: string
-}
+const bottomNavItems = [
+  { label: 'Custom Agent', href: '/dashboard/deploy', icon: Pencil },
+  { label: 'Settings', href: '/dashboard/settings', icon: Settings },
+  { label: 'Support', href: '/dashboard/support', icon: HelpCircle },
+]
 
-export function Sidebar({ agents: propAgents }: { agents?: any[] }) {
-  const pathname = usePathname()
-  const { isMobileSidebarOpen, setMobileSidebarOpen, agents: storeAgents } = useDashboardStore()
-  
-  const agents = propAgents || storeAgents || []
-  const hasVoice = hasAgentType(agents, 'voice')
-  const hasChat = hasAgentType(agents, 'chat')
-  const hasWhatsApp = hasAgentType(agents, 'whatsapp')
+export function Sidebar({ isOpen, onClose }: { isOpen?: boolean; onClose?: () => void }) {
+  const pathname = usePathname() || ''
 
-  const showDemo = !agents || agents.length === 0
-
-  const topLinks: SidebarLink[] = [
-    { name: 'Overview', href: '/dashboard', icon: Home },
-  ]
-
-  if (showDemo) {
-    topLinks.push({ name: 'Demo', href: '/dashboard/demo', icon: FlaskConical })
+  const isActive = (href: string) => {
+    if (href === '/dashboard') return pathname === '/dashboard'
+    return pathname === href || pathname.startsWith(href + '/')
   }
 
-  topLinks.push(
-    { name: 'Agents', href: '/dashboard/agents', icon: Bot },
-    { name: 'Leads', href: '/dashboard/leads', icon: Target },
-    { name: 'Analytics', href: '/dashboard/analytics', icon: BarChart3 },
-  )
-
-  const channelLinks: SidebarLink[] = []
-  if (hasVoice) channelLinks.push({ name: 'Voice Calls', href: '/dashboard/calls', icon: Phone })
-  if (hasChat) channelLinks.push({ name: 'Chat', href: '/dashboard/conversations', icon: MessageCircle })
-  if (hasWhatsApp) channelLinks.push({ name: 'WhatsApp', href: '/dashboard/whatsapp', icon: MessageSquare })
-
-  const bottomLinks: SidebarLink[] = [
-    { name: 'Settings', href: '/dashboard/settings', icon: Settings },
-    { name: 'Deploy Agent', href: '/dashboard/deploy', icon: Rocket },
-    { name: 'Support', href: '/dashboard/support', icon: HeadphonesIcon },
-  ]
-
-  const NavLink = ({ item }: { item: SidebarLink }) => {
-    const isActive = pathname === item.href
-    const Icon = item.icon
-
+  const renderLink = (item: { label: string; href: string; icon: React.ElementType }) => {
+    const active = isActive(item.href)
     return (
-      <Link 
+      <Link
+        key={item.href}
         href={item.href}
-        onClick={() => setMobileSidebarOpen(false)}
-        className={`flex items-center justify-between px-3 py-2.5 rounded-lg transition-all duration-150 ${
-          isActive 
-            ? 'bg-violet-600/15 text-white border-l-2 border-violet-500' 
-            : 'text-gray-400 hover:text-gray-300 hover:bg-white/5 border-l-2 border-transparent'
-        }`}
+        onClick={onClose}
+        className={`flex items-center gap-3 px-4 py-2.5 rounded-[10px] text-sm font-medium transition-all duration-150 ${active
+            ? 'bg-violet-100 dark:bg-violet-950/50 text-violet-600 dark:text-violet-400 font-semibold'
+            : 'text-[var(--body)] hover:bg-[var(--hover-bg)] hover:text-[var(--heading)]'
+          }`}
       >
-        <div className="flex items-center gap-3">
-          <Icon className={`w-5 h-5 ${isActive ? 'text-violet-500' : ''}`} />
-          <span className="font-medium text-sm">{item.name}</span>
-        </div>
-        {item.badge && (
-          <span className="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded-md bg-violet-500/20 text-violet-400">
-            {item.badge}
-          </span>
-        )}
+        <item.icon className={`w-5 h-5 shrink-0 ${active ? 'text-violet-600 dark:text-violet-400' : 'text-[var(--muted)]'}`} />
+        <span className="font-playfair font-semibold text-[15px]">{item.label}</span>
       </Link>
     )
   }
 
   return (
-    <>
-      {/* Mobile Overlay */}
-      <AnimatePresence>
-        {isMobileSidebarOpen && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={() => setMobileSidebarOpen(false)}
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 lg:hidden"
-          />
-        )}
-      </AnimatePresence>
-
-      {/* Sidebar Content */}
-      <div className={`fixed top-16 left-0 h-[calc(100vh-64px)] w-60 bg-[#080810]/95 backdrop-blur-xl border-r border-white/5 z-40 transition-transform duration-300 lg:translate-x-0 flex flex-col ${
-        isMobileSidebarOpen ? 'translate-x-0' : '-translate-x-full'
-      }`}>
-        <div className="p-4 flex-1 overflow-y-auto custom-scrollbar">
-          <div className="space-y-1">
-            {topLinks.map(link => <NavLink key={link.name} item={link} />)}
-          </div>
-
-          {channelLinks.length > 0 && (
-            <>
-              <div className="mt-8 mb-2 px-3">
-                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Channels</span>
-              </div>
-              <div className="space-y-1">
-                {channelLinks.map(link => <NavLink key={link.name} item={link} />)}
-              </div>
-            </>
-          )}
-        </div>
-
-        <div className="p-4 border-t border-white/5 space-y-1">
-          {bottomLinks.map(link => <NavLink key={link.name} item={link} />)}
-        </div>
+    <aside
+      className={`fixed left-0 top-16 h-[calc(100vh-4rem)] w-60 bg-[var(--card-bg)] border-r border-[var(--border)] z-40 flex flex-col justify-between transition-transform duration-200 ${isOpen === false ? '-translate-x-full lg:translate-x-0' : 'translate-x-0'
+        }`}
+    >
+      {/* Top: Navigation */}
+      <div className="flex flex-col flex-1 min-h-0 pt-4">
+        {/* Main Navigation */}
+        <nav className="flex-1 px-3 py-2 space-y-0.5 overflow-y-auto">
+          {topNavItems.map(renderLink)}
+        </nav>
       </div>
-    </>
+
+      {/* Bottom: Secondary Nav */}
+      <div className="px-3 py-3 border-t border-[var(--border)] space-y-0.5">
+        {bottomNavItems.map(renderLink)}
+      </div>
+    </aside>
   )
 }
+
+export default Sidebar

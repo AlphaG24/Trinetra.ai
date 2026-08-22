@@ -163,6 +163,7 @@ function formatIncludedValue(value: number | null, unit: string) {
 }
 
 function getMonthlyDisplayPrice(plan: PlanRecord, billingMode: BillingMode) {
+  if (plan.priceMonthly === 0) return "Custom";
   return formatPaise(billingMode === "annual" ? plan.priceAnnual : plan.priceMonthly);
 }
 
@@ -609,8 +610,48 @@ function PricingCard({
   );
 }
 
+import { useEffect } from 'react';
+
 export default function PricingPage() {
-  const { data: plans, loading } = useActivePlans();
+  const { data: dbPlans, loading } = useActivePlans();
+  const [publicConfig, setPublicConfig] = useState<any>(null);
+
+  useEffect(() => {
+    fetch('/api/public/config')
+      .then(res => res.json())
+      .then(data => {
+        if (data.configs) {
+          setPublicConfig(data.configs)
+        }
+      })
+      .catch(err => console.error("Error loading config:", err))
+  }, []);
+
+  const plans = useMemo(() => {
+    if (!publicConfig) return dbPlans;
+
+    return dbPlans.map(plan => {
+      const p = { ...plan };
+      if (p.slug === 'starter') {
+        p.priceMonthly = parseInt(publicConfig.starter_price_paisa || '499900', 10);
+        p.priceAnnual = Math.round(p.priceMonthly * 0.8);
+        p.includedVoiceMinutes = parseInt(publicConfig.starter_minutes || '500', 10);
+      } else if (p.slug === 'growth') {
+        p.name = 'Professional';
+        p.priceMonthly = parseInt(publicConfig.professional_price_paisa || '1499900', 10);
+        p.priceAnnual = Math.round(p.priceMonthly * 0.8);
+        p.includedVoiceMinutes = parseInt(publicConfig.professional_minutes || '2000', 10);
+      } else if (p.slug === 'scale') {
+        p.name = 'Enterprise';
+        p.priceMonthly = parseInt(publicConfig.enterprise_price_paisa || '0', 10);
+        p.priceAnnual = 0;
+        p.includedVoiceMinutes = parseInt(publicConfig.enterprise_minutes || '10000', 10);
+        p.description = 'Tailored limits, custom integrations, and dedicated SLA for large enterprises.';
+      }
+      return p;
+    });
+  }, [dbPlans, publicConfig]);
+
   const { data: siteConfig } = useSiteConfig();
   const [billingMode, setBillingMode] = useState<BillingMode>("monthly");
   const [comparisonOpen, setComparisonOpen] = useState(false);

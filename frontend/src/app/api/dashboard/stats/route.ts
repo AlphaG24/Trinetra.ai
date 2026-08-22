@@ -1,57 +1,124 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/server'
-import { calculateROI } from '@/lib/utils/roiCalculator'
-import { safeApiHandler } from '@/utils/apiAuth'
 
-export const GET = safeApiHandler(async () => {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-
-  if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
-
-  // Real queries from database
-  let total_calls = 0
-  let minutes_used = 0
-  let total_conversations = 0
-  let appointments = 0
-  let total_leads = 0
-
+export async function GET() {
   try {
-    const [{ count: callsCount }, { count: convCount }, { count: apptCount }, { count: leadsCount }] = await Promise.all([
-      supabase.from('calls').select('*', { count: 'exact', head: true }).eq('user_id', user.id),
-      supabase.from('chat_sessions').select('*', { count: 'exact', head: true }).eq('user_id', user.id),
-      supabase.from('appointments').select('*', { count: 'exact', head: true }).eq('user_id', user.id),
-      supabase.from('leads').select('*', { count: 'exact', head: true }).eq('user_id', user.id),
-    ])
-    
-    total_calls = callsCount || 0
-    total_conversations = convCount || 0
-    appointments = apptCount || 0
-    total_leads = leadsCount || 0
-  } catch (err) {
-    console.error("Database tables might not exist yet:", err)
-  }
+    const supabase = await createClient()
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
 
-  const stats = {
-    total_calls,
-    minutes_used, // Will need a real aggregation query in the future
-    total_conversations,
-    resolution_rate: 0,
-    appointments,
-    appointments_week: 0,
-    total_leads,
-    qualified_leads: 0,
-    active_now: 0,
-    trends: {
-      calls: 0,
-      minutes: 0,
-      conversations: 0,
-      appointments: 0,
-      leads: 0
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
-  }
 
-  return NextResponse.json(stats)
-})
+    // 1. Get profile organization info
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('organization_id')
+      .eq('id', user.id)
+      .single()
+
+    const orgId = profile?.organization_id
+
+    // Fetch user agents first to fallback on scoping
+    const { data: userAgents } = await supabase
+      .from('agents')
+      .select('id')
+      .eq('user_id', user.id)
+    
+    const agentIds = (userAgents || []).map(a => a.id)
+
+    // Calculate start of current month
+    const startOfMonth = new Date()
+    startOfMonth.setDate(1)
+    startOfMonth.setHours(0, 0, 0, 0)
+
+    // 2. Fetch Total Interactions (this month)
+    // A: Voice Calls
+    let callsQuery = supabase
+      .from('voice_calls')
+      .select('id', { count: 'exact', head: true })
+      .gte('created_at', startOfMonth.toISOString())
+    
+    if (orgId) {
+      callsQuery = callsQuery.eq('organization_id', orgId)
+    } else {
+      callsQuery = callsQuery.eq('user_id', user.id)
+    }
+
+    // B: Text Interactions
+    let interactionsQuery: any = null
+    
+    if (orgId || agentIds.length > 0) {
+      interactionsQuery = supabase
+        .from('interactions')
+        .select('id', { count: 'exact', head: true })
+        .gte('created_at', startOfMonth.toISOString())
+      
+      if (orgId) {
+        interactionsQuery = interactionsQuery.eq('organization_id', orgId)
+      } else {
+        interactionsQuery = interactionsQuery.in('agent_id', agentIds)
+      }
+    }
+
+    // 3. Fetch Active Tools (status = 'live')
+    let activeToolsQuery = supabase
+      .from('agents')
+      .select('id', { count: 'exact', head: true })
+      .eq('status', 'live')
+    
+    if (orgId) {
+      activeToolsQuery = activeToolsQuery.eq('organization_id', orgId)
+    } else {
+      activeToolsQuery = activeToolsQuery.eq('user_id', user.id)
+    }
+
+    // 4. Fetch Leads Generated & Converted
+    const totalLeadsQuery = supabase
+      .from('leads')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', user.id)
+
+    const convertedLeadsQuery = supabase
+      .from('leads')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', user.id)
+      .eq('status', 'converted')
+
+    // Execute queries in parallel
+    const [
+      callsRes,
+      interactionsRes,
+      activeToolsRes,
+      totalLeadsRes,
+      convertedLeadsRes
+    ] = await Promise.all([
+      callsQuery,
+      interactionsQuery ? interactionsQuery : Promise.resolve({ count: 0 }),
+      activeToolsQuery,
+      totalLeadsQuery,
+      convertedLeadsQuery
+    ])
+
+    const totalCalls = callsRes.count || 0
+    const totalText = interactionsRes.count || 0
+    const totalInteractions = totalCalls + totalText
+
+    const activeTools = activeToolsRes.count || 0
+    const leadsGenerated = totalLeadsRes.count || 0
+    const convertedLeads = convertedLeadsRes.count || 0
+    const conversionRate = leadsGenerated > 0 
+      ? Math.round((convertedLeads / leadsGenerated) * 100) 
+      : 0
+
+    return NextResponse.json({
+      totalInteractions,
+      activeTools,
+      leadsGenerated,
+      conversionRate
+    })
+  } catch (err: any) {
+    console.error('[/api/dashboard/stats] Error:', err)
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
+  }
+}

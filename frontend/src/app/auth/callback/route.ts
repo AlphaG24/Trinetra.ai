@@ -21,21 +21,17 @@ export const GET = safeApiHandler(async (request: Request) => {
             process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
             {
                 cookies: {
-                    get(name: string) {
-                        return cookieStore.get(name)?.value
+                    getAll() {
+                        return cookieStore.getAll()
                     },
-                    set(name: string, value: string, options: CookieOptions) {
+                    setAll(cookiesToSet) {
                         const domain = process.env.NODE_ENV === 'development'
                             ? undefined
                             : process.env.NEXT_PUBLIC_COOKIE_DOMAIN
-                        cookieStore.set({ name, value, ...options, domain })
-                    },
-                    remove(name: string, options: CookieOptions) {
-                        const domain = process.env.NODE_ENV === 'development'
-                            ? undefined
-                            : process.env.NEXT_PUBLIC_COOKIE_DOMAIN
-                        cookieStore.set({ name, value: '', ...options, domain })
-                    },
+                        cookiesToSet.forEach(({ name, value, options }) => {
+                            cookieStore.set({ name, value, ...options, domain })
+                        })
+                    }
                 },
             }
         )
@@ -53,7 +49,7 @@ export const GET = safeApiHandler(async (request: Request) => {
 
                     await fetch(`${origin}/api/email/welcome`, {
                         method: 'POST',
-                        headers: { 
+                        headers: {
                             'Cookie': cookieHeader,
                             'Content-Type': 'application/json'
                         },
@@ -66,8 +62,33 @@ export const GET = safeApiHandler(async (request: Request) => {
             let targetUrl = `${origin}${next}`
             if (type === 'recovery') {
                 targetUrl = `${origin}/reset-password`
-            } else if (next.includes('trinetraedu-ai.com')) {
-                targetUrl = next.startsWith('http') ? next : `https://${next}`
+            } else {
+                const { data: { user } } = await supabase.auth.getUser()
+                if (user) {
+                    // Fetch user role
+                    const { data: profile } = await supabase
+                        .from('profiles')
+                        .select('role')
+                        .eq('id', user.id)
+                        .single()
+
+                    const role = (profile?.role || 'client').toLowerCase()
+                    
+                    if (role !== 'admin' && role !== 'super_admin' && role === 'client') {
+                        const { data: consent } = await supabase
+                            .from('consent_records')
+                            .select('id')
+                            .eq('user_id', user.id)
+                            .maybeSingle()
+                        
+                        if (!consent) {
+                            targetUrl = `${origin}/consent`
+                        }
+                    }
+                }
+                if (next.includes('trinetraedu-ai.com')) {
+                    targetUrl = next.startsWith('http') ? next : `https://${next}`
+                }
             }
 
             // Return a 200 OK to force the browser to save the cookie immediately.

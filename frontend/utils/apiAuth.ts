@@ -54,7 +54,7 @@ export async function requireAdmin(): Promise<
     .eq('id', user.id)
     .single()
 
-  if (profileError || profile?.role !== 'admin') {
+  if (profileError || !['admin', 'super_admin'].includes(profile?.role || '')) {
     return Response.json(
       { error: 'Forbidden. Admin access required.' },
       { status: 403 }
@@ -68,12 +68,12 @@ export async function requireAdmin(): Promise<
  * Wrap an API route handler to catch unhandled errors and return
  * sanitized error responses. Never leaks stack traces in production.
  */
-export function safeApiHandler(
-  handler: (request: Request) => Promise<Response>
-): (request: Request) => Promise<Response> {
-  return async (request: Request) => {
+export function safeApiHandler<T extends any[]>(
+  handler: (request: Request, ...args: T) => Promise<Response>
+): (request: Request, ...args: T) => Promise<Response> {
+  return async (request: Request, ...args: T) => {
     try {
-      return await handler(request)
+      return await handler(request, ...args)
     } catch (error: unknown) {
       console.error('[API Error]', error)
       return Response.json(

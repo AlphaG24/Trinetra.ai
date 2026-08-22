@@ -247,7 +247,7 @@ export default async function ToolGatekeeperPage({ params }: PageProps) {
               {displayName} <span className="text-xs font-normal text-zinc-500">Demo Sandbox</span>
             </h1>
             <Link 
-              href="/dashboard/demo"
+              href="/dashboard/agents"
               className="inline-flex items-center gap-1.5 text-xs font-semibold text-zinc-400 hover:text-white transition-colors"
             >
               <ArrowLeft className="w-3.5 h-3.5" /> Back to Dashboard

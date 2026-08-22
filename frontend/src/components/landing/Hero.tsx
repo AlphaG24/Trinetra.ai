@@ -73,12 +73,7 @@ export function Hero() {
                 alt="Trinetra Trident"
                 width={350}
                 height={160}
-                className="relative z-10 h-[100px] w-auto md:h-[130px] lg:h-[160px]"
-                style={{
-                  width: "auto",
-                  filter:
-                    "drop-shadow(0 0 60px rgba(139,92,246,0.5)) drop-shadow(0 0 120px rgba(251,191,36,0.25))",
-                }}
+                className="relative z-10 h-[100px] w-auto md:h-[130px] lg:h-[160px] drop-shadow-[0_0_60px_rgba(139,92,246,0.5)]"
                 priority
               />
             </motion.div>

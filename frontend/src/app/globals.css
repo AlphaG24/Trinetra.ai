@@ -1,479 +1,199 @@
 @import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
 
-/* ─────────────────────────────────────────────
-   TRINETRA — Global Design Tokens
-   ───────────────────────────────────────────── */
+/* ═══════════════════════════════════════════════════════════════
+   TAILWIND v4 THEME REGISTER
+   ═══════════════════════════════════════════════════════════════ */
+@theme {
+  --font-sans: var(--font-merriweather), Merriweather, Georgia, serif;
+  --font-display: var(--font-playfair), "Playfair Display", Georgia, serif;
+  --font-heading: var(--font-playfair), "Playfair Display", Georgia, serif;
+  --font-montserrat: var(--font-montserrat), Montserrat, "Segoe UI", sans-serif;
+  --font-mono: var(--font-jetbrains-mono), "JetBrains Mono", monospace;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   DASHBOARD THEME VARIABLES
+   Sleek, premium color schemes matching reference image
+   ═══════════════════════════════════════════════════════════════ */
 
 :root {
-  /* ── Backgrounds ── */
+  /* Dark theme (default) */
+  --background: #080010;
+  --card-bg: #120E22;
+  --heading: #FFFFFF;
+  --body: #E2E0FD;
+  --muted: #9E99E0;
+  --border: rgba(255, 255, 255, 0.06);
+  --primary-bg: #1C1530;
+  --hover-bg: #261D41;
+  --secondary: #3B2E60;
+  --accent: #7C3AED;
+  --accent-light: #8B5CF6;
+
+  /* Marketing & Landing Page variables */
   --bg-deep: #080010;
   --bg-primary: #0C0118;
   --bg-secondary: #130224;
   --bg-tertiary: #1A0530;
   --bg-surface: #10021E;
-
-  /* ── Violet ── */
   --violet-300: #C4B5FD;
   --violet-400: #A78BFA;
   --violet-500: #8B5CF6;
   --violet-600: #7C3AED;
   --violet-700: #6D28D9;
-
-  /* ── Gold ── */
   --gold-300: #FDE68A;
   --gold-400: #FBBF24;
   --gold-500: #F59E0B;
   --gold-600: #D97706;
-
-  /* ── Cyan ── */
   --cyan-400: #22D3EE;
   --cyan-500: #06B6D4;
-
-  /* ── Text ── */
   --text-primary: #F5F3FF;
-  --text-secondary: #A8A0C0;
-  --text-tertiary: #6B6088;
+  --text-secondary: #E2E0FD;
+  --text-tertiary: #9E99E0;
   --text-accent: #FBBF24;
-
-  /* ── Borders ── */
-  --border-subtle: #1E0A35;
-  --border-medium: #2D1255;
+  --border-subtle: rgba(139, 92, 246, 0.12);
+  --border-medium: rgba(139, 92, 246, 0.22);
   --border-active: #8B5CF6;
-
-  /* ── Fonts ── */
-  --font-heading: "Space Grotesk", "Inter", "Segoe UI", system-ui, sans-serif;
-  --font-body: "Inter", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-  --font-mono: "JetBrains Mono", "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  --font-heading-fallback: "Space Grotesk", "Inter", "Segoe UI", system-ui, sans-serif;
+  --font-body-fallback: "Inter", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
 }
 
-/* ─────────────────────────────────────────────
-   RESET & BASE
-   ───────────────────────────────────────────── */
-
-@layer base {
-
-  *,
-  *::before,
-  *::after {
-    box-sizing: border-box;
-    margin: 0;
-    padding: 0;
-  }
-
-  html {
-    scroll-behavior: smooth;
-  }
-
-  body {
-    background-color: var(--bg-deep);
-    background-image:
-      radial-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px);
-    background-size: 24px 24px;
-    font-family: var(--font-body);
-    font-size: 16px;
-    line-height: 1.7;
-    color: var(--text-secondary);
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-  }
-
-  /* ── Headings ── */
-  h1,
-  h2,
-  h3,
-  h4,
-  h5,
-  h6 {
-    font-family: var(--font-heading);
-    color: var(--text-primary);
-    line-height: 1.2;
-  }
-
-  /* ── Links ── */
-  a {
-    color: inherit;
-    text-decoration: none;
-  }
-
-  /* ── Selection ── */
-  ::selection {
-    background: rgba(139, 92, 246, 0.3);
-    color: var(--violet-300);
-  }
+/* Light theme (Active in reference image) */
+:root[data-theme='light'] {
+  --background: #F8F9FC;
+  --card-bg: #FFFFFF;
+  --heading: #1A1D20;
+  --body: #4A5268;
+  --muted: #8E96A4;
+  --border: rgba(0, 0, 0, 0.05);
+  --primary-bg: rgba(124, 58, 237, 0.08);
+  /* Transparent light violet */
+  --hover-bg: rgba(0, 0, 0, 0.03);
+  --secondary: #E2E8F0;
+  --accent: #7C3AED;
+  --accent-light: #8B5CF6;
 }
 
-/* ─────────────────────────────────────────────
-   SCROLLBAR
-   ───────────────────────────────────────────── */
-
-@layer base {
-
-  /* Firefox */
-  * {
-    scrollbar-width: thin;
-    scrollbar-color: var(--border-medium) var(--bg-primary);
-  }
-
-  /* Webkit (Chrome / Edge / Safari) */
-  ::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
-  }
-
-  ::-webkit-scrollbar-track {
-    background: var(--bg-primary);
-  }
-
-  ::-webkit-scrollbar-thumb {
-    background: var(--border-medium);
-    border-radius: 9999px;
-  }
-
-  ::-webkit-scrollbar-thumb:hover {
-    background: var(--violet-500);
-  }
+.dark {
+  --background: #080010;
+  --card-bg: #120E22;
+  --primary-bg: #1C1530;
+  --hover-bg: #261D41;
+  --secondary: #3B2E60;
+  --border: rgba(255, 255, 255, 0.06);
+  --heading: #FFFFFF;
+  --body: #E2E0FD;
+  --muted: #9E99E0;
+  --accent: #7C3AED;
+  --accent-light: #8B5CF6;
 }
 
-/* ─────────────────────────────────────────────
-   NAVBAR
-   ───────────────────────────────────────────── */
+/* ═══════════════════════════════════════════════════════════════
+   BASE STYLES — Marketing / Landing pages
+   ═══════════════════════════════════════════════════════════════ */
 
-/* ── Entrance animation ── */
-@keyframes navbar-slide-down {
-  from {
-    transform: translateY(-72px);
-    opacity: 0;
-  }
-
-  to {
-    transform: translateY(0);
-    opacity: 1;
-  }
-}
-
-.navbar {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  z-index: 1000;
-  height: 72px;
-  background: rgba(12, 1, 24, 0.75);
-  backdrop-filter: blur(20px) saturate(180%);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
-  border-bottom: none;
-  transition: background 0.35s ease;
-  animation: navbar-slide-down 0.5s ease-out both;
-}
-
-.navbar--scrolled {
-  background: rgba(12, 1, 24, 0.92);
-}
-
-/* ── Inner container ── */
-.navbar__inner {
-  max-width: 1280px;
-  height: 100%;
-  margin: 0 auto;
-  padding: 0 24px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-/* ── Logo ── */
-.navbar__logo {
-  display: flex;
-  align-items: center;
-  flex-shrink: 0;
-}
-
-.navbar__logo-img {
-  height: 56px;
-  width: auto;
-  object-fit: contain;
-}
-
-/* ── Desktop links ── */
-.navbar__links {
-  list-style: none;
-  display: flex;
-  align-items: center;
-  gap: 36px;
-  margin: 0;
-  padding: 0;
-}
-
-.navbar__link {
-  position: relative;
-  font-family: var(--font-body);
-  font-weight: 500;
-  font-size: 15px;
+body {
+  background-color: var(--bg-deep);
+  background-image:
+    radial-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+  background-size: 24px 24px;
+  font-family: var(--font-body-fallback), sans-serif;
+  font-size: 16px;
+  line-height: 1.7;
   color: var(--text-secondary);
-  text-decoration: none;
-  transition: color 0.3s ease;
-  padding-bottom: 4px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-.navbar__link::after {
-  content: "";
-  position: absolute;
-  left: 0;
-  bottom: 0;
-  width: 0;
-  height: 2px;
-  background: var(--violet-500);
-  border-radius: 1px;
-  transition: width 0.3s ease;
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--font-heading-fallback), sans-serif;
+  color: inherit;
+  line-height: 1.2;
 }
 
-.navbar__link:hover {
-  color: var(--text-primary);
+/* ═══════════════════════════════════════════════════════════════
+   DASHBOARD-SCOPED TYPOGRAPHY & THEME
+   ═══════════════════════════════════════════════════════════════ */
+
+.dashboard-theme-root {
+  font-family: var(--font-merriweather), Merriweather, Georgia, serif !important;
+  background-color: var(--background) !important;
+  background-image: none !important;
+  color: var(--body);
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
-.navbar__link:hover::after {
-  width: 100%;
+/* Scoped headings styling */
+.dashboard-theme-root h1,
+.dashboard-theme-root h2,
+.dashboard-theme-root [class*="font-display"],
+.dashboard-theme-root [class*="font-playfair"] {
+  font-family: var(--font-playfair), "Playfair Display", Georgia, serif !important;
+  color: var(--heading);
 }
 
-/* ── Desktop actions ── */
-.navbar__actions {
-  display: flex;
-  align-items: center;
-  gap: 12px;
+.dashboard-theme-root h3,
+.dashboard-theme-root h4,
+.dashboard-theme-root h5,
+.dashboard-theme-root h6,
+.dashboard-theme-root [class*="font-montserrat"] {
+  font-family: var(--font-montserrat), Montserrat, "Segoe UI", sans-serif !important;
+  color: var(--heading);
 }
 
-/* Login — ghost */
-.navbar__btn-login {
-  font-family: var(--font-body);
-  font-weight: 500;
-  font-size: 15px;
-  color: var(--violet-400);
-  background: transparent;
-  border: none;
-  border-radius: 10px;
-  padding: 8px 18px;
-  cursor: pointer;
-  transition: background 0.3s ease, color 0.3s ease;
-  text-decoration: none;
+/* Ensure smooth text transitions for all links & buttons */
+.dashboard-theme-root a,
+.dashboard-theme-root button {
+  transition: all 0.15s ease;
 }
 
-.navbar__btn-login:hover {
-  background: rgba(139, 92, 246, 0.1);
-  color: var(--violet-300);
+/* ═══════════════════════════════════════════════════════════════
+   LOGO THEME SWITCHING
+   ═══════════════════════════════════════════════════════════════ */
+
+.dynamic-logo {
+  filter: none;
+  transition: filter 0.2s ease;
 }
 
-/* Deploy Agent — solid */
-.navbar__btn-deploy {
-  font-family: var(--font-body);
-  font-weight: 600;
-  font-size: 15px;
-  color: var(--bg-deep);
-  background: var(--gold-500);
-  border: none;
-  border-radius: 9999px;
-  padding: 8px 20px;
-  cursor: pointer;
-  box-shadow: 0 0 20px rgba(245, 158, 11, 0.2);
-  transition: background 0.3s ease, box-shadow 0.3s ease;
-  text-decoration: none;
+/* Light mode: Invert to pure black logo */
+:root[data-theme='light'] .dynamic-logo,
+.light .dynamic-logo {
+  filter: brightness(0);
 }
 
-.navbar__btn-deploy:hover {
-  background: var(--gold-600);
-  box-shadow: 0 0 28px rgba(245, 158, 11, 0.35);
+/* Dark mode: Show default white logo */
+.dark .dynamic-logo,
+:root[data-theme='dark'] .dynamic-logo {
+  filter: none;
 }
 
-/* ── Hamburger ── */
-.navbar__hamburger {
-  display: none;
-  /* shown via media query */
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  gap: 5px;
-  width: 40px;
-  height: 40px;
-  background: none;
-  border: none;
-  cursor: pointer;
-  z-index: 1100;
-  padding: 0;
-}
+/* ═══════════════════════════════════════════════════════════════
+   SCROLLBAR & MISC UTILITIES
+   ═══════════════════════════════════════════════════════════════ */
 
-.navbar__hamburger-line {
-  display: block;
-  width: 22px;
-  height: 2px;
-  background: var(--text-primary);
-  border-radius: 2px;
-  transition: transform 0.35s ease, opacity 0.25s ease;
-  transform-origin: center;
-}
+@layer base {
 
-/* Animate to X */
-.navbar__hamburger--open .navbar__hamburger-line:nth-child(1) {
-  transform: translateY(7px) rotate(45deg);
-}
-
-.navbar__hamburger--open .navbar__hamburger-line:nth-child(2) {
-  opacity: 0;
-}
-
-.navbar__hamburger--open .navbar__hamburger-line:nth-child(3) {
-  transform: translateY(-7px) rotate(-45deg);
-}
-
-/* ── Mobile overlay ── */
-.navbar-mobile {
-  position: fixed;
-  inset: 0;
-  z-index: 1050;
-  background: rgba(8, 0, 16, 0.97);
-  backdrop-filter: blur(30px);
-  -webkit-backdrop-filter: blur(30px);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  opacity: 0;
-  visibility: hidden;
-  transition: opacity 0.4s ease, visibility 0.4s ease;
-}
-
-.navbar-mobile--open {
-  opacity: 1;
-  visibility: visible;
-}
-
-/* Close button */
-.navbar-mobile__close {
-  position: absolute;
-  top: 20px;
-  right: 20px;
-  background: none;
-  border: none;
-  color: var(--text-primary);
-  cursor: pointer;
-  padding: 8px;
-  transition: color 0.3s ease;
-}
-
-.navbar-mobile__close:hover {
-  color: var(--violet-400);
-}
-
-/* Mobile nav container */
-.navbar-mobile__nav {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 32px;
-}
-
-/* Mobile links */
-.navbar-mobile__link {
-  font-family: var(--font-heading);
-  font-weight: 600;
-  font-size: 28px;
-  color: var(--text-primary);
-  text-decoration: none;
-  opacity: 0;
-  transform: translateY(16px);
-  transition: opacity 0.4s ease, transform 0.4s ease, color 0.3s ease;
-}
-
-.navbar-mobile--open .navbar-mobile__link {
-  opacity: 1;
-  transform: translateY(0);
-}
-
-.navbar-mobile__link:hover {
-  color: var(--violet-400);
-}
-
-/* Mobile deploy button */
-.navbar-mobile__deploy {
-  margin-top: 24px;
-  font-family: var(--font-body);
-  font-weight: 600;
-  font-size: 18px;
-  color: var(--bg-deep);
-  background: var(--gold-500);
-  border: none;
-  border-radius: 9999px;
-  padding: 14px 36px;
-  box-shadow: 0 0 24px rgba(245, 158, 11, 0.25);
-  text-decoration: none;
-  opacity: 0;
-  transform: translateY(16px);
-  transition: opacity 0.4s ease, transform 0.4s ease, background 0.3s ease;
-}
-
-.navbar-mobile--open .navbar-mobile__deploy {
-  opacity: 1;
-  transform: translateY(0);
-}
-
-.navbar-mobile__deploy:hover {
-  background: var(--gold-600);
-}
-
-/* ── Responsive ── */
-@media (max-width: 767px) {
-
-  .navbar__links,
-  .navbar__actions {
-    display: none;
+  .dashboard-theme-root,
+  .dashboard-theme-root * {
+    scrollbar-color: var(--border) transparent;
   }
 
-  .navbar__hamburger {
-    display: flex;
-  }
-}
-
-@media (min-width: 768px) {
-  .navbar-mobile {
-    display: none !important;
-  }
-}
-
-/* ─────────────────────────────────────────────
-   MARQUEE
-   ───────────────────────────────────────────── */
-
-@keyframes marquee {
-  0% {
-    transform: translateX(0);
+  .dashboard-theme-root ::-webkit-scrollbar-track {
+    background: transparent;
   }
 
-  100% {
-    transform: translateX(-100%);
-  }
-}
-
-.animate-marquee {
-  animation: marquee 30s linear infinite;
-  will-change: transform;
-}
-
-.animate-marquee:hover,
-.group:hover .animate-marquee {
-  animation-play-state: paused;
-}
-
-/* ── Skeleton Loading ── */
-@keyframes shimmer {
-  0% {
-    background-position: -1000px 0;
+  .dashboard-theme-root ::-webkit-scrollbar-thumb {
+    background: var(--border);
   }
 
-  100% {
-    background-position: 1000px 0;
+  .dashboard-theme-root ::-webkit-scrollbar-thumb:hover {
+    background: var(--muted);
   }
-}
-
-.skeleton {
-  background: linear-gradient(90deg, rgba(255, 255, 255, 0.03) 25%, rgba(255, 255, 255, 0.08) 50%, rgba(255, 255, 255, 0.03) 75%);
-  background-size: 1000px 100%;
-  animation: shimmer 2s infinite linear;
 }

@@ -73,3 +73,10 @@ credentials.json
 *.key
 *.pem
 .gemini/
+.vercel
+.env*
+frontend/vercel-env.txt
+frontend/test_pdf.js
+supabase/.temp/
+*.bak
+*.bak.*

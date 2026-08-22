@@ -57,12 +57,29 @@ const timeAgo = (dateString: string) => {
   return `${Math.floor(hours / 24)}d ago`
 }
 
-export function ActivityFeed() {
-  const [activities, setActivities] = useState<ActivityItem[]>([])
+interface ActivityFeedProps {
+  activities?: ActivityItem[]
+  loading?: boolean
+  error?: any
+  onRetry?: () => void
+}
+
+export function ActivityFeed({
+  activities: propActivities,
+  loading,
+  error,
+  onRetry
+}: ActivityFeedProps = {}) {
+  const [localActivities, setLocalActivities] = useState<ActivityItem[]>([])
   const [isConnected, setIsConnected] = useState(false)
   const supabase = createClient()
 
+  const isControlled = propActivities !== undefined
+  const displayActivities = isControlled ? propActivities : localActivities
+
   useEffect(() => {
+    if (isControlled) return
+
     let channel: any = null
 
     const setupRealtime = async () => {
@@ -78,7 +95,7 @@ export function ActivityFeed() {
         .limit(50)
 
       if (initialActivities) {
-        setActivities(initialActivities as ActivityItem[])
+        setLocalActivities(initialActivities as ActivityItem[])
       }
 
       setIsConnected(true)
@@ -95,7 +112,7 @@ export function ActivityFeed() {
           },
           (payload: any) => {
             const newActivity = payload.new as ActivityItem
-            setActivities(prev => [newActivity, ...prev].slice(0, 50)) // Keep last 50
+            setLocalActivities(prev => [newActivity, ...prev].slice(0, 50)) // Keep last 50
           }
         )
         .subscribe()
@@ -108,52 +125,69 @@ export function ActivityFeed() {
         supabase.removeChannel(channel)
       }
     }
-  }, [supabase])
+  }, [supabase, isControlled])
 
   return (
-    <div className="bg-[#0f1117]/90 border border-white/5 rounded-2xl p-6 h-full flex flex-col">
+    <div className="bg-transparent h-full flex flex-col">
       <div className="flex items-center justify-between mb-6">
-        <h2 className="text-xl font-bold text-white">Live Activity</h2>
+        <h2 className="text-xl font-bold text-[var(--heading)]">Live Activity</h2>
         <div className="flex items-center gap-2">
           <span className="relative flex h-3 w-3">
-            {isConnected && <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>}
-            <span className={`relative inline-flex rounded-full h-3 w-3 ${isConnected ? 'bg-emerald-500' : 'bg-white/20'}`}></span>
+            {(isConnected || isControlled) && <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>}
+            <span className={`relative inline-flex rounded-full h-3 w-3 ${(isConnected || isControlled) ? 'bg-emerald-500' : 'bg-[var(--border)]'}`}></span>
           </span>
-          <span className={`text-sm font-medium ${isConnected ? 'text-emerald-500' : 'text-white/40'}`}>
-            {isConnected ? 'Live' : 'Connecting...'}
+          <span className={`text-sm font-medium ${(isConnected || isControlled) ? 'text-emerald-500' : 'text-[var(--muted)]'}`}>
+            {(isConnected || isControlled) ? 'Live' : 'Connecting...'}
           </span>
         </div>
       </div>
 
       <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar">
-        {activities.length === 0 ? (
+        {loading ? (
+          <div className="flex flex-col items-center justify-center h-full min-h-[200px]">
+            <div className="w-8 h-8 border-2 border-violet-500 border-t-transparent rounded-full animate-spin mb-2" />
+            <p className="text-xs text-[var(--muted)]">Loading activity...</p>
+          </div>
+        ) : error ? (
+          <div className="flex flex-col items-center justify-center h-full min-h-[200px] text-center p-4">
+            <p className="text-sm text-red-400 mb-3">{error.message || 'Failed to load activity'}</p>
+            {onRetry && (
+              <button 
+                onClick={onRetry}
+                className="px-3 py-1.5 bg-violet-600 hover:bg-violet-700 text-white rounded-lg text-xs font-semibold transition-colors cursor-pointer"
+              >
+                Retry
+              </button>
+            )}
+          </div>
+        ) : displayActivities.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full min-h-[200px] text-center">
-            <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center mb-4 border border-white/10">
-              <Activity className="w-8 h-8 text-white/40" />
+            <div className="w-16 h-16 rounded-full bg-[var(--hover-bg)] flex items-center justify-center mb-4 border border-[var(--border)]">
+              <Activity className="w-8 h-8 text-[var(--muted)]" />
             </div>
-            <h3 className="text-lg font-medium text-white mb-2">No activity yet</h3>
-            <p className="text-white/50 mb-6 text-sm max-w-xs">Activity will appear here as your agents start handling interactions</p>
+            <h3 className="text-lg font-medium text-[var(--heading)] mb-2">No activity yet</h3>
+            <p className="text-[var(--muted)] mb-6 text-sm max-w-xs">Activity will appear here as your agents start handling interactions</p>
           </div>
         ) : (
           <div className="space-y-4">
             <AnimatePresence initial={false}>
-              {activities.map((activity) => (
+              {displayActivities.map((activity) => (
                 <motion.div
                   key={activity.id}
                   initial={{ opacity: 0, y: -20, scale: 0.95 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.95, transition: { duration: 0.2 } }}
                   layout
-                  className="flex items-start gap-3 p-3 rounded-xl hover:bg-white/[0.02] transition-colors"
+                  className="flex items-start gap-3 p-3 rounded-xl hover:bg-[var(--hover-bg)] transition-colors"
                 >
                   <div className="flex-shrink-0 mt-0.5">
                     {getActivityIcon(activity.type)}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h4 className="text-sm font-semibold text-white truncate">{activity.title}</h4>
-                    <p className="text-xs text-white/50 mt-0.5 break-words">{activity.description}</p>
+                    <h4 className="text-sm font-semibold text-[var(--heading)] truncate">{activity.title}</h4>
+                    <p className="text-xs text-[var(--body)] mt-0.5 break-words">{activity.description}</p>
                   </div>
-                  <div className="flex-shrink-0 text-[10px] text-white/40 whitespace-nowrap">
+                  <div className="flex-shrink-0 text-[10px] text-[var(--muted)] whitespace-nowrap">
                     {timeAgo(activity.created_at)}
                   </div>
                 </motion.div>

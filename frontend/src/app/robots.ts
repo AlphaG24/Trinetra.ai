@@ -6,7 +6,7 @@ export default function robots(): MetadataRoute.Robots {
       {
         userAgent: '*',
         allow: '/',
-        disallow: ['/dashboard/', '/api/', '/admin/', '/admin-blog/'],
+        disallow: ['/api/', '/admin/'],
       },
     ],
     sitemap: 'https://trinetraedu-ai.com/sitemap.xml',

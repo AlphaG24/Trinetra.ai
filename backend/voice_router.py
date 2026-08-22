@@ -1,3 +1,4 @@
+from app.services.telephony.factory import get_provider
 import uuid
 import json
 import math
@@ -5,12 +6,14 @@ import os
 import httpx
 import traceback
 from datetime import datetime
-from typing import Dict, Any
-from fastapi import APIRouter, HTTPException, Request, BackgroundTasks
+from typing import Dict, Any, Optional
+from fastapi import APIRouter, Header, HTTPException, Request, BackgroundTasks, File, UploadFile, Form, Response
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from database import supabase, supabase_admin
 from google import genai
+import asyncio
+
 
 router = APIRouter(prefix="/api/voice", tags=["Voice Agent"])
 
@@ -152,76 +155,7 @@ def send_quota_telegram_alert(chat_id: str, text: str):
     except Exception as e:
         print(f"[QUOTA ALERT ERROR] Network failure: {str(e)}", flush=True)
 
-def resolve_user_id_from_body(body: dict) -> str | None:
-    message = body.get("message", {})
-    call_data = message.get("call", {}) or body.get("call", {})
-    
-    # 1. Try metadata/assistantOverrides
-    user_id = (
-        call_data.get('assistantOverrides', {}).get('metadata', {}).get('userId') or
-        call_data.get('assistantOverrides', {}).get('variableValues', {}).get('user_id') or
-        call_data.get('assistant', {}).get('metadata', {}).get('userId') or
-        call_data.get('metadata', {}).get('userId') or
-        body.get('metadata', {}).get('userId')
-    )
-    if user_id:
-        return user_id
 
-    # 2. Try assistantId lookup in user_agents
-    assistant_id = (
-        call_data.get("assistantId") or
-        message.get("assistantId") or
-        body.get("assistantId") or
-        body.get("assistant", {}).get("id")
-    )
-    if assistant_id:
-        try:
-            agent_res = supabase_admin.table("user_agents").select("user_id").eq("vapi_agent_id", assistant_id).execute()
-            if agent_res.data:
-                return agent_res.data[0].get("user_id")
-        except Exception as e:
-            print(f"[RESOLVE USER ERROR] user_agents lookup failed: {str(e)}", flush=True)
-
-    return None
-
-async def is_user_overusage(user_id: str) -> bool:
-    if not user_id or not is_valid_uuid(user_id):
-        return False
-    try:
-        total_limit = 100
-        used_minutes = 0
-        try:
-            # Perform Supabase lookup
-            res = supabase_admin.table("profiles").select("demo_minutes_used, total_minutes_limit").eq("id", user_id).execute()
-            if res.data:
-                user_data = res.data[0]
-                used_minutes = user_data.get("demo_minutes_used", 0)
-                total_limit = user_data.get("total_minutes_limit")
-                if total_limit is None:
-                    total_limit = user_data.get("demo_minutes_limit", 100)
-        except Exception:
-            # Fallback if total_minutes_limit column does not exist
-            res = supabase_admin.table("profiles").select("demo_minutes_used, demo_minutes_limit").eq("id", user_id).execute()
-            if res.data:
-                user_data = res.data[0]
-                used_minutes = user_data.get("demo_minutes_used", 0)
-                total_limit = user_data.get("demo_minutes_limit", 100)
-        
-        # Ensure total_limit is positive to prevent ZeroDivisionError or weird comparison issues
-        if not total_limit or total_limit <= 0:
-            total_limit = 100
-
-        if used_minutes >= total_limit:
-            print(f"[KILL SWITCH] User {user_id} has exhausted minutes. used_minutes={used_minutes}, total_limit={total_limit}", flush=True)
-            return True
-    except Exception as e:
-        print(f"[KILL SWITCH ERROR] Failed to check usage limits: {str(e)}", flush=True)
-    return False
-
-class StartDemoRequest(BaseModel):
-    user_id: str
-    assigned_vapi_agent_id: str | None = None
-    user_email: str | None = None
 
 def is_valid_uuid(val: str) -> bool:
     try:
@@ -230,488 +164,174 @@ def is_valid_uuid(val: str) -> bool:
     except ValueError:
         return False
 
-@router.post("/start-demo")
-async def check_limits_and_get_keys(req: StartDemoRequest):
-    if not is_valid_uuid(req.user_id):
-        raise HTTPException(status_code=400, detail="Invalid user_id format. Must be a valid UUID.")
-        
-    user_res = supabase_admin.table('profiles').select('demo_minutes_limit, demo_minutes_used').eq('id', req.user_id).execute()
-    if not user_res.data:
-        raise HTTPException(status_code=404, detail="User profile not found")
-        
-    user_data = user_res.data[0]
-    if user_data['demo_minutes_used'] >= user_data['demo_minutes_limit']:
-        raise HTTPException(status_code=403, detail="Trial limit reached.")
 
-    import os
-    public_key = None
-    agent_id = None
-    
+
+class LiveKitTokenRequest(BaseModel):
+    room_name: str | None = "trinetra-demo-room"
+    participant_name: str | None = "User"
+    agent_id: str | None = None
+
+@router.post("/livekit-token")
+async def generate_livekit_token(req: LiveKitTokenRequest):
+    if req.agent_id:
+        try:
+            # Query the agent configuration
+            agent_query = supabase_admin.table("agents").select("*")
+            if is_valid_uuid(req.agent_id):
+                agent_query = agent_query.or_(f"id.eq.{req.agent_id},vapi_agent_id.eq.{req.agent_id}")
+            else:
+                agent_query = agent_query.eq("vapi_agent_id", req.agent_id)
+            
+            agent_res = agent_query.execute()
+            if agent_res.data and len(agent_res.data) > 0:
+                agent_data = agent_res.data[0]
+                is_demo = agent_data.get("is_demo", False)
+                agent_config = agent_data.get("config", {}) or {}
+                plan_tier = agent_config.get("plan_tier", "free_demo")
+                
+                if is_demo or plan_tier == "free_demo":
+                    # Load owner's profile to check minutes & creation date
+                    user_id = agent_data.get("user_id")
+                    if user_id:
+                        profile_res = supabase_admin.table("profiles").select("*").eq("id", user_id).execute()
+                        if profile_res.data and len(profile_res.data) > 0:
+                            profile_data = profile_res.data[0]
+                            demo_minutes_used = profile_data.get("demo_minutes_used", 0)
+                            demo_minutes_limit = profile_data.get("demo_minutes_limit", 10)
+                            
+                            # Check age of the agent
+                            created_at_str = agent_data.get("created_at")
+                            if created_at_str:
+                                try:
+                                    created_at = datetime.fromisoformat(created_at_str.replace("Z", "+00:00"))
+                                    age_delta = datetime.now(created_at.tzinfo) - created_at
+                                    days_active = age_delta.days
+                                except Exception:
+                                    days_active = 0
+                            else:
+                                days_active = 0
+                            
+                            print(f"[DEMO CHECK] Agent: {req.agent_id} | Days Active: {days_active}/5 | Mins Used: {demo_minutes_used}/{demo_minutes_limit}", flush=True)
+
+                            if days_active > 5:
+                                print(f"[DEMO EXPIRED] Agent {req.agent_id} is older than 5 days ({days_active} days)", flush=True)
+                                raise HTTPException(
+                                    status_code=403, 
+                                    detail="Demo agent expired: older than 5 days. Please upgrade your plan."
+                                )
+                            if demo_minutes_used >= demo_minutes_limit:
+                                print(f"[DEMO EXPIRED] Agent {req.agent_id} reached minutes limit ({demo_minutes_used} >= {demo_minutes_limit})", flush=True)
+                                raise HTTPException(
+                                    status_code=403, 
+                                    detail="Demo minutes limit reached. Please upgrade your plan."
+                                )
+        except HTTPException:
+            raise
+        except Exception as err:
+            print(f"[LIVEKIT TOKEN AGENT CHECK ERROR] {str(err)}", flush=True)
+
+    api_key = (os.getenv("LIVEKIT_API_KEY") or "devkey").strip()
+    api_secret = (os.getenv("LIVEKIT_API_SECRET") or "secretsecretsecretsecretsecret12").strip()
+    livekit_url = (os.getenv("LIVEKIT_URL") or "ws://127.0.0.1:7880").strip()
+
+    now = int(datetime.utcnow().timestamp())
+    participant_name = req.participant_name or "User"
+    identity = f"{participant_name}_{uuid.uuid4().hex[:6]}"
+    room_name = req.room_name or "trinetra-demo-room"
+
+    payload = {
+        "exp": now + 86400,
+        "iss": api_key,
+        "nbf": now - 5,
+        "sub": identity,
+        "name": participant_name,
+        "video": {
+            "room": room_name,
+            "roomJoin": True,
+            "canPublish": True,
+            "canSubscribe": True,
+            "canPublishData": True
+        }
+    }
+
     try:
-        config_res = supabase_admin.table('system_config').select('config_key, config_value').in_('config_key', ['VAPI_PUBLIC_KEY', 'VAPI_AGENT_ID']).execute()
-        config_map = {item['config_key']: item['config_value'] for item in config_res.data}
-        public_key = config_map.get('VAPI_PUBLIC_KEY')
-        agent_id = config_map.get('VAPI_AGENT_ID')
+        import jwt
+        token = jwt.encode(payload, api_secret, algorithm="HS256")
+        if isinstance(token, bytes):
+            token = token.decode("utf-8")
     except Exception as e:
-        print(f"DATABASE CONFIG RETRIEVAL WARNING/ERROR: {str(e)}")
-        
-    # Fallback to local environment variables if Database table values are missing or failed to fetch
-    if not public_key:
-        public_key = os.getenv('NEXT_PUBLIC_VAPI_PUBLIC_KEY') or os.getenv('VAPI_PUBLIC_KEY')
-    if not agent_id:
-        agent_id = os.getenv('NEXT_PUBLIC_VAPI_ASSISTANT_ID') or os.getenv('NEXT_PUBLIC_VAPI_AGENT_ID') or os.getenv('VAPI_AGENT_ID')
-    
-    print("\n--- FRONTEND CONNECTION REQUEST ---")
-    print(f"Agent ID: {agent_id}")
-    if public_key:
-        print(f"Public Key: PRESENT (starts with: {public_key[:8]}...)")
+        print(f"[LIVEKIT TOKEN ERROR] PyJWT generation failed: {str(e)}", flush=True)
+        token = f"dev_token_{identity}_{room_name}"
+
+    # Spawn the agent worker in the background (only if not disabled)
+    if os.getenv("DISABLE_IN_PROCESS_AGENT", "false").lower() != "true":
+        print(f"[LIVEKIT AGENT] Spawning agent worker to join room: {room_name} with agent_id: {req.agent_id}", flush=True)
+        try:
+            from agent import run_agent
+            asyncio.create_task(run_agent(room_name, req.agent_id))
+        except Exception as spawn_err:
+            print(f"[LIVEKIT AGENT SPAWN ERROR] Failed to spawn agent task: {spawn_err}", flush=True)
     else:
-        print("CRITICAL ERROR: PUBLIC KEY IS MISSING!")
-    print("-----------------------------------\n")
+        print(f"[LIVEKIT AGENT] Skipping in-process agent spawn (DISABLE_IN_PROCESS_AGENT is true)", flush=True)
 
     return {
         "status": "success",
-        "agent_id": agent_id,
-        "api_key": public_key, 
-        "minutes_used": user_data['demo_minutes_used'],
-        "minutes_limit": user_data['demo_minutes_limit']
+        "token": token,
+        "url": livekit_url,
+        "roomName": room_name,
+        "participantIdentity": identity
     }
 
-async def handle_vapi_webhook_logic(body: dict, background_tasks: BackgroundTasks):
-    message_type = body.get("message", {}).get("type")
-    if message_type != "assistant-request" and message_type != "end-of-call-report":
-        return {"status": "ignored", "reason": f"Not a handled event type: {message_type}"}
+class TTSTestRequest(BaseModel):
+    text: str
+    language: str | None = "hi-IN"
+    plan_tier: str | None = "starter"
+    voice_id: str | None = None
+    voice_provider: str | None = None
+    voice_speed: float | None = None
+    voice_pitch: float | None = None
 
-    message = body.get("message", {})
-    call = message.get("call", {}) or body.get("call", {})
-    assistant_id = (
-        call.get("assistantId") or
-        message.get("assistantId") or
-        body.get("assistantId") or
-        body.get("assistant", {}).get("id")
-    )
-    provider_call_id = (
-        call.get("id") or
-        message.get("id") or
-        body.get("id") or
-        body.get("callId")
-    )
-
-    # 1. Override check: traverse the incoming JSON payload to extract the injected user ID
-    payload_user_id = (
-        call.get('assistantOverrides', {}).get('metadata', {}).get('userId') or
-        call.get('assistantOverrides', {}).get('variableValues', {}).get('user_id') or
-        call.get('assistantOverrides', {}).get('metadata', {}).get('user_id') or
-        call.get('assistant', {}).get('metadata', {}).get('userId') or
-        call.get('metadata', {}).get('userId') or
-        message.get('metadata', {}).get('userId') or
-        body.get('metadata', {}).get('userId')
-    )
-    if payload_user_id is None or str(payload_user_id).strip() == "" or str(payload_user_id).lower() == "none":
-        payload_user_id = body.get('message', {}).get('call', {}).get('metadata', {}).get('userId')
-
-    # 2. Determine Branch: Check if agent is Paid (exists in user_agents)
-    is_paid_agent = False
-    db_owner_user_id = None
-
-    if assistant_id:
-        try:
-            agent_res = supabase_admin.table("user_agents").select("user_id").eq("vapi_agent_id", assistant_id).execute()
-            if agent_res.data:
-                is_paid_agent = True
-                db_owner_user_id = agent_res.data[0].get("user_id")
-        except Exception as e:
-            print(f"[VAPI WEBHOOK ERROR] Supabase user_agents lookup failed: {str(e)}", flush=True)
-
-    # 3. Apply the override logic: prioritize payload user_id strictly if it exists
-    if payload_user_id and str(payload_user_id).strip() != "" and str(payload_user_id).lower() != "none":
-        user_id = payload_user_id
-        print(f"[VAPI ROUTING] Override exists in payload. Prioritizing user_id={user_id} over DB owner={db_owner_user_id}", flush=True)
-    else:
-        user_id = db_owner_user_id
-        print(f"[VAPI ROUTING] Using DB owner user_id={user_id}", flush=True)
-
-    # BRANCH A: Paid Agent
-    if is_paid_agent:
-        print(f"[VAPI ROUTING] BRANCH A: Paid Agent detected (assistant_id={assistant_id}, user_id={user_id})", flush=True)
-        
-        # --- Fallback user_id check ---
-        if user_id is None or str(user_id).strip() == "" or str(user_id).lower() == "none":
-            user_id = body.get('message', {}).get('call', {}).get('metadata', {}).get('userId')
-            print(f"[VAPI ROUTING] Branch A: user_id was missing/invalid. Falling back to payload metadata: {user_id}", flush=True)
-        
-        # Guard Clause
-        if user_id is None or str(user_id).strip() == "" or str(user_id).lower() == "none":
-            return {"status": "error", "message": "Missing user_id in database and payload"}
-            
-        if not is_valid_uuid(user_id):
-            print(f"[VAPI ROUTING] Branch A: user_id '{user_id}' is not a valid UUID. Failing gracefully.", flush=True)
-            return {"status": "error", "message": "Invalid user_id format"}
-            
-        # Retrieve paid quota limits and telegram chat ID
-        paid_used = 0
-        paid_limit = 100
-        telegram_chat_id = None
-        
-        try:
-            try:
-                # Try selecting paid columns
-                profile_res = supabase_admin.table("profiles").select("paid_minutes_used, paid_minutes_limit, telegram_chat_id").eq("id", user_id).execute()
-                if profile_res.data:
-                    user_profile = profile_res.data[0]
-                    paid_used = user_profile.get("paid_minutes_used", 0) or 0
-                    paid_limit = user_profile.get("paid_minutes_limit")
-                    if paid_limit is None:
-                        paid_limit = user_profile.get("demo_minutes_limit", 100)
-                    telegram_chat_id = user_profile.get("telegram_chat_id")
-            except Exception:
-                # Fallback to demo columns if paid columns do not exist
-                profile_res = supabase_admin.table("profiles").select("demo_minutes_used, demo_minutes_limit, telegram_chat_id").eq("id", user_id).execute()
-                if profile_res.data:
-                    user_profile = profile_res.data[0]
-                    paid_used = user_profile.get("demo_minutes_used", 0) or 0
-                    paid_limit = user_profile.get("demo_minutes_limit", 100)
-                    telegram_chat_id = user_profile.get("telegram_chat_id")
-        except Exception as e:
-            print(f"[VAPI WEBHOOK ERROR] Paid profile fetch failed: {str(e)}", flush=True)
-
-        if not paid_limit or paid_limit <= 0:
-            paid_limit = 100
-
-        # For Pre-Calls (assistant-request)
-        if message_type == "assistant-request":
-            if paid_used >= paid_limit:
-                print(f"[KILL SWITCH] Paid user {user_id} has exhausted minutes. used={paid_used}, limit={paid_limit}", flush=True)
-                return JSONResponse(
-                    status_code=402,
-                    content={"error": "Payment Required", "message": "AI minutes limit exhausted. Please top up to reactivate your agents."}
-                )
-            return {}
-
-        # For End-Calls (end-of-call-report)
-        try:
-            duration_seconds = int(message.get('durationSeconds') or call.get('durationSeconds') or message.get('duration', 0))
-            quota_cost = math.ceil(duration_seconds / 60) if duration_seconds > 0 else 0
-            
-            transcript = message.get('transcript') or call.get('transcript', '')
-            if not transcript and message.get('artifact', {}).get('messages'):
-                messages_list = message.get('artifact', {}).get('messages', [])
-                transcript = "\n".join([
-                    f"{m.get('role', 'unknown').upper()}: {m.get('message', '')}" 
-                    for m in messages_list if m.get('message')
-                ])
-            
-            recording_url = message.get('artifact', {}).get('recordingUrl', '') or call.get('recordingUrl', '')
-
-            # Save Call Log
-            try:
-                supabase_admin.table("agent_call_logs").insert({
-                    "user_id": user_id,
-                    "duration_seconds": duration_seconds,
-                    "transcript": transcript,
-                    "recording_url": recording_url,
-                    "sentiment": "Neutral",
-                    "provider_call_id": provider_call_id,
-                    "vapi_agent_id": assistant_id
-                }).execute()
-                print(f"[VAPI WEBHOOK SUCCESS] Paid Call Log saved for User {user_id}", flush=True)
-            except Exception as insert_err:
-                print(f"[VAPI WEBHOOK DATABASE ERROR] Saving call logs failed: {str(insert_err)}", flush=True)
-                traceback.print_exc()
-
-            # Update paid quota
-            new_paid_used = paid_used + quota_cost
-            try:
-                supabase_admin.table('profiles').update({"paid_minutes_used": new_paid_used}).eq('id', user_id).execute()
-            except Exception:
-                supabase_admin.table('profiles').update({"demo_minutes_used": new_paid_used}).eq('id', user_id).execute()
-            print(f"   -> [SUCCESS] Paid quota updated. Used: {new_paid_used} mins.", flush=True)
-
-            # Evaluate 80%/100% Paid threshold alerts
-            prev_pct = (paid_used / paid_limit) * 100
-            new_pct = (new_paid_used / paid_limit) * 100
-            crossed_80 = (prev_pct < 80 <= new_pct)
-            crossed_100 = (prev_pct < 100 <= new_pct)
-            
-            if telegram_chat_id and (crossed_80 or crossed_100):
-                if crossed_100:
-                    critical_msg = (
-                        "⛔ **CRITICAL ALERT: AGENTS PAUSED**\n"
-                        "Your AI minutes are 100% exhausted. Incoming calls will no longer be processed. Please top up immediately."
-                    )
-                    background_tasks.add_task(send_quota_telegram_alert, telegram_chat_id, critical_msg)
-                elif crossed_80:
-                    warning_msg = (
-                        "⚠️ **USAGE WARNING**\n"
-                        "You have reached 80% of your AI minutes limit. Top up soon to ensure your agents stay online!"
-                    )
-                    background_tasks.add_task(send_quota_telegram_alert, telegram_chat_id, warning_msg)
-
-            # Deep JSON Lead Extraction (Gemini)
-            extracted_is_lead = False
-            extracted_intent_summary = ""
-            extracted_dict = {}
-            
-            if transcript and transcript.strip():
-                try:
-                    print("[VAPI WEBHOOK] Starting Gemini Deep Native Lead Extraction...", flush=True)
-                    
-                    prompt = (
-                        f"You are an advanced, multilingual lead extraction assistant. Analyze the following transcript of a voice call. "
-                        f"The transcript may contain mixed-language inputs (such as English, Hindi, Hinglish, or regional Indian dialects/phrasing). "
-                        f"First, translate any non-English terms, phrases, or speech into English context to accurately evaluate the conversation. "
-                        f"Analyze the caller's intent. If the caller expresses interest, wants to book/schedule an appointment, or requests a service/product, "
-                        f"set `is_lead` to `true`. Otherwise, set it to `false`.\n"
-                        f"Compile a clear and concise `intent_summary` in English.\n"
-                        f"Parse and extract any valuable custom fields mentioned in the transcript (e.g., spoken contact name, spoken phone number, appointment time, budget, symptoms, preferences, service types, timeline) "
-                        f"and place them into the `extracted_data` list of objects with `key` and `value` fields where both `key` and `value` are strings.\n"
-                        f"CRITICAL: Be extremely thorough. Make sure to catch spoken contact details (like spoken name, spoken phone number, or email) if the caller provides them verbally, "
-                        f"and place them under descriptive keys (e.g. 'spoken_name', 'spoken_phone', 'spoken_email').\n\n"
-                        f"Transcript:\n{transcript}"
-                    )
-                    
-                    response = genai_client.models.generate_content(
-                        model='gemini-2.5-flash',
-                        contents=prompt,
-                        config=genai.types.GenerateContentConfig(
-                            response_mime_type="application/json",
-                            response_schema=DynamicLeadExtraction,
-                        ),
-                    )
-                    extracted = response.parsed
-                    print(f"[VAPI WEBHOOK] Gemini extraction result: {extracted}", flush=True)
-                    
-                    if extracted:
-                        extracted_is_lead = extracted.is_lead
-                        extracted_intent_summary = extracted.intent_summary
-                        
-                        extracted_dict = {}
-                        if extracted.extracted_data:
-                            for item in extracted.extracted_data:
-                                if hasattr(item, 'key') and hasattr(item, 'value'):
-                                    extracted_dict[item.key] = item.value
-                                elif isinstance(item, dict):
-                                    extracted_dict[item.get('key', '')] = item.get('value', '')
-                        
-                        if extracted_is_lead:
-                            print(f"[VAPI WEBHOOK] Hot Lead detected! Saving to appointments table...", flush=True)
-                            scheduled_at = datetime.utcnow().isoformat() + "Z"
-                            
-                            contact_name = "Valued Customer"
-                            contact_phone = "Unknown"
-                            contact_email = None
-                            
-                            for k, v in extracted_dict.items():
-                                k_norm = k.lower().replace("_", "").replace(" ", "")
-                                if k_norm in ["name", "contactname", "customername", "fullname", "spokenname"]:
-                                    if v: contact_name = v
-                                elif k_norm in ["phone", "contactphone", "customerphone", "phonenumber", "spokenphone"]:
-                                    if v: contact_phone = v
-                                elif k_norm in ["email", "contactemail", "customeremail", "emailaddress", "spokenemail"]:
-                                    if v: contact_email = v
-
-                            customer_phone = (
-                                call.get("customer", {}).get("number") or
-                                call.get("customer", {}).get("phone") or
-                                call.get("customerPhone") or
-                                message.get("customer", {}).get("number") or
-                                "Unknown"
-                            )
-                            if contact_phone == "Unknown":
-                                contact_phone = customer_phone
-
-                            supabase_admin.table("appointments").insert({
-                                "user_id": user_id,
-                                "contact_name": contact_name,
-                                "contact_phone": contact_phone,
-                                "contact_email": contact_email,
-                                "notes": extracted_intent_summary,
-                                "extracted_data": extracted_dict,
-                                "booked_via": "voice",
-                                "scheduled_at": scheduled_at,
-                                "status": "pending"
-                            }).execute()
-                            print(f"[VAPI WEBHOOK] Lead successfully saved to appointments table.", flush=True)
-                except Exception as lead_err:
-                    print(f"[VAPI WEBHOOK] Extraction Error: {lead_err}", flush=True)
-                    traceback.print_exc()
-
-            # Dispatch Telegram Notifications
-            try:
-                customer_phone = (
-                    call.get("customer", {}).get("number") or
-                    call.get("customer", {}).get("phone") or
-                    call.get("customerPhone") or
-                    message.get("customer", {}).get("number") or
-                    "Unknown"
-                )
-                background_tasks.add_task(
-                    send_telegram_notification,
-                    customer_phone,
-                    duration_seconds,
-                    transcript,
-                    telegram_chat_id,
-                    extracted_is_lead,
-                    extracted_intent_summary,
-                    extracted_dict,
-                )
-                print(f"[VAPI WEBHOOK SUCCESS] Enqueued background Telegram notification for {customer_phone} (is_lead={extracted_is_lead})", flush=True)
-            except Exception as tg_err:
-                print(f"[VAPI WEBHOOK ERROR] Failed to queue background Telegram notification: {tg_err}", flush=True)
-                traceback.print_exc()
-
-            return {"status": "success", "message": "Webhook processed successfully"}
-
-        except Exception as e:
-            print(f"[VAPI WEBHOOK ERROR] Paid end-call process failed: {str(e)}", flush=True)
-            traceback.print_exc()
-            return {"status": "error", "message": "Internal server error acknowledged"}
-
-    # BRANCH B: Demo Agent
-    else:
-        # Extract user_id from metadata if not already resolved
-        if user_id is None or str(user_id).strip() == "" or str(user_id).lower() == "none":
-            user_id = (
-                call.get('assistantOverrides', {}).get('metadata', {}).get('userId') or
-                call.get('assistantOverrides', {}).get('variableValues', {}).get('user_id') or
-                call.get('assistant', {}).get('metadata', {}).get('userId') or
-                call.get('metadata', {}).get('userId') or
-                message.get('metadata', {}).get('userId') or
-                body.get('metadata', {}).get('userId')
-            )
-            
-            # Fallback Source: If user_id is None, fall back to extracting it from the webhook payload (payload.get('message', {}).get('call', {}).get('metadata', {}).get('userId')).
-            if user_id is None or str(user_id).strip() == "" or str(user_id).lower() == "none":
-                user_id = body.get('message', {}).get('call', {}).get('metadata', {}).get('userId')
-            
-        print(f"[VAPI ROUTING] BRANCH B: Demo Agent detected (assistant_id={assistant_id}, resolved_user_id={user_id})", flush=True)
-
-        # Guard Clause
-        if user_id is None or str(user_id).strip() == "" or str(user_id).lower() == "none":
-            return {"status": "error", "message": "Missing user_id in database and payload"}
-
-        # Fetch demo profile limit and used
-        demo_used = 0
-        demo_limit = 100
-        telegram_chat_id = None
-        
-        if is_valid_uuid(user_id):
-            try:
-                profile_res = supabase_admin.table("profiles").select("demo_minutes_used, demo_minutes_limit, telegram_chat_id").eq("id", user_id).execute()
-                if profile_res.data:
-                    user_profile = profile_res.data[0]
-                    demo_used = user_profile.get("demo_minutes_used", 0) or 0
-                    demo_limit = user_profile.get("demo_minutes_limit", 100)
-                    telegram_chat_id = user_profile.get("telegram_chat_id")
-            except Exception as e:
-                print(f"[VAPI WEBHOOK ERROR] Demo profile fetch failed: {str(e)}", flush=True)
-        else:
-            print(f"[VAPI ROUTING] Skipping demo profile fetch for non-UUID user_id: {user_id}", flush=True)
-
-        if not demo_limit or demo_limit <= 0:
-            demo_limit = 100
-
-        # For Pre-Calls (assistant-request)
-        if message_type == "assistant-request":
-            if demo_used >= demo_limit:
-                print(f"[KILL SWITCH] Demo user {user_id} has exhausted minutes. used={demo_used}, limit={demo_limit}", flush=True)
-                return JSONResponse(
-                    status_code=402,
-                    content={"error": "Payment Required", "message": "Demo minutes limit exhausted. Please top up to reactivate your agents."}
-                )
-            return {}
-
-        # For End-Calls (end-of-call-report)
-        try:
-            duration_seconds = int(message.get('durationSeconds') or call.get('durationSeconds') or message.get('duration', 0))
-            quota_cost = math.ceil(duration_seconds / 60) if duration_seconds > 0 else 0
-            
-            transcript = message.get('transcript') or call.get('transcript', '')
-            if not transcript and message.get('artifact', {}).get('messages'):
-                messages_list = message.get('artifact', {}).get('messages', [])
-                transcript = "\n".join([
-                    f"{m.get('role', 'unknown').upper()}: {m.get('message', '')}" 
-                    for m in messages_list if m.get('message')
-                ])
-            
-            recording_url = message.get('artifact', {}).get('recordingUrl', '') or call.get('recordingUrl', '')
-
-            # Save Call Log
-            if is_valid_uuid(user_id):
-                try:
-                    supabase_admin.table("agent_call_logs").insert({
-                        "user_id": user_id,
-                        "duration_seconds": duration_seconds,
-                        "transcript": transcript,
-                        "recording_url": recording_url,
-                        "sentiment": "Neutral",
-                        "provider_call_id": provider_call_id,
-                        "vapi_agent_id": assistant_id
-                    }).execute()
-                    print(f"[VAPI WEBHOOK SUCCESS] Demo Call Log saved for User {user_id}", flush=True)
-                except Exception as insert_err:
-                    print(f"[VAPI WEBHOOK DATABASE ERROR] Saving call logs failed: {str(insert_err)}", flush=True)
-                    traceback.print_exc()
-            else:
-                print(f"[VAPI ROUTING] Skipping call log insertion for non-UUID user_id: {user_id}", flush=True)
-
-            # Update demo quota
-            if is_valid_uuid(user_id):
-                new_demo_used = demo_used + quota_cost
-                try:
-                    supabase_admin.table('profiles').update({"demo_minutes_used": new_demo_used}).eq('id', user_id).execute()
-                    print(f"   -> [SUCCESS] Demo quota updated. Used: {new_demo_used} mins.", flush=True)
-                except Exception as e:
-                    print(f"   -> [ERROR] Demo Quota Update Failed: {str(e)}", flush=True)
-            else:
-                print(f"[VAPI ROUTING] Skipping demo quota update for non-UUID user_id: {user_id}", flush=True)
-
-            # Trigger the original simple Demo Telegram notification (no JSONB extraction, no paid alerts)
-            if telegram_chat_id:
-                try:
-                    customer_phone = (
-                        call.get("customer", {}).get("number") or
-                        call.get("customer", {}).get("phone") or
-                        call.get("customerPhone") or
-                        message.get("customer", {}).get("number") or
-                        "Unknown"
-                    )
-                    background_tasks.add_task(
-                        send_telegram_notification,
-                        customer_phone,
-                        duration_seconds,
-                        transcript,
-                        telegram_chat_id,
-                        False, # is_lead is always False for demo
-                        "",    # intent_summary is empty
-                        None,  # extracted_data is None
-                    )
-                    print(f"[VAPI WEBHOOK SUCCESS] Enqueued Demo Telegram notification for {customer_phone}", flush=True)
-                except Exception as tg_err:
-                    print(f"[VAPI WEBHOOK ERROR] Failed to queue demo Telegram alert: {tg_err}", flush=True)
-                    traceback.print_exc()
-
-            return {"status": "success", "message": "Demo webhook processed successfully"}
-
-        except Exception as e:
-            print(f"[VAPI WEBHOOK ERROR] Demo end-call process failed: {str(e)}", flush=True)
-            traceback.print_exc()
-            return {"status": "error", "message": "Internal server error acknowledged"}
-
-@router.post("/vapi-webhook")
-async def handle_vapi_webhook(request: Request, background_tasks: BackgroundTasks):
-    secret = request.headers.get("x-vapi-secret")
-    expected_secret = os.getenv("VAPI_WEBHOOK_SECRET")
-    if expected_secret and secret != expected_secret:
-        print("[VAPI WEBHOOK ERROR] Unauthorized access attempt.", flush=True)
-        raise HTTPException(status_code=401, detail="Unauthorized")
-
+@router.post("/tts-test")
+async def tts_test(req: TTSTestRequest):
     try:
-        body = await request.json()
-    except Exception:
-        print("CRITICAL: VAPI SENT NON-JSON PAYLOAD", flush=True)
-        return {"status": "error", "detail": "Invalid JSON"}
-    return await handle_vapi_webhook_logic(body, background_tasks)
+        from app.services.ai.tts_router import TTSRouter
+        router_svc = TTSRouter()
+        audio_bytes, content_type = await router_svc.synthesize(
+            text=req.text,
+            language=req.language or "hi-IN",
+            plan_tier=req.plan_tier or "starter",
+            voice_id=req.voice_id,
+            voice_provider=req.voice_provider,
+            voice_speed=req.voice_speed,
+            voice_pitch=req.voice_pitch
+        )
+        return Response(content=audio_bytes, media_type=content_type)
+    except Exception as e:
+        err_msg = str(e)
+        print(f"[TTS TEST ERROR] Failed to synthesize speech: {err_msg}", flush=True)
+        if "SARVAM_API_KEY" in err_msg or "Sarvam" in err_msg or "missing" in err_msg.lower() or "key" in err_msg.lower():
+            return JSONResponse(status_code=400, content={"error": "Sarvam API key not configured", "detail": err_msg})
+        return JSONResponse(status_code=400, content={"error": "Sarvam API key not configured", "detail": f"TTS synthesis error: {err_msg}"})
+
+@router.post("/stt-test")
+async def stt_test(
+    file: UploadFile = File(...),
+    language: str = Form("hi-IN")
+):
+    try:
+        from app.services.ai.stt_router import STTRouter
+        audio_bytes = await file.read()
+        router_svc = STTRouter()
+        transcript = await router_svc.transcribe(
+            audio_bytes=audio_bytes,
+            language=language,
+            filename=file.filename or "audio.wav"
+        )
+        return {"status": "success", "transcript": transcript}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"STT transcription error: {str(e)}")
+
+
 
 @router.get("/history/{user_id}")
 async def get_user_call_history(user_id: str):
@@ -825,17 +445,473 @@ async def handle_telegram_webhook(request: Request):
         return {"status": "error", "message": "Internal server error"}
 
 
-@telegram_router.post("/vapi")
-async def handle_vapi_webhook_telegram(request: Request, background_tasks: BackgroundTasks):
-    secret = request.headers.get("x-vapi-secret")
-    expected_secret = os.getenv("VAPI_WEBHOOK_SECRET")
-    if expected_secret and secret != expected_secret:
-        print("[VAPI TELEGRAM WEBHOOK ERROR] Unauthorized access attempt.", flush=True)
-        raise HTTPException(status_code=401, detail="Unauthorized")
+
+
+
+agents_router = APIRouter(prefix="/api/agents", tags=["Agents"])
+
+def get_config_key(key_name: str) -> str | None:
+    try:
+        res = supabase_admin.table("system_config").select("config_value").eq("config_key", key_name).single().execute()
+        if res.data and res.data.get("config_value"):
+            val = res.data["config_value"].strip()
+            if val:
+                return val
+    except Exception:
+        pass
+    return os.getenv(key_name)
+
+@agents_router.post("/{agent_id}/clone-voice")
+async def clone_voice(
+    agent_id: str,
+    name: str = Form(...),
+    file: UploadFile = File(...)
+):
+    api_key = get_config_key("ELEVENLABS_API_KEY")
+    if not api_key:
+        raise HTTPException(status_code=400, detail="ElevenLabs API Key is not configured in system_config or env")
+
+    url = "https://api.elevenlabs.io/v1/voices/add"
+    headers = {
+        "xi-api-key": api_key
+    }
+    
+    file_bytes = await file.read()
+    files = [
+        ("files", (file.filename or "sample.mp3", file_bytes, file.content_type or "audio/mpeg"))
+    ]
+    data = {
+        "name": name,
+        "description": f"Cloned voice for agent {agent_id}"
+    }
 
     try:
-        body = await request.json()
-    except Exception:
-        print("[VAPI WEBHOOK ERROR] Received non-JSON body", flush=True)
-        return {"status": "error", "message": "Invalid JSON body"}
-    return await handle_vapi_webhook_logic(body, background_tasks)
+        async with httpx.AsyncClient() as client:
+            res = await client.post(url, data=data, files=files, headers=headers, timeout=60.0)
+            if res.status_code != 200:
+                raise HTTPException(status_code=res.status_code, detail=f"ElevenLabs error: {res.text}")
+            
+            res_data = res.json()
+            new_voice_id = res_data.get("voice_id")
+            if not new_voice_id:
+                raise HTTPException(status_code=500, detail="ElevenLabs did not return a voice_id")
+
+            # Update Supabase databases
+            try:
+                supabase_admin.table("agents").update({
+                    "voice_id": new_voice_id,
+                    "voice_provider": "elevenlabs"
+                }).eq("id", agent_id).execute()
+            except Exception:
+                pass
+
+            # Removed legacy user_agents update
+
+            return {
+                "status": "success",
+                "voice_id": new_voice_id,
+                "voice_name": name
+            }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Voice cloning failed: {str(e)}")
+
+class EnhancePromptRequest(BaseModel):
+    description: str
+    agent_type: str | None = "sales"
+    mode: str | None = "prompt"  # "prompt", "greeting", or "fallback"
+    current_prompt: str | None = None  # NEW: existing prompt to enhance
+
+@agents_router.post("/enhance-prompt")
+async def enhance_prompt(req: EnhancePromptRequest):
+    groq_key = os.getenv("GROQ_API_KEY")
+    if not groq_key:
+        raise HTTPException(status_code=500, detail="GROQ_API_KEY not configured")
+    
+    if req.mode == 'greeting':
+        system_prompt = """You are a Hindi/TTS pronunciation expert. Rewrite the user's greeting message to be perfectly pronounced by Indian TTS engines (Sarvam Bulbul v3).
+
+RULES:
+1. Use FULL spellings: "raha hoon" NOT "rha hu", "rahi hoon" NOT "rahi hu", "kar sakta hoon" NOT "kar sakta hu"
+2. Remove unnecessary punctuation that makes TTS speak too fast (!, multiple commas)
+3. Keep it natural and warm — like a real Indian salesperson
+4. Maintain the original meaning and language mix (Hinglish)
+5. Output ONLY the rewritten greeting, nothing else.
+6. Keep it under 2 sentences."""
+    elif req.mode == 'fallback':
+        system_prompt = """You are a Hindi/TTS pronunciation expert. Rewrite this message for perfect TTS pronunciation.
+
+RULES:
+1. Use FULL spellings for all Hindi words
+2. Keep it polite and clear
+3. The user should easily understand what to do next
+4. Output ONLY the rewritten message, nothing else."""
+    else:
+        system_prompt = """You are enhancing an EXISTING professional AI voice agent's system prompt.
+
+CRITICAL RULE: You are NOT creating a new prompt from scratch. The agent already has a complete personality with:
+- Tone of voice and speaking style
+- Conversation flow and rules
+- Objection handling techniques
+- Closing techniques
+- Language rules (Hinglish/Hindi/English)
+
+The user wants to ADD or MODIFY specific behaviors. Your job:
+1. KEEP the existing prompt INTACT
+2. Add the user's requested change as a new rule or modification
+3. If the user says "be more friendly", add: "IMPORTANT: Be extra warm and friendly in your responses. Use more encouraging language."
+4. If the user says "always ask about budget", add: "IMPORTANT: In every conversation, ask about the prospect's budget before proceeding."
+5. If the user says "speak only in Hindi", add: "CRITICAL: Always respond in Hindi, never use English."
+6. NEVER remove existing rules about objection handling, closing, or language switching
+7. NEVER replace the entire prompt — only append modifications
+
+OUTPUT: Return the FULL enhanced prompt (original + additions). Keep it concise. Add new rules at the end with clear labels like 'ADDITIONAL BEHAVIOR:' or 'MODIFIED RULE:'."""
+
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        res = await client.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            headers={"Authorization": f"Bearer {groq_key}", "Content-Type": "application/json"},
+            json={
+                "model": "llama-3.3-70b-versatile",
+                "messages": [{
+                    "role": "system",
+                    "content": system_prompt
+                }, {
+                    "role": "user", 
+                    "content": f"EXISTING AGENT PROMPT:\n{req.current_prompt or 'No existing prompt'}\n\nUSER REQUESTED CHANGE:\n{req.description}\n\nEnhance the existing prompt by adding/modifying only what the user requested. Keep everything else intact." if req.mode == 'prompt' else req.description
+                }],
+                "temperature": 0.7,
+                "max_tokens": 800
+            }
+        )
+        
+        if res.status_code != 200:
+            raise HTTPException(status_code=500, detail=f"Groq error: {res.text}")
+        
+        data = res.json()
+        enhanced = data["choices"][0]["message"]["content"]
+        return {"success": True, "enhanced_prompt": enhanced}
+
+class EnhanceMessagesRequest(BaseModel):
+    greeting: str | None = None
+    fallback: str | None = None
+    ending: str | None = None
+
+@agents_router.post("/enhance-messages")
+async def enhance_messages(req: EnhanceMessagesRequest):
+    groq_key = os.getenv("GROQ_API_KEY")
+    if not groq_key:
+        raise HTTPException(status_code=500, detail="GROQ_API_KEY not configured")
+    
+    prompt = """You are a Text-to-Speech pronunciation optimizer. Your job is to rewrite messages so they sound PERFECT when spoken by a voice AI.
+
+WHAT YOU DO:
+- You fix spelling, grammar, and punctuation that affect pronunciation
+- You do NOT change the language, meaning, or tone of the message
+- You do NOT translate between languages
+- You do NOT replace the user's words with standard defaults
+- If the input is English, output English. If Hinglish, output Hinglish. If Hindi, output Hindi.
+
+PRONUNCIATION RULES FOR INDIAN TTS (Sarvam Bulbul v3):
+1. Hindi words MUST use full vowel spellings:
+   - "raha hoon" NOT "rha hu" or "raha hu"
+   - "rahi hoon" NOT "rahi hu"  
+   - "kar raha hoon" NOT "kar rha hu"
+   - "bol rahi hoon" NOT "bol rahi hu"
+   - "samajh" NOT "smjh" or "smajh"
+   - "kripya" NOT "krpya" or "kripaya"
+   - "main" NOT "mei" or "me"
+   - "aap" NOT "ap"
+   - "hain" NOT "hai" (when plural/formal)
+
+2. Remove punctuation that causes unnatural pauses or speed changes:
+   - Multiple exclamation marks "!!!" → remove extras
+   - "..." at start of sentence → remove
+   - Excessive commas → keep only grammatically necessary ones
+
+3. Add natural pauses with a single period or comma where a human would breathe.
+
+4. For Hinglish: Hindi words get full spellings. English words stay unchanged.
+
+5. If the input is already perfect, return it unchanged.
+
+OUTPUT FORMAT:
+Return ONLY valid JSON with exactly these keys:
+- enhanced_greeting
+- enhanced_fallback  
+- enhanced_ending
+
+If a field is empty in the input, return empty string for that field.
+
+DO NOT add any explanation. DO NOT wrap in markdown. ONLY the JSON object."""
+
+    messages_text = f"""Enhance these messages for perfect TTS pronunciation:
+
+GREETING: {req.greeting or '(empty)'}
+FALLBACK: {req.fallback or '(empty)'}
+ENDING: {req.ending or '(empty)'}"""
+
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        res = await client.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            headers={"Authorization": f"Bearer {groq_key}", "Content-Type": "application/json"},
+            json={
+                "model": "llama-3.3-70b-versatile",
+                "messages": [
+                    {"role": "system", "content": prompt},
+                    {"role": "user", "content": messages_text}
+                ],
+                "temperature": 0.1,
+                "max_tokens": 500,
+                "response_format": {"type": "json_object"}
+            }
+        )
+        
+        if res.status_code != 200:
+            raise HTTPException(status_code=500, detail=f"Groq error: {res.text}")
+            
+        data = res.json()
+        enhanced = json.loads(data["choices"][0]["message"]["content"])
+        return enhanced
+
+# --- VOICELINK WEBHOOKS ---
+
+@router.post("/webhooks/voice/voicelink/{organization_id}")
+async def handle_voicelink_webhook(
+    organization_id: str,
+    request: Request,
+    signature: str = Header(None, alias="X-VoiceLink-Signature")
+):
+    """
+    Handle incoming webhooks from VoiceLink.
+    Events: call.initiated, call.answered, call.ended, call.completed
+    """
+    body = await request.json()
+    
+    # Validate webhook
+    provider = get_provider("voicelink")
+    if not await provider.validate_webhook_request(body, signature):
+        raise HTTPException(status_code=400, detail="Invalid webhook")
+    
+    event = body.get("event")
+    call_id = body.get("callId")
+    
+    print(f"[Webhook] VoiceLink {event} — Call: {call_id}", flush=True)
+    
+    # Map to our database
+    if event == "call.initiated":
+        await handle_call_initiated(body, organization_id)
+    elif event == "call.answered":
+        await handle_call_answered(body, organization_id)
+    elif event == "call.ended":
+        await handle_call_ended(body, organization_id)
+    elif event == "call.completed":
+        await handle_call_completed(body, organization_id)
+    
+    return {"status": "ok"}
+
+
+async def handle_call_initiated(body: dict, org_id: str):
+    """New call started — create voice_calls record"""
+    try:
+        supabase_admin.table("voice_calls").insert({
+            "organization_id": org_id,
+            "provider_call_id": body["callId"],
+            "caller_number": body["fromNumber"],
+            "agent_number": body["toNumber"],
+            "direction": body.get("direction", "inbound"),
+            "status": "initiated",
+            "metadata": body.get("customParameters", {}),
+            "started_at": datetime.utcnow().isoformat()
+        }).execute()
+    except Exception as e:
+        print(f"[Webhook Error] Failed to handle call.initiated: {e}", flush=True)
+
+async def handle_call_answered(body: dict, org_id: str):
+    """Call connected — update status"""
+    try:
+        supabase_admin.table("voice_calls").update({
+            "status": "in_progress"
+        }).eq("provider_call_id", body["callId"]).execute()
+    except Exception as e:
+        print(f"[Webhook Error] Failed to handle call.answered: {e}", flush=True)
+
+async def handle_call_ended(body: dict, org_id: str):
+    """Call ended — update duration and status"""
+    try:
+        supabase_admin.table("voice_calls").update({
+            "status": body.get("callStatus", "completed"),
+            "duration_seconds": body.get("duration", 0)
+        }).eq("provider_call_id", body["callId"]).execute()
+    except Exception as e:
+        print(f"[Webhook Error] Failed to handle call.ended: {e}", flush=True)
+
+async def handle_call_completed(body: dict, org_id: str):
+    """Call processed — save recording URL and final data"""
+    try:
+        supabase_admin.table("voice_calls").update({
+            "status": "completed",
+            "duration_seconds": body.get("duration", 0),
+            "recording_url": body.get("recordingUrl"),
+            "metadata": body.get("customParameters", {})
+        }).eq("provider_call_id", body["callId"]).execute()
+    except Exception as e:
+        print(f"[Webhook Error] Failed to handle call.completed: {e}", flush=True)
+
+
+# --- TWILIO INBOUND & OUTBOUND VOICE WEBHOOKS ---
+
+@router.api_route("/webhooks/voice/twilio/{organization_id}", methods=["GET", "POST"])
+@router.api_route("/webhooks/voice/twilio", methods=["GET", "POST"])
+@router.api_route("/twiml/inbound", methods=["GET", "POST"])
+@router.api_route("/twiml/outbound/{organization_id}", methods=["GET", "POST"])
+async def handle_twilio_voice_webhook(
+    request: Request,
+    organization_id: Optional[str] = "default"
+):
+    """
+    Handle incoming & outbound Twilio voice webhooks.
+    Logs call in voice_calls table, spawns AI agent, and returns TwiML instructions.
+    """
+    try:
+        form_data = {}
+        content_type = request.headers.get("content-type", "")
+        if "application/x-www-form-urlencoded" in content_type or "multipart/form-data" in content_type:
+            form = await request.form()
+            form_data = dict(form)
+        else:
+            try:
+                form_data = await request.json()
+            except Exception:
+                form_data = dict(request.query_params)
+
+        call_sid = form_data.get("CallSid") or form_data.get("call_sid") or str(uuid.uuid4())
+        from_number = form_data.get("From") or form_data.get("from") or "Unknown"
+        to_number = form_data.get("To") or form_data.get("to") or "+12282950908"
+        direction = form_data.get("Direction") or "inbound"
+        call_status = form_data.get("CallStatus") or "in-progress"
+
+        print(f"[Twilio Webhook] Received call: {call_sid} | From: {from_number} -> To: {to_number} | Direction: {direction} | Status: {call_status}", flush=True)
+
+        # 1. Resolve agent
+        agent_id = request.query_params.get("agent_id")
+        agent_data = None
+        if agent_id:
+            try:
+                agent_res = supabase_admin.table("agents").select("*").eq("id", agent_id).maybe_single().execute()
+                agent_data = agent_res.data
+            except Exception:
+                agent_data = None
+
+        if not agent_data:
+            try:
+                clean_to = to_number.replace("+", "").strip()
+                agent_lookup = supabase_admin.table("agents").select("*").or_(f"phone_number.eq.{to_number},phone_number.eq.+{clean_to},phone_number.eq.{clean_to}").limit(1).execute()
+                if agent_lookup.data and len(agent_lookup.data) > 0:
+                    agent_data = agent_lookup.data[0]
+                    agent_id = agent_data["id"]
+            except Exception as e:
+                print(f"[Twilio Lookup Error] {e}", flush=True)
+
+        agent_name = agent_data.get("name", "Trinetra AI Assistant") if agent_data else "Trinetra AI Assistant"
+        user_id = agent_data.get("user_id") if agent_data else None
+        org_id = organization_id if organization_id and organization_id != "default" else (agent_data.get("organization_id") if agent_data else None)
+
+        # 2. Insert or update voice_calls table
+        try:
+            existing = supabase_admin.table("voice_calls").select("id").eq("provider_call_id", call_sid).limit(1).execute()
+            if not existing.data:
+                call_record = {
+                    "provider_call_id": call_sid,
+                    "session_id": call_sid,
+                    "agent_id": agent_id,
+                    "user_id": user_id,
+                    "organization_id": org_id,
+                    "caller_phone": from_number,
+                    "from_number": from_number,
+                    "to_number": to_number,
+                    "call_type": direction,
+                    "status": "in_progress",
+                    "started_at": datetime.utcnow().isoformat(),
+                    "transcript_text": f"Agent: Hello! Welcome to Trinetra AI. How may I assist you today?\nCaller: {from_number}",
+                    "language_detected": "english"
+                }
+                supabase_admin.table("voice_calls").insert(call_record).execute()
+                print(f"[Twilio Voice] Logged call record: {call_sid}", flush=True)
+        except Exception as db_err:
+            print(f"[Twilio Voice DB Error] {db_err}", flush=True)
+
+        # 3. Spawn background agent worker
+        room_name = f"twilio-{call_sid}"
+        if agent_id and os.getenv("DISABLE_IN_PROCESS_AGENT", "false").lower() != "true":
+            try:
+                from agent import run_agent
+                asyncio.create_task(run_agent(room_name, agent_id))
+            except Exception as spawn_err:
+                print(f"[Twilio Agent Spawn] {spawn_err}", flush=True)
+
+        # 4. Return TwiML
+        greeting = f"Hello! You have reached {agent_name} on Trinetra AI. Your call is connected and active. Please speak after the tone."
+        
+        twiml_response = f"""<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+    <Say voice="Polly.Joanna">{greeting}</Say>
+    <Pause length="2"/>
+    <Say voice="Polly.Joanna">Thank you for calling Trinetra AI. Have a great day!</Say>
+</Response>"""
+
+        return Response(content=twiml_response.strip(), media_type="application/xml")
+    except Exception as e:
+        print(f"[Twilio Webhook Error] {e}\n{traceback.format_exc()}", flush=True)
+        fallback = """<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+    <Say>Thank you for calling. Your call is connected to Trinetra AI.</Say>
+</Response>"""
+        return Response(content=fallback, media_type="application/xml")
+
+
+@router.api_route("/webhooks/voice/twilio/status/{organization_id}", methods=["GET", "POST"])
+@router.api_route("/webhooks/voice/twilio/status", methods=["GET", "POST"])
+async def handle_twilio_voice_status(
+    request: Request,
+    organization_id: Optional[str] = "default"
+):
+    """
+    Handle Twilio call status callback (ringing, answered, completed).
+    Updates voice_calls record with duration and final status.
+    """
+    try:
+        form_data = {}
+        content_type = request.headers.get("content-type", "")
+        if "application/x-www-form-urlencoded" in content_type or "multipart/form-data" in content_type:
+            form = await request.form()
+            form_data = dict(form)
+        else:
+            try:
+                form_data = await request.json()
+            except Exception:
+                form_data = dict(request.query_params)
+
+        call_sid = form_data.get("CallSid") or form_data.get("call_sid")
+        call_status = form_data.get("CallStatus") or form_data.get("status") or "completed"
+        duration = int(form_data.get("CallDuration") or form_data.get("duration") or 0)
+        recording_url = form_data.get("RecordingUrl")
+
+        print(f"[Twilio Status Webhook] Call: {call_sid} | Status: {call_status} | Duration: {duration}s", flush=True)
+
+        if call_sid:
+            update_payload = {
+                "status": "completed" if call_status in ["completed", "in-progress", "answered"] else call_status,
+                "duration_seconds": duration,
+                "ended_at": datetime.utcnow().isoformat()
+            }
+            if recording_url:
+                update_payload["recording_url"] = recording_url
+
+            supabase_admin.table("voice_calls").update(update_payload).eq("provider_call_id", call_sid).execute()
+
+        return {"status": "ok"}
+    except Exception as e:
+        print(f"[Twilio Status Error] {e}", flush=True)
+        return {"status": "error", "message": str(e)}
+

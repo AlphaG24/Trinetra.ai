@@ -33,6 +33,20 @@ function LoginForm() {
     return () => window.removeEventListener('mousemove', handleMouseMove)
   }, [])
 
+  // Show a toast if the user was redirected due to an expired session
+  useEffect(() => {
+    if (searchParams?.get('expired') === 'true') {
+      toast.error('Your session has expired. Please sign in again.', {
+        duration: 5000,
+        id: 'session-expired', // prevent duplicate toasts
+      })
+      // Clean the URL to prevent re-triggering on refresh
+      const url = new URL(window.location.href)
+      url.searchParams.delete('expired')
+      window.history.replaceState({}, '', url.toString())
+    }
+  }, [searchParams])
+
   if (!isMounted) {
     return <div className="flex h-screen w-full bg-[#06040A]" />
   }

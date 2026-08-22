@@ -90,17 +90,17 @@ export function DeployPageClient({ user, services }: DeployPageClientProps) {
     <div className="relative min-h-[calc(100vh-64px)] pb-16 overflow-hidden">
       
       {/* Subtle Background Radial Gradient */}
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-amber-900/10 via-[#0f1117] to-[#0f1117] pointer-events-none z-0" />
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-amber-500/10 via-[var(--background)] to-[var(--background)] pointer-events-none z-0" />
 
       <div className="relative z-10 space-y-8 animate-fade-in">
         
         {/* Header */}
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-white flex items-center gap-3">
+          <h1 className="text-3xl font-bold tracking-tight text-[var(--heading)] flex items-center gap-3">
             <Rocket className="w-8 h-8 text-amber-500" />
             Deploy Agent
           </h1>
-          <p className="text-gray-400 mt-2 text-sm max-w-xl">
+          <p className="text-[var(--muted)] mt-2 text-sm max-w-xl">
             Submit a deployment request or book a discovery call with our engineers.
           </p>
         </div>
@@ -108,13 +108,13 @@ export function DeployPageClient({ user, services }: DeployPageClientProps) {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           
           {/* Left Column: Form Card */}
-          <div className="lg:col-span-7 bg-[#0f1117]/80 backdrop-blur-xl border border-zinc-800 rounded-2xl p-6 lg:p-8 shadow-xl shadow-black/40 relative overflow-hidden group">
+          <div className="lg:col-span-7 bg-[var(--card-bg)] backdrop-blur-xl border border-[var(--border)] rounded-2xl p-6 lg:p-8 shadow-xl shadow-black/5 relative overflow-hidden group">
             <div className="absolute inset-0 bg-gradient-to-br from-amber-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none duration-500" />
             
             {!isSuccess ? (
               <div className="space-y-6">
                 <div>
-                  <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                  <h3 className="text-xl font-bold text-[var(--heading)] flex items-center gap-2">
                     <Cpu className="w-5 h-5 text-amber-500" />
                     Deploy Your Custom AI Workforce
                   </h3>
@@ -124,13 +124,13 @@ export function DeployPageClient({ user, services }: DeployPageClientProps) {
                   
                   {/* Select Autonomous Agent */}
                   <div className="space-y-2">
-                    <label className="text-xs font-semibold text-gray-300 uppercase tracking-wider">SELECT AUTONOMOUS AGENT</label>
+                    <label className="text-xs font-semibold text-[var(--muted)] uppercase tracking-wider">SELECT AUTONOMOUS AGENT</label>
                     <div className="relative">
                       <Target className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-amber-500/60 pointer-events-none" />
                       <select
                         value={selectedAgentId}
                         onChange={(e) => setSelectedAgentId(e.target.value)}
-                        className="w-full py-3 pl-11 pr-10 bg-black/40 border border-white/10 rounded-xl text-white text-sm focus:outline-none focus:border-amber-500/50 appearance-none cursor-pointer"
+                        className="w-full py-3 pl-11 pr-10 bg-[var(--background)] border border-[var(--border)] rounded-xl text-[var(--body)] text-sm focus:outline-none focus:border-amber-500/50 appearance-none cursor-pointer"
                       >
                         {services.map((service) => (
                           <option key={service.id} value={service.id}>
@@ -138,7 +138,7 @@ export function DeployPageClient({ user, services }: DeployPageClientProps) {
                           </option>
                         ))}
                       </select>
-                      <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-gray-400">
+                      <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-[var(--muted)]">
                         <ChevronRight className="w-4 h-4 rotate-90" />
                       </div>
                     </div>
@@ -146,20 +146,20 @@ export function DeployPageClient({ user, services }: DeployPageClientProps) {
 
                   {/* Estimated Monthly Execution Scale */}
                   <div className="space-y-2">
-                    <label className="text-xs font-semibold text-gray-300 uppercase tracking-wider">ESTIMATED MONTHLY EXECUTION SCALE</label>
+                    <label className="text-xs font-semibold text-[var(--muted)] uppercase tracking-wider">ESTIMATED MONTHLY EXECUTION SCALE</label>
                     <div className="relative">
                       <Activity className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-amber-500/60 pointer-events-none" />
                       <select
                         value={estimatedScale}
                         onChange={(e) => setEstimatedScale(e.target.value)}
-                        className="w-full py-3 pl-11 pr-10 bg-black/40 border border-white/10 rounded-xl text-white text-sm focus:outline-none focus:border-amber-500/50 appearance-none cursor-pointer"
+                        className="w-full py-3 pl-11 pr-10 bg-[var(--background)] border border-[var(--border)] rounded-xl text-[var(--body)] text-sm focus:outline-none focus:border-amber-500/50 appearance-none cursor-pointer"
                       >
                         <option value="1,000 - 10,000 monthly executions / tasks">1,000 - 10,000 monthly executions / tasks</option>
                         <option value="10,000 - 50,000 monthly executions / tasks">10,000 - 50,000 monthly executions / tasks</option>
                         <option value="50,000 - 250,000 monthly executions / tasks">50,000 - 250,000 monthly executions / tasks</option>
                         <option value="250,000+ (Enterprise Volume)">250,000+ (Enterprise Volume)</option>
                       </select>
-                      <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-gray-400">
+                      <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-[var(--muted)]">
                         <ChevronRight className="w-4 h-4 rotate-90" />
                       </div>
                     </div>
@@ -167,7 +167,7 @@ export function DeployPageClient({ user, services }: DeployPageClientProps) {
 
                   {/* Current CRM / Software Stack */}
                   <div className="space-y-2">
-                    <label className="text-xs font-semibold text-gray-300 uppercase tracking-wider">CURRENT SOFTWARE / DATA STACK</label>
+                    <label className="text-xs font-semibold text-[var(--muted)] uppercase tracking-wider">CURRENT SOFTWARE / DATA STACK</label>
                     <div className="relative">
                       <Box className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-amber-500/60 pointer-events-none" />
                       <input
@@ -176,14 +176,14 @@ export function DeployPageClient({ user, services }: DeployPageClientProps) {
                         onChange={(e) => setCurrentStack(e.target.value)}
                         placeholder="e.g., Salesforce, HubSpot, Custom ERP, AWS S3, or REST APIs..."
                         required
-                        className="w-full py-3 pl-11 pr-4 bg-black/40 border border-white/10 rounded-xl text-white text-sm placeholder:text-gray-600 focus:outline-none focus:border-amber-500/50 transition-colors"
+                        className="w-full py-3 pl-11 pr-4 bg-[var(--background)] border border-[var(--border)] rounded-xl text-[var(--body)] text-sm placeholder:text-zinc-500 focus:outline-none focus:border-amber-500/50 transition-colors"
                       />
                     </div>
                   </div>
 
                   {/* Additional Requirements */}
                   <div className="space-y-2">
-                    <label className="text-xs font-semibold text-gray-300 uppercase tracking-wider">CUSTOM WORKFLOW & INTEGRATION REQUIREMENTS</label>
+                    <label className="text-xs font-semibold text-[var(--muted)] uppercase tracking-wider">CUSTOM WORKFLOW & INTEGRATION REQUIREMENTS</label>
                     <div className="relative">
                       <AlignLeft className="absolute left-4 top-4 w-4 h-4 text-amber-500/60 pointer-events-none" />
                       <textarea
@@ -191,7 +191,7 @@ export function DeployPageClient({ user, services }: DeployPageClientProps) {
                         value={requirements}
                         onChange={(e) => setRequirements(e.target.value)}
                         placeholder="Describe your specific operational bottlenecks, target subdomains, or required SLAs..."
-                        className="w-full py-3 pl-11 pr-4 bg-black/40 border border-white/10 rounded-xl text-white text-sm placeholder:text-gray-600 focus:outline-none focus:border-amber-500/50 transition-colors resize-none"
+                        className="w-full py-3 pl-11 pr-4 bg-[var(--background)] border border-[var(--border)] rounded-xl text-[var(--body)] text-sm placeholder:text-zinc-500 focus:outline-none focus:border-amber-500/50 transition-colors resize-none"
                       />
                     </div>
                   </div>
@@ -225,8 +225,8 @@ export function DeployPageClient({ user, services }: DeployPageClientProps) {
                   <CheckCircle2 className="w-8 h-8" />
                 </div>
                 <div className="space-y-2">
-                  <h3 className="text-2xl font-bold text-white">Request Received!</h3>
-                  <p className="text-gray-400 text-sm max-w-sm">
+                  <h3 className="text-2xl font-bold text-[var(--heading)]">Request Received!</h3>
+                  <p className="text-[var(--muted)] text-sm max-w-sm">
                     Our engineering squad has received your deployment parameters and is reviewing your CRM stack config. We will reach out to you within 24 hours.
                   </p>
                 </div>
@@ -242,30 +242,30 @@ export function DeployPageClient({ user, services }: DeployPageClientProps) {
 
           {/* Right Column: Fast Track Discovery */}
           <div className="lg:col-span-5 space-y-6">
-            <div className="bg-[#0f1117]/80 backdrop-blur-xl border border-zinc-800 rounded-2xl p-6 shadow-xl relative overflow-hidden group hover:border-amber-500/40 transition-all duration-300">
+            <div className="bg-[var(--card-bg)] backdrop-blur-xl border border-[var(--border)] rounded-2xl p-6 shadow-xl relative overflow-hidden group hover:border-amber-500/40 transition-all duration-300">
               <div className="absolute inset-0 bg-gradient-to-br from-purple-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none duration-500" />
               
               <div className="space-y-4">
-                <div className="inline-flex px-3 py-1 bg-amber-500/10 border border-amber-500/20 text-amber-500 text-xs font-bold uppercase tracking-wider rounded-md">
+                <div className="inline-flex px-3 py-1 bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-500 text-xs font-bold uppercase tracking-wider rounded-md">
                   Fast Track
                 </div>
-                <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                <h3 className="text-xl font-bold text-[var(--heading)] flex items-center gap-2">
                   <Calendar className="w-5 h-5 text-amber-500" />
                   Skip the Line
                 </h3>
 
-                <div className="space-y-3 pt-3 border-t border-white/5">
+                <div className="space-y-3 pt-3 border-t border-[var(--border)]">
                   <div className="flex items-start gap-3">
                     <div className="w-1.5 h-1.5 rounded-full bg-amber-500 mt-2 shrink-0" />
-                    <p className="text-xs text-gray-400">Seamlessly connect the autonomous agents to your existing workflows</p>
+                    <p className="text-xs text-[var(--muted)]">Seamlessly connect the autonomous agents to your existing workflows</p>
                   </div>
                   <div className="flex items-start gap-3">
                     <div className="w-1.5 h-1.5 rounded-full bg-amber-500 mt-2 shrink-0" />
-                    <p className="text-xs text-gray-400">Configure custom triggers, thresholds, and self-healing heuristics</p>
+                    <p className="text-xs text-[var(--muted)]">Configure custom triggers, thresholds, and self-healing heuristics</p>
                   </div>
                   <div className="flex items-start gap-3">
                     <div className="w-1.5 h-1.5 rounded-full bg-amber-500 mt-2 shrink-0" />
-                    <p className="text-xs text-gray-400">Design tailored execution paths optimized for your business operations</p>
+                    <p className="text-xs text-[var(--muted)]">Design tailored execution paths optimized for your business operations</p>
                   </div>
                 </div>
 
@@ -279,11 +279,11 @@ export function DeployPageClient({ user, services }: DeployPageClientProps) {
                       console.error("Calendly URL not configured in environment.");
                     }
                   }}
-                  className="w-full mt-4 py-3 px-4 bg-white/5 hover:bg-white/10 text-white border border-white/10 hover:border-amber-500/30 font-semibold rounded-xl transition-all flex items-center justify-center gap-2 group cursor-pointer"
+                  className="w-full mt-4 py-3 px-4 bg-[var(--hover-bg)]/40 hover:bg-[var(--hover-bg)] text-[var(--heading)] border border-[var(--border)] hover:border-amber-500/30 font-semibold rounded-xl transition-all flex items-center justify-center gap-2 group cursor-pointer"
                 >
                   <Calendar className="w-4 h-4 text-amber-500" />
                   Schedule Discovery Call
-                  <ChevronRight className="w-4 h-4 text-gray-500 group-hover:translate-x-1 transition-transform" />
+                  <ChevronRight className="w-4 h-4 text-[var(--muted)] group-hover:translate-x-1 transition-transform" />
                 </button>
               </div>
             </div>
@@ -292,27 +292,27 @@ export function DeployPageClient({ user, services }: DeployPageClientProps) {
             <div className="grid grid-cols-2 gap-4">
               
               {/* Card 1: Ultra-Low Latency */}
-              <div className="bg-white/5 border border-zinc-800 hover:border-amber-500/20 hover:bg-white/10 rounded-xl p-4 flex flex-col items-center justify-center text-center transition-all duration-300 group min-h-[96px]">
+              <div className="bg-[var(--card-bg)] border border-[var(--border)] hover:border-amber-500/20 hover:bg-[var(--hover-bg)] rounded-xl p-4 flex flex-col items-center justify-center text-center transition-all duration-300 group min-h-[96px]">
                 <Zap className="w-5 h-5 text-amber-500 mb-2 group-hover:scale-110 transition-transform duration-300" />
-                <span className="text-xs font-semibold text-white">Ultra-Low Latency</span>
+                <span className="text-xs font-semibold text-[var(--heading)]">Ultra-Low Latency</span>
               </div>
 
               {/* Card 2: Custom Integration */}
-              <div className="bg-white/5 border border-zinc-800 hover:border-amber-500/20 hover:bg-white/10 rounded-xl p-4 flex flex-col items-center justify-center text-center transition-all duration-300 group min-h-[96px]">
+              <div className="bg-[var(--card-bg)] border border-[var(--border)] hover:border-amber-500/20 hover:bg-[var(--hover-bg)] rounded-xl p-4 flex flex-col items-center justify-center text-center transition-all duration-300 group min-h-[96px]">
                 <Cpu className="w-5 h-5 text-amber-500 mb-2 group-hover:scale-110 transition-transform duration-300" />
-                <span className="text-xs font-semibold text-white">Custom Integration</span>
+                <span className="text-xs font-semibold text-[var(--heading)]">Custom Integration</span>
               </div>
 
               {/* Card 3: Enterprise Security */}
-              <div className="bg-white/5 border border-zinc-800 hover:border-amber-500/20 hover:bg-white/10 rounded-xl p-4 flex flex-col items-center justify-center text-center transition-all duration-300 group min-h-[96px]">
+              <div className="bg-[var(--card-bg)] border border-[var(--border)] hover:border-amber-500/20 hover:bg-[var(--hover-bg)] rounded-xl p-4 flex flex-col items-center justify-center text-center transition-all duration-300 group min-h-[96px]">
                 <Shield className="w-5 h-5 text-amber-500 mb-2 group-hover:scale-110 transition-transform duration-300" />
-                <span className="text-xs font-semibold text-white">Enterprise Security</span>
+                <span className="text-xs font-semibold text-[var(--heading)]">Enterprise Security</span>
               </div>
 
               {/* Card 4: Dedicated Engineering Support */}
-              <div className="bg-white/5 border border-zinc-800 hover:border-amber-500/20 hover:bg-white/10 rounded-xl p-4 flex flex-col items-center justify-center text-center transition-all duration-300 group min-h-[96px]">
+              <div className="bg-[var(--card-bg)] border border-[var(--border)] hover:border-amber-500/20 hover:bg-[var(--hover-bg)] rounded-xl p-4 flex flex-col items-center justify-center text-center transition-all duration-300 group min-h-[96px]">
                 <Activity className="w-5 h-5 text-amber-500 mb-2 group-hover:scale-110 transition-transform duration-300" />
-                <span className="text-xs font-semibold text-white">Dedicated Engineering Support</span>
+                <span className="text-xs font-semibold text-[var(--heading)]">Dedicated Engineering Support</span>
               </div>
 
             </div>

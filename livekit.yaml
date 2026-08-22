@@ -1,0 +1,15 @@
+port: 7880
+rtc:
+  tcp_port: 7881
+  udp_port: 7882
+  # Advertise localhost so the browser can reach Docker's mapped ports
+  node_ip: 127.0.0.1
+
+keys:
+  devkey: secretsecretsecretsecretsecret12
+
+logging:
+  level: info
+
+# Allow connections without TLS locally
+development: true

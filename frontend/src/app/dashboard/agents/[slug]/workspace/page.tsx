@@ -31,6 +31,11 @@ export default async function WorkspacePage({ params }: PageProps) {
     redirect('/dashboard/agents')
   }
 
+  // Redirect voice tools to the new tabbed AgentEditor route
+  if (tool.type === 'voice') {
+    redirect(`/dashboard/agents/${slug}`)
+  }
+
   // 3. Fetch user service quota
   let { data: quota, error: quotaError } = await supabase
     .from('user_service_quotas')
@@ -202,7 +207,7 @@ export default async function WorkspacePage({ params }: PageProps) {
               </div>
 
               <Link 
-                href="/dashboard/deploy-agent"
+                href="/dashboard/contact"
                 className="w-full py-4 px-6 rounded-xl text-sm font-bold uppercase tracking-wider bg-gradient-to-r from-red-600 to-red-500 hover:from-red-500 hover:to-red-400 text-white shadow-lg shadow-red-600/10 text-center transition-all inline-block hover:scale-[1.02] active:scale-[0.98]"
               >
                 Upgrade Plan / Contact Sales

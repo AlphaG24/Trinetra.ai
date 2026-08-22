@@ -1,0 +1,8 @@
+-- Add missing columns to leads table
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS agent_id UUID REFERENCES agents(id);
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS call_id UUID REFERENCES voice_calls(id);
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS interest_level TEXT;
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS budget_range TEXT;
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS timeline TEXT;
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS call_summary TEXT;
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS extracted_data JSONB DEFAULT '{}';

@@ -39,7 +39,7 @@ export default function SignupPage() {
           data: {
             full_name: fullName,
           },
-          emailRedirectTo: getURL('api/auth/callback'),
+          emailRedirectTo: getURL('auth/callback?next=/dashboard'),
         }
       })
 

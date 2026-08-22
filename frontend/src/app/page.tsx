@@ -4,6 +4,7 @@ import { Layout } from "@/components/layout/Layout";
 import { Hero } from "@/components/landing/Hero";
 import { MetricsBar } from "@/components/landing/MetricsBar";
 import { WhatWeBuild } from "@/components/landing/WhatWeBuild";
+import { TrinetraShikshaSection } from "@/components/landing/TrinetraShikshaSection";
 import { ProductsShowcase } from "@/components/landing/ProductsShowcase";
 import { HowItWorks } from "@/components/landing/HowItWorks";
 import { PartnerProgram } from "@/components/landing/PartnerProgram";
@@ -80,6 +81,9 @@ export default async function Home() {
 
         {/* What We Build (Three Pillars) */}
         <WhatWeBuild />
+
+        {/* Trinetra Shiksha Spotlight */}
+        <TrinetraShikshaSection />
 
         {/* Our Products / Use Cases (Alternating) */}
         <ProductsShowcase />

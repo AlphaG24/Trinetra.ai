@@ -3,6 +3,7 @@
 import { motion } from "framer-motion";
 import { Bot, GraduationCap, Users, ExternalLink } from "lucide-react";
 import Link from "next/link";
+import Image from "next/image";
 
 const cards = [
   {
@@ -218,87 +219,50 @@ export function WhatWeBuild() {
               </a>
             </div>
 
-            {/* Right Column: Premium Royal Style Live Assessment Preview */}
+            {/* Right Column: Actual Platform Screenshot */}
             <div className="w-full lg:w-1/2 flex justify-center">
-              <div className="w-full max-w-[480px] bg-[#130224]/80 border border-[#1E0A35] rounded-[24px] p-[28px] md:p-[32px] relative overflow-hidden shadow-[0_20px_50px_rgba(245,158,11,0.03)] transition-all duration-500">
-                {/* Thin Gold accent line on top */}
-                <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-[#F59E0B] to-transparent" />
-                
-                {/* Glassmorphic card header */}
-                <div className="flex items-center justify-between border-b border-[#1E0A35] pb-[16px] mb-[24px]">
-                  <div className="flex items-center gap-[10px]">
-                    <div className="w-[10px] h-[10px] rounded-full bg-[#F59E0B] animate-pulse" />
-                    <span className="font-mono text-[12px] text-[#FAF7FF] uppercase tracking-wider">Trinetra Shiksha Console</span>
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                whileInView={{ opacity: 1, scale: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.8, ease: 'easeOut' }}
+                className="w-full max-w-[480px] relative"
+              >
+                {/* Outer glow */}
+                <div
+                  className="absolute -inset-[2px] rounded-[26px] z-0 pointer-events-none"
+                  style={{ background: 'linear-gradient(135deg, rgba(245,158,11,0.25) 0%, rgba(139,92,246,0.1) 100%)' }}
+                />
+
+                {/* Card shell */}
+                <div className="relative z-10 bg-[#0C0118] border border-[rgba(245,158,11,0.15)] rounded-[24px] overflow-hidden shadow-[0_30px_80px_rgba(245,158,11,0.08)]">
+                  {/* Thin top gold line */}
+                  <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-[#F59E0B] to-transparent z-20" />
+
+                  {/* Browser chrome bar */}
+                  <div className="flex items-center gap-[6px] px-[16px] py-[12px] bg-[#0C0118] border-b border-[rgba(245,158,11,0.08)]">
+                    <div className="w-[10px] h-[10px] rounded-full bg-[#FF5F57]" />
+                    <div className="w-[10px] h-[10px] rounded-full bg-[#FEBC2E]" />
+                    <div className="w-[10px] h-[10px] rounded-full bg-[#28C840]" />
+                    <div className="flex-1 mx-[10px] bg-[#130224] border border-[rgba(245,158,11,0.1)] rounded-[6px] px-[10px] py-[4px]">
+                      <span className="font-mono text-[11px] text-[#6B6088]">
+                        🟢 shiksha.trinetraedu-ai.com
+                      </span>
+                    </div>
                   </div>
-                  <div className="px-[10px] py-[4px] rounded-md bg-[rgba(245,158,11,0.05)] border border-[rgba(245,158,11,0.1)] font-mono text-[11px] text-[#F59E0B]">
-                    Difficulty: Level 4
+
+                  {/* Platform image */}
+                  <div className="relative w-full aspect-[3/4] overflow-hidden">
+                    <Image
+                      src="/Trinetra-shiksha.jpeg"
+                      alt="Trinetra Shiksha Platform — AI-driven adaptive assessment"
+                      fill
+                      className="object-cover object-top"
+                      sizes="(max-width: 768px) 100vw, 480px"
+                    />
                   </div>
                 </div>
-
-                {/* Question block */}
-                <div className="space-y-[16px]">
-                  <div className="flex justify-between items-center text-[12px] text-[#9A91B5] font-mono">
-                    <span>SECTION: ADVANCED ALGORITHMS</span>
-                    <span>Q. 12/25</span>
-                  </div>
-                  
-                  <p className="text-[#FAF7FF] font-medium text-[16px] leading-[1.6]">
-                    Given a cyclic graph of size N, what is the maximum number of cuts required to partition it into components of size at most K?
-                  </p>
-
-                  {/* Multi-choice options */}
-                  <div className="space-y-[10px] pt-[8px]">
-                    {[
-                      { label: "A", text: "ceil(N / K)", selected: false },
-                      { label: "B", text: "N - K + 1", selected: false },
-                      { label: "C", text: "ceil(N / K) + 1", selected: true },
-                      { label: "D", text: "floor(N / K)", selected: false }
-                    ].map((opt) => (
-                      <div 
-                        key={opt.label}
-                        className={`flex items-center justify-between px-[16px] py-[12px] rounded-[10px] border transition-all duration-300 ${
-                          opt.selected 
-                            ? "bg-[rgba(245,158,11,0.08)] border-[#F59E0B] text-[#FAF7FF] shadow-[0_0_15px_rgba(245,158,11,0.05)]" 
-                            : "bg-[#080010] border-[#1E0A35] text-[#B8B0D1]"
-                        }`}
-                      >
-                        <span className="text-[14px]"><strong>{opt.label}.</strong> {opt.text}</span>
-                        {opt.selected && <div className="w-[8px] h-[8px] rounded-full bg-[#F59E0B]" />}
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Adaptive Engine Real-time Analysis Widget */}
-                  <div className="mt-[28px] pt-[20px] border-t border-[#1E0A35] bg-[rgba(245,158,11,0.02)] p-[16px] rounded-[12px] border border-[rgba(245,158,11,0.05)] space-y-[12px]">
-                    <div className="flex items-center justify-between text-[12px] font-mono">
-                      <span className="text-[#9A91B5]">REAL-TIME ADAPTIVE RUNTIME</span>
-                      <span className="text-[#FBBF24] font-semibold">Active</span>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-[12px] text-[13px]">
-                      <div className="bg-[#080010]/80 p-[10px] rounded-md border border-[#1E0A35]">
-                        <span className="text-[#6B6088] text-[11px] block uppercase font-mono mb-[2px]">Student Pace</span>
-                        <strong className="text-[#FAF7FF] font-medium font-sans">14.2s (Optimal)</strong>
-                      </div>
-                      <div className="bg-[#080010]/80 p-[10px] rounded-md border border-[#1E0A35]">
-                        <span className="text-[#6B6088] text-[11px] block uppercase font-mono mb-[2px]">Cognitive Load</span>
-                        <strong className="text-[#FAF7FF] font-medium font-sans text-green-400">Stable</strong>
-                      </div>
-                    </div>
-
-                    <div className="pt-[4px]">
-                      <div className="flex justify-between items-center text-[11px] text-[#9A91B5] font-mono mb-[4px]">
-                        <span>Difficulty Progression</span>
-                        <span className="text-[#F59E0B]">Level Up imminent</span>
-                      </div>
-                      <div className="h-[4px] w-full bg-[#080010] rounded-full overflow-hidden">
-                        <div className="h-full bg-gradient-to-r from-[#F59E0B] to-[#FBBF24] rounded-full" style={{ width: '84%' }} />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-              </div>
+              </motion.div>
             </div>
           </div>
         </div>

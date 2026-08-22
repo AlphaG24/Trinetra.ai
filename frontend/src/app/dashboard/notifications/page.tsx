@@ -12,9 +12,26 @@ export default async function NotificationsPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
+  const threeMonthsAgo = new Date()
+  threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3)
+  const threeMonthsAgoStr = threeMonthsAgo.toISOString()
+
+  // Permanently delete notifications older than 3 months
+  try {
+    await supabase
+      .from('notifications')
+      .delete()
+      .eq('user_id', user.id)
+      .lt('created_at', threeMonthsAgoStr)
+  } catch (err) {
+    console.error('Failed to permanently delete old notifications:', err)
+  }
+
   const { data: notifications } = await supabase
-    .from('official_notifications')
-    .select('*, user_read_notifications!left(read_at)')
+    .from('notifications')
+    .select('*')
+    .eq('user_id', user.id)
+    .gte('created_at', threeMonthsAgoStr)
     .order('created_at', { ascending: false })
     .limit(50)
 
@@ -24,7 +41,9 @@ export default async function NotificationsPage() {
     message: n.message,
     type: n.type,
     created_at: n.created_at,
-    is_read: n.user_read_notifications && n.user_read_notifications.length > 0
+    is_read: !!n.is_read,
+    action_url: n.action_url || null,
+    action_text: n.action_text || n.action_label || null
   }))
 
   return <NotificationsPageClient initialNotifications={mappedNotifications} userId={user.id} />

@@ -2,6 +2,8 @@ import { createClient } from '@/lib/server'
 import { redirect } from 'next/navigation'
 import { LeadsPageClient } from '@/src/components/pages/LeadsPageClient'
 
+export const dynamic = 'force-dynamic'
+
 export const metadata = {
   title: 'Leads — Trinetra AI',
   description: 'Track and manage all leads captured by your AI agents.',
@@ -26,7 +28,7 @@ export default async function LeadsPage() {
     .select('*')
     .eq('user_id', user.id)
     .order('created_at', { ascending: false })
-
+     
   return (
     <LeadsPageClient 
       initialLeads={leads || []} 
