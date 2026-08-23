@@ -109,7 +109,7 @@ export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
             <img
               src="/trident.png"
               alt="Trinetra"
-              className="dynamic-logo h-9 w-auto object-contain"
+              className="dynamic-logo h-11 md:h-12 w-auto object-contain"
             />
           </Link>
         </div>

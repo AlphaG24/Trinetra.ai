@@ -40,8 +40,8 @@ export async function POST(request: Request) {
             });
         } catch (fetchErr: any) {
             clearTimeout(timeoutId);
-            console.error("[POST /api/phone-numbers/sync] FastAPI sync failed:", fetchErr);
-            return NextResponse.json({ success: false, data: [], error: "Backend server is offline or unreachable" }, { status: 503 });
+            console.warn("[POST /api/phone-numbers/sync] FastAPI sync failed (backend offline):", fetchErr);
+            return NextResponse.json({ success: false, data: [], error: "Backend server is offline or unreachable" });
         }
     } catch (err: any) {
         return NextResponse.json({ success: false, data: [], error: err.message || "Internal server error" }, { status: 500 });

@@ -3,7 +3,7 @@ import { authenticateRequest } from "@/lib/api-helpers";
 
 export async function GET(request: Request) {
   try {
-    const { authenticated, profile, error } = await authenticateRequest();
+    const { authenticated, profile, error, supabase } = await authenticateRequest();
     if (!authenticated || !profile) {
       return NextResponse.json({ error: error || "Unauthorized" }, { status: 401 });
     }
@@ -33,8 +33,33 @@ export async function GET(request: Request) {
       return NextResponse.json(data);
     } catch (fetchErr: any) {
       clearTimeout(timeoutId);
-      console.error("[GET /api/campaigns] FastAPI fetch failed:", fetchErr);
-      return NextResponse.json({ error: "Backend server is offline or unreachable" }, { status: 503 });
+      console.warn("[GET /api/campaigns] FastAPI fetch failed, falling back to direct database query:", fetchErr);
+      
+      try {
+        const { data: dbCampaigns, error: dbError } = await supabase
+          .from("campaigns")
+          .select(`
+            *,
+            agents (
+              name
+            )
+          `)
+          .eq("organization_id", profile.organization_id)
+          .order("created_at", { ascending: false });
+
+        if (dbError) {
+          console.error("[GET /api/campaigns] Supabase fallback database query failed:", dbError);
+          return NextResponse.json({ error: "Failed to list campaigns from database" }, { status: 500 });
+        }
+
+        return NextResponse.json({
+          success: true,
+          data: dbCampaigns || []
+        });
+      } catch (dbFallbackErr: any) {
+        console.error("[GET /api/campaigns] Supabase fallback exception:", dbFallbackErr);
+        return NextResponse.json({ error: "Backend server is offline or unreachable" }, { status: 503 });
+      }
     }
   } catch (err: any) {
     return NextResponse.json({ error: err.message || "Internal server error" }, { status: 500 });

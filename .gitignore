@@ -75,3 +75,10 @@ credentials.json
 .gemini/
 .vercel
 .env*
+
+# Vercel & testing artifacts
+frontend/vercel-env.txt
+frontend/test_pdf.js
+
+# Supabase local configuration & state
+supabase/.temp/
