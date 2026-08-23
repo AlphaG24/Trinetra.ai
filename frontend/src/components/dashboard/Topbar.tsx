@@ -84,7 +84,7 @@ export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
   const handleSignOut = async () => {
     const supabase = createClient()
     await supabase.auth.signOut()
-    router.push('/login')
+    router.push('/')
     router.refresh()
   }
 
@@ -203,13 +203,13 @@ export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
                   <Link
                     href="/dashboard/profile"
                     onClick={() => setIsDropdownOpen(false)}
-                    className="flex items-center gap-2 px-4 py-2.5 text-sm text-[var(--body)] hover:bg-[var(--hover-bg)] hover:text-[var(--heading)] transition-colors font-playfair font-medium"
+                    className="flex items-center gap-2 px-4 py-2.5 text-sm text-[var(--body)] hover:bg-[var(--hover-bg)] hover:text-[var(--heading)] transition-colors font-playfair font-bold"
                   >
                     <User className="w-4 h-4 text-[var(--muted)]" /> My Profile
                   </Link>
                   <button
                     onClick={() => { setIsDropdownOpen(false); handleSignOut() }}
-                    className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-red-500 hover:bg-[var(--hover-bg)] hover:text-red-400 text-left transition-colors font-playfair font-medium"
+                    className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-red-500 hover:bg-[var(--hover-bg)] hover:text-red-400 text-left transition-colors font-playfair font-bold"
                   >
                     <LogOut className="w-4 h-4" /> Sign Out
                   </button>

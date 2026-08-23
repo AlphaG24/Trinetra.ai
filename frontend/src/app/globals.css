@@ -5,11 +5,13 @@
    TAILWIND v4 THEME REGISTER
    ═══════════════════════════════════════════════════════════════ */
 @theme {
-  --font-sans: var(--font-merriweather), Merriweather, Georgia, serif;
-  --font-display: var(--font-playfair), "Playfair Display", Georgia, serif;
-  --font-heading: var(--font-playfair), "Playfair Display", Georgia, serif;
+  --font-sans: var(--font-inter), "Inter", system-ui, -apple-system, sans-serif;
+  --font-display: "Space Grotesk", "Inter", sans-serif;
+  --font-heading: "Space Grotesk", "Inter", sans-serif;
   --font-montserrat: var(--font-montserrat), Montserrat, "Segoe UI", sans-serif;
   --font-mono: var(--font-jetbrains-mono), "JetBrains Mono", monospace;
+  --font-playfair: var(--font-playfair), "Playfair Display", Georgia, serif;
+  --font-merriweather: var(--font-merriweather), Merriweather, Georgia, serif;
 }
 
 /* ═══════════════════════════════════════════════════════════════

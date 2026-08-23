@@ -77,7 +77,7 @@ export function Navbar() {
   const [productsMenuOpen, setProductsMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const companyName = getConfigString(siteConfig, "company_name", "Trinetra AI");
+  const companyName = getConfigString(siteConfig, "company_name", "Trinetra");
   const products: ProductNavItem[] =
     productsData.length > 0
       ? productsData.map((product) => ({
@@ -153,7 +153,7 @@ export function Navbar() {
               alt={companyName}
               width={320}
               height={90}
-              className="h-10 w-auto object-contain"
+              className="h-14 w-auto object-contain"
               priority
             />
           </Link>

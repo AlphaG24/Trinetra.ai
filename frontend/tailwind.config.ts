@@ -51,9 +51,9 @@ const config: Config = {
                 },
             },
             fontFamily: {
-                sans:    ['var(--font-merriweather)', 'Merriweather', 'serif'],
-                display: ['var(--font-playfair)', 'Playfair Display', 'serif'],
-                heading: ['var(--font-playfair)', 'Playfair Display', 'serif'],
+                sans:    ['var(--font-inter)', 'Inter', 'sans-serif'],
+                display: ['Space Grotesk', 'Inter', 'sans-serif'],
+                heading: ['Space Grotesk', 'Inter', 'sans-serif'],
                 montserrat: ['var(--font-montserrat)', 'Montserrat', 'sans-serif'],
                 mono:    ['var(--font-jetbrains-mono)', 'JetBrains Mono', 'monospace'],
             },

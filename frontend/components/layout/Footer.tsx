@@ -85,7 +85,7 @@ export function Footer() {
     return null;
   }
 
-  const companyName = getConfigString(siteConfig, "company_name", "Trinetra AI");
+  const companyName = getConfigString(siteConfig, "company_name", "Trinetra");
   const linkedinUrl = getConfigString(siteConfig, "social_linkedin");
   const instagramUrl = getConfigString(siteConfig, "social_instagram");
   const twitterUrl = getConfigString(siteConfig, "social_twitter");
@@ -236,7 +236,7 @@ export function Footer() {
 
         <div className="mt-[48px] flex flex-col items-center justify-between gap-[16px] border-t border-[#1E0A35] pt-[24px] md:flex-row">
           <p className="text-center font-sans text-[13px] font-normal text-[#6B6088] md:text-left">
-            &copy; 2026 trinetraedu-ai. All rights reserved.
+            &copy; 2026 {companyName}. All rights reserved.
           </p>
           <p className="flex items-center justify-center gap-[6px] font-sans text-[13px] font-normal text-[#6B6088] md:justify-end">
             Made in India.
