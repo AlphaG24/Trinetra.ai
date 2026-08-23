@@ -289,7 +289,7 @@ export function IntegrationsTab() {
             <button
               onClick={() => handleSave('telegram')}
               disabled={loadingSection !== null}
-              className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-violet-650 hover:bg-violet-600 text-white border border-violet-500/20 font-bold text-xs uppercase tracking-wider transition-all cursor-pointer disabled:opacity-50"
+              className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-700 text-white border border-violet-500/20 font-bold text-xs uppercase tracking-wider transition-all cursor-pointer disabled:opacity-50"
             >
               {loadingSection === 'telegram' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
               {loadingSection === 'telegram' ? 'Connecting...' : 'Save & Connect'}
@@ -355,7 +355,7 @@ export function IntegrationsTab() {
             <button
               onClick={() => handleSave('whatsapp')}
               disabled={loadingSection !== null}
-              className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-violet-650 hover:bg-violet-600 text-white border border-violet-500/20 font-bold text-xs uppercase tracking-wider transition-all cursor-pointer disabled:opacity-50"
+              className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-700 text-white border border-violet-500/20 font-bold text-xs uppercase tracking-wider transition-all cursor-pointer disabled:opacity-50"
             >
               {loadingSection === 'whatsapp' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
               {loadingSection === 'whatsapp' ? 'Connecting...' : 'Save & Connect'}
@@ -449,7 +449,7 @@ export function IntegrationsTab() {
             <button
               onClick={() => handleSave('email')}
               disabled={loadingSection !== null}
-              className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-violet-650 hover:bg-violet-600 text-white border border-violet-500/20 font-bold text-xs uppercase tracking-wider transition-all cursor-pointer disabled:opacity-50"
+              className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-700 text-white border border-violet-500/20 font-bold text-xs uppercase tracking-wider transition-all cursor-pointer disabled:opacity-50"
             >
               {loadingSection === 'email' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
               {loadingSection === 'email' ? 'Connecting...' : 'Save & Connect'}
@@ -494,7 +494,7 @@ export function IntegrationsTab() {
             <button
               onClick={() => handleSave('crm')}
               disabled={loadingSection !== null}
-              className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-violet-650 hover:bg-violet-600 text-white border border-violet-500/20 font-bold text-xs uppercase tracking-wider transition-all cursor-pointer disabled:opacity-50"
+              className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-700 text-white border border-violet-500/20 font-bold text-xs uppercase tracking-wider transition-all cursor-pointer disabled:opacity-50"
             >
               {loadingSection === 'crm' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
               {loadingSection === 'crm' ? 'Connecting...' : 'Save & Connect'}
@@ -548,7 +548,7 @@ export function IntegrationsTab() {
             <button
               onClick={() => handleSave('calendar')}
               disabled={loadingSection !== null}
-              className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-violet-650 hover:bg-violet-600 text-white border border-violet-500/20 font-bold text-xs uppercase tracking-wider transition-all cursor-pointer disabled:opacity-50"
+              className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-700 text-white border border-violet-500/20 font-bold text-xs uppercase tracking-wider transition-all cursor-pointer disabled:opacity-50"
             >
               {loadingSection === 'calendar' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
               {loadingSection === 'calendar' ? 'Connecting...' : 'Save & Connect'}

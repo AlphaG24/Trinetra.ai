@@ -42,7 +42,7 @@ export function WelcomeHeader({ fullName, isOnboardingComplete = true, loading =
       </div>
 
       {!isOnboardingComplete && (
-        <div className="flex items-center justify-between p-4 rounded-xl bg-violet-500/10 border border-violet-500/20 text-violet-750 dark:text-violet-405 text-sm animate-pulse">
+        <div className="flex items-center justify-between p-4 rounded-xl bg-violet-500/10 border border-violet-500/20 text-violet-700 dark:text-violet-400 text-sm animate-pulse">
           <div className="flex items-center gap-2">
             <Sparkles className="w-4 h-4 shrink-0" />
             <span className="font-semibold">Complete your profile to get the most out of Trinetra</span>

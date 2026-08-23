@@ -240,7 +240,7 @@ export function NewCampaignModal({ isOpen, onClose, onSuccess }: NewCampaignModa
                   placeholder="10:00"
                   value={startHours}
                   onChange={(e) => setStartHours(e.target.value)}
-                  className="w-1/2 text-center bg-[var(--background)] border border-[var(--border)] rounded-xl px-3 py-2.5 text-sm text-[var(--heading)] focus:outline-none focus:border-violet-550 font-mono"
+                  className="w-1/2 text-center bg-[var(--background)] border border-[var(--border)] rounded-xl px-3 py-2.5 text-sm text-[var(--heading)] focus:outline-none focus:border-violet-500 font-mono"
                 />
                 <span className="text-[var(--muted)] text-xs font-bold">to</span>
                 <input 

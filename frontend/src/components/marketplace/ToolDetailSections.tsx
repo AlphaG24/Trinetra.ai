@@ -285,7 +285,7 @@ export function PricingSection({ config, agentType = 'voice', agentSlug = 'voice
           </div>
           <button
             onClick={() => router.push(`/dashboard/checkout?agent=${agentSlug}&plan=trial`)}
-            className="mt-6 w-full py-2.5 px-4 rounded-xl bg-violet-600 hover:bg-violet-550 text-white font-bold text-xs uppercase tracking-wider transition-all cursor-pointer text-center shadow-md shadow-violet-600/10"
+            className="mt-6 w-full py-2.5 px-4 rounded-xl bg-violet-600 hover:bg-violet-700 text-white font-bold text-xs uppercase tracking-wider transition-all cursor-pointer text-center shadow-md shadow-violet-600/10"
           >
             Start Trial for ₹{trialPrice}
           </button>
@@ -315,7 +315,7 @@ export function PricingSection({ config, agentType = 'voice', agentSlug = 'voice
           </div>
           <button
             onClick={() => router.push(`/dashboard/checkout?agent=${agentSlug}&plan=starter`)}
-            className="mt-6 w-full py-2.5 px-4 rounded-xl bg-violet-600 hover:bg-violet-550 text-white font-bold text-xs uppercase tracking-wider transition-all cursor-pointer text-center shadow-md shadow-violet-600/10"
+            className="mt-6 w-full py-2.5 px-4 rounded-xl bg-violet-600 hover:bg-violet-700 text-white font-bold text-xs uppercase tracking-wider transition-all cursor-pointer text-center shadow-md shadow-violet-600/10"
           >
             Buy Now at ₹{starterPrice}/mo
           </button>
@@ -345,7 +345,7 @@ export function PricingSection({ config, agentType = 'voice', agentSlug = 'voice
           </div>
           <button
             onClick={() => router.push(`/dashboard/checkout?agent=${agentSlug}&plan=professional`)}
-            className="mt-6 w-full py-2.5 px-4 rounded-xl bg-violet-600 hover:bg-violet-550 text-white font-bold text-xs uppercase tracking-wider transition-all cursor-pointer text-center shadow-md shadow-violet-600/10"
+            className="mt-6 w-full py-2.5 px-4 rounded-xl bg-violet-600 hover:bg-violet-700 text-white font-bold text-xs uppercase tracking-wider transition-all cursor-pointer text-center shadow-md shadow-violet-600/10"
           >
             Buy Now at ₹{professionalPrice}/mo
           </button>

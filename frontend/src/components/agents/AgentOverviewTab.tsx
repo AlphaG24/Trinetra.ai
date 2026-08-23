@@ -691,7 +691,7 @@ export function AgentOverviewTab({
               {/* Remaining Quota indicator */}
               <div className="bg-[var(--background)] border border-[var(--border)] rounded-2xl p-4 flex items-center justify-between">
                 <span className="text-xs text-[var(--body)] font-medium">Remaining Plan Minutes:</span>
-                <span className={`text-xs font-mono font-bold ${remainingSeconds < 120 ? 'text-amber-500 animate-pulse' : 'text-violet-550'}`}>
+                <span className={`text-xs font-mono font-bold ${remainingSeconds < 120 ? 'text-amber-500 animate-pulse' : 'text-violet-500'}`}>
                   {formatTime(remainingSeconds)}
                 </span>
               </div>

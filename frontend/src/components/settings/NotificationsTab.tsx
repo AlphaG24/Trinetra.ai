@@ -303,7 +303,7 @@ export function NotificationsTab() {
                     type="time"
                     value={prefs.quiet_hours.start}
                     onChange={(e) => handleUpdateQuietHours('start', e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg bg-[var(--background)] border border-[var(--border)] text-xs text-white focus:outline-none focus:border-violet-550"
+                    className="w-full px-3 py-2 rounded-lg bg-[var(--background)] border border-[var(--border)] text-xs text-white focus:outline-none focus:border-violet-500"
                   />
                 </div>
                 <div>
@@ -312,7 +312,7 @@ export function NotificationsTab() {
                     type="time"
                     value={prefs.quiet_hours.end}
                     onChange={(e) => handleUpdateQuietHours('end', e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg bg-[var(--background)] border border-[var(--border)] text-xs text-white focus:outline-none focus:border-violet-550"
+                    className="w-full px-3 py-2 rounded-lg bg-[var(--background)] border border-[var(--border)] text-xs text-white focus:outline-none focus:border-violet-500"
                   />
                 </div>
               </div>
@@ -354,7 +354,7 @@ export function NotificationsTab() {
                   type="time"
                   value={prefs.digest_mode.time}
                   onChange={(e) => handleUpdateDigest('time', e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg bg-[var(--background)] border border-[var(--border)] text-xs text-white focus:outline-none focus:border-violet-550"
+                  className="w-full px-3 py-2 rounded-lg bg-[var(--background)] border border-[var(--border)] text-xs text-white focus:outline-none focus:border-violet-500"
                 />
               </div>
             )}

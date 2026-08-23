@@ -210,7 +210,7 @@ export default function CallQualityPage() {
             placeholder="Filter by agent name, caller ID, outcome..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-violet-550 transition"
+            className="w-full px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-violet-500 transition"
           />
         </div>
 
@@ -222,7 +222,7 @@ export default function CallQualityPage() {
           <select
             value={anomalyFilter}
             onChange={(e) => setAnomalyFilter(e.target.value)}
-            className="w-full px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-xs text-white focus:outline-none focus:border-violet-550 transition cursor-pointer"
+            className="w-full px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-xs text-white focus:outline-none focus:border-violet-500 transition cursor-pointer"
           >
             <option value="all">All Audited Logs</option>
             <option value="hallucination">Hallucination Flags Only</option>

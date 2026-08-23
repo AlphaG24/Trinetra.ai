@@ -290,7 +290,7 @@ export default function AdminBundlesPage() {
             setIsActive(true)
             setShowAddForm(!showAddForm)
           }}
-          className="flex items-center gap-1.5 px-4 py-2 bg-violet-600 hover:bg-violet-550 text-white text-xs font-bold uppercase rounded-xl transition-all cursor-pointer shadow-sm"
+          className="flex items-center gap-1.5 px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold uppercase rounded-xl transition-all cursor-pointer shadow-sm"
         >
           {showAddForm ? <X className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
           <span>{showAddForm ? 'Cancel' : 'Create Bundle'}</span>
@@ -469,7 +469,7 @@ export default function AdminBundlesPage() {
             <button
               type="submit"
               disabled={saving}
-              className="flex items-center gap-1.5 px-5 py-2.5 bg-violet-600 hover:bg-violet-550 text-white text-xs font-bold uppercase rounded-xl transition-all cursor-pointer shadow-sm disabled:opacity-50"
+              className="flex items-center gap-1.5 px-5 py-2.5 bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold uppercase rounded-xl transition-all cursor-pointer shadow-sm disabled:opacity-50"
             >
               {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
               <span>{saving ? 'Saving...' : editingBundle ? 'Update Bundle' : 'Save Bundle'}</span>

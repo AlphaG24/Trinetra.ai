@@ -219,7 +219,7 @@ export function AgentCallHistoryTab({ agent }: AgentCallHistoryTabProps) {
             placeholder="Search transcripts, phones, outcomes..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full px-3 py-2 rounded-xl bg-[var(--background)] border border-[var(--border)] text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-violet-550 transition"
+            className="w-full px-3 py-2 rounded-xl bg-[var(--background)] border border-[var(--border)] text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-violet-500 transition"
           />
         </div>
 
@@ -231,7 +231,7 @@ export function AgentCallHistoryTab({ agent }: AgentCallHistoryTabProps) {
           <select
             value={sentimentFilter}
             onChange={(e) => setSentimentFilter(e.target.value)}
-            className="w-full px-3 py-2 rounded-xl bg-[var(--background)] border border-[var(--border)] text-xs text-white focus:outline-none focus:border-violet-550 transition cursor-pointer"
+            className="w-full px-3 py-2 rounded-xl bg-[var(--background)] border border-[var(--border)] text-xs text-white focus:outline-none focus:border-violet-500 transition cursor-pointer"
           >
             <option value="all">All Sentiments</option>
             <option value="positive">Positive</option>
@@ -249,7 +249,7 @@ export function AgentCallHistoryTab({ agent }: AgentCallHistoryTabProps) {
             type="date"
             value={startDate}
             onChange={(e) => setStartDate(e.target.value)}
-            className="w-full px-3 py-2 rounded-xl bg-[var(--background)] border border-[var(--border)] text-xs text-white focus:outline-none focus:border-violet-550 transition"
+            className="w-full px-3 py-2 rounded-xl bg-[var(--background)] border border-[var(--border)] text-xs text-white focus:outline-none focus:border-violet-500 transition"
           />
         </div>
 
@@ -262,7 +262,7 @@ export function AgentCallHistoryTab({ agent }: AgentCallHistoryTabProps) {
             type="date"
             value={endDate}
             onChange={(e) => setEndDate(e.target.value)}
-            className="w-full px-3 py-2 rounded-xl bg-[var(--background)] border border-[var(--border)] text-xs text-white focus:outline-none focus:border-violet-550 transition"
+            className="w-full px-3 py-2 rounded-xl bg-[var(--background)] border border-[var(--border)] text-xs text-white focus:outline-none focus:border-violet-500 transition"
           />
         </div>
       </div>

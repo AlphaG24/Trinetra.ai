@@ -97,7 +97,7 @@ export default function AgentComparePage() {
           <p className="text-sm text-[var(--muted)]">You do not have any agents deployed to compare yet.</p>
           <Link
             href="/dashboard/marketplace"
-            className="inline-block px-5 py-2.5 rounded-xl bg-violet-650 hover:bg-violet-750 text-white font-bold text-xs uppercase tracking-wider transition"
+            className="inline-block px-5 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-700 text-white font-bold text-xs uppercase tracking-wider transition"
           >
             Browse Marketplace
           </Link>

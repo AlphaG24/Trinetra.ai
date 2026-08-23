@@ -475,7 +475,7 @@ function BillingContent() {
               </div>
               <Link
                 href="/dashboard/marketplace"
-                className="px-5 py-2.5 bg-violet-600 hover:bg-violet-550 text-white font-bold text-xs uppercase tracking-wider rounded-xl transition-all cursor-pointer shadow-md shadow-violet-600/10 shrink-0 text-center"
+                className="px-5 py-2.5 bg-violet-600 hover:bg-violet-700 text-white font-bold text-xs uppercase tracking-wider rounded-xl transition-all cursor-pointer shadow-md shadow-violet-600/10 shrink-0 text-center"
               >
                 Go to Marketplace
               </Link>
@@ -497,7 +497,7 @@ function BillingContent() {
               </div>
               <button
                 onClick={() => addToCart('phone_number', 'phone_number', 'Extra Virtual Phone Number', phonePriceRaw)}
-                className="px-4 py-2 bg-violet-600 hover:bg-violet-550 text-white font-bold text-xs uppercase rounded-xl transition-all cursor-pointer shadow-sm"
+                className="px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white font-bold text-xs uppercase rounded-xl transition-all cursor-pointer shadow-sm"
               >
                 Add Number Slot
               </button>
@@ -552,7 +552,7 @@ function BillingContent() {
                       </div>
                       <button
                         onClick={() => addToCart('bundle', b.id, b.name, b.bundle_price_paisa / 100)}
-                        className="px-3 py-1.5 bg-violet-600 hover:bg-violet-550 text-white font-bold text-xs uppercase rounded-xl transition-all cursor-pointer"
+                        className="px-3 py-1.5 bg-violet-600 hover:bg-violet-700 text-white font-bold text-xs uppercase rounded-xl transition-all cursor-pointer"
                       >
                         Add Pack
                       </button>
@@ -674,7 +674,7 @@ function BillingContent() {
                 <button
                   onClick={handleCartCheckout}
                   disabled={updatingPlan}
-                  className="mt-4 w-full py-3 bg-violet-600 hover:bg-violet-550 text-white font-bold text-xs uppercase tracking-wider rounded-xl transition-all cursor-pointer shadow-md disabled:opacity-50 flex items-center justify-center gap-1.5"
+                  className="mt-4 w-full py-3 bg-violet-600 hover:bg-violet-700 text-white font-bold text-xs uppercase tracking-wider rounded-xl transition-all cursor-pointer shadow-md disabled:opacity-50 flex items-center justify-center gap-1.5"
                 >
                   <span>{updatingPlan ? 'Initiating Checkout...' : 'Secure Razorpay Payment'}</span>
                   <ArrowUpRight className="w-4 h-4" />

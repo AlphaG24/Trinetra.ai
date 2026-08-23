@@ -162,7 +162,7 @@ export function AgentNumbersTab({ agentId, organizationId }: AgentNumbersTabProp
         </div>
         <Link 
           href="/dashboard/phone-numbers"
-          className="shrink-0 bg-violet-650 text-white hover:bg-violet-600 transition-all rounded-lg px-4 py-2 font-bold text-xs uppercase tracking-wider shadow-md"
+          className="shrink-0 bg-violet-600 text-white hover:bg-violet-700 transition-all rounded-lg px-4 py-2 font-bold text-xs uppercase tracking-wider shadow-md"
         >
           Manage Numbers &rarr;
         </Link>

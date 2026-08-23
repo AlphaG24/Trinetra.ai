@@ -243,7 +243,7 @@ export function ToolDetailClient({ tool, profile, config, agents }: ToolDetailCl
                 <select
                   value={industryTemplate}
                   onChange={(e) => setIndustryTemplate(e.target.value)}
-                  className="w-full px-3 py-2.5 rounded-xl bg-[var(--background)] border border-[var(--border)] text-xs text-white focus:outline-none focus:border-violet-550 transition cursor-pointer"
+                  className="w-full px-3 py-2.5 rounded-xl bg-[var(--background)] border border-[var(--border)] text-xs text-white focus:outline-none focus:border-violet-500 transition cursor-pointer"
                 >
                   <option value="">General / Custom (Default)</option>
                   <option value="real_estate">Real Estate Agent</option>
@@ -268,7 +268,7 @@ export function ToolDetailClient({ tool, profile, config, agents }: ToolDetailCl
                 <button
                   onClick={handleStartTrial}
                   disabled={demoLoading || trialLoading}
-                  className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-violet-600 hover:bg-violet-550 text-white font-bold text-xs uppercase tracking-wider transition-all disabled:opacity-50 cursor-pointer shadow-md hover:scale-[1.01]"
+                  className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-violet-600 hover:bg-violet-700 text-white font-bold text-xs uppercase tracking-wider transition-all disabled:opacity-50 cursor-pointer shadow-md hover:scale-[1.01]"
                 >
                   {trialLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Zap className="w-3.5 h-3.5 text-amber-300" />}
                   <span>Start Trial for ₹{trialPrice.toFixed(0)}</span>

@@ -527,7 +527,7 @@ function CheckoutContent() {
                         <span className="text-xs font-bold text-violet-400 font-mono">₹{b.bundle_price_paisa / 100}</span>
                         <button
                           onClick={() => addToCart('bundle', b.id, b.name, b.bundle_price_paisa / 100)}
-                          className="px-2.5 py-1 bg-violet-650 hover:bg-violet-550 text-white font-bold text-[10px] uppercase rounded-lg transition-all cursor-pointer"
+                          className="px-2.5 py-1 bg-violet-600 hover:bg-violet-500 text-white font-bold text-[10px] uppercase rounded-lg transition-all cursor-pointer"
                         >
                           Add Bundle
                         </button>
@@ -605,7 +605,7 @@ function CheckoutContent() {
                   className={`w-full py-3.5 px-6 rounded-xl text-xs font-bold uppercase tracking-wider transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer mt-4 ${
                     processing
                       ? 'bg-[var(--hover-bg)] text-[var(--muted)] cursor-wait border border-[var(--border)]'
-                      : 'bg-violet-600 hover:bg-violet-550 text-white shadow-lg shadow-violet-500/20 hover:scale-[1.02]'
+                      : 'bg-violet-600 hover:bg-violet-700 text-white shadow-lg shadow-violet-500/20 hover:scale-[1.02]'
                   }`}
                 >
                   <CreditCard className="w-4 h-4" />
