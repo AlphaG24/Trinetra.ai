@@ -109,7 +109,7 @@ export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
             <img
               src="/trident.png"
               alt="Trinetra"
-              className="dynamic-logo h-11 md:h-12 w-auto object-contain"
+              className="dynamic-logo h-12 md:h-14 w-auto object-contain -mt-0.5"
             />
           </Link>
         </div>
@@ -134,7 +134,7 @@ export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
                 <div className="fixed inset-0 z-40 bg-transparent" onClick={() => setShowNotifDropdown(false)} />
                 <div className="absolute right-0 mt-2 w-80 bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl shadow-xl overflow-hidden z-50 py-1">
                   <div className="px-4 py-2.5 border-b border-[var(--border)] flex items-center justify-between">
-                    <span className="font-playfair font-bold text-sm text-[var(--heading)]">Recent Notifications</span>
+                    <span className="font-playfair font-bold text-sm text-gray-300">Recent Notifications</span>
                     {unreadCount > 0 && <span className="text-[10px] font-bold bg-rose-500/15 text-rose-500 px-1.5 py-0.5 rounded-full">{unreadCount} new</span>}
                   </div>
                   
@@ -188,7 +188,7 @@ export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
                   displayName[0]?.toUpperCase()
                 )}
               </div>
-              <span className="text-sm font-bold text-[var(--body)] hidden sm:block max-w-[120px] truncate font-playfair">
+              <span className="text-sm font-bold text-gray-400 hidden sm:block max-w-[120px] truncate font-playfair">
                 {displayName}
               </span>
             </button>

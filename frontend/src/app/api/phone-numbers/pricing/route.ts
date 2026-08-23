@@ -9,9 +9,10 @@ export async function GET(request: Request) {
             return NextResponse.json({ error }, { status: 401 });
         }
 
-        // Call FastAPI Backend
         const fastApiUrl = process.env.NEXT_PUBLIC_FASTAPI_URL || 'http://127.0.0.1:8000';
         const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 6000);
 
         try {
             const backendResponse = await fetch(`${fastApiUrl}/api/pricing/display`, {
@@ -19,10 +20,11 @@ export async function GET(request: Request) {
                 headers: {
                     'Authorization': `Bearer ${serviceRoleKey}`
                 },
-                // Cache for 5 minutes
-                next: { revalidate: 300 }
+                cache: 'no-store',
+                signal: controller.signal
             });
 
+            clearTimeout(timeoutId);
             const backendData = await backendResponse.json();
 
             if (!backendResponse.ok) {
@@ -35,11 +37,12 @@ export async function GET(request: Request) {
                 data: backendData.data || backendData
             });
         } catch (fetchErr: any) {
-            console.warn('[API] FastAPI pricing fetch failed, returning default display pricing:', fetchErr);
+            clearTimeout(timeoutId);
+            console.warn('[API] FastAPI pricing fetch failed, returning default display pricing:', fetchErr?.message || fetchErr);
             return NextResponse.json({
                 success: true,
                 data: {
-                    display_text: "₹2,500/month per line (all incoming calls free)"
+                    display_text: "Billed monthly"
                 }
             });
         }
@@ -52,3 +55,4 @@ export async function GET(request: Request) {
         );
     }
 }
+
