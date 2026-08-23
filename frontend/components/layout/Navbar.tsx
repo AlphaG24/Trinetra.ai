@@ -155,6 +155,7 @@ export function Navbar() {
               height={90}
               className="h-19 w-auto object-contain"
               priority
+              suppressHydrationWarning={true}
             />
           </Link>
 
