@@ -25,7 +25,33 @@ interface Campaign {
 }
 
 export default function CampaignsPage() {
-  const { profile } = useDashboardStore()
+  const { profile, setProfile } = useDashboardStore()
+
+  useEffect(() => {
+    if (!profile) {
+      const loadProfile = async () => {
+        try {
+          const { createClient } = await import('@/utils/supabase/client');
+          const supabase = createClient();
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user) {
+            const { data: dbProfile } = await supabase
+              .from('profiles')
+              .select('*')
+              .eq('id', user.id)
+              .single();
+            if (dbProfile) {
+              setProfile(dbProfile);
+            }
+          }
+        } catch (err) {
+          console.error("Error loading profile in CampaignsPage:", err);
+        }
+      };
+      loadProfile();
+    }
+  }, [profile, setProfile]);
+
   const [campaigns, setCampaigns] = useState<Campaign[]>([])
   const [loading, setLoading] = useState(true)
   const [isModalOpen, setIsModalOpen] = useState(false)

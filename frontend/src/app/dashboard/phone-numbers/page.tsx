@@ -16,7 +16,32 @@ import { useDashboardStore } from "@/store/dashboardStore";
 import UpgradePrompt from "@/src/components/shared/UpgradePrompt";
 
 export default function PhoneNumbersPage() {
-  const { profile } = useDashboardStore();
+  const { profile, setProfile } = useDashboardStore();
+
+  useEffect(() => {
+    if (!profile) {
+      const loadProfile = async () => {
+        try {
+          const { createClient } = await import('@/utils/supabase/client');
+          const supabase = createClient();
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user) {
+            const { data: dbProfile } = await supabase
+              .from('profiles')
+              .select('*')
+              .eq('id', user.id)
+              .single();
+            if (dbProfile) {
+              setProfile(dbProfile);
+            }
+          }
+        } catch (err) {
+          console.error("Error loading profile in PhoneNumbersPage:", err);
+        }
+      };
+      loadProfile();
+    }
+  }, [profile, setProfile]);
 
   // Purchased Numbers State
   const [numbers, setNumbers] = useState<any[]>([]);

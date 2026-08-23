@@ -41,7 +41,32 @@ const cleanAgentName = (name: string) => {
 };
 
 export default function CallbacksDashboardPage() {
-  const { agents, profile } = useDashboardStore();
+  const { agents, profile, setProfile } = useDashboardStore();
+
+  useEffect(() => {
+    if (!profile) {
+      const loadProfile = async () => {
+        try {
+          const { createClient } = await import('@/utils/supabase/client');
+          const supabase = createClient();
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user) {
+            const { data: dbProfile } = await supabase
+              .from('profiles')
+              .select('*')
+              .eq('id', user.id)
+              .single();
+            if (dbProfile) {
+              setProfile(dbProfile);
+            }
+          }
+        } catch (err) {
+          console.error("Error loading profile in CallbacksDashboardPage:", err);
+        }
+      };
+      loadProfile();
+    }
+  }, [profile, setProfile]);
 
   if (!profile) {
     return (

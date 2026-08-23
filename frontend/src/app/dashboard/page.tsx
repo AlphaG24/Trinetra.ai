@@ -31,7 +31,7 @@ export default function DashboardPage() {
   const router = useRouter()
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [profileLoading, setProfileLoading] = useState(true)
-  const { runProductTour, setRunProductTour } = useDashboardStore()
+  const { runProductTour, setRunProductTour, setProfile: setStoreProfile } = useDashboardStore()
 
   useEffect(() => {
     if (profile && profile.tour_completed === false) {
@@ -63,11 +63,13 @@ export default function DashboardPage() {
         .single()
 
       if (userProfile) {
-        setProfile({
+        const fullProfile = {
           ...userProfile,
           plan_tier: 'free_demo',
           trial_ends_at: null
-        })
+        }
+        setProfile(fullProfile)
+        setStoreProfile(fullProfile as any)
       }
     } catch (err) {
       console.error('[Dashboard page init error]', err)
@@ -97,7 +99,9 @@ export default function DashboardPage() {
             filter: `id=eq.${user.id}`,
           },
           (payload) => {
-            setProfile(payload.new as UserProfile)
+            const updatedProfile = payload.new as UserProfile
+            setProfile(updatedProfile)
+            setStoreProfile(updatedProfile as any)
           }
         )
         .subscribe()
