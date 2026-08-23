@@ -85,7 +85,7 @@ export function Footer() {
     return null;
   }
 
-  const companyName = getConfigString(siteConfig, "company_name", "Trinetra");
+  const companyName = "Trinetra";
   const linkedinUrl = getConfigString(siteConfig, "social_linkedin");
   const instagramUrl = getConfigString(siteConfig, "social_instagram");
   const twitterUrl = getConfigString(siteConfig, "social_twitter");

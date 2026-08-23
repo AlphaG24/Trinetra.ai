@@ -77,7 +77,7 @@ export function Navbar() {
   const [productsMenuOpen, setProductsMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const companyName = getConfigString(siteConfig, "company_name", "Trinetra");
+  const companyName = "Trinetra";
   const products: ProductNavItem[] =
     productsData.length > 0
       ? productsData.map((product) => ({
