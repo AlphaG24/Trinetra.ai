@@ -126,12 +126,12 @@ export default function ConsentPage() {
         
         {/* Header */}
         <div className="text-center space-y-3">
-          <div className="w-12 h-12 rounded-2xl bg-violet-500/10 border border-violet-500/20 flex items-center justify-center text-violet-600 dark:text-violet-400 mx-auto">
-            <Shield className="w-6 h-6 animate-pulse" />
+          <div className="w-14 h-14 rounded-2xl bg-violet-500/10 border border-violet-500/20 flex items-center justify-center text-violet-600 dark:text-violet-400 mx-auto">
+            <Shield className="w-7 h-7 animate-pulse" />
           </div>
           <div>
             <h1 className="text-2xl font-black text-zinc-900 dark:text-white">Data Consent</h1>
-            <p className="text-zinc-500 dark:text-zinc-400 text-xs mt-1 uppercase tracking-widest font-semibold">DPDP Act 2023 Compliance</p>
+            <p className="text-zinc-500 dark:text-zinc-400 text-xs mt-1.5 uppercase tracking-widest font-bold">DPDP Act 2023 Compliance</p>
           </div>
         </div>
 
@@ -146,12 +146,12 @@ export default function ConsentPage() {
         )}
 
         {/* Notice Content */}
-        <div className="bg-zinc-100 dark:bg-zinc-900/40 border border-zinc-200 dark:border-zinc-900 rounded-2xl p-5 space-y-3 text-xs leading-relaxed text-zinc-700 dark:text-zinc-300">
-          <p>
+        <div className="bg-zinc-100 dark:bg-zinc-900/40 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-6 space-y-3 text-sm leading-relaxed text-zinc-700 dark:text-zinc-300">
+          <p className="font-medium">
             Trinetra AI collects and processes your personal data to provide AI voice agent services. 
             This includes your name, email, phone number, business details, and call recordings.
           </p>
-          <p>
+          <p className="font-medium">
             Your data is encrypted (AES-256), stored securely, and never shared without consent. 
             You can request deletion at any time from your dashboard settings.
           </p>
@@ -169,14 +169,14 @@ export default function ConsentPage() {
                 onChange={(e) => setPersonalConsent(e.target.checked)}
                 className="sr-only"
               />
-              <div className={`w-5 h-5 rounded-lg border flex items-center justify-center shrink-0 transition-all ${
+              <div className={`w-5 h-5 rounded-lg border flex items-center justify-center shrink-0 transition-all mt-0.5 ${
                 personalConsent 
                   ? 'bg-violet-600 border-violet-600 text-white' 
-                  : 'bg-white dark:bg-[#12101A] border-zinc-200 dark:border-white/10 group-hover:border-zinc-300 dark:group-hover:border-white/20'
+                  : 'bg-white dark:bg-[#12101A] border-zinc-300 dark:border-white/10 group-hover:border-zinc-400 dark:group-hover:border-white/20'
               }`}>
                 {personalConsent && <Check className="w-3.5 h-3.5" />}
               </div>
-              <span className="text-xs text-zinc-700 dark:text-zinc-300 select-none leading-relaxed">
+              <span className="text-sm font-medium text-zinc-800 dark:text-zinc-200 select-none leading-relaxed">
                 I consent to Trinetra AI processing my personal data for service delivery <span className="text-rose-500 font-bold">*</span>
               </span>
             </label>
@@ -189,14 +189,14 @@ export default function ConsentPage() {
                 onChange={(e) => setRecordingsConsent(e.target.checked)}
                 className="sr-only"
               />
-              <div className={`w-5 h-5 rounded-lg border flex items-center justify-center shrink-0 transition-all ${
+              <div className={`w-5 h-5 rounded-lg border flex items-center justify-center shrink-0 transition-all mt-0.5 ${
                 recordingsConsent 
                   ? 'bg-violet-600 border-violet-600 text-white' 
-                  : 'bg-white dark:bg-[#12101A] border-zinc-200 dark:border-white/10 group-hover:border-zinc-300 dark:group-hover:border-white/20'
+                  : 'bg-white dark:bg-[#12101A] border-zinc-300 dark:border-white/10 group-hover:border-zinc-400 dark:group-hover:border-white/20'
               }`}>
                 {recordingsConsent && <Check className="w-3.5 h-3.5" />}
               </div>
-              <span className="text-xs text-zinc-700 dark:text-zinc-300 select-none leading-relaxed">
+              <span className="text-sm font-medium text-zinc-800 dark:text-zinc-200 select-none leading-relaxed">
                 I consent to call recordings for agent execution, transcriptions, and quality improvements <span className="text-rose-500 font-bold">*</span>
               </span>
             </label>
@@ -209,15 +209,15 @@ export default function ConsentPage() {
                 onChange={(e) => setTermsAgreement(e.target.checked)}
                 className="sr-only"
               />
-              <div className={`w-5 h-5 rounded-lg border flex items-center justify-center shrink-0 transition-all ${
+              <div className={`w-5 h-5 rounded-lg border flex items-center justify-center shrink-0 transition-all mt-0.5 ${
                 termsAgreement 
                   ? 'bg-violet-600 border-violet-600 text-white' 
-                  : 'bg-white dark:bg-[#12101A] border-zinc-200 dark:border-white/10 group-hover:border-zinc-300 dark:group-hover:border-white/20'
+                  : 'bg-white dark:bg-[#12101A] border-zinc-300 dark:border-white/10 group-hover:border-zinc-400 dark:group-hover:border-white/20'
               }`}>
                 {termsAgreement && <Check className="w-3.5 h-3.5" />}
               </div>
-              <span className="text-xs text-zinc-700 dark:text-zinc-300 select-none leading-relaxed">
-                I agree to the <a href="/terms" target="_blank" className="text-violet-600 dark:text-violet-400 hover:underline">Terms of Service</a> and <a href="/privacy" target="_blank" className="text-violet-600 dark:text-violet-400 hover:underline">Privacy Policy</a> <span className="text-rose-500 font-bold">*</span>
+              <span className="text-sm font-medium text-zinc-800 dark:text-zinc-200 select-none leading-relaxed">
+                I agree to the <a href="/terms" target="_blank" className="text-violet-600 dark:text-violet-400 hover:underline font-bold">Terms of Service</a> and <a href="/privacy" target="_blank" className="text-violet-600 dark:text-violet-400 hover:underline font-bold">Privacy Policy</a> <span className="text-rose-500 font-bold">*</span>
               </span>
             </label>
 
@@ -227,7 +227,7 @@ export default function ConsentPage() {
           <button
             type="submit"
             disabled={!canContinue || loading}
-            className="w-full py-3.5 bg-violet-600 hover:bg-violet-700 text-white font-extrabold rounded-xl transition-all flex items-center justify-center gap-2 group shadow-md shadow-violet-500/10 disabled:opacity-50 disabled:pointer-events-none cursor-pointer"
+            className="w-full py-3.5 bg-violet-600 hover:bg-violet-700 text-white font-extrabold text-sm rounded-xl transition-all flex items-center justify-center gap-2 group shadow-md shadow-violet-500/10 disabled:opacity-50 disabled:pointer-events-none cursor-pointer"
           >
             {loading ? (
               <Loader2 className="w-5 h-5 animate-spin" />

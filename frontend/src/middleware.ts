@@ -418,8 +418,23 @@ export async function middleware(request: NextRequest) {
       .eq('id', user.id)
       .single()
 
-    const userRole = profile?.role || 'client'
-    const onboardingComplete = profile?.onboarding_complete ?? true // Default true to avoid locking existing users
+    // SECURITY: If auth user has no profile row (e.g., deleted during onboarding),
+    // sign them out by clearing cookies and redirecting to login.
+    if (!profile) {
+      const url = request.nextUrl.clone()
+      url.pathname = '/login'
+      const redirectResponse = NextResponse.redirect(url)
+      // Clear all Supabase auth cookies to fully invalidate the ghost session
+      request.cookies.getAll().forEach(cookie => {
+        if (cookie.name.startsWith('sb-')) {
+          redirectResponse.cookies.set(cookie.name, '', { maxAge: 0, path: '/' })
+        }
+      })
+      return applySecurityHeaders(redirectResponse)
+    }
+
+    const userRole = profile.role || 'client'
+    const onboardingComplete = profile.onboarding_complete ?? true // Default true to avoid locking existing users
 
     // 2. Admin / super_admin: redirect away from auth/entry pages and consent page
     if (

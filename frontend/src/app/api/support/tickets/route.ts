@@ -55,10 +55,15 @@ export const GET = safeApiHandler(async () => {
     .from('profiles')
     .select('organization_id, role, full_name')
     .eq('id', user.id)
-    .single()
+    .maybeSingle()
 
-  if (profileErr || !profile) {
-    return NextResponse.json({ error: 'User profile not found' }, { status: 404 })
+  if (profileErr) {
+    console.error('[/api/support/tickets GET] Profile query error:', profileErr)
+    return NextResponse.json({ error: 'Failed to load user profile' }, { status: 500 })
+  }
+
+  if (!profile) {
+    return NextResponse.json({ error: 'User profile not found. Please complete onboarding first.' }, { status: 404 })
   }
 
   const isAdmin = profile.role === 'admin' || profile.role === 'super_admin'
@@ -110,10 +115,15 @@ export const POST = safeApiHandler(async (req: Request) => {
     .from('profiles')
     .select('organization_id, full_name')
     .eq('id', user.id)
-    .single()
+    .maybeSingle()
 
-  if (profileErr || !profile) {
-    return NextResponse.json({ error: 'User profile not found' }, { status: 404 })
+  if (profileErr) {
+    console.error('[/api/support/tickets POST] Profile query error:', profileErr)
+    return NextResponse.json({ error: 'Failed to load user profile' }, { status: 500 })
+  }
+
+  if (!profile) {
+    return NextResponse.json({ error: 'User profile not found. Please complete onboarding first.' }, { status: 404 })
   }
 
   let orgId = profile.organization_id

@@ -54,9 +54,13 @@ export async function GET() {
       }
     }
 
-    if (error || !profile) {
+    if (error) {
       console.error('[/api/profiles GET] Error fetching profile:', error)
       return NextResponse.json({ error: 'Failed to fetch profile' }, { status: 500 })
+    }
+
+    if (!profile) {
+      return NextResponse.json({ error: 'Profile not found' }, { status: 404 })
     }
 
     // Map database state column to client region field

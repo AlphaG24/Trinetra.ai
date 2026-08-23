@@ -283,7 +283,7 @@ export function OnboardingClient() {
               <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded border ${
                 isDark 
                   ? 'text-violet-400 bg-violet-500/10 border-violet-500/20' 
-                  : 'text-violet-750 bg-violet-100 border-violet-200'
+                  : 'text-violet-700 bg-violet-100 border-violet-200'
               }`}>
                 Setup Wizard
               </span>
@@ -293,7 +293,7 @@ export function OnboardingClient() {
                 Trinetra Onboarding
               </h1>
               <p className={`text-[11px] mt-1 ${
-                isDark ? 'text-zinc-400' : 'text-zinc-500 font-semibold'
+                isDark ? 'text-zinc-400' : 'text-zinc-600 font-semibold'
               }`}>Configure your workspace defaults in minutes.</p>
             </div>
 
@@ -317,7 +317,7 @@ export function OnboardingClient() {
                       <h4 className={`text-xs font-bold ${
                         isActive 
                           ? (isDark ? 'text-white' : 'text-zinc-950 font-black') 
-                          : (isDark ? 'text-zinc-500' : 'text-zinc-450')
+                          : (isDark ? 'text-zinc-500' : 'text-zinc-500')
                       }`}>{s.title}</h4>
                       <p className={`text-[10px] truncate leading-none ${
                         isDark ? 'text-zinc-500' : 'text-zinc-500 font-medium'
@@ -355,14 +355,14 @@ export function OnboardingClient() {
                   <div className="space-y-6">
                     <div className="space-y-1">
                       <h3 className={`text-lg font-bold font-heading ${isDark ? 'text-white' : 'text-zinc-950 font-black'}`}>Business profile</h3>
-                      <p className={`text-xs ${isDark ? 'text-zinc-400' : 'text-zinc-650 font-medium'}`}>Tell us details about your corporate structure.</p>
+                      <p className={`text-xs ${isDark ? 'text-zinc-400' : 'text-zinc-600 font-medium'}`}>Tell us details about your corporate structure.</p>
                     </div>
 
                     <div className="space-y-5 pt-2">
                       <div className="space-y-1.5">
-                        <label className={`text-[10px] font-bold uppercase tracking-widest block ${isDark ? 'text-zinc-500' : 'text-zinc-900 font-black'}`}>Your Full Name</label>
+                        <label className={`text-[10px] font-bold uppercase tracking-widest block ${isDark ? 'text-zinc-400' : 'text-zinc-900 font-black'}`}>Your Full Name</label>
                         <div className="relative">
-                          <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-450" />
+                          <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
                           <input
                             type="text"
                             value={fullName}
@@ -370,17 +370,17 @@ export function OnboardingClient() {
                             placeholder="e.g. Priya Sharma"
                             className={`w-full pl-10 pr-4 py-3 rounded-xl border text-xs focus:outline-none focus:ring-1 focus:ring-violet-500 focus:border-violet-500 transition ${
                               isDark 
-                                ? 'bg-[#12101A] border-white/10 text-white placeholder-zinc-550' 
-                                : 'bg-white border-zinc-300 text-zinc-955 placeholder-zinc-400 font-bold'
+                                ? 'bg-[#12101A] border-white/10 text-white placeholder-zinc-500' 
+                                : 'bg-white border-zinc-300 text-zinc-900 placeholder-zinc-400 font-bold'
                             }`}
                           />
                         </div>
                       </div>
 
                       <div className="space-y-1.5">
-                        <label className={`text-[10px] font-bold uppercase tracking-widest block ${isDark ? 'text-zinc-500' : 'text-zinc-900 font-black'}`}>Company / Business Name</label>
+                        <label className={`text-[10px] font-bold uppercase tracking-widest block ${isDark ? 'text-zinc-400' : 'text-zinc-900 font-black'}`}>Company / Business Name</label>
                         <div className="relative">
-                          <Building2 className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-450" />
+                          <Building2 className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
                           <input
                             type="text"
                             value={companyName}
@@ -388,24 +388,24 @@ export function OnboardingClient() {
                             placeholder="e.g. Acme Corporation"
                             className={`w-full pl-10 pr-4 py-3 rounded-xl border text-xs focus:outline-none focus:ring-1 focus:ring-violet-500 focus:border-violet-500 transition ${
                               isDark 
-                                ? 'bg-[#12101A] border-white/10 text-white placeholder-zinc-550' 
-                                : 'bg-white border-zinc-300 text-zinc-955 placeholder-zinc-400 font-bold'
+                                ? 'bg-[#12101A] border-white/10 text-white placeholder-zinc-500' 
+                                : 'bg-white border-zinc-300 text-zinc-900 placeholder-zinc-400 font-bold'
                             }`}
                           />
                         </div>
                       </div>
 
                       <div className="space-y-1.5">
-                        <label className={`text-[10px] font-bold uppercase tracking-widest block ${isDark ? 'text-zinc-500' : 'text-zinc-900 font-black'}`}>Industry Vertical</label>
+                        <label className={`text-[10px] font-bold uppercase tracking-widest block ${isDark ? 'text-zinc-400' : 'text-zinc-900 font-black'}`}>Industry Vertical</label>
                         <div className="relative">
-                          <Briefcase className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-450 pointer-events-none" />
+                          <Briefcase className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400 pointer-events-none" />
                           <select
                             value={industry}
                             onChange={e => setIndustry(e.target.value)}
                             className={`w-full pl-10 pr-4 py-3 rounded-xl border text-xs focus:outline-none focus:ring-1 focus:ring-violet-500 focus:border-violet-500 transition cursor-pointer appearance-none ${
                               isDark 
                                 ? 'bg-[#12101A] border-white/10 text-white' 
-                                : 'bg-white border-zinc-300 text-zinc-955 font-bold'
+                                : 'bg-white border-zinc-300 text-zinc-900 font-bold'
                             }`}
                           >
                             {INDUSTRIES.map(ind => <option key={ind} value={ind}>{ind}</option>)}
@@ -414,7 +414,7 @@ export function OnboardingClient() {
                       </div>
 
                       <div className="space-y-1.5">
-                        <label className={`text-[10px] font-bold uppercase tracking-widest block ${isDark ? 'text-zinc-500' : 'text-zinc-900 font-black'}`}>Business Description</label>
+                        <label className={`text-[10px] font-bold uppercase tracking-widest block ${isDark ? 'text-zinc-400' : 'text-zinc-900 font-black'}`}>Business Description</label>
                         <textarea
                           value={businessDescription}
                           onChange={e => setBusinessDescription(e.target.value)}
@@ -422,8 +422,8 @@ export function OnboardingClient() {
                           rows={3}
                           className={`w-full px-4 py-3 rounded-xl border text-xs focus:outline-none focus:ring-1 focus:ring-violet-500 focus:border-violet-500 transition ${
                             isDark 
-                              ? 'bg-[#12101A] border-white/10 text-white placeholder-zinc-550' 
-                              : 'bg-white border-zinc-300 text-zinc-955 placeholder-zinc-400 font-bold'
+                              ? 'bg-[#12101A] border-white/10 text-white placeholder-zinc-500' 
+                              : 'bg-white border-zinc-300 text-zinc-900 placeholder-zinc-400 font-bold'
                           }`}
                         />
                       </div>
@@ -436,21 +436,21 @@ export function OnboardingClient() {
                   <div className="space-y-6">
                     <div className="space-y-1">
                       <h3 className={`text-lg font-bold font-heading ${isDark ? 'text-white' : 'text-zinc-950 font-black'}`}>Regional scope</h3>
-                      <p className={`text-xs ${isDark ? 'text-zinc-400' : 'text-zinc-650 font-medium'}`}>Specify your geographic area and localization context.</p>
+                      <p className={`text-xs ${isDark ? 'text-zinc-400' : 'text-zinc-600 font-medium'}`}>Specify your geographic area and localization context.</p>
                     </div>
 
                     <div className="space-y-5 pt-2">
                       <div className="space-y-1.5">
-                        <label className={`text-[10px] font-bold uppercase tracking-widest block ${isDark ? 'text-zinc-500' : 'text-zinc-900 font-black'}`}>Operational Country</label>
+                        <label className={`text-[10px] font-bold uppercase tracking-widest block ${isDark ? 'text-zinc-400' : 'text-zinc-900 font-black'}`}>Operational Country</label>
                         <div className="relative">
-                          <Globe className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-450 pointer-events-none" />
+                          <Globe className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400 pointer-events-none" />
                           <select
                             value={country}
                             onChange={e => setCountry(e.target.value)}
                             className={`w-full pl-10 pr-4 py-3 rounded-xl border text-xs focus:outline-none focus:ring-1 focus:ring-violet-500 focus:border-violet-500 transition cursor-pointer appearance-none ${
                               isDark 
                                 ? 'bg-[#12101A] border-white/10 text-white' 
-                                : 'bg-white border-zinc-300 text-zinc-955 font-bold'
+                                : 'bg-white border-zinc-300 text-zinc-900 font-bold'
                             }`}
                           >
                             {COUNTRIES.map(c => <option key={c.code} value={c.code}>{c.name}</option>)}
@@ -459,7 +459,7 @@ export function OnboardingClient() {
                       </div>
 
                       <div className="space-y-1.5">
-                        <label className={`text-[10px] font-bold uppercase tracking-widest block ${isDark ? 'text-zinc-500' : 'text-zinc-900 font-black'}`}>State / Region / Province <span className={`font-normal lowercase ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>(optional)</span></label>
+                        <label className={`text-[10px] font-bold uppercase tracking-widest block ${isDark ? 'text-zinc-400' : 'text-zinc-900 font-black'}`}>State / Region / Province <span className={`font-normal lowercase ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>(optional)</span></label>
                         <input
                           type="text"
                           value={region}
@@ -467,8 +467,8 @@ export function OnboardingClient() {
                           placeholder="e.g. Maharashtra, California"
                           className={`w-full px-4 py-3 rounded-xl border text-xs focus:outline-none focus:ring-1 focus:ring-violet-500 focus:border-violet-500 transition ${
                             isDark 
-                              ? 'bg-[#12101A] border-white/10 text-white placeholder-zinc-550' 
-                              : 'bg-white border-zinc-300 text-zinc-955 placeholder-zinc-400 font-bold'
+                              ? 'bg-[#12101A] border-white/10 text-white placeholder-zinc-500' 
+                              : 'bg-white border-zinc-300 text-zinc-900 placeholder-zinc-400 font-bold'
                           }`}
                         />
                       </div>
@@ -481,7 +481,7 @@ export function OnboardingClient() {
                   <div className="space-y-6">
                     <div className="space-y-1">
                       <h3 className={`text-lg font-bold font-heading ${isDark ? 'text-white' : 'text-zinc-950 font-black'}`}>Connect Live AlertUplinks</h3>
-                      <p className={`text-xs ${isDark ? 'text-zinc-400' : 'text-zinc-650 font-medium'}`}>Uplink real-time transcripts and metrics directly to Telegram.</p>
+                      <p className={`text-xs ${isDark ? 'text-zinc-400' : 'text-zinc-600 font-medium'}`}>Uplink real-time transcripts and metrics directly to Telegram.</p>
                     </div>
 
                     <div className="space-y-5 pt-2">
@@ -494,7 +494,7 @@ export function OnboardingClient() {
                             <h4 className={`text-xs font-bold ${isDark ? 'text-white' : 'text-zinc-950 font-black'}`}>Seamless Alert Syncing</h4>
                             <p className={`text-[10px] mt-1 leading-relaxed ${isDark ? 'text-zinc-400' : 'text-zinc-600 font-medium'}`}>
                               Send the <code className={`px-1.5 py-0.5 rounded font-mono text-[10px] ${
-                                isDark ? 'bg-black text-violet-400' : 'bg-zinc-200 text-violet-850 font-extrabold'
+                                isDark ? 'bg-black text-violet-400' : 'bg-zinc-200 text-violet-800 font-extrabold'
                               }`}>/start</code> command to our Telegram Bot. The wizard will automatically handshake and capture your chat ID.
                             </p>
                           </div>
@@ -534,10 +534,10 @@ export function OnboardingClient() {
                       {/* Success / Status card */}
                       {isTelegramConnected ? (
                         <div className={`border rounded-xl p-4 flex items-center justify-between transition-colors duration-300 ${
-                          isDark ? 'bg-emerald-500/10 border-emerald-550/20' : 'bg-emerald-50 border-emerald-200'
+                          isDark ? 'bg-emerald-500/10 border-emerald-500/20' : 'bg-emerald-50 border-emerald-200'
                         }`}>
                           <div className={`flex items-center gap-2 text-xs ${
-                            isDark ? 'text-emerald-400' : 'text-emerald-850 font-black'
+                            isDark ? 'text-emerald-400' : 'text-emerald-800 font-black'
                           }`}>
                             <CheckCircle className="w-4 h-4 text-emerald-500" />
                             <span>Chat ID active: <code className="font-mono text-[10px]">{telegramChatId}</code></span>
@@ -597,7 +597,7 @@ export function OnboardingClient() {
                     onClick={handleComplete}
                     disabled={loading}
                     className={`px-4 py-2.5 text-xs font-black uppercase tracking-wider transition cursor-pointer ${
-                      isDark ? 'text-zinc-500 hover:text-white' : 'text-zinc-500 hover:text-zinc-955'
+                      isDark ? 'text-zinc-500 hover:text-white' : 'text-zinc-500 hover:text-zinc-950'
                     }`}
                   >
                     Skip Uplink
