@@ -18,7 +18,6 @@ import {
 
 const fallbackProductLinks = [
   { name: "AI Voice Agent", href: "/products/voice-agent", isComingSoon: false },
-  { name: "AI Workflow Agent", href: "/products/workflow-agent", isComingSoon: true },
 ];
 
 const companyLinks = [
@@ -86,23 +85,27 @@ export function Footer() {
     return null;
   }
 
-  const companyName = getConfigString(siteConfig, "company_name", "Trinetraedu-ai");
+  const companyName = getConfigString(siteConfig, "company_name", "Trinetra AI");
   const linkedinUrl = getConfigString(siteConfig, "social_linkedin");
   const instagramUrl = getConfigString(siteConfig, "social_instagram");
   const twitterUrl = getConfigString(siteConfig, "social_twitter");
   const facebookUrl = getConfigString(siteConfig, "social_facebook");
   const redditUrl = getConfigString(siteConfig, "social_reddit");
 
-  const productLinks =
+  const productLinks = (
     products.length > 0
       ? products.map((product) => ({
-        name: product.name,
-        href: `/products/${product.slug}`,
-        isComingSoon: product.status === "coming_soon",
-      }))
+          name: product.name,
+          href: `/products/${product.slug}`,
+          isComingSoon: product.status === "coming_soon",
+        }))
       : productsError
         ? fallbackProductLinks
-        : [];
+        : []
+  ).filter(link => {
+    const nameLower = link.name.toLowerCase();
+    return !nameLower.includes("chat") && !nameLower.includes("social") && !nameLower.includes("workflow");
+  });
 
   if (pathname === "/login") {
     return (
