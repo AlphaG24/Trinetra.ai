@@ -6,6 +6,8 @@ import { safeApiHandler } from '@/utils/apiAuth'
 
 export const GET = safeApiHandler(async (request: Request) => {
     const { searchParams, origin } = new URL(request.url)
+    const host = request.headers.get('host') || ''
+    const cleanHost = host.split(':')[0]
     const code = searchParams.get('code')
     const type = searchParams.get('type')
 
@@ -25,9 +27,15 @@ export const GET = safeApiHandler(async (request: Request) => {
                         return cookieStore.getAll()
                     },
                     setAll(cookiesToSet) {
-                        const domain = process.env.NODE_ENV === 'development'
-                            ? undefined
-                            : process.env.NEXT_PUBLIC_COOKIE_DOMAIN
+                        const isProd = process.env.NODE_ENV === 'production'
+                        let domain: string | undefined = undefined
+                        if (isProd && cleanHost) {
+                            if (cleanHost.endsWith('trinetraedu-ai.com')) {
+                                domain = '.trinetraedu-ai.com'
+                            } else if (cleanHost.endsWith('trinetra.ai')) {
+                                domain = '.trinetra.ai'
+                            }
+                        }
                         cookiesToSet.forEach(({ name, value, options }) => {
                             cookieStore.set({ name, value, ...options, domain })
                         })
