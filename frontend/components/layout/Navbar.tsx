@@ -81,14 +81,14 @@ export function Navbar() {
   const products: ProductNavItem[] =
     productsData.length > 0
       ? productsData.map((product) => ({
-          slug: product.slug,
-          name: product.name,
-          tagline: product.tagline || product.description,
-          status:
-            product.status === "live" || product.status === "beta" || product.status === "coming_soon"
-              ? product.status
-              : "coming_soon",
-        }))
+        slug: product.slug,
+        name: product.name,
+        tagline: product.tagline || product.description,
+        status:
+          product.status === "live" || product.status === "beta" || product.status === "coming_soon"
+            ? product.status
+            : "coming_soon",
+      }))
       : productsError
         ? fallbackProducts
         : [];
@@ -153,7 +153,7 @@ export function Navbar() {
               alt={companyName}
               width={320}
               height={90}
-              className="h-14 w-auto object-contain"
+              className="h-19 w-auto object-contain"
               priority
             />
           </Link>
@@ -173,18 +173,16 @@ export function Navbar() {
                 Products
                 <ChevronDown
                   size={14}
-                  className={`transition-transform duration-200 ${
-                    productsMenuOpen ? "rotate-180" : ""
-                  }`}
+                  className={`transition-transform duration-200 ${productsMenuOpen ? "rotate-180" : ""
+                    }`}
                 />
               </Link>
 
               <div
-                className={`absolute left-1/2 top-full z-[1100] mt-[16px] w-[320px] -translate-x-1/2 rounded-[18px] border border-[#1E0A35] bg-[rgba(12,1,24,0.96)] p-[8px] shadow-[0_30px_80px_rgba(0,0,0,0.45)] backdrop-blur-xl transition-all duration-200 ${
-                  productsMenuOpen
+                className={`absolute left-1/2 top-full z-[1100] mt-[16px] w-[320px] -translate-x-1/2 rounded-[18px] border border-[#1E0A35] bg-[rgba(12,1,24,0.96)] p-[8px] shadow-[0_30px_80px_rgba(0,0,0,0.45)] backdrop-blur-xl transition-all duration-200 ${productsMenuOpen
                     ? "pointer-events-auto translate-y-0 opacity-100"
                     : "pointer-events-none -translate-y-[8px] opacity-0"
-                }`}
+                  }`}
               >
                 {productsLoading ? (
                   <div className="px-[14px] py-[16px] font-sans text-[14px] text-[#6B6088]">
@@ -315,26 +313,23 @@ export function Navbar() {
               <button
                 type="button"
                 onClick={() => setProductsExpanded((prev) => !prev)}
-                className={`rounded-full border border-[#2D1255] p-[8px] text-[#A78BFA] transition-all duration-300 ${
-                  menuOpen ? "translate-y-0 opacity-100" : "translate-y-[16px] opacity-0"
-                }`}
+                className={`rounded-full border border-[#2D1255] p-[8px] text-[#A78BFA] transition-all duration-300 ${menuOpen ? "translate-y-0 opacity-100" : "translate-y-[16px] opacity-0"
+                  }`}
                 style={{ transitionDelay: "0.1s" }}
                 aria-label={productsExpanded ? "Collapse product list" : "Expand product list"}
                 aria-expanded={productsExpanded}
               >
                 <ChevronDown
                   size={18}
-                  className={`transition-transform duration-200 ${
-                    productsExpanded ? "rotate-180" : ""
-                  }`}
+                  className={`transition-transform duration-200 ${productsExpanded ? "rotate-180" : ""
+                    }`}
                 />
               </button>
             </div>
 
             <div
-              className={`w-full overflow-hidden transition-all duration-300 ${
-                productsExpanded ? "mt-[18px] max-h-[420px] opacity-100" : "max-h-0 opacity-0"
-              }`}
+              className={`w-full overflow-hidden transition-all duration-300 ${productsExpanded ? "mt-[18px] max-h-[420px] opacity-100" : "max-h-0 opacity-0"
+                }`}
             >
               <div className="flex flex-col gap-[10px] border-l border-[#2D1255] pl-[18px]">
                 {productsLoading ? (
