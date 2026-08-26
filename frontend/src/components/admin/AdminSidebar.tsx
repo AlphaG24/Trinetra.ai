@@ -28,6 +28,7 @@ const navItems = [
   { name: 'Support Tickets', href: '/admin/support', icon: LifeBuoy },
   { name: 'Notifications', href: '/admin/notifications', icon: Bell },
   { name: 'Consent Records', href: '/admin/consent-records', icon: ShieldCheck },
+  { name: 'Developer Requests', href: '/admin/developer-requests', icon: ShieldCheck },
   { name: 'Audit Logs', href: '/admin/audit-logs', icon: ScrollText },
   { name: 'System Config', href: '/admin/system', icon: Sliders },
   { name: 'Telephony', href: '/admin/telephony', icon: PhoneCall },

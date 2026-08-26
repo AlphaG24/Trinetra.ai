@@ -13,7 +13,14 @@ interface AgentVoiceTabProps {
 // If an agent was created with our old broken mapping (nova-openai, echo-openai, shimmer-openai)
 // or has voice_provider='elevenlabs' but no valid ElevenLabs ID, auto-correct to Sarvam.
 const FAKE_ELEVENLABS_IDS = ['nova-openai', 'echo-openai', 'shimmer-openai', 'onyx-openai', 'alloy-openai', '']
-const SARVAM_VOICE_IDS = ['shubh', 'anushka', 'arvind', 'maya', 'neel', 'pavithra', 'arjun', 'amol', 'diya', 'meera']
+const SARVAM_VOICE_IDS = [
+  'shubh', 'aditya', 'rahul', 'rohan', 'amit', 'dev', 'ratan', 'varun', 
+  'manan', 'sumit', 'kabir', 'aayan', 'ashutosh', 'advait', 'anand', 
+  'tarun', 'sunny', 'mani', 'gokul', 'vijay', 'mohit', 'rehan', 'soham',
+  'ritu', 'priya', 'neha', 'pooja', 'simran', 'kavya', 'ishita', 'shreya', 
+  'roopa', 'tanya', 'shruti', 'suhani', 'kavitha', 'rupali',
+  'anushka', 'manisha', 'vidya', 'arya', 'abhilash', 'karun', 'hitesh'
+]
 
 function getEffectiveProvider(agentVoiceProvider: string, agentVoiceId: string): 'elevenlabs' | 'sarvam' {
   // If stored provider is sarvam, trust it

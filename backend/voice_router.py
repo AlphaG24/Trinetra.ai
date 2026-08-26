@@ -7,12 +7,17 @@ import httpx
 import traceback
 from datetime import datetime
 from typing import Dict, Any, Optional
-from fastapi import APIRouter, Header, HTTPException, Request, BackgroundTasks, File, UploadFile, Form, Response
+from fastapi import APIRouter, Header, HTTPException, Request, BackgroundTasks, File, UploadFile, Form, Response, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from database import supabase, supabase_admin
 from google import genai
 import asyncio
+import audioop
+import base64
+from livekit import rtc
+from app.workers.livekit_agent import generate_agent_token
+
 
 
 router = APIRouter(prefix="/api/voice", tags=["Voice Agent"])
@@ -267,8 +272,16 @@ async def generate_livekit_token(req: LiveKitTokenRequest):
     if os.getenv("DISABLE_IN_PROCESS_AGENT", "false").lower() != "true":
         print(f"[LIVEKIT AGENT] Spawning agent worker to join room: {room_name} with agent_id: {req.agent_id}", flush=True)
         try:
-            from agent import run_agent
-            asyncio.create_task(run_agent(room_name, req.agent_id))
+            async def safe_run_agent(r_name: str, a_id: str):
+                try:
+                    from agent import run_agent
+                    await run_agent(r_name, a_id)
+                except Exception as run_err:
+                    import traceback
+                    print(f"[LIVEKIT AGENT RUN ERROR] Exception in run_agent: {run_err}", flush=True)
+                    traceback.print_exc()
+
+            asyncio.create_task(safe_run_agent(room_name, req.agent_id))
         except Exception as spawn_err:
             print(f"[LIVEKIT AGENT SPAWN ERROR] Failed to spawn agent task: {spawn_err}", flush=True)
     else:
@@ -572,7 +585,7 @@ OUTPUT: Return the FULL enhanced prompt (original + additions). Keep it concise.
             "https://api.groq.com/openai/v1/chat/completions",
             headers={"Authorization": f"Bearer {groq_key}", "Content-Type": "application/json"},
             json={
-                "model": "llama-3.3-70b-versatile",
+                "model": "groq/compound",
                 "messages": [{
                     "role": "system",
                     "content": system_prompt
@@ -656,7 +669,7 @@ ENDING: {req.ending or '(empty)'}"""
             "https://api.groq.com/openai/v1/chat/completions",
             headers={"Authorization": f"Bearer {groq_key}", "Content-Type": "application/json"},
             json={
-                "model": "llama-3.3-70b-versatile",
+                "model": "groq/compound",
                 "messages": [
                     {"role": "system", "content": prompt},
                     {"role": "user", "content": messages_text}
@@ -810,8 +823,31 @@ async def handle_twilio_voice_webhook(
                 if agent_lookup.data and len(agent_lookup.data) > 0:
                     agent_data = agent_lookup.data[0]
                     agent_id = agent_data["id"]
+                else:
+                    # Try resolving via agent_phone_numbers / phone_numbers pool mapping
+                    phone_res = supabase_admin.table("phone_numbers").select("id").or_(f"phone_number.eq.{to_number},phone_number.eq.+{clean_to},phone_number.eq.{clean_to}").limit(1).execute()
+                    if phone_res.data and len(phone_res.data) > 0:
+                        phone_id = phone_res.data[0]["id"]
+                        mapping_res = supabase_admin.table("agent_phone_numbers").select("agent_id").eq("phone_number_id", phone_id).limit(1).execute()
+                        if mapping_res.data and len(mapping_res.data) > 0:
+                            agent_id = mapping_res.data[0]["agent_id"]
+                            agent_res = supabase_admin.table("agents").select("*").eq("id", agent_id).maybe_single().execute()
+                            agent_data = agent_res.data
             except Exception as e:
                 print(f"[Twilio Lookup Error] {e}", flush=True)
+
+        # Enforce Capabilities Matrix check
+        if agent_data and direction == "inbound":
+            agent_type = agent_data.get("agent_type", "voice")
+            # Lead Qualifier does NOT support inbound calls
+            if agent_type == "lead_qualifier":
+                print(f"[Twilio Webhook] Inbound call rejected for agent {agent_id} (type: {agent_type})", flush=True)
+                rejection_twiml = """<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+    <Say voice="Polly.Joanna">Thank you for calling. This assistant is configured for outbound campaigns and callbacks only. Goodbye.</Say>
+    <Hangup/>
+</Response>"""
+                return Response(content=rejection_twiml.strip(), media_type="application/xml")
 
         agent_name = agent_data.get("name", "Trinetra AI Assistant") if agent_data else "Trinetra AI Assistant"
         user_id = agent_data.get("user_id") if agent_data else None
@@ -819,22 +855,24 @@ async def handle_twilio_voice_webhook(
 
         # 2. Insert or update voice_calls table
         try:
-            existing = supabase_admin.table("voice_calls").select("id").eq("provider_call_id", call_sid).limit(1).execute()
+            existing = supabase_admin.table("voice_calls").select("id").eq("metadata->>provider_call_id", call_sid).limit(1).execute()
             if not existing.data:
                 call_record = {
-                    "provider_call_id": call_sid,
-                    "session_id": call_sid,
                     "agent_id": agent_id,
                     "user_id": user_id,
                     "organization_id": org_id,
-                    "caller_phone": from_number,
-                    "from_number": from_number,
-                    "to_number": to_number,
-                    "call_type": direction,
+                    "caller_phone": to_number if direction == "outbound-api" else from_number,
                     "status": "in_progress",
                     "started_at": datetime.utcnow().isoformat(),
-                    "transcript_text": f"Agent: Hello! Welcome to Trinetra AI. How may I assist you today?\nCaller: {from_number}",
-                    "language_detected": "english"
+                    "transcript": f"Agent: Hello! Welcome to Trinetra AI. How may I assist you today?\nCaller: {from_number}",
+                    "language_detected": "english",
+                    "metadata": {
+                        "provider_call_id": call_sid,
+                        "session_id": call_sid,
+                        "direction": direction,
+                        "from_number": from_number,
+                        "to_number": to_number
+                    }
                 }
                 supabase_admin.table("voice_calls").insert(call_record).execute()
                 print(f"[Twilio Voice] Logged call record: {call_sid}", flush=True)
@@ -850,14 +888,17 @@ async def handle_twilio_voice_webhook(
             except Exception as spawn_err:
                 print(f"[Twilio Agent Spawn] {spawn_err}", flush=True)
 
-        # 4. Return TwiML
-        greeting = f"Hello! You have reached {agent_name} on Trinetra AI. Your call is connected and active. Please speak after the tone."
+        # 4. Return TwiML with Connect Stream
+        host = request.headers.get("host") or "localhost:8000"
+        scheme = "wss" if request.url.scheme == "https" or "trycloudflare.com" in host or "ngrok-free.dev" in host else "ws"
+        stream_url = f"{scheme}://{host}/api/voice/webhooks/voice/twilio/stream/{room_name}"
         
         twiml_response = f"""<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-    <Say voice="Polly.Joanna">{greeting}</Say>
-    <Pause length="2"/>
-    <Say voice="Polly.Joanna">Thank you for calling Trinetra AI. Have a great day!</Say>
+    <Connect>
+        <Stream url="{stream_url}" />
+    </Connect>
+    <Pause length="3600" />
 </Response>"""
 
         return Response(content=twiml_response.strip(), media_type="application/xml")
@@ -908,10 +949,142 @@ async def handle_twilio_voice_status(
             if recording_url:
                 update_payload["recording_url"] = recording_url
 
-            supabase_admin.table("voice_calls").update(update_payload).eq("provider_call_id", call_sid).execute()
+            supabase_admin.table("voice_calls").update(update_payload).eq("metadata->>provider_call_id", call_sid).execute()
 
         return {"status": "ok"}
     except Exception as e:
         print(f"[Twilio Status Error] {e}", flush=True)
         return {"status": "error", "message": str(e)}
+
+
+# --- TWILIO BI-DIRECTIONAL WEBSOCKET AUDIO BRIDGE ---
+
+@router.websocket("/webhooks/voice/twilio/stream/{room_name}")
+async def twilio_audio_stream(websocket: WebSocket, room_name: str):
+    await websocket.accept()
+    print(f"[Twilio WebSocket] Connected for room: {room_name}", flush=True)
+    
+    # 1. Connect to LiveKit room
+    room = rtc.Room()
+    token = generate_agent_token(room_name)
+    livekit_url = os.getenv("LIVEKIT_URL", "ws://127.0.0.1:7880").strip()
+    
+    try:
+        await room.connect(livekit_url, token)
+        print(f"[Twilio WebSocket] Connected to LiveKit room: {room_name}", flush=True)
+    except Exception as conn_err:
+        print(f"[Twilio WebSocket] LiveKit connection failed: {conn_err}", flush=True)
+        await websocket.close()
+        return
+
+    # 2. Setup Audio Source & Track
+    audio_source = rtc.AudioSource(sample_rate=16000, num_channels=1)
+    audio_track = rtc.LocalAudioTrack.create_audio_track("twilio-inbound", audio_source)
+    await room.local_participant.publish_track(audio_track)
+    print("[Twilio WebSocket] Inbound audio track published", flush=True)
+    
+    stream_sid = None
+    ratecv_state_in = None
+    ratecv_state_out = None
+    
+    audio_queue = asyncio.Queue()
+    track_tasks = {}
+
+    async def read_track(track: rtc.RemoteAudioTrack):
+        try:
+            audio_stream = rtc.AudioStream(track)
+            async for event in audio_stream:
+                await audio_queue.put(event.frame)
+        except Exception as read_err:
+            print(f"[Twilio WebSocket] Error reading track: {read_err}", flush=True)
+
+    @room.on("track_subscribed")
+    def on_track_subscribed(track: rtc.RemoteAudioTrack, publication: rtc.RemoteTrackPublication, participant: rtc.RemoteParticipant):
+        print(f"[Twilio WebSocket] Track subscribed: {track.sid} from {participant.identity} (kind: {track.kind})", flush=True)
+        if track.kind == rtc.TrackKind.KIND_AUDIO:
+            task = asyncio.create_task(read_track(track))
+            track_tasks[track.sid] = task
+
+    @room.on("track_unsubscribed")
+    def on_track_unsubscribed(track: rtc.RemoteAudioTrack, publication: rtc.RemoteTrackPublication, participant: rtc.RemoteParticipant):
+        print(f"[Twilio WebSocket] Track unsubscribed: {track.sid}", flush=True)
+        if track.sid in track_tasks:
+            track_tasks[track.sid].cancel()
+            del track_tasks[track.sid]
+
+    async def send_to_twilio():
+        nonlocal stream_sid, ratecv_state_out
+        try:
+            while True:
+                frame = await audio_queue.get()
+                if not stream_sid:
+                    continue
+                
+                pcm_data = frame.data
+                sample_rate = frame.sample_rate
+                
+                pcm_8k, ratecv_state_out = audioop.ratecv(
+                    pcm_data, 2, 1, sample_rate, 8000, ratecv_state_out
+                )
+                
+                mulaw_data = audioop.lin2ulaw(pcm_8k, 2)
+                payload = base64.b64encode(mulaw_data).decode("utf-8")
+                await websocket.send_json({
+                    "event": "media",
+                    "streamSid": stream_sid,
+                    "media": {
+                        "payload": payload
+                    }
+                })
+        except asyncio.CancelledError:
+            pass
+        except Exception as send_err:
+            print(f"[Twilio WebSocket] Send task error: {send_err}", flush=True)
+
+    send_task = asyncio.create_task(send_to_twilio())
+    
+    try:
+        while True:
+            data = await websocket.receive_text()
+            msg = json.loads(data)
+            event = msg.get("event")
+            
+            if event == "start":
+                stream_sid = msg["start"]["streamSid"]
+                print(f"[Twilio WebSocket] Media stream active: {stream_sid}", flush=True)
+                
+            elif event == "media":
+                media = msg.get("media", {})
+                payload_b64 = media.get("payload")
+                if payload_b64:
+                    mulaw_data = base64.b64decode(payload_b64)
+                    
+                    pcm_8k = audioop.ulaw2lin(mulaw_data, 2)
+                    pcm_16k, ratecv_state_in = audioop.ratecv(
+                        pcm_8k, 2, 1, 8000, 16000, ratecv_state_in
+                    )
+                    
+                    samples_per_channel = len(pcm_16k) // 2
+                    frame = rtc.AudioFrame(
+                        data=pcm_16k,
+                        sample_rate=16000,
+                        num_channels=1,
+                        samples_per_channel=samples_per_channel
+                    )
+                    await audio_source.capture_frame(frame)
+                    
+            elif event == "stop":
+                print("[Twilio WebSocket] Media stream stopped by Twilio", flush=True)
+                break
+    except WebSocketDisconnect:
+        print("[Twilio WebSocket] Client disconnected", flush=True)
+    except Exception as e:
+        print(f"[Twilio WebSocket] Bridge exception: {e}", flush=True)
+    finally:
+        send_task.cancel()
+        for t in track_tasks.values():
+            t.cancel()
+        await room.disconnect()
+        print(f"[Twilio WebSocket] Connection for room {room_name} closed & cleaned up", flush=True)
+
 

@@ -20,7 +20,7 @@ export async function GET() {
       // Active agents count
       supabase.from('agents').select('id, name, status', { count: 'exact' }).eq('user_id', user.id),
       // Call logs for today + volume chart
-      supabase.from('agent_call_logs')
+      supabase.from('voice_calls')
         .select('id, duration_seconds, sentiment, created_at')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false })
@@ -28,8 +28,8 @@ export async function GET() {
       // Leads count
       supabase.from('leads').select('id, status, created_at', { count: 'exact' }).eq('user_id', user.id),
       // Recent 5 calls for activity feed
-      supabase.from('agent_call_logs')
-        .select('id, duration_seconds, sentiment, created_at, caller_number')
+      supabase.from('voice_calls')
+        .select('id, duration_seconds, sentiment, created_at, caller_phone')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false })
         .limit(5),
@@ -93,7 +93,7 @@ export async function GET() {
       type: 'call',
       duration: c.duration_seconds,
       sentiment: c.sentiment,
-      caller: c.caller_number || 'Unknown',
+      caller: c.caller_phone || 'Unknown',
       createdAt: c.created_at,
     }))
 

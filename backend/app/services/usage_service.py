@@ -15,7 +15,7 @@ class UsageService:
         """Check if an agent has exceeded its minutes limit"""
         res = await asyncio.to_thread(
             self.supabase.table("agents")
-            .select("id, name, organization_id, minutes_limit, minutes_used, status")
+            .select("id, name, organization_id, minutes_limit, minutes_used, status, config")
             .eq("id", agent_id).single().execute
         )
         
@@ -23,28 +23,73 @@ class UsageService:
             return {"error": "Agent not found"}
         
         a = res.data
-        limit = a.get("minutes_limit", 0) or 0
+        db_limit = a.get("minutes_limit", 0) or 0
         used = a.get("minutes_used", 0) or 0
+        org_id = a.get("organization_id")
+        config = a.get("config", {}) or {}
         
-        if limit == 0:
-            return {"status": "unlimited", "used": used, "limit": limit, "percent": 0}
+        # 1. Resolve from agent config
+        config_limit = config.get("minutes_limit")
+        config_tier = config.get("plan_tier")
         
-        percent = round((used / limit) * 100, 1)
+        resolved_limit = db_limit
+        if config_limit is not None:
+            resolved_limit = max(resolved_limit, int(config_limit))
+            
+        if config_tier:
+            tier_lower = str(config_tier).lower()
+            if tier_lower in ('pro', 'professional'):
+                resolved_limit = max(resolved_limit, 2000)
+            elif tier_lower == 'starter':
+                resolved_limit = max(resolved_limit, 500)
+            elif tier_lower == 'trial':
+                resolved_limit = max(resolved_limit, 100)
+            elif tier_lower == 'enterprise':
+                resolved_limit = max(resolved_limit, 10000)
+                
+        # 2. Fallback to profiles table if organization_id is present
+        if org_id and resolved_limit <= 100: # Only fallback if we haven't resolved a higher tier limit yet
+            try:
+                prof_res = await asyncio.to_thread(
+                    self.supabase.table("profiles")
+                    .select("plan_tier")
+                    .eq("organization_id", org_id).execute
+                )
+                if prof_res.data:
+                    plan_tier = (prof_res.data[0].get("plan_tier") or "free").lower()
+                    if plan_tier in ('pro', 'professional'):
+                        tier_limit = 2000
+                    elif plan_tier == 'starter':
+                        tier_limit = 500
+                    elif plan_tier == 'trial':
+                        tier_limit = 100
+                    elif plan_tier == 'enterprise':
+                        tier_limit = 10000
+                    else:
+                        tier_limit = 10
+                    resolved_limit = max(resolved_limit, tier_limit)
+            except Exception as e:
+                logger.error(f"Failed to fetch profile plan tier in check_agent_minutes: {e}")
+
+        if resolved_limit == 0:
+            return {"status": "unlimited", "used": used, "limit": resolved_limit, "percent": 0}
+        
+        percent = round((used / resolved_limit) * 100, 1)
         
         # Determine status
-        if used >= limit:
+        if used >= resolved_limit:
             status = "exceeded"
             await self._pause_agent(agent_id)
         elif percent >= 80:
             status = "warning"
-            await self._send_usage_warning(a.get("organization_id"), agent_id, a.get("name"), percent)
+            await self._send_usage_warning(org_id, agent_id, a.get("name"), percent)
         else:
             status = "normal"
         
         return {
             "status": status,
             "used": used,
-            "limit": limit,
+            "limit": resolved_limit,
             "percent": percent,
             "agent_name": a.get("name")
         }

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { 
   PhoneIncoming, Clock, Users, Zap, Play, Copy, Lock, ChevronDown, ChevronUp,
@@ -55,6 +55,35 @@ export function AgentOverviewTab({
   })
   const [statsLoading, setStatsLoading] = useState(true)
   const [resettingAll, setResettingAll] = useState(false)
+  const [submittingRequest, setSubmittingRequest] = useState(false)
+
+  const handleRequestHomepagePlacement = async () => {
+    setSubmittingRequest(true)
+    try {
+      const response = await fetch('/api/developer/requests', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          request_type: 'set_homepage_agent',
+          request_data: {
+            agent_id: agent.id,
+            agent_name: agent.name
+          }
+        })
+      })
+
+      const resData = await response.json()
+      if (!response.ok) {
+        throw new Error(resData.error || 'Failed to submit request.')
+      }
+
+      toast.success('Homepage placement request submitted for approval!')
+    } catch (err: any) {
+      toast.error(err.message || 'Something went wrong.')
+    } finally {
+      setSubmittingRequest(false)
+    }
+  }
 
   const [agentUsage, setAgentUsage] = useState<any>(null)
   const [usageLoading, setUsageLoading] = useState(true)
@@ -83,7 +112,8 @@ export function AgentOverviewTab({
     transcriptEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [transcripts])
 
-  useEffect(() => {
+  const fetchUsage = useCallback(() => {
+    setUsageLoading(true)
     fetch(`/api/usage/agent/${agent.id}`)
       .then(res => res.json())
       .then(res => {
@@ -92,6 +122,10 @@ export function AgentOverviewTab({
       })
       .catch(() => setUsageLoading(false))
   }, [agent.id])
+
+  useEffect(() => {
+    fetchUsage()
+  }, [fetchUsage])
 
   // Resolve agent-specific tier
   const getAgentTier = (agentData: any, profileData: any) => {
@@ -180,17 +214,26 @@ export function AgentOverviewTab({
     }
   }, [agent.id])
 
-  // Initialize remaining seconds when modal opens or profile changes
+  // Initialize remaining seconds when modal opens — use backend agentUsage as single source of truth
   useEffect(() => {
     if (showCallModal) {
-      const remainingSecs = Math.max(0, (limit - used) * 60)
+      let remainingSecs = 0
+      if (agentUsage && agentUsage.limit > 0) {
+        remainingSecs = Math.max(0, (agentUsage.limit - agentUsage.used) * 60)
+      } else if (agentUsage && agentUsage.limit === 0) {
+        // unlimited plan
+        remainingSecs = 99999 * 60
+      } else {
+        // Fallback to frontend-computed values if backend data not loaded yet
+        remainingSecs = Math.max(0, (limit - used) * 60)
+      }
       setRemainingSeconds(remainingSecs)
       setMicPermissionError(null)
       if (remainingSecs <= 0) {
         setShowUpgradeModal(true)
       }
     }
-  }, [showCallModal, limit, used])
+  }, [showCallModal, agentUsage, limit, used])
 
   // Track call connection state transitions
   useEffect(() => {
@@ -268,36 +311,39 @@ export function AgentOverviewTab({
 
       const mockRecordingUrl = 'https://trinetra-voice-recordings.s3.amazonaws.com/sandbox_recording.mp3'
 
-      // 1. Insert into agent_call_logs (frontend console list)
-      await supabase
-        .from('agent_call_logs')
-        .insert({
-          user_id: user.id,
-          vapi_agent_id: agent.vapi_agent_id || agent.id,
-          duration_seconds: secs,
-          sentiment: sentiment,
-          transcript: fullTranscript || 'No speech detected.',
-          recording_url: mockRecordingUrl
-        })
-
-      // 2. Insert into voice_calls (global telemetry & billing usage)
-      await supabase
-        .from('voice_calls')
-        .insert({
-          user_id: user.id,
-          agent_id: agent.id,
-          organization_id: freshProfile.organization_id,
+      // 1. Insert into voice_calls (global telemetry & billing usage)
+      const voiceCallRecord: Record<string, any> = {
+        user_id: user.id,
+        agent_id: agent.id,
+        caller_phone: 'SANDBOX',
+        caller_name: 'Browser Sandbox',
+        status: 'completed',
+        duration_seconds: secs,
+        recording_url: mockRecordingUrl,
+        transcript: fullTranscript || 'No speech detected.',
+        sentiment: sentiment,
+        is_test_call: true,
+        started_at: new Date(Date.now() - secs * 1000).toISOString(),
+        ended_at: new Date().toISOString(),
+        metadata: {
+          provider: 'sandbox',
           provider_call_id: `sandbox-${agent.id}-${Date.now()}`,
-          caller_number: 'SANDBOX',
           agent_number: agent.phone_number || 'SANDBOX_LINE',
-          direction: 'sandbox',
-          status: 'completed',
-          duration_seconds: secs,
-          recording_url: mockRecordingUrl,
-          transcript: fullTranscript || 'No speech detected.',
-          sentiment: sentiment,
-          started_at: new Date(Date.now() - secs * 1000).toISOString()
-        })
+          direction: 'sandbox'
+        }
+      }
+      // Only include organization_id if it's a valid UUID
+      if (freshProfile.organization_id) {
+        voiceCallRecord.organization_id = freshProfile.organization_id
+      }
+
+      const { error: vcError } = await supabase
+        .from('voice_calls')
+        .insert(voiceCallRecord)
+
+      if (vcError) {
+        console.error('Failed to insert voice_calls record:', vcError)
+      }
 
       // 3. Save minutes limits updates
       const updates: any = {}
@@ -347,6 +393,7 @@ export function AgentOverviewTab({
         onProfileUpdate(updatedProfile)
       }
       
+      fetchUsage()
       fetchStats()
       toast.success(`Call logs saved (+${minsUsed} mins)`)
     } catch (err) {
@@ -647,6 +694,19 @@ export function AgentOverviewTab({
                   <Lock className="w-4 h-4 text-[var(--muted)]" /> No Phone Assigned
                 </span>
               </div>
+            )}
+
+            {/* Request Homepage Demo Placement (For Developers only) */}
+            {profile?.role === 'developer_tester' && (
+              <button 
+                onClick={handleRequestHomepagePlacement}
+                disabled={submittingRequest}
+                className="w-full flex items-center justify-between p-4 rounded-xl border border-violet-500/20 bg-violet-500/5 hover:bg-violet-500/10 transition-all font-montserrat font-bold text-xs uppercase tracking-wider text-violet-400 cursor-pointer animate-pulse"
+              >
+                <span className="flex items-center gap-2">
+                  {submittingRequest ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />} Request Homepage Demo Placement
+                </span>
+              </button>
             )}
 
             {/* Reset Entire Agent */}

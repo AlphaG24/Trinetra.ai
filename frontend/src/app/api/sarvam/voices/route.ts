@@ -1,6 +1,16 @@
 import { NextResponse } from 'next/server'
 
 const SARVAM_VOICES = [
+  // High-performance Low-latency Voices (bulbul:v2)
+  { id: 'anushka', name: 'Anushka (Low Latency / Smooth)', gender: 'Female' },
+  { id: 'karun', name: 'Karun (Low Latency / Smooth)', gender: 'Male' },
+  { id: 'manisha', name: 'Manisha (Low Latency)', gender: 'Female' },
+  { id: 'abhilash', name: 'Abhilash (Low Latency)', gender: 'Male' },
+  { id: 'vidya', name: 'Vidya (Low Latency)', gender: 'Female' },
+  { id: 'arya', name: 'Arya (Low Latency)', gender: 'Female' },
+  { id: 'hitesh', name: 'Hitesh (Low Latency)', gender: 'Male' },
+  
+  // Standard Voices (bulbul:v3)
   { id: 'shubh', name: 'Shubh', gender: 'Male' },
   { id: 'aditya', name: 'Aditya', gender: 'Male' },
   { id: 'rahul', name: 'Rahul', gender: 'Male' },

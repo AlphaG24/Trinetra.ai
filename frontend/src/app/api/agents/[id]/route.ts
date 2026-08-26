@@ -119,3 +119,35 @@ export async function DELETE(
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
+
+export async function GET(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id: agentId } = await params;
+    const supabase = await createClient();
+
+    // 1. Authenticate User
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // 2. Fetch agent
+    const { data: agent, error: fetchError } = await supabase
+      .from('agents')
+      .select('*')
+      .eq('id', agentId)
+      .single();
+
+    if (fetchError || !agent) {
+      return NextResponse.json({ error: "Agent not found" }, { status: 404 });
+    }
+
+    return NextResponse.json({ success: true, data: agent });
+  } catch (error: any) {
+    console.error("[Agent Fetch API] Catch Error:", error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}

@@ -147,10 +147,6 @@ function logSecurityEvent(event: string, details: Record<string, string | number
 }
 
 // ============================================================================
-// MAIN MIDDLEWARE
-// ============================================================================
-
-// ============================================================================
 // SECURITY: Persistent Database-Backed Sliding Window Rate Limiting (Serverless-Safe)
 // ============================================================================
 
@@ -210,6 +206,9 @@ function getDatabaseRateLimitConfig(pathname: string, userId: string, ip: string
   if (pathname.startsWith('/api/auth') || pathname.startsWith('/auth') || pathname === '/login' || pathname === '/signup') {
     return { limit: 100, windowSeconds: 900, key: `rl:auth:${ip}` }
   }
+  if (pathname === '/api/public/callback') {
+    return { limit: 1, windowSeconds: 10800, key: `rl:public_callback:${ip}` }
+  }
   if (pathname === '/api/ingest') {
     const userKey = userId || ip
     return { limit: 100, windowSeconds: 3600, key: `rl:ingest:${userKey}` }
@@ -267,10 +266,10 @@ function applySecurityHeaders(response: NextResponse): NextResponse {
 }
 
 // ============================================================================
-// MAIN MIDDLEWARE
+// MAIN PROXY HANDLER (Next.js 16 Convention)
 // ============================================================================
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
     || request.headers.get('x-real-ip')
     || 'unknown'
@@ -394,7 +393,7 @@ export async function middleware(request: NextRequest) {
   const isPartnerDashboard = currentPath.startsWith('/partners/dashboard')
 
   if (currentPath.startsWith('/dashboard/agents')) {
-    console.log('🔍 MIDDLEWARE - Agents route check:', {
+    console.log('🔍 PROXY - Agents route check:', {
       path: currentPath,
       isAuthenticated: !!user,
       willRedirect: !user

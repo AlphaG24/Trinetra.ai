@@ -44,3 +44,13 @@ app.include_router(blog_ai_router)
 def read_root():
     return {"message": "Trinetra Voice AI Backend is Active"}
 
+@app.get("/api/debug-env")
+def debug_env():
+    return {
+        "groq_api_key_len": len(os.environ.get("GROQ_API_KEY", "")),
+        "sarvam_api_key_len": len(os.environ.get("SARVAM_API_KEY", "")),
+        "google_api_key_len": len(os.environ.get("GOOGLE_API_KEY", "")),
+        "livekit_api_key_len": len(os.environ.get("LIVEKIT_API_KEY", "")),
+        "cwd": os.getcwd()
+    }
+

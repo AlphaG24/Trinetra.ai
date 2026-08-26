@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { authenticateRequest } from "@/lib/api-helpers";
+import { createClient } from "@/utils/supabase/server";
 
 export async function GET(request: Request) {
     try {
@@ -17,6 +18,31 @@ export async function GET(request: Request) {
 
         if (!provider) {
             provider = profile?.country === 'IN' ? 'voicelink' : 'twilio';
+        }
+
+        const supabase = await createClient();
+        
+        // Check local database pool for available numbers first
+        const { data: poolNumbers } = await supabase
+            .from('phone_number_pool')
+            .select('*')
+            .eq('status', 'available')
+            .limit(10);
+
+        if (poolNumbers && poolNumbers.length > 0) {
+            const available_numbers = poolNumbers.map((num: any) => ({
+                did_id: num.id,
+                phone_number: num.phone_number,
+                city: 'Trinetra Pool',
+                area_code: num.phone_number.substring(1, 4),
+                did_type: 'mobile',
+                provider: 'twilio'
+            }));
+
+            return NextResponse.json({
+                success: true,
+                data: { available_numbers }
+            });
         }
 
         const fastApiUrl = process.env.NEXT_PUBLIC_FASTAPI_URL || 'http://127.0.0.1:8000';

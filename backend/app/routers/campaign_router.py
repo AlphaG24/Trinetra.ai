@@ -164,10 +164,18 @@ async def retry_contact(id: str, contact_id: str):
             .eq("campaign_id", id)\
             .execute()
             
-        # If the campaign is completed, we should reset it to ready so it can run again
+        # Check campaign status and re-trigger calling loop if not already running
         campaign = supabase_admin.table("campaigns").select("status").eq("id", id).single().execute().data
-        if campaign and campaign["status"] == "completed":
-            supabase_admin.table("campaigns").update({"status": "ready"}).eq("id", id).execute()
+        if campaign and campaign["status"] in ("completed", "ready", "paused"):
+            # Set campaign to running and spawn the background dialer loop
+            supabase_admin.table("campaigns").update({"status": "running"}).eq("id", id).execute()
+            
+            import asyncio
+            from app.services.campaign_service import CampaignService, running_campaign_tasks
+            task = asyncio.create_task(CampaignService.run_campaign_loop(id))
+            running_campaign_tasks.add(task)
+            task.add_done_callback(running_campaign_tasks.discard)
+            logger.info(f"Retry triggered: re-started calling loop for campaign {id}")
             
         return {"success": True, "data": res.data[0] if res.data else {}}
     except Exception as e:

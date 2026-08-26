@@ -272,7 +272,7 @@ export async function POST(request: Request) {
         // 2. Fetch Profile (including plan_tier, demo_usage and business_description)
         let { data: profile, error: profileError } = await supabaseAdmin
             .from('profiles')
-            .select('id, full_name, email, company_name, business_type, onboarding_complete, organization_id, plan_tier, demo_usage, business_description, additional_agents')
+            .select('id, full_name, email, company_name, business_type, onboarding_complete, organization_id, plan_tier, demo_usage, business_description, additional_agents, role')
             .eq('id', user.id)
             .single();
  
@@ -288,7 +288,7 @@ export async function POST(request: Request) {
                     full_name: user.user_metadata?.full_name || '',
                     onboarding_complete: false,
                 })
-                .select('id, full_name, email, company_name, business_type, onboarding_complete, organization_id, plan_tier, demo_usage, business_description, additional_agents')
+                .select('id, full_name, email, company_name, business_type, onboarding_complete, organization_id, plan_tier, demo_usage, business_description, additional_agents, role')
                 .single();
  
             if (createError || !newProfile) {
@@ -407,7 +407,8 @@ export async function POST(request: Request) {
             console.error("[Trinetra] Error fetching dynamic agent limit:", err);
         }
 
-        if (currentAgentCount >= limit) {
+        // Bypass limit checks entirely if user has developer_tester role
+        if (profile?.role !== 'developer_tester' && currentAgentCount >= limit) {
             return NextResponse.json(
                 { error: "You've reached the maximum number of agents for your plan. Please upgrade to add more." },
                 { status: 403 }

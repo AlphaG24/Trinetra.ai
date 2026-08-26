@@ -1,5 +1,6 @@
 import re
 import logging
+import asyncio
 from database import supabase_admin
 
 logger = logging.getLogger("DNDService")
@@ -16,10 +17,12 @@ class DNDService:
         if not cleaned:
             return False
         
-        result = await self.supabase.table("dnd_registry") \
-            .select("id") \
-            .eq("phone_number", cleaned) \
-            .execute()
+        result = await asyncio.to_thread(
+            self.supabase.table("dnd_registry")
+            .select("id")
+            .eq("phone_number", cleaned)
+            .execute
+        )
         
         return len(result.data) > 0
     
@@ -31,10 +34,12 @@ class DNDService:
         if not cleaned_numbers:
             return {p: False for p in phone_numbers}
             
-        result = await self.supabase.table("dnd_registry") \
-            .select("phone_number") \
-            .in_("phone_number", cleaned_numbers) \
-            .execute()
+        result = await asyncio.to_thread(
+            self.supabase.table("dnd_registry")
+            .select("phone_number")
+            .in_("phone_number", cleaned_numbers)
+            .execute
+        )
         
         dnd_numbers = {r["phone_number"] for r in result.data}
         return {p: (cleaned_map[p] in dnd_numbers) for p in phone_numbers}
@@ -44,17 +49,26 @@ class DNDService:
         cleaned = self._clean_phone(phone_number)
         if not cleaned:
             return
-        await self.supabase.table("dnd_registry").upsert({
-            "phone_number": cleaned,
-            "source": source
-        }).execute()
+        await asyncio.to_thread(
+            self.supabase.table("dnd_registry")
+            .upsert({
+                "phone_number": cleaned,
+                "source": source
+            })
+            .execute
+        )
     
     async def remove_from_dnd(self, phone_number: str):
         """Remove a number from DND registry"""
         cleaned = self._clean_phone(phone_number)
         if not cleaned:
             return
-        await self.supabase.table("dnd_registry").delete().eq("phone_number", cleaned).execute()
+        await asyncio.to_thread(
+            self.supabase.table("dnd_registry")
+            .delete()
+            .eq("phone_number", cleaned)
+            .execute
+        )
     
     async def bulk_upload(self, phone_numbers: list, source: str = "upload"):
         """Bulk add numbers to DND registry"""
@@ -64,7 +78,11 @@ class DNDService:
             if cleaned:
                 records.append({"phone_number": cleaned, "source": source})
         if records:
-            await self.supabase.table("dnd_registry").upsert(records).execute()
+            await asyncio.to_thread(
+                self.supabase.table("dnd_registry")
+                .upsert(records)
+                .execute
+            )
             
     async def bulk_delete_by_source_or_date(self, source: str = None, before_date: str = None):
         """Bulk delete registry items by source and/or registration date threshold"""
@@ -73,7 +91,7 @@ class DNDService:
             query = query.eq("source", source)
         if before_date:
             query = query.lte("registered_at", before_date)
-        await query.execute()
+        await asyncio.to_thread(query.execute)
     
     def _clean_phone(self, phone: str) -> str:
         """Clean phone number to standard format: 10 digits"""

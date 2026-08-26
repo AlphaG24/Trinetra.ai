@@ -41,7 +41,10 @@ export function ManageNumberModal({
   const [releaseConfirmText, setReleaseConfirmText] = useState("");
   const [isReleasing, setIsReleasing] = useState(false);
   
-  const { agents } = useDashboardStore();
+  const { agents: storeAgents } = useDashboardStore();
+  const [localAgents, setLocalAgents] = useState<any[]>([]);
+  const agents = localAgents.length > 0 ? localAgents : (storeAgents || []);
+
   const [selectedAgentId, setSelectedAgentId] = useState("");
   const [isPrimary, setIsPrimary] = useState(false);
   const [isAssigning, setIsAssigning] = useState(false);
@@ -49,7 +52,7 @@ export function ManageNumberModal({
   const assignedAgentIds = phoneNumber.assigned_agents?.map(a => a.agent_id) || [];
   const unassignedAgents = (agents || [])
     .filter(a => !assignedAgentIds.includes(a.id))
-    .filter(a => !(a.is_demo === true || a.status === 'draft' || a.status === 'beta' || a.agent_type === 'free_demo' || a.name?.startsWith('[')));
+    .filter(a => a.status !== 'deleted');
 
   // Close with Escape key
   useEffect(() => {
@@ -59,6 +62,41 @@ export function ManageNumberModal({
     if (isOpen) window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isOpen, onClose]);
+
+  // Dynamically load agents if not present in Zustand store
+  useEffect(() => {
+    if (isOpen && (!storeAgents || storeAgents.length === 0)) {
+      const fetchLocalAgents = async () => {
+        try {
+          const { createClient } = await import('@/utils/supabase/client');
+          const supabase = createClient();
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user) {
+            const { data: profile } = await supabase
+              .from('profiles')
+              .select('organization_id')
+              .eq('id', user.id)
+              .single();
+
+            if (profile?.organization_id) {
+              const { data: dbAgents } = await supabase
+                .from('agents')
+                .select('id, name, status, is_demo, agent_type')
+                .eq('organization_id', profile.organization_id)
+                .neq('status', 'deleted');
+
+              if (dbAgents) {
+                setLocalAgents(dbAgents);
+              }
+            }
+          }
+        } catch (err) {
+          console.error("Error fetching local agents in ManageNumberModal:", err);
+        }
+      };
+      fetchLocalAgents();
+    }
+  }, [isOpen, storeAgents]);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(phoneNumber.phone_number);

@@ -179,7 +179,7 @@ async def query_knowledge(req: QueryRequest):
                     "Content-Type": "application/json"
                 },
                 json={
-                    "model": "llama-3.3-70b-versatile",
+                    "model": "groq/compound",
                     "messages": [
                         {
                             "role": "system",
