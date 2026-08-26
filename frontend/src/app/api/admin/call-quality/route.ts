@@ -28,8 +28,8 @@ export async function GET() {
 
     // 1. Fetch Call Logs
     const { data: logs, error: logsErr } = await supabase
-      .from('agent_call_logs')
-      .select('id, created_at, duration_seconds, sentiment, outcome, caller_phone, vapi_agent_id')
+      .from('voice_calls')
+      .select('id, created_at, duration_seconds, sentiment, outcome, caller_phone, agent_id')
       .order('created_at', { ascending: false })
       .limit(100)
 

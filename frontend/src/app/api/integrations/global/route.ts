@@ -234,7 +234,7 @@ export async function POST(req: Request) {
     const { data: existingRow, error: findError } = await supabase
       .from('integrations')
       .select('id')
-      .eq('organization_id', profile.organization_id)
+      .eq('organization_id', orgId)
       .is('agent_id', null)
       .maybeSingle()
 
@@ -245,7 +245,7 @@ export async function POST(req: Request) {
     // Prepare fields to update
     const updateData: any = {
       user_id: user.id,
-      organization_id: profile.organization_id,
+      organization_id: orgId,
       agent_id: null,
       updated_at: new Date().toISOString()
     }

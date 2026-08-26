@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Phone, Copy, Check, Info, PhoneOff } from "lucide-react";
+import { Phone, Copy, Check, Info, PhoneOff, UserPlus, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 
@@ -10,6 +10,9 @@ interface AgentNumbersTabProps {
 
 export function AgentNumbersTab({ agentId, organizationId }: AgentNumbersTabProps) {
   const [numbers, setNumbers] = useState<any[]>([]);
+  const [unassignedPool, setUnassignedPool] = useState<any[]>([]);
+  const [selectedNumberId, setSelectedNumberId] = useState("");
+  const [assigning, setAssigning] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -27,7 +30,15 @@ export function AgentNumbersTab({ agentId, organizationId }: AgentNumbersTabProp
       const assigned = Array.isArray(numbersList) 
         ? numbersList.filter((n: any) => n.assigned_agents?.some((a: any) => a.agent_id === agentId))
         : [];
+      const unassigned = Array.isArray(numbersList)
+        ? numbersList.filter((n: any) => !n.assigned_agents || n.assigned_agents.length === 0)
+        : [];
+
       setNumbers(assigned);
+      setUnassignedPool(unassigned);
+      if (unassigned.length > 0) {
+        setSelectedNumberId(unassigned[0].id);
+      }
     } catch (err: any) {
       console.error(err);
       setError("Failed to load assigned phone numbers.");
@@ -45,6 +56,30 @@ export function AgentNumbersTab({ agentId, organizationId }: AgentNumbersTabProp
     setCopiedId(id);
     toast.success("Number copied to clipboard");
     setTimeout(() => setCopiedId(null), 2000);
+  };
+
+  const handleAssign = async () => {
+    if (!selectedNumberId) return;
+    setAssigning(true);
+    try {
+      const res = await fetch(`/api/phone-numbers/${selectedNumberId}/assign`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ agent_id: agentId, is_primary: true })
+      });
+      
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Failed to assign number");
+      }
+      
+      toast.success("Phone number assigned successfully!");
+      fetchNumbers();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to assign number.");
+    } finally {
+      setAssigning(false);
+    }
   };
 
   if (loading) {
@@ -72,22 +107,57 @@ export function AgentNumbersTab({ agentId, organizationId }: AgentNumbersTabProp
 
   if (numbers.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
+      <div className="flex flex-col items-center justify-center py-10 px-4 text-center">
         <div className="w-16 h-16 bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl flex items-center justify-center text-[var(--muted)] mb-4">
           <PhoneOff className="w-8 h-8" />
         </div>
         <h3 className="text-lg font-bold text-[var(--heading)] font-display mb-2">No number assigned</h3>
-        <p className="text-[var(--muted)] text-sm max-w-sm mb-6">
-          This agent does not have any assigned phone numbers. Assign an existing number or provision a new one centrally.
+        <p className="text-[var(--muted)] text-sm max-w-sm mb-6 leading-relaxed">
+          This agent does not have any assigned phone numbers. Assign an existing pool number below or provision a new one centrally.
         </p>
-        <div className="flex items-center gap-3">
-          <Link 
-            href="/dashboard/phone-numbers"
-            className="bg-violet-600 hover:bg-violet-700 text-white transition-all rounded-lg px-5 py-2 font-bold text-xs uppercase tracking-wider shadow-md"
-          >
-            Manage Phone Numbers
-          </Link>
-        </div>
+
+        {unassignedPool.length > 0 ? (
+          <div className="w-full max-w-md p-5 rounded-2xl border border-[var(--border)] bg-[var(--card-bg)] space-y-4 text-left shadow-lg">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted)] flex items-center gap-1.5">
+              <UserPlus className="w-3.5 h-3.5" /> Assign Unallocated Number
+            </span>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <select
+                value={selectedNumberId}
+                onChange={(e) => setSelectedNumberId(e.target.value)}
+                className="flex-1 rounded-xl border border-[var(--border)] bg-[var(--background)] px-4 py-2.5 text-xs text-[var(--heading)] outline-none focus:border-violet-500 transition cursor-pointer appearance-none"
+              >
+                {unassignedPool.map((num) => (
+                  <option key={num.id} value={num.id}>
+                    {num.phone_number} ({num.city})
+                  </option>
+                ))}
+              </select>
+              <button
+                onClick={handleAssign}
+                disabled={assigning || !selectedNumberId}
+                className="px-5 py-2.5 bg-violet-600 hover:bg-violet-750 text-white text-xs font-extrabold uppercase tracking-wider rounded-xl transition flex items-center justify-center gap-1.5 shadow-md disabled:opacity-50 cursor-pointer"
+              >
+                {assigning ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" /> Assigning...
+                  </>
+                ) : (
+                  "Assign Number"
+                )}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="flex items-center gap-3">
+            <Link 
+              href="/dashboard/phone-numbers"
+              className="bg-violet-600 hover:bg-violet-750 text-white transition-all rounded-lg px-5 py-2.5 font-bold text-xs uppercase tracking-wider shadow-md"
+            >
+              Manage Phone Numbers
+            </Link>
+          </div>
+        )}
       </div>
     );
   }
@@ -101,7 +171,7 @@ export function AgentNumbersTab({ agentId, organizationId }: AgentNumbersTabProp
         </div>
         <Link 
           href="/dashboard/phone-numbers"
-          className="text-xs font-bold text-[var(--secondary)] hover:opacity-80 transition-opacity"
+          className="text-xs font-bold text-violet-500 hover:opacity-80 transition-opacity"
         >
           Manage All Numbers &rarr;
         </Link>
@@ -156,13 +226,13 @@ export function AgentNumbersTab({ agentId, organizationId }: AgentNumbersTabProp
       <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-lg p-4 flex items-start sm:items-center gap-3">
         <Info className="w-5 h-5 text-[var(--heading)] shrink-0 mt-0.5 sm:mt-0" />
         <div className="flex-1">
-          <p className="text-sm text-[var(--heading)]">
+          <p className="text-sm text-[var(--heading)] leading-relaxed">
             Phone numbers are managed centrally on the Phone Numbers console. You can assign and configure them for any agent there.
           </p>
         </div>
         <Link 
           href="/dashboard/phone-numbers"
-          className="shrink-0 bg-violet-600 text-white hover:bg-violet-700 transition-all rounded-lg px-4 py-2 font-bold text-xs uppercase tracking-wider shadow-md"
+          className="shrink-0 bg-violet-600 text-white hover:bg-violet-750 transition-all rounded-lg px-4 py-2.5 font-bold text-xs uppercase tracking-wider shadow-md"
         >
           Manage Numbers &rarr;
         </Link>

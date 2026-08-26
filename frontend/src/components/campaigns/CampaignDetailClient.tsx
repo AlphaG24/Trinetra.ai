@@ -11,6 +11,7 @@ import Link from 'next/link'
 import toast from 'react-hot-toast'
 import { useRouter } from 'next/navigation'
 import { AgentCallingStatus } from '../agents/AgentCallingStatus'
+import { createClient } from '@/utils/supabase/client'
 
 interface Contact {
   id: string
@@ -173,6 +174,43 @@ export function CampaignDetailClient({ campaignId }: CampaignDetailClientProps) 
       }
     }
   }, [campaign?.status, page, search, statusFilter])
+
+  // Setup Supabase Realtime subscription
+  useEffect(() => {
+    const supabase = createClient()
+    
+    const campaignChannel = supabase
+      .channel(`campaign_detail_${campaignId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'campaigns',
+          filter: `id=eq.${campaignId}`
+        },
+        (payload) => {
+          setCampaign(payload.new as CampaignDetail)
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'campaign_contacts',
+          filter: `campaign_id=eq.${campaignId}`
+        },
+        () => {
+          fetchCampaignContacts(true)
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(campaignChannel)
+    }
+  }, [campaignId, page, search, statusFilter])
 
   // Handle Search submit
   const handleSearchSubmit = (e: React.FormEvent) => {

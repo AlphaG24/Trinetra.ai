@@ -210,9 +210,9 @@ export function AgentDetailPageClient({
 
       // 3. Fetch call logs matching this agent
       const { data: logsData, error: logsErr } = await supabase
-        .from('agent_call_logs')
+        .from('voice_calls')
         .select('id, duration_seconds, sentiment, transcript, recording_url, created_at')
-        .eq('vapi_agent_id', agentData.vapi_agent_id)
+        .eq('agent_id', agentData.id)
         .eq('user_id', user.id)
         .order('created_at', { ascending: false })
 

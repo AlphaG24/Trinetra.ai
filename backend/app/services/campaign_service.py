@@ -66,9 +66,11 @@ class CampaignService:
         try:
             _, local_time = CampaignService.get_current_time_in_timezone(tz_name)
             
-            # Parse start and end hours
-            sh, sm = map(int, start_str.split(':'))
-            eh, em = map(int, end_str.split(':'))
+            # Parse start and end hours (handle HH:MM and HH:MM:SS formats)
+            start_parts = start_str.split(':')
+            sh, sm = int(start_parts[0]), int(start_parts[1])
+            end_parts = end_str.split(':')
+            eh, em = int(end_parts[0]), int(end_parts[1])
             
             start_time = time(sh, sm)
             end_time = time(eh, em)
@@ -373,6 +375,11 @@ class CampaignService:
                     .eq("id", campaign_id)
                     .execute
                 )
+                # Dispatch consolidated campaign report notification
+                try:
+                    await CampaignService.dispatch_campaign_report(campaign_id, campaign)
+                except Exception as report_err:
+                    logger.error(f"Failed to dispatch campaign report: {report_err}")
                 break
                 
             # Simulate a calling cooldown/processing interval
@@ -442,96 +449,70 @@ class CampaignService:
         webhook_url = f"{webhook_base}/api/voice/webhooks/voice/twilio/{organization_id}?agent_id={agent_id}&contact_id={contact_id}"
         
         agent_phone = agent.get("phone_number") or os.getenv("TWILIO_PHONE_NUMBER") or "+12282950908"
-        contact_phone = contact["phone"]
+        if agent_phone and not str(agent_phone).startswith("+"):
+            agent_phone = f"+{agent_phone}"
+            
+        contact_phone = str(contact["phone"]).strip()
+        if not contact_phone.startswith("+"):
+            import re
+            digits = re.sub(r"\D", "", contact_phone)
+            if len(digits) == 10:
+                # Default to India (+91) country code since customer is using IN verified numbers
+                contact_phone = f"+91{digits}"
+            elif len(digits) == 12 and digits.startswith("91"):
+                contact_phone = f"+{digits}"
+            elif len(digits) == 11 and digits.startswith("1"):
+                contact_phone = f"+{digits}"
+            elif len(digits) == 11 and digits.startswith("0"):
+                contact_phone = f"+91{digits[1:]}"
+            else:
+                contact_phone = f"+{digits}"
 
         call_sid = None
         outcome = "failed"
         duration = 0
 
+        # Place the real outbound call via Twilio
         try:
             call_res = await provider.make_outbound_call(contact_phone, agent_phone, webhook_url)
             call_sid = call_res.get("call_sid")
             outcome = "connected"
-            logger.info(f"[Campaign Outbound] Twilio call placed successfully: {call_sid} to {contact_phone}")
+            logger.info(f"[Campaign Outbound] Twilio call placed successfully: SID={call_sid} to {contact_phone}")
         except Exception as dial_err:
-            logger.error(f"[Campaign Outbound] Failed to place Twilio outbound call to {contact_phone}: {dial_err}")
-            # Fallback to simulated if error or trial limit
+            logger.error(f"[Campaign Outbound] Twilio call FAILED to {contact_phone}: {dial_err}")
             outcome = "failed"
-            duration = 0
-            
+            call_sid = None
+
         call_id = None
         lead_id = None
         
-        # 5. If call connected, simulate conversation transcript and sentiment analysis
+        # 5. If call connected, log the outbound call record
+        #    The actual transcript and sentiment will be populated by the voice webhook
+        #    once the AI agent conversation completes.
         if outcome == "connected":
-            # Decide if caller is interested (e.g. 40% probability)
-            interested = random.choice([True, False, False, True, False])
-            
-            transcript = (
-                f"Agent: Hello, main {agent.get('name', 'AI Agent')} bol rahi hoon {campaign_data.get('name', 'Trinetra Campaigns')} se. Kya meri baat {contact.get('full_name', 'apne target')} se ho rahi hai?\n"
-                f"Prospect: Haan main bol raha hoon. Kahiye kya kaam hai?\n"
-                f"Agent: Main aapse humare services ke baare mein baat karne ke liye call kiya hai, jo aapke business efficiency ko improve kar sakti hai.\n"
-            )
-            
-            if interested:
-                transcript += (
-                    f"Prospect: Achha, sound matches our interest. Kya aap hume detailed pricing structure bhej sakte hain and iske features demonstrate kar sakte hain?\n"
-                    f"Agent: Haan bilkul! Main aapka positive response log kar rahi hoon, aur humara representative aapse jaldi contact karega. Dhanyavad!\n"
-                    f"Prospect: Theek hai, shukriya."
-                )
-                sentiment = "positive"
-            else:
-                transcript += (
-                    f"Prospect: Nahi, abhi main busy hoon aur hume koi aisi service nahi chahiye. Please do not call back.\n"
-                    f"Agent: Theek hai, sorry to disturb you. Take care."
-                )
-                sentiment = "negative"
-                
-            # Log in voice_calls table
             try:
                 call_payload = {
                     "user_id": agent.get("user_id"),
                     "organization_id": organization_id,
                     "agent_id": agent_id,
-                    "from_number": agent.get("phone_number") or "+91 022 98765432",
-                    "to_number": contact["phone"],
-                    "transcript": transcript,
-                    "sentiment": sentiment,
-                    "status": "completed",
-                    "duration_seconds": duration,
-                    "call_type": "outbound"
+                    "caller_phone": contact["phone"],
+                    "status": "in_progress",
+                    "duration_seconds": 0,
+                    "metadata": {
+                        "from_number": agent_phone,
+                        "to_number": contact["phone"],
+                        "provider_call_id": call_sid,
+                        "session_id": call_sid
+                    }
                 }
                 call_res = await asyncio.to_thread(
                     supabase_admin.table("voice_calls").insert(call_payload).execute
                 )
                 if call_res.data:
                     call_id = call_res.data[0]["id"]
+                    logger.info(f"[Campaign] Logged outbound call record: {call_id}")
             except Exception as call_log_err:
                 logger.error(f"Failed to log outbound call record: {call_log_err}")
-                
-            # Create Lead if interested
-            if interested:
-                try:
-                    lead_payload = {
-                        "user_id": agent.get("user_id"),
-                        "organization_id": organization_id,
-                        "agent_id": agent_id,
-                        "full_name": contact.get("full_name") or "Unknown Prospect",
-                        "phone": contact["phone"],
-                        "company_name": contact.get("company_name"),
-                        "interest_level": "high",
-                        "call_summary": "Prospect responded positively to outbound campaign call and asked for pricing details.",
-                        "status": "new",
-                        "stage": "new",
-                        "source": "voice_call"
-                    }
-                    lead_res = await asyncio.to_thread(
-                        supabase_admin.table("leads").insert(lead_payload).execute
-                    )
-                    if lead_res.data:
-                        lead_id = lead_res.data[0]["id"]
-                except Exception as lead_err:
-                    logger.error(f"Failed to save extracted lead: {lead_err}")
                     
         # 6. Finalize contact status
         final_call_status = "answered" if outcome == "connected" else outcome
@@ -574,3 +555,83 @@ class CampaignService:
             .execute
         )
         return {"success": True, "data": result.data or []}
+
+    @staticmethod
+    async def dispatch_campaign_report(campaign_id: str, campaign_data: Dict):
+        # 1. Fetch contacts outcomes
+        contacts_res = await asyncio.to_thread(
+            supabase_admin.table("campaign_contacts")
+            .select("call_status")
+            .eq("campaign_id", campaign_id)
+            .execute
+        )
+        contacts = contacts_res.data or []
+        total_contacts = len(contacts)
+
+        answered = sum(1 for c in contacts if c.get("call_status") == "answered")
+        no_answer = sum(1 for c in contacts if c.get("call_status") == "no-answer")
+        failed = sum(1 for c in contacts if c.get("call_status") == "failed")
+        dnd = sum(1 for c in contacts if c.get("call_status") == "dnd")
+
+        # 2. Query scheduled callbacks
+        callbacks_res = await asyncio.to_thread(
+            supabase_admin.table("callbacks")
+            .select("id", count="exact")
+            .eq("organization_id", campaign_data.get("organization_id"))
+            .eq("agent_id", campaign_data.get("agent_id"))
+            .execute
+        )
+        callbacks_count = callbacks_res.count or 0
+
+        # 3. Retrieve user profile
+        user_res = await asyncio.to_thread(
+            supabase_admin.table("profiles")
+            .select("telegram_chat_id")
+            .eq("id", campaign_data.get("user_id") or "")
+            .maybe_single()
+            .execute
+        )
+
+        telegram_chat_id = None
+        if user_res.data:
+            telegram_chat_id = user_res.data.get("telegram_chat_id")
+
+        # 4. Construct report message
+        report_text = (
+            f"📢 *Trinetra AI Campaign Report*\n\n"
+            f"*Campaign:* {campaign_data.get('name', 'Voice Campaign')}\n"
+            f"*Status:* Completed ✅\n\n"
+            f"📊 *Key Statistics:*\n"
+            f"- Total Contacts: {total_contacts}\n"
+            f"- Connected calls: {answered}\n"
+            f"- Leads Extracted: {campaign_data.get('leads_generated', 0)}\n\n"
+            f"📞 *Dispositions:*\n"
+            f"- Answered & Talked: {answered}\n"
+            f"- Callbacks Scheduled: {callbacks_count}\n"
+            f"- DND / Skipped: {dnd}\n"
+            f"- Failed / Switch-Off: {failed + no_answer}\n\n"
+            f"🚀 *Trinetra.ai* - Human-grade Outbound Telephony."
+        )
+
+        # 5. Dispatch Telegram alert
+        bot_token = os.getenv("TELEGRAM_BOT_TOKEN")
+        if bot_token and telegram_chat_id:
+            import httpx
+            url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+            payload = {
+                "chat_id": telegram_chat_id,
+                "text": report_text,
+                "parse_mode": "Markdown"
+            }
+            try:
+                async with httpx.AsyncClient() as client:
+                    res = await client.post(url, json=payload, timeout=10.0)
+                    if res.status_code == 200:
+                        logger.info(f"[Report Alert] Sent campaign completion report to Telegram: {telegram_chat_id}")
+                    else:
+                        logger.warning(f"[Report Alert] Telegram API rejected report message: {res.text}")
+            except Exception as e:
+                logger.error(f"[Report Alert] Failed to post Telegram notification: {e}")
+        else:
+            logger.info(f"[Report Alert] Skipping Telegram report: bot_token={bool(bot_token)}, chat_id={telegram_chat_id}")
+            logger.info(f"Report Output:\n{report_text}")

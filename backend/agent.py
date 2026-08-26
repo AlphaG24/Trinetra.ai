@@ -254,27 +254,58 @@ def generate_personalized_greeting(name: str, tags: list, last_call: str | None,
 class VikramAgent(Agent):
     def __init__(self, instructions: str, voice_provider='sarvam', voice_id='shubh', voice_speed=1.0, voice_pitch=1.0, language='en-US'):
         groq_api_key = os.getenv("GROQ_API_KEY", "")
+        logger.info(f"[VikramAgent] __init__: GROQ_API_KEY length is {len(groq_api_key)}")
         
         self.language = language
         
-        sarvam_male = ['shubh', 'aditya', 'rahul', 'rohan', 'amit', 'dev', 'ratan', 'varun', 'manan', 'sumit', 'kabir', 'aayan', 'ashutosh', 'advait', 'anand']
-        sarvam_female = ['ritu', 'priya', 'neha', 'pooja', 'simran', 'kavya', 'ishita', 'shreya', 'roopa', 'tanya', 'shruti', 'suhani', 'kavitha', 'rupali', 'amelia', 'sophia']
+        sarvam_male = [
+            'shubh', 'aditya', 'rahul', 'rohan', 'amit', 'dev', 'ratan', 'varun', 
+            'manan', 'sumit', 'kabir', 'aayan', 'ashutosh', 'advait', 'anand', 
+            'tarun', 'sunny', 'mani', 'gokul', 'vijay', 'mohit', 'rehan', 'soham',
+            'arvind', 'neel', 'arjun', 'amol'
+        ]
+        sarvam_female = [
+            'ritu', 'priya', 'neha', 'pooja', 'simran', 'kavya', 'ishita', 'shreya', 
+            'roopa', 'tanya', 'shruti', 'suhani', 'kavitha', 'rupali', 'amelia', 
+            'sophia', 'anushka', 'maya', 'diya', 'meera', 'pavithra', 'aditi'
+        ]
         elevenlabs_male = ['pNInz6obpgDQGcFmaJgB', 'TxGEqnHWrfWFTfGW9XjX']
         self.gender = 'male' if voice_id in sarvam_male or voice_id in elevenlabs_male else 'female'
 
         if voice_provider == 'sarvam':
             # bulbul:v3 validation check: ensure speaker is compatible with bulbul:v3
-            bulbul_v3_speakers = [
-                'shubh', 'ritu', 'rahul', 'pooja', 'simran', 'kavya', 'amit', 'ratan', 'rohan', 
-                'dev', 'ishita', 'shreya', 'manan', 'sumit', 'priya', 'aditya', 'kabir', 'neha', 
-                'varun', 'roopa', 'aayan', 'ashutosh', 'advait', 'amelia', 'sophia', 'suhani', 
-                'rupali', 'tanya', 'shruti', 'kavitha'
-            ]
+            bulbul_v3_speakers = sarvam_male + sarvam_female
             if voice_id not in bulbul_v3_speakers:
                 voice_id = 'ritu' if self.gender == 'female' else 'shubh'
 
+            # Normalize pitch/speed: dashboard stores 1.0 as "normal" (multiplier),
+            # but Sarvam expects delta values where 0.0 = normal.
+            # Convert: if value is around 1.0 (multiplier), treat as "normal" (0.0 delta).
+            # If value is already in [-0.75, 0.75], use as-is (delta format).
+            sarvam_pitch = voice_pitch
+            if sarvam_pitch is None:
+                sarvam_pitch = 0.0
+            elif abs(sarvam_pitch) > 0.75:
+                # Value like 1.0 or 1.5 — likely a multiplier, convert to delta
+                sarvam_pitch = sarvam_pitch - 1.0
+            sarvam_pitch = max(-0.75, min(0.75, sarvam_pitch))
+
+            sarvam_pace = voice_speed
+            if sarvam_pace is None:
+                sarvam_pace = 1.0
+            sarvam_pace = max(0.5, min(2.0, sarvam_pace))
+
+            # Select model: bulbul:v2 for compatible low-latency speakers, bulbul:v3 for others
+            bulbul_v2_speakers = ['anushka', 'manisha', 'vidya', 'arya', 'abhilash', 'karun', 'hitesh']
+            if voice_id in bulbul_v2_speakers:
+                model_name = "bulbul:v2"
+            else:
+                model_name = "bulbul:v3"
+
+            logger.info(f"[VikramAgent] Sarvam TTS config: model={model_name}, speaker={voice_id}, pace={sarvam_pace}, pitch={sarvam_pitch}, lang={language}")
+
             target_lang = "hi-IN" if language == 'hinglish' else "en-IN"
-            tts_plugin = sarvam.TTS(target_language_code=target_lang, model="bulbul:v3", speaker=voice_id, pace=voice_speed, pitch=voice_pitch)
+            tts_plugin = sarvam.TTS(target_language_code=target_lang, model=model_name, speaker=voice_id, pace=sarvam_pace, pitch=sarvam_pitch)
         else:
             tts_plugin = elevenlabs.TTS(voice_id=voice_id)
 
@@ -283,13 +314,13 @@ class VikramAgent(Agent):
 
         super().__init__(
             instructions=instructions,
-            stt=sarvam.STT(language="unknown", model="saaras:v3", mode="transcribe", flush_signal=True),
+            stt=sarvam.STT(language="unknown", model="saarika:v2.5", mode="transcribe", flush_signal=True),
             llm=openai.LLM(
-                model="llama-3.3-70b-versatile",
+                model="groq/compound",
                 base_url="https://api.groq.com/openai/v1",
                 api_key=groq_api_key,
             ),
-            tts=wrapped_tts,
+            tts=tts_plugin,
         )
 
     async def on_enter(self):
@@ -369,7 +400,7 @@ Only return valid JSON. No other text."""
             "https://api.groq.com/openai/v1/chat/completions",
             headers={"Authorization": f"Bearer {groq_key}", "Content-Type": "application/json"},
             json={
-                "model": "llama-3.3-70b-versatile",
+                "model": "groq/compound",
                 "messages": [{"role": "user", "content": prompt}],
                 "temperature": 0.1,
                 "max_tokens": 600,
@@ -1037,6 +1068,7 @@ async def run_agent(room_name: str, agent_id: str | None = None):
 
     user_id = None
     organization_id = None
+    agent_data = None
 
     if agent_id:
         try:
@@ -1156,12 +1188,15 @@ async def run_agent(room_name: str, agent_id: str | None = None):
                 except Exception as e:
                     logger.error(f"Failed to fetch profile for greeting in run_agent: {e}")
 
-                sarvam_female = ['ritu', 'priya', 'neha', 'pooja', 'simran', 'kavya', 'ishita', 'shreya', 'roopa', 'tanya', 'shruti', 'suhani', 'kavitha', 'rupali', 'amelia', 'sophia', 'anushka', 'maya', 'diya', 'meera']
+                sarvam_female = [
+                    'ritu', 'priya', 'neha', 'pooja', 'simran', 'kavya', 'ishita', 'shreya', 
+                    'roopa', 'tanya', 'shruti', 'suhani', 'kavitha', 'rupali', 'amelia', 
+                    'sophia', 'anushka', 'maya', 'diya', 'meera', 'pavithra', 'aditi'
+                ]
                 gender_tag = 'female' if voice_id in sarvam_female else 'male'
 
                 if raw_greeting:
                     # Clean [slug] prefix and suffixes like - Demo / - Trial
-                    import re
                     raw_name = agent_data.get('name', 'Agent')
                     clean_name = re.sub(r'^\[[^\]]+\]\s*', '', raw_name)
                     clean_name = re.sub(r'\s*-\s*(Demo|Trial)\s*$', '', clean_name, flags=re.IGNORECASE)
@@ -1300,6 +1335,35 @@ async def run_agent(room_name: str, agent_id: str | None = None):
                 except Exception as _err:
                     logger.warning(f"[MULTI-PERSONALITY] run_agent hook error: {_err}")
         # --- END MULTI-PERSONALITY HOOK ---
+        
+        # --- TRANSCRIBE HOOKS TO FRONTEND ---
+        @session.on("user_speech_committed")
+        def _on_user_speech(event):
+            try:
+                txt = getattr(event, 'transcript', None) or getattr(event, 'text', None) or ""
+                if txt and txt.strip():
+                    payload = json.dumps({
+                        "type": "transcript",
+                        "speaker": "customer",
+                        "text": txt
+                    }).encode("utf-8")
+                    asyncio.create_task(room.local_participant.publish_data(payload))
+            except Exception as err:
+                logger.warning(f"Error publishing user transcript: {err}")
+
+        @session.on("agent_speech_committed")
+        def _on_agent_speech(event):
+            try:
+                txt = getattr(event, 'transcript', None) or getattr(event, 'text', None) or ""
+                if txt and txt.strip():
+                    payload = json.dumps({
+                        "type": "transcript",
+                        "speaker": "agent",
+                        "text": txt
+                    }).encode("utf-8")
+                    asyncio.create_task(room.local_participant.publish_data(payload))
+            except Exception as err:
+                logger.warning(f"Error publishing agent transcript: {err}")
 
         try:
             await room.connect(livekit_url, token)

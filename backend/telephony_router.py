@@ -29,9 +29,52 @@ class ProvisionNumberRequest(BaseModel):
     did_type: str
     provider: Optional[str] = None
 
+class OutboundCallRequest(BaseModel):
+    to_phone: str
+    from_phone: Optional[str] = None
+    agent_id: str
+    organization_id: str
+
 # We use the admin client since these are internal BFF routes that have already 
 # passed auth checks on the Next.js side, but we should still enforce a secret/header if this were prod.
 # For now, we trust internal network calls.
+
+@router.post("/outbound-call")
+async def trigger_outbound_call(req: OutboundCallRequest):
+    try:
+        from app.services.config_service import ConfigService
+        import os
+
+        provider = get_provider("twilio")
+        webhook_base = ConfigService.get("TRINETRA_WEBHOOK_BASE_URL") or os.getenv("TRINETRA_WEBHOOK_BASE_URL") or "http://localhost:8000"
+        webhook_url = f"{webhook_base}/api/voice/webhooks/voice/twilio/{req.organization_id}?agent_id={req.agent_id}"
+
+        # Use provided from_phone or fallback to TWILIO_PHONE_NUMBER env or default pool number
+        from_phone = req.from_phone
+        if not from_phone:
+            # Query the developer account's active twilio number from the database if not in env
+            try:
+                res = supabase_admin.table("phone_numbers")\
+                    .select("phone_number")\
+                    .eq("organization_id", req.organization_id)\
+                    .eq("provider", "twilio")\
+                    .eq("status", "active")\
+                    .limit(1)\
+                    .execute()
+                if res.data and len(res.data) > 0:
+                    from_phone = res.data[0]["phone_number"]
+            except Exception as e:
+                logger.warn(f"Failed to lookup phone number in DB: {e}")
+
+        if not from_phone:
+            from_phone = os.getenv("TWILIO_PHONE_NUMBER") or "+12282950908"
+
+        logger.info(f"Placing manual outbound call: From {from_phone} -> To {req.to_phone} (agent: {req.agent_id})")
+        call_res = await provider.make_outbound_call(req.to_phone, from_phone, webhook_url)
+        return {"success": True, "data": call_res}
+    except Exception as e:
+        logger.error(f"Failed to place outbound callback: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/test/{provider}")
 async def test_connection(provider: str, req: TestConnectionRequest):

@@ -71,6 +71,20 @@ export async function DELETE(
             return NextResponse.json({ error: "Assignment not found" }, { status: 404 });
         }
 
+        // Clear phone number and provider in agents table if it matches the number being unassigned
+        const { error: agentUpdateError } = await supabase
+            .from("agents")
+            .update({
+                phone_number: null,
+                telephony_provider: null
+            })
+            .eq("id", agent_id)
+            .eq("phone_number", phone_number.phone_number);
+            
+        if (agentUpdateError) {
+            console.error('[API] Error clearing agent phone record:', agentUpdateError);
+        }
+
         // Write to activity_log
         await supabase.from("activity_log").insert({
             user_id: user.id,

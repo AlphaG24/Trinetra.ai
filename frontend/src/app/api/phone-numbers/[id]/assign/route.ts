@@ -101,6 +101,21 @@ export async function POST(
             }
         }
 
+        // Keep agents table in sync if this is primary number
+        if (is_primary) {
+            const { error: agentUpdateError } = await supabase
+                .from("agents")
+                .update({
+                    phone_number: phone_number.phone_number,
+                    telephony_provider: phone_number.provider || "twilio"
+                })
+                .eq("id", agent_id);
+                
+            if (agentUpdateError) {
+                console.error('[API] Error updating agent record:', agentUpdateError);
+            }
+        }
+
         // Write to activity_log
         await supabase.from("activity_log").insert({
             user_id: user.id,

@@ -77,7 +77,8 @@ export async function POST(request: Request) {
 
         const limit = baseLimit + (profile.additional_phone_numbers || 0);
 
-        if (activeCount !== null && activeCount >= limit) {
+        // Bypass limit checks entirely if user has developer_tester role
+        if (profile?.role !== 'developer_tester' && activeCount !== null && activeCount >= limit) {
             return NextResponse.json({
                 error: `You have reached your limit of ${limit} phone numbers. Please purchase extra number slots in the billing page.`,
                 code: "LIMIT_REACHED"
@@ -107,6 +108,69 @@ export async function POST(request: Request) {
                 code: "RATE_LIMITED", 
                 retry_after: retryDate.toISOString() 
             }, { status: 429 });
+        }
+
+        // ── POOL ALLOCATION STRATEGY ──────────────────────────────────────────
+        // First try to resolve and assign the number from our database pre-purchased pool
+        if (phone_number) {
+            const { data: poolNumber } = await supabase
+                .from('phone_number_pool')
+                .select('*')
+                .eq('phone_number', phone_number)
+                .eq('status', 'available')
+                .maybeSingle();
+
+            if (poolNumber) {
+                console.log(`[Pool Provision] Allocating pre-purchased number ${phone_number} from database pool`);
+                
+                // Initialize Admin Client (using supabase service role key) to bypass RLS to update pool
+                const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+                const { createClient: createSupabaseClient } = await import('@supabase/supabase-js');
+                const supabaseAdmin = createSupabaseClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, serviceRoleKey!);
+
+                // Update pool status
+                await supabaseAdmin
+                    .from('phone_number_pool')
+                    .update({
+                        status: 'assigned',
+                        assigned_organization_id: profile.organization_id
+                    })
+                    .eq('id', poolNumber.id);
+
+                // Insert into phone_numbers table
+                const { data: phoneRow, error: phoneInsertError } = await supabaseAdmin
+                    .from('phone_numbers')
+                    .insert({
+                        organization_id: profile.organization_id,
+                        provider: 'twilio',
+                        phone_number: poolNumber.phone_number,
+                        did_type: 'mobile',
+                        status: 'active',
+                        monthly_cost_paisa: poolNumber.monthly_cost_paisa,
+                        retail_price_paisa: poolNumber.retail_price_paisa,
+                        metadata: {
+                            pool_id: poolNumber.id,
+                            allocated_via: 'pool_provision'
+                        }
+                    })
+                    .select()
+                    .single();
+
+                if (!phoneInsertError && phoneRow) {
+                    await supabase.from("activity_log").insert({
+                        user_id: user.id,
+                        organization_id: profile.organization_id,
+                        activity_type: 'number_provisioned',
+                        title: 'Phone Number Provisioned (Pool)',
+                        description: `Provisioned pre-purchased number ${phoneRow.phone_number} from Trinetra pool`
+                    });
+
+                    return NextResponse.json({
+                        success: true,
+                        data: { phone_number: phoneRow }
+                    }, { status: 201 });
+                }
+            }
         }
 
         // Call FastAPI Backend

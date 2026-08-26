@@ -32,9 +32,30 @@ const bottomNavItems = [
 export function Sidebar({ isOpen, onClose }: { isOpen?: boolean; onClose?: () => void }) {
   const pathname = usePathname() || ''
   const [mounted, setMounted] = useState(false)
+  const [role, setRole] = useState<string | null>(null)
 
   useEffect(() => {
     setMounted(true)
+    const fetchUserRole = async () => {
+      try {
+        const { createClient } = await import('@/lib/client')
+        const supabase = createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        if (user) {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('role')
+            .eq('id', user.id)
+            .maybeSingle()
+          if (profile) {
+            setRole(profile.role)
+          }
+        }
+      } catch (err) {
+        console.warn('Failed to fetch sidebar role:', err)
+      }
+    }
+    fetchUserRole()
   }, [])
 
   const isActive = (href: string) => {
@@ -61,6 +82,11 @@ export function Sidebar({ isOpen, onClose }: { isOpen?: boolean; onClose?: () =>
     )
   }
 
+  const navItemsToRender = [...topNavItems]
+  if (role === 'developer_tester' || role === 'admin' || role === 'super_admin') {
+    navItemsToRender.push({ label: 'Marketing Portal', href: '/dashboard/requests', icon: Settings })
+  }
+
   return (
     <aside
       className={`fixed left-0 top-16 h-[calc(100vh-4rem)] w-60 bg-[var(--card-bg)] border-r border-[var(--border)] z-40 flex flex-col justify-between transition-transform duration-200 ${isOpen === false ? '-translate-x-full lg:translate-x-0' : 'translate-x-0'
@@ -70,7 +96,7 @@ export function Sidebar({ isOpen, onClose }: { isOpen?: boolean; onClose?: () =>
       <div className="flex flex-col flex-1 min-h-0 pt-4">
         {/* Main Navigation */}
         <nav className="flex-1 px-3 py-2 space-y-0.5 overflow-y-auto">
-          {topNavItems.map(renderLink)}
+          {navItemsToRender.map(renderLink)}
         </nav>
       </div>
 
