@@ -1,26 +1,26 @@
 ### **Phase 0 — Stabilize the Voice Stack (Blocking Everything)**
 > **Goal:** Make a real outbound call from a Campaign actually connect to the selected agent and speak naturally. Fix webcalls.
 
-| # | Task | Details |
-|---|------|---------|
-| 0.1 | **Fix Twilio outbound → LiveKit agent** | Currently calls play a default greeting and hang up. The Twilio webhook must start a LiveKit room and connect the agent. Check `backend/agent.py` `create_outbound_session` and TwiML generation. |
-| 0.2 | **Fix webcall (WebRTC)** | Agent voice not coming, quota not decreasing. Likely LiveKit token or audio stream misconfigured. Also ensure `demo_minutes_used` increments only after a successful call. |
-| 0.3 | **Verify call transcript storage** | After any call, transcript, duration, sentiment, lead extraction must be saved to `voice_calls`. |
-| 0.4 | **Error logging** | Add clear logs in FastAPI for: outbound call initiated, TwiML served, LiveKit room joined, agent response, call end. |
+| # | Task | Status | Details |
+|---|------|--------|---------|
+| 0.1 | **Fix Twilio outbound → LiveKit agent** | ✅ COMPLETED | Twilio webhook streams call audio to LiveKit room and runs background VikramAgent. |
+| 0.2 | **Fix webcall (WebRTC)** | ✅ COMPLETED | Fixed WebRTC Expressive TTS wrapper initialization and ensured usage quota decrements on disconnect. |
+| 0.3 | **Verify call transcript storage** | ✅ COMPLETED | Transcript, duration, sentiment, and leads are extracted and saved on call completion, updating existing record to prevent duplicates. |
+| 0.4 | **Error logging** | ✅ COMPLETED | Added rich logs in FastAPI, telephony, and agent execution. |
 
 ---
 
 ### **Phase 1 — Real Outbound Campaigns**
 > **Goal:** User uploads CSV, starts campaign, agent dials numbers using Twilio (verified numbers for trial) and talks like the demo.
 
-| # | Task | Details |
-|---|------|---------|
-| 1.1 | **Pass contact data to agent** | In `campaign_service.py`, before dialing each contact, fetch `campaign_contacts` fields (name, phone, company, notes, reason) and inject them into the agent's system prompt / conversation context. |
-| 1.2 | **Rewrite sales/support prompts** | Use your demo conversation as a gold standard. Add: personal greeting, 2‑minute ask, objection handling, feature explanation (callbacks, campaigns, dashboard, reports), trial offer, demo CTA, website mention, polite close. |
-| 1.3 | **Personalize every call** | The agent must refer to `{name}`, `{company}`, `{reason}` naturally. Use context variables. |
-| 1.4 | **Callback scheduling from campaign call** | If the prospect says "call later", the agent must schedule a callback in `callbacks` table and the system should dial back at that time (re-use outbound pipeline). |
-| 1.5 | **Lead extraction** | Ensure after every connected call, `lead_extraction` runs and saves to `leads` + links to campaign. |
-| 1.6 | **Real-time progress** | Update campaign counters (`contacts_called`, `connected`, `leads_generated`) as calls happen. |
+| # | Task | Status | Details |
+|---|------|--------|---------|
+| 1.1 | **Pass contact data to agent** | ✅ COMPLETED | Campaign service queries contact parameters and passes them via call query string webhooks. |
+| 1.2 | **Rewrite sales/support prompts** | ✅ COMPLETED | VikramAgent includes Objection handling, feature explanations, custom trial CTA. |
+| 1.3 | **Personalize every call** | ✅ COMPLETED | Prompt dynamically appends contact name, company name, notes context with safe empty fallbacks. |
+| 1.4 | **Callback scheduling from campaign call** | ✅ COMPLETED | VikramAgent parses callback requests from transcript and inserts into callbacks table. |
+| 1.5 | **Lead extraction** | ✅ COMPLETED | extract_and_save_lead parses transcript for intent, creates leads, and links to campaign. |
+| 1.6 | **Real-time progress** | ✅ COMPLETED | Dialer updates contact statuses, increments leads_generated and called counters. |
 
 ---
 
@@ -75,8 +75,5 @@
 ---
 
 ### **Immediate Next Actions**
-1. **Fix Phase 0** — get outbound calls to actually speak with the selected agent. This is the #1 blocker.
-2. **Rewrite sales prompt** with your demo conversation as the template.
-3. **Implement contact context injection** in campaign service.
-4. **Test full campaign** with your own verified phone number.
-5. **Then** move to number pool and billing.
+1. **Proceed with Phase 2** — Number Pool & Assignment: List available numbers, integrate Razorpay checkout, and implement number assignment logic.
+2. **Setup auto-release scheduler** for number pools.

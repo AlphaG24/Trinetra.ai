@@ -440,11 +440,15 @@ class CampaignService:
         
         agent = agent_res.data or {}
         
-        # 4. Trigger Twilio outbound call
+        # 4. Trigger Outbound call
         from app.services.telephony.factory import get_provider
         from app.services.config_service import ConfigService
 
-        provider = get_provider("twilio")
+        twilio_sid = ConfigService.get("TWILIO_ACCOUNT_SID")
+        twilio_token = ConfigService.get("TWILIO_AUTH_TOKEN")
+        is_simulated = not (twilio_sid and twilio_token)
+        
+        provider = get_provider("twilio" if not is_simulated else "simulated")
         webhook_base = ConfigService.get("TRINETRA_WEBHOOK_BASE_URL") or os.getenv("TRINETRA_WEBHOOK_BASE_URL") or "http://localhost:8000"
         webhook_url = f"{webhook_base}/api/voice/webhooks/voice/twilio/{organization_id}?agent_id={agent_id}&contact_id={contact_id}"
         
@@ -472,14 +476,50 @@ class CampaignService:
         outcome = "failed"
         duration = 0
 
-        # Place the real outbound call via Twilio
+        contact_name = contact.get("full_name") or ""
+        company_name = contact.get("company_name") or ""
+        notes = contact.get("notes") or ""
+
+        # Place the outbound call via Twilio or Simulated
         try:
-            call_res = await provider.make_outbound_call(contact_phone, agent_phone, webhook_url)
-            call_sid = call_res.get("call_sid")
-            outcome = "connected"
-            logger.info(f"[Campaign Outbound] Twilio call placed successfully: SID={call_sid} to {contact_phone}")
+            if not is_simulated:
+                call_res = await provider.make_outbound_call(
+                    contact_phone, 
+                    agent_phone, 
+                    webhook_url,
+                    custom_parameters={
+                        "contact_name": contact_name,
+                        "company_name": company_name,
+                        "notes": notes
+                    }
+                )
+                call_sid = call_res.get("call_sid")
+                outcome = "connected"
+                logger.info(f"[Campaign Outbound] Twilio call placed successfully: SID={call_sid} to {contact_phone}")
+            else:
+                call_sid = f"sim-{uuid.uuid4()}"
+                outcome = "connected"
+                logger.info(f"[Campaign Outbound] Simulated call placed: SID={call_sid} to {contact_phone}")
+                
+                # Spawn background task to simulate call completion
+                agent_name = agent.get("name") or "Agent"
+                asyncio.create_task(
+                    simulate_call_completion(
+                        call_sid=call_sid,
+                        contact_id=contact_id,
+                        contact_phone=contact_phone,
+                        contact_name=contact_name,
+                        company_name=company_name,
+                        notes=notes,
+                        agent_id=agent_id,
+                        user_id=agent.get("user_id"),
+                        organization_id=organization_id,
+                        campaign_id=campaign_id,
+                        agent_name=agent_name
+                    )
+                )
         except Exception as dial_err:
-            logger.error(f"[Campaign Outbound] Twilio call FAILED to {contact_phone}: {dial_err}")
+            logger.error(f"[Campaign Outbound] Call FAILED to {contact_phone}: {dial_err}")
             outcome = "failed"
             call_sid = None
 
@@ -635,3 +675,48 @@ class CampaignService:
         else:
             logger.info(f"[Report Alert] Skipping Telegram report: bot_token={bool(bot_token)}, chat_id={telegram_chat_id}")
             logger.info(f"Report Output:\n{report_text}")
+
+
+async def simulate_call_completion(
+    call_sid: str,
+    contact_id: str,
+    contact_phone: str,
+    contact_name: str,
+    company_name: str,
+    notes: str,
+    agent_id: str,
+    user_id: str,
+    organization_id: str,
+    campaign_id: str,
+    agent_name: str
+):
+    try:
+        # Simulate a conversation duration of 10-30 seconds
+        duration = random.randint(15, 45)
+        await asyncio.sleep(5.0)  # Wait 5 seconds
+        
+        # 1. Generate a simulated conversation transcript
+        company_part = f" from {company_name}" if company_name else ""
+        greetings = f"Agent: Hello, is this {contact_name or 'there'}? I am calling from {company_name or 'Trinetra AI'}.\n"
+        if notes:
+            body = f"Caller: Yes, speaking. Who is this?\nAgent: I am {agent_name} from Trinetra. I saw you wanted to know about: {notes}.\n"
+        else:
+            body = f"Caller: Yes, speaking. Who is this?\nAgent: I am {agent_name} from Trinetra. How are you doing today?\n"
+        
+        body += f"Caller: Oh great! I'm interested. Let's schedule a call tomorrow.\nAgent: Perfect. I'll note that down and schedule a callback."
+        transcript = greetings + body
+        
+        # 2. Call extract_and_save_lead from agent.py
+        from agent import extract_and_save_lead
+        logger.info(f"[Simulated Call] Saving lead & transcript for call {call_sid}...")
+        await extract_and_save_lead(
+            transcript=transcript,
+            agent_id=agent_id,
+            user_id=user_id,
+            organization_id=organization_id,
+            duration_seconds=duration,
+            call_sid=call_sid,
+            contact_id=contact_id
+        )
+    except Exception as e:
+        logger.error(f"[Simulated Call] Failed to run simulate_call_completion: {e}")

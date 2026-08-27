@@ -98,6 +98,14 @@ const nextConfig: NextConfig = {
       },
     ];
   },
+  async rewrites() {
+    return [
+      {
+        source: '/api/backend/:path*',
+        destination: `${process.env.NEXT_PUBLIC_BACKEND_URL || 'https://api.trinetraedu-ai.com'}/:path*`,
+      }
+    ];
+  },
   async headers() {
     const isProd = process.env.NODE_ENV === 'production';
     const securityHeaders = [

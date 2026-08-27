@@ -11,8 +11,11 @@ export const GET = safeApiHandler(async (request: Request) => {
     const code = searchParams.get('code')
     const type = searchParams.get('type')
 
-    // Default to dashboard if no parameter is passed
-    const next = searchParams.get('next') ?? '/dashboard'
+    // Default to dashboard if no parameter is passed or if it redirects to the root landing page
+    let next = searchParams.get('next') ?? '/dashboard'
+    if (!next.startsWith('/') || next === '/') {
+        next = '/dashboard'
+    }
 
     if (code) {
         // THE FIX: We must await the cookies() function in newer Next.js versions
@@ -29,7 +32,7 @@ export const GET = safeApiHandler(async (request: Request) => {
                     setAll(cookiesToSet) {
                         const isProd = process.env.NODE_ENV === 'production'
                         let domain: string | undefined = undefined
-                        if (isProd && cleanHost) {
+                        if (isProd && cleanHost && !cleanHost.includes('dev.')) {
                             if (cleanHost.endsWith('trinetraedu-ai.com')) {
                                 domain = '.trinetraedu-ai.com'
                             } else if (cleanHost.endsWith('trinetra.ai')) {
@@ -37,7 +40,14 @@ export const GET = safeApiHandler(async (request: Request) => {
                             }
                         }
                         cookiesToSet.forEach(({ name, value, options }) => {
-                            cookieStore.set({ name, value, ...options, domain })
+                            const setOptions: any = {
+                                ...options,
+                                path: '/',
+                            }
+                            if (domain) {
+                                setOptions.domain = domain
+                            }
+                            cookieStore.set(name, value, setOptions)
                         })
                     }
                 },
@@ -46,7 +56,9 @@ export const GET = safeApiHandler(async (request: Request) => {
 
         const { error } = await supabase.auth.exchangeCodeForSession(code)
 
-        if (!error) {
+        if (error) {
+            console.error('[OAuth Callback Error] Code exchange failed:', error.message, error)
+        } else {
             if (type === 'signup') {
                 try {
                     // Extract all cookies from the updated cookieStore to ensure the new session cookie is sent

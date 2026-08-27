@@ -19,10 +19,6 @@
         }
       ],
       "destination": "/admin/:path*"
-    },
-    {
-      "source": "/api/backend/:path*",
-      "destination": "https://api.trinetraedu-ai.com/:path*"
     }
   ],
   "headers": [

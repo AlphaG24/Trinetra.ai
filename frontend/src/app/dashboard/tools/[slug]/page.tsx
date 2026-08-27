@@ -1,5 +1,5 @@
 import { createServerClient } from '@supabase/ssr'
-import { cookies } from 'next/headers'
+import { cookies, headers } from 'next/headers'
 import { redirect, notFound } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Lock, Sparkles, ChevronRight, Activity } from 'lucide-react'
@@ -40,8 +40,19 @@ export default async function ToolGatekeeperPage({ params }: PageProps) {
   
   // 1. Initialize Supabase SSR Server Client with cookies
   const cookieStore = await cookies()
+  const headerList = await headers()
+  const host = headerList.get('host') || ''
+  const cleanHost = host.split(':')[0]
+  let cookieDomain: string | undefined = undefined
+
   const isProd = process.env.NODE_ENV === 'production'
-  const cookieDomain = isProd ? '.trinetraedu-ai.com' : undefined
+  if (isProd && cleanHost && !cleanHost.includes('dev.')) {
+    if (cleanHost.endsWith('trinetraedu-ai.com')) {
+      cookieDomain = '.trinetraedu-ai.com'
+    } else if (cleanHost.endsWith('trinetra.ai')) {
+      cookieDomain = '.trinetra.ai'
+    }
+  }
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,

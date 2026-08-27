@@ -155,6 +155,10 @@ class SimulatedProvider(AbstractTelephonyProvider):
             "duration_seconds": random.randint(15, 120) if outcome == "connected" else 0
         }
 
+    async def make_outbound_call(self, to_number: str, from_number: str, webhook_url: str, custom_parameters: Optional[dict] = None) -> dict:
+        logger.info(f"[{self.provider_name}] Simulated outbound call placed to {to_number} from {from_number}")
+        return {"call_sid": f"sim-{uuid.uuid4()}", "status": "queued"}
+
     async def validate_webhook_request(self, request_data: Dict, signature: str) -> bool:
         return True
 

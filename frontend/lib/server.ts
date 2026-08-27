@@ -9,7 +9,7 @@ export async function createClient() {
   let cookieDomain: string | undefined = undefined
   
   const isProd = process.env.NODE_ENV === 'production'
-  if (isProd && cleanHost) {
+  if (isProd && cleanHost && !cleanHost.includes('dev.')) {
     if (cleanHost.endsWith('trinetraedu-ai.com')) {
       cookieDomain = '.trinetraedu-ai.com'
     } else if (cleanHost.endsWith('trinetra.ai')) {
