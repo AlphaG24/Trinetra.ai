@@ -51,8 +51,9 @@ export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
           await fetchNotifs()
 
           // Subscribe to Postgres changes on notifications table
+          const uniqueChannelName = `topbar-notifications-${currentUser.id}-${Math.random().toString(36).slice(2, 9)}`
           channel = supabase
-            .channel('topbar-notifications-realtime')
+            .channel(uniqueChannelName)
             .on(
               'postgres_changes',
               {

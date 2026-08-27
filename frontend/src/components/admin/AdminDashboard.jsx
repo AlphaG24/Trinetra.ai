@@ -106,8 +106,9 @@ export default function AdminDashboard({ onCreateNew, onEdit }) {
       refreshTimerRef.current = setTimeout(() => void fetchDashboardData({ silent: true }), 350);
     };
 
+    const uniqueChannelName = `admin-blog-dashboard-${Math.random().toString(36).slice(2, 9)}`;
     const channel = supabase
-      .channel("admin-blog-dashboard")
+      .channel(uniqueChannelName)
       .on("postgres_changes", { event: "*", schema: "public", table: "blog_posts" }, scheduleRefresh)
       .on("postgres_changes", { event: "*", schema: "public", table: "blog_comments" }, scheduleRefresh)
       .on("postgres_changes", { event: "*", schema: "public", table: "blog_likes" }, scheduleRefresh)
