@@ -203,7 +203,7 @@ function getDatabaseRateLimitConfig(pathname: string, userId: string, ip: string
   if (pathname === '/api/admin/login') {
     return { limit: 30, windowSeconds: 900, key: `rl:admin_login:${ip}` }
   }
-  if (pathname.startsWith('/api/auth') || pathname.startsWith('/auth') || pathname === '/login' || pathname === '/signup') {
+  if (pathname.startsWith('/api/auth') || pathname.startsWith('/auth')) {
     return { limit: 10000, windowSeconds: 900, key: `rl:auth:${ip}` }
   }
   if (pathname === '/api/public/callback') {
@@ -277,6 +277,18 @@ export async function proxy(request: NextRequest) {
   const currentPath = request.nextUrl.pathname
 
   // ------------------------------------------------------------------
+  // OPTIMIZATION: Bypassing heavy checks for prefetch requests
+  // Next.js prefetch requests should skip rate limiting, database lookups,
+  // and authentication session refreshes to prevent connection lockups.
+  // ------------------------------------------------------------------
+  const isPrefetch = request.headers.get('x-middleware-prefetch') === '1'
+    || request.headers.get('purpose') === 'prefetch'
+
+  if (isPrefetch) {
+    return applySecurityHeaders(NextResponse.next())
+  }
+
+  // ------------------------------------------------------------------
   // STEP 1: Supabase Auth Session Refresh
   // ------------------------------------------------------------------
   let supabaseResponse = NextResponse.next({
@@ -333,7 +345,7 @@ export async function proxy(request: NextRequest) {
   // STEP 3: Persistent Database-Backed Rate Limiting
   // ------------------------------------------------------------------
   const isApiRoute = currentPath.startsWith('/api/')
-  const isAuthRoute = currentPath.startsWith('/auth') || currentPath === '/login' || currentPath === '/signup'
+  const isAuthRoute = currentPath.startsWith('/auth') || currentPath.startsWith('/api/auth')
 
   if (isApiRoute || isAuthRoute) {
     const config = getDatabaseRateLimitConfig(currentPath, userId, ip)
