@@ -13,7 +13,10 @@ from pydantic import BaseModel
 from database import supabase, supabase_admin
 from google import genai
 import asyncio
-import audioop
+try:
+    import audioop  # Python <= 3.11 built-in
+except ModuleNotFoundError:
+    import audioop_lts as audioop  # type: ignore  # Python 3.12+ drop-in replacement
 import base64
 from livekit import rtc
 from app.workers.livekit_agent import generate_agent_token
