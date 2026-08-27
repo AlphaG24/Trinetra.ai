@@ -37,7 +37,11 @@ export const GET = safeApiHandler(async (request: Request) => {
                             }
                         }
                         cookiesToSet.forEach(({ name, value, options }) => {
-                            cookieStore.set({ name, value, ...options, domain })
+                            const setOptions: any = { name, value, ...options }
+                            if (domain) {
+                                setOptions.domain = domain
+                            }
+                            cookieStore.set(setOptions)
                         })
                     }
                 },
@@ -46,7 +50,9 @@ export const GET = safeApiHandler(async (request: Request) => {
 
         const { error } = await supabase.auth.exchangeCodeForSession(code)
 
-        if (!error) {
+        if (error) {
+            console.error('[OAuth Callback Error] Code exchange failed:', error.message, error)
+        } else {
             if (type === 'signup') {
                 try {
                     // Extract all cookies from the updated cookieStore to ensure the new session cookie is sent
