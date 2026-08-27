@@ -47,21 +47,13 @@ export async function proxy(request: NextRequest) {
     .eq('id', user.id)
     .single()
 
-  if (!profile) {
-    // No profile — clear cookies and send to login
-    const url = request.nextUrl.clone()
-    url.pathname = '/login'
-    const response = NextResponse.redirect(url)
-    request.cookies.getAll().forEach(cookie => {
-      if (cookie.name.startsWith('sb-')) {
-        response.cookies.set(cookie.name, '', { maxAge: 0, path: '/' })
-      }
-    })
-    return response
-  }
+  let userRole = 'client'
+  let onboardingComplete = false
 
-  const userRole = profile.role || 'client'
-  const onboardingComplete = profile.onboarding_complete ?? true
+  if (profile) {
+    userRole = profile.role || 'client'
+    onboardingComplete = profile.onboarding_complete ?? true
+  }
 
   // Redirect logged-in users away from login page
   if (currentPath === '/login') {
