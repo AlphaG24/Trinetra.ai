@@ -28,8 +28,9 @@ export function MaintenanceWatcher({
     if (isAdmin) return // Admins are never blocked
 
     // Subscribe to changes on system_config row where config_key = 'maintenance_mode'
+    const uniqueChannelName = `maintenance_mode_watch_${Math.random().toString(36).slice(2, 9)}`
     const channel = supabase
-      .channel('maintenance_mode_watch')
+      .channel(uniqueChannelName)
       .on(
         'postgres_changes',
         {
