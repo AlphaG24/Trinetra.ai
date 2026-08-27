@@ -13,7 +13,7 @@ export const GET = safeApiHandler(async (request: Request) => {
   let next = searchParams.get('next') ?? '/dashboard'
 
   // SECURITY: Prevent Open Redirect attacks. Ensure `next` is a relative path.
-  if (!next.startsWith('/')) {
+  if (!next.startsWith('/') || next === '/') {
     next = '/dashboard'
   }
 

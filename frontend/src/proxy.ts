@@ -113,7 +113,7 @@ function containsMaliciousPayload(input: string): { blocked: boolean; reason: st
 function getRateLimitConfig(pathname: string): { maxRequests: number; windowMs: number } {
   // Auth routes — strictest limit
   if (pathname === '/login' || pathname === '/signup' || pathname.startsWith('/auth')) {
-    return { maxRequests: 10, windowMs: 60_000 }
+    return { maxRequests: 500, windowMs: 60_000 }
   }
   // API routes — moderate limit
   if (pathname.startsWith('/api/')) {
@@ -345,7 +345,7 @@ export async function proxy(request: NextRequest) {
   // STEP 3: Persistent Database-Backed Rate Limiting
   // ------------------------------------------------------------------
   const isApiRoute = currentPath.startsWith('/api/')
-  const isAuthRoute = currentPath.startsWith('/auth') || currentPath.startsWith('/api/auth')
+  const isAuthRoute = (currentPath.startsWith('/auth') || currentPath.startsWith('/api/auth')) && !currentPath.includes('/callback')
 
   if (isApiRoute || isAuthRoute) {
     const config = getDatabaseRateLimitConfig(currentPath, userId, ip)

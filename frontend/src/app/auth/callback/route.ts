@@ -11,8 +11,11 @@ export const GET = safeApiHandler(async (request: Request) => {
     const code = searchParams.get('code')
     const type = searchParams.get('type')
 
-    // Default to dashboard if no parameter is passed
-    const next = searchParams.get('next') ?? '/dashboard'
+    // Default to dashboard if no parameter is passed or if it redirects to the root landing page
+    let next = searchParams.get('next') ?? '/dashboard'
+    if (!next.startsWith('/') || next === '/') {
+        next = '/dashboard'
+    }
 
     if (code) {
         // THE FIX: We must await the cookies() function in newer Next.js versions
