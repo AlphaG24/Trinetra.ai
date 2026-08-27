@@ -40,11 +40,14 @@ export const GET = safeApiHandler(async (request: Request) => {
                             }
                         }
                         cookiesToSet.forEach(({ name, value, options }) => {
-                            const setOptions: any = { name, value, ...options }
+                            const setOptions: any = {
+                                ...options,
+                                path: '/',
+                            }
                             if (domain) {
                                 setOptions.domain = domain
                             }
-                            cookieStore.set(setOptions)
+                            cookieStore.set(name, value, setOptions)
                         })
                     }
                 },
