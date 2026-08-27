@@ -853,9 +853,12 @@ async def handle_twilio_voice_webhook(
         user_id = agent_data.get("user_id") if agent_data else None
         org_id = organization_id if organization_id and organization_id != "default" else (agent_data.get("organization_id") if agent_data else None)
 
+        # Resolve contact_id from query params
+        contact_id = request.query_params.get("contact_id")
+
         # 2. Insert or update voice_calls table
         try:
-            existing = supabase_admin.table("voice_calls").select("id").eq("metadata->>provider_call_id", call_sid).limit(1).execute()
+            existing = supabase_admin.table("voice_calls").select("id, metadata").eq("metadata->>provider_call_id", call_sid).limit(1).execute()
             if not existing.data:
                 call_record = {
                     "agent_id": agent_id,
@@ -871,11 +874,22 @@ async def handle_twilio_voice_webhook(
                         "session_id": call_sid,
                         "direction": direction,
                         "from_number": from_number,
-                        "to_number": to_number
+                        "to_number": to_number,
+                        "contact_id": contact_id
                     }
                 }
                 supabase_admin.table("voice_calls").insert(call_record).execute()
                 print(f"[Twilio Voice] Logged call record: {call_sid}", flush=True)
+            else:
+                # Update contact_id in metadata if present
+                if contact_id:
+                    existing_row = existing.data[0]
+                    existing_meta = existing_row.get("metadata") or {}
+                    existing_meta["contact_id"] = contact_id
+                    supabase_admin.table("voice_calls").update({
+                        "metadata": existing_meta
+                    }).eq("id", existing_row["id"]).execute()
+                    print(f"[Twilio Voice] Updated call record {existing_row['id']} metadata with contact_id: {contact_id}", flush=True)
         except Exception as db_err:
             print(f"[Twilio Voice DB Error] {db_err}", flush=True)
 
@@ -884,7 +898,7 @@ async def handle_twilio_voice_webhook(
         if agent_id and os.getenv("DISABLE_IN_PROCESS_AGENT", "false").lower() != "true":
             try:
                 from agent import run_agent
-                asyncio.create_task(run_agent(room_name, agent_id))
+                asyncio.create_task(run_agent(room_name, agent_id, contact_id=contact_id))
             except Exception as spawn_err:
                 print(f"[Twilio Agent Spawn] {spawn_err}", flush=True)
 

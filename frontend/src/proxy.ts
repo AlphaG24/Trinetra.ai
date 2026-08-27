@@ -204,7 +204,7 @@ function getDatabaseRateLimitConfig(pathname: string, userId: string, ip: string
     return { limit: 30, windowSeconds: 900, key: `rl:admin_login:${ip}` }
   }
   if (pathname.startsWith('/api/auth') || pathname.startsWith('/auth') || pathname === '/login' || pathname === '/signup') {
-    return { limit: 100, windowSeconds: 900, key: `rl:auth:${ip}` }
+    return { limit: 10000, windowSeconds: 900, key: `rl:auth:${ip}` }
   }
   if (pathname === '/api/public/callback') {
     return { limit: 1, windowSeconds: 10800, key: `rl:public_callback:${ip}` }
@@ -222,7 +222,7 @@ function getDatabaseRateLimitConfig(pathname: string, userId: string, ip: string
     const userKey = userId || ip
     return { limit: 300, windowSeconds: 60, key: `rl:other_api:${userKey}` }
   }
-  return { limit: 500, windowSeconds: 60, key: `rl:default:${ip}` }
+  return { limit: 5000, windowSeconds: 60, key: `rl:default:${ip}` }
 }
 
 // ============================================================================

@@ -320,7 +320,7 @@ class VikramAgent(Agent):
                 base_url="https://api.groq.com/openai/v1",
                 api_key=groq_api_key,
             ),
-            tts=tts_plugin,
+            tts=wrapped_tts,
         )
 
     async def on_enter(self):
@@ -359,7 +359,7 @@ async def fetch_knowledge_base(agent_id: str) -> list:
         return []
 
 
-async def extract_and_save_lead(transcript: str, agent_id: str, user_id: str, organization_id: str, duration_seconds: int = 0):
+async def extract_and_save_lead(transcript: str, agent_id: str, user_id: str, organization_id: str, duration_seconds: int = 0, call_sid: str | None = None, contact_id: str | None = None):
     """Extract lead information and callbacks from call transcript and save to DB"""
     if not transcript or not transcript.strip():
         return
@@ -428,20 +428,44 @@ Only return valid JSON. No other text."""
 
         # 1. Update/Insert voice_calls with transcript and sentiment
         original_call_id = None
+        existing_call = None
+        if call_sid:
+            try:
+                res = await asyncio.to_thread(
+                    supabase_admin.table("voice_calls").select("id").eq("metadata->>provider_call_id", call_sid).limit(1).execute
+                )
+                if res.data:
+                    existing_call = res.data[0]
+            except Exception as e:
+                logger.error(f"Failed to lookup existing call by call_sid {call_sid}: {e}")
+
         try:
-            call_res = await asyncio.to_thread(
-                supabase_admin.table("voice_calls").insert({
-                    "user_id": user_id,
-                    "agent_id": agent_id,
-                    "organization_id": organization_id,
-                    "transcript": transcript,
-                    "sentiment": lead_data.get("sentiment", "neutral"),
-                    "status": "completed",
-                    "duration_seconds": duration_seconds
-                }).execute
-            )
-            if call_res.data:
-                original_call_id = call_res.data[0].get("id")
+            if existing_call:
+                logger.info(f"Updating existing voice_call record {existing_call['id']} with transcript")
+                call_res = await asyncio.to_thread(
+                    supabase_admin.table("voice_calls").update({
+                        "transcript": transcript,
+                        "sentiment": lead_data.get("sentiment", "neutral"),
+                        "status": "completed",
+                        "duration_seconds": duration_seconds
+                    }).eq("id", existing_call["id"]).execute
+                )
+                original_call_id = existing_call["id"]
+            else:
+                logger.info("Inserting new voice_call record")
+                call_res = await asyncio.to_thread(
+                    supabase_admin.table("voice_calls").insert({
+                        "user_id": user_id,
+                        "agent_id": agent_id,
+                        "organization_id": organization_id,
+                        "transcript": transcript,
+                        "sentiment": lead_data.get("sentiment", "neutral"),
+                        "status": "completed",
+                        "duration_seconds": duration_seconds
+                    }).execute
+                )
+                if call_res.data:
+                    original_call_id = call_res.data[0].get("id")
         except Exception as e:
             logger.error(f"Failed to save voice call: {e}")
 
@@ -606,12 +630,51 @@ Only return valid JSON. No other text."""
 
             except Exception as e:
                 logger.error(f"Failed to schedule callback: {e}")
-        try:
-            from app.services.usage_service import UsageService
-            usage_service = UsageService(supabase_admin)
-            await usage_service.increment_minutes(agent_id, duration_seconds)
-        except Exception as err:
-            logger.error(f"Failed to increment usage minutes: {err}")
+        # Resolve contact_id from metadata if not explicitly passed
+        if not contact_id and call_sid:
+            try:
+                call_res = await asyncio.to_thread(
+                    supabase_admin.table("voice_calls").select("metadata").eq("metadata->>provider_call_id", call_sid).maybe_single().execute
+                )
+                if call_res.data and call_res.data.get("metadata"):
+                    contact_id = call_res.data["metadata"].get("contact_id")
+            except Exception as e:
+                logger.error(f"Failed to resolve contact_id from voice_calls metadata in extract_and_save_lead: {e}")
+
+        # 4. Update Campaign Stats and dispositions if outbound campaign call
+        if contact_id:
+            try:
+                contact_res = await asyncio.to_thread(
+                    supabase_admin.table("campaign_contacts").select("campaign_id").eq("id", contact_id).single().execute
+                )
+                if contact_res.data:
+                    campaign_id = contact_res.data["campaign_id"]
+                    
+                    # Update contact status
+                    update_fields = {"call_status": "answered"}
+                    if lead_id:
+                        update_fields["lead_id"] = lead_id
+                    
+                    await asyncio.to_thread(
+                        supabase_admin.table("campaign_contacts").update(update_fields).eq("id", contact_id).execute
+                    )
+                    logger.info(f"[Campaign Update] Updated campaign_contact {contact_id} call_status=answered, lead_id={lead_id}")
+                    
+                    # Increment leads count on campaigns table
+                    if lead_id and campaign_id:
+                        camp_res = await asyncio.to_thread(
+                            supabase_admin.table("campaigns").select("leads_generated").eq("id", campaign_id).single().execute
+                        )
+                        if camp_res.data:
+                            current_leads = camp_res.data.get("leads_generated", 0) or 0
+                            await asyncio.to_thread(
+                                supabase_admin.table("campaigns").update({
+                                    "leads_generated": current_leads + 1
+                                }).eq("id", campaign_id).execute
+                            )
+                            logger.info(f"[Campaign Update] Incremented leads_generated for campaign {campaign_id}")
+            except Exception as campaign_err:
+                logger.error(f"Failed to update campaign/contact statistics: {campaign_err}")
 
 server = AgentServer(num_idle_processes=1)
 
@@ -750,9 +813,32 @@ async def entrypoint(ctx: JobContext):
                                 caller_number = cleaned
                                 break
 
+                # Fetch contact_id from voice_calls metadata if twilio room
+                contact_id = None
+                campaign_contact = None
+                if ctx.room and ctx.room.name.startswith("twilio-"):
+                    call_sid = ctx.room.name.replace("twilio-", "")
+                    try:
+                        call_res = await asyncio.to_thread(
+                            supabase_admin.table("voice_calls").select("metadata").eq("metadata->>provider_call_id", call_sid).maybe_single().execute
+                        )
+                        if call_res.data and call_res.data.get("metadata"):
+                            contact_id = call_res.data["metadata"].get("contact_id")
+                    except Exception as e:
+                        logger.error(f"Failed to resolve contact_id from voice_calls metadata in entrypoint: {e}")
+
+                if contact_id:
+                    try:
+                        c_res = await asyncio.to_thread(
+                            supabase_admin.table("campaign_contacts").select("*").eq("id", contact_id).maybe_single().execute
+                        )
+                        campaign_contact = c_res.data
+                    except Exception as e:
+                        logger.error(f"Failed to fetch campaign contact {contact_id}: {e}")
+
                 # Lookup Caller
                 customer = None
-                if organization_id and caller_number != "Unknown":
+                if not campaign_contact and organization_id and caller_number != "Unknown":
                     try:
                         from app.services.caller_lookup import CallerLookupService
                         lookup_svc = CallerLookupService(supabase_admin)
@@ -775,6 +861,7 @@ async def entrypoint(ctx: JobContext):
 
                 sarvam_female = ['ritu', 'priya', 'neha', 'pooja', 'simran', 'kavya', 'ishita', 'shreya', 'roopa', 'tanya', 'shruti', 'suhani', 'kavitha', 'rupali', 'amelia', 'sophia', 'anushka', 'maya', 'diya', 'meera']
                 gender_tag = 'female' if voice_id in sarvam_female else 'male'
+                bot_name = "Anushka" if gender_tag == 'female' else "Vikram"
 
                 if raw_greeting:
                     # Clean [slug] prefix and suffixes like - Demo / - Trial
@@ -788,10 +875,31 @@ async def entrypoint(ctx: JobContext):
                     greeting_message = greeting_message.replace('{agentName}', clean_name)
                     greeting_message = greeting_message.replace('{companyName}', profile_data.get('company_name') or '')
                     
-                    if customer:
+                    if campaign_contact:
+                        c_name = campaign_contact.get("full_name") or ""
+                        is_name_valid = c_name and str(c_name).strip() and str(c_name).lower() != "null"
+                        c_name_replaced = c_name if is_name_valid else ""
+                        greeting_message = greeting_message.replace('{{customer_name}}', c_name_replaced).replace('{customerName}', c_name_replaced)
+                        # Clean up punctuation spacing if name was empty
+                        if not is_name_valid:
+                            greeting_message = greeting_message.replace("Namaste  ji", "Namaste ji").replace("Hello ,", "Hello,").replace("Hello  ji", "Hello ji")
+                    elif customer:
                         cust_name = customer.get("full_name") or ""
                         greeting_message = greeting_message.replace('{{customer_name}}', cust_name)
                         greeting_message = greeting_message.replace('{customerName}', cust_name)
+                elif campaign_contact:
+                    c_name = campaign_contact.get("full_name") or ""
+                    is_name_valid = c_name and str(c_name).strip() and str(c_name).lower() != "null"
+                    if is_name_valid:
+                        if language in ['hinglish', 'hi-IN']:
+                            greeting_message = f"Namaste {c_name} ji, main Trinetra AI se {bot_name} bol {'rahi' if gender_tag=='female' else 'raha'} hoon. Kya main 30 second ke liye aapka time le {'sakti' if gender_tag=='female' else 'sakta'} hoon?"
+                        else:
+                            greeting_message = f"Hello {c_name}, this is {bot_name} calling from {profile_data.get('company_name') or 'Trinetra'}. I hope you are doing well. Do you have 30 seconds to speak?"
+                    else:
+                        if language in ['hinglish', 'hi-IN']:
+                            greeting_message = f"Namaste ji, main Trinetra AI se {bot_name} bol {'rahi' if gender_tag=='female' else 'raha'} hoon. Kya main 30 second ke liye aapka time le {'sakti' if gender_tag=='female' else 'sakta'} hoon?"
+                        else:
+                            greeting_message = f"Hello, this is {bot_name} calling from {profile_data.get('company_name') or 'Trinetra'}. I hope you are doing well. Do you have 30 seconds to speak?"
                 elif customer:
                     cust_name = customer.get("full_name") or ""
                     cust_tags = customer.get("tags") or []
@@ -804,7 +912,33 @@ async def entrypoint(ctx: JobContext):
                     else:
                         greeting_message = "Hello! Thank you for calling. May I know who I'm speaking with?"
 
-                if customer:
+                if campaign_contact:
+                    c_name = campaign_contact.get("full_name") or ""
+                    is_name_valid = c_name and str(c_name).strip() and str(c_name).lower() != "null"
+                    c_company = campaign_contact.get("company_name") or ""
+                    is_company_valid = c_company and str(c_company).strip() and str(c_company).lower() != "null"
+                    c_notes = campaign_contact.get("notes") or ""
+                    is_notes_valid = c_notes and str(c_notes).strip() and str(c_notes).lower() != "null"
+
+                    comp_part = f" from {c_company}" if is_company_valid else ""
+                    notes_part = f"\nReason for calling: {c_notes}" if is_notes_valid else ""
+                    
+                    if is_name_valid:
+                        personalized_context = (
+                            f"\n\n## PERSONALIZED CALL CONTEXT:\n"
+                            f"You are calling {c_name}{comp_part}.\n"
+                            f"{notes_part}\n"
+                            f"Greet them by name naturally."
+                        )
+                    else:
+                        personalized_context = (
+                            f"\n\n## PERSONALIZED CALL CONTEXT:\n"
+                            f"You are calling a customer{comp_part}.\n"
+                            f"{notes_part}\n"
+                            f"Greet them naturally."
+                        )
+                    system_prompt += personalized_context
+                elif customer:
                     cust_name = customer.get("full_name") or ""
                     cust_tags = customer.get("tags") or []
                     cust_notes = customer.get("notes") or ""
@@ -929,15 +1063,39 @@ async def entrypoint(ctx: JobContext):
         try:
             if agent_id and user_id:
                 duration = int(time.time() - call_start_time)
+                
+                # Always increment minutes/quota if duration > 0, regardless of transcript
+                if duration > 0:
+                    try:
+                        from app.services.usage_service import UsageService
+                        usage_service = UsageService(supabase_admin)
+                        await usage_service.increment_minutes(agent_id, duration)
+                        logger.info(f"Incremented minutes usage for agent {agent_id} by {duration} seconds.")
+                    except Exception as usage_err:
+                        logger.error(f"Failed to increment usage minutes: {usage_err}")
+
                 if hasattr(agent_instance, 'chat_ctx'):
                     messages = agent_instance.chat_ctx.messages
                     transcript = "\n".join([f"{m.role}: {m.content}" for m in messages if m.role in ("user", "assistant")])
                 else:
                     transcript = ""
                 
+                call_sid = None
+                contact_id = None
+                if ctx.room and ctx.room.name.startswith("twilio-"):
+                    call_sid = ctx.room.name.replace("twilio-", "")
+                    try:
+                        call_res = await asyncio.to_thread(
+                            supabase_admin.table("voice_calls").select("metadata").eq("metadata->>provider_call_id", call_sid).maybe_single().execute
+                        )
+                        if call_res.data and call_res.data.get("metadata"):
+                            contact_id = call_res.data["metadata"].get("contact_id")
+                    except Exception as e:
+                        logger.error(f"Failed to resolve contact_id from voice_calls metadata in entrypoint finally: {e}")
+
                 if transcript:
                     logger.info(f"Awaiting save/extraction of completed call details ({duration}s)...")
-                    await extract_and_save_lead(transcript, agent_id, user_id, organization_id, duration)
+                    await extract_and_save_lead(transcript, agent_id, user_id, organization_id, duration, call_sid=call_sid, contact_id=contact_id)
         except Exception as err:
             logger.error(f"Failed to execute final disconnect log save: {err}")
 
@@ -1048,7 +1206,7 @@ def generate_agent_token(room_name: str) -> str:
     return token
 
 
-async def run_agent(room_name: str, agent_id: str | None = None):
+async def run_agent(room_name: str, agent_id: str | None = None, contact_id: str | None = None):
     # Fallback/Direct background worker runner used by voice_router.py
     from livekit import rtc
     livekit_url = os.getenv("LIVEKIT_URL", "ws://127.0.0.1:7880").strip()
@@ -1167,9 +1325,27 @@ async def run_agent(room_name: str, agent_id: str | None = None):
                             caller_number = cleaned
                             break
 
+                # Fetch contact_id from voice_calls metadata if twilio room
+                campaign_contact = None
+                if not contact_id and room_name and room_name.startswith("twilio-"):
+                    call_sid = room_name.replace("twilio-", "")
+                    try:
+                        call_res = supabase_admin.table("voice_calls").select("metadata").eq("metadata->>provider_call_id", call_sid).maybe_single().execute()
+                        if call_res.data and call_res.data.get("metadata"):
+                            contact_id = call_res.data["metadata"].get("contact_id")
+                    except Exception as e:
+                        logger.error(f"Failed to resolve contact_id from voice_calls metadata in run_agent: {e}")
+
+                if contact_id:
+                    try:
+                        c_res = supabase_admin.table("campaign_contacts").select("*").eq("id", contact_id).maybe_single().execute()
+                        campaign_contact = c_res.data
+                    except Exception as e:
+                        logger.error(f"Failed to fetch campaign contact {contact_id} in run_agent: {e}")
+
                 # Lookup Caller
                 customer = None
-                if organization_id and caller_number != "Unknown":
+                if not campaign_contact and organization_id and caller_number != "Unknown":
                     try:
                         from app.services.caller_lookup import CallerLookupService
                         lookup_svc = CallerLookupService(supabase_admin)
@@ -1194,6 +1370,7 @@ async def run_agent(room_name: str, agent_id: str | None = None):
                     'sophia', 'anushka', 'maya', 'diya', 'meera', 'pavithra', 'aditi'
                 ]
                 gender_tag = 'female' if voice_id in sarvam_female else 'male'
+                bot_name = "Anushka" if gender_tag == 'female' else "Vikram"
 
                 if raw_greeting:
                     # Clean [slug] prefix and suffixes like - Demo / - Trial
@@ -1206,10 +1383,31 @@ async def run_agent(room_name: str, agent_id: str | None = None):
                     greeting_message = greeting_message.replace('{agentName}', clean_name)
                     greeting_message = greeting_message.replace('{companyName}', profile_data.get('company_name') or '')
                     
-                    if customer:
+                    if campaign_contact:
+                        c_name = campaign_contact.get("full_name") or ""
+                        is_name_valid = c_name and str(c_name).strip() and str(c_name).lower() != "null"
+                        c_name_replaced = c_name if is_name_valid else ""
+                        greeting_message = greeting_message.replace('{{customer_name}}', c_name_replaced).replace('{customerName}', c_name_replaced)
+                        # Clean up punctuation spacing if name was empty
+                        if not is_name_valid:
+                            greeting_message = greeting_message.replace("Namaste  ji", "Namaste ji").replace("Hello ,", "Hello,").replace("Hello  ji", "Hello ji")
+                    elif customer:
                         cust_name = customer.get("full_name") or ""
                         greeting_message = greeting_message.replace('{{customer_name}}', cust_name)
                         greeting_message = greeting_message.replace('{customerName}', cust_name)
+                elif campaign_contact:
+                    c_name = campaign_contact.get("full_name") or ""
+                    is_name_valid = c_name and str(c_name).strip() and str(c_name).lower() != "null"
+                    if is_name_valid:
+                        if language in ['hinglish', 'hi-IN']:
+                            greeting_message = f"Namaste {c_name} ji, main Trinetra AI se {bot_name} bol {'rahi' if gender_tag=='female' else 'raha'} hoon. Kya main 30 second ke liye aapka time le {'sakti' if gender_tag=='female' else 'sakta'} hoon?"
+                        else:
+                            greeting_message = f"Hello {c_name}, this is {bot_name} calling from {profile_data.get('company_name') or 'Trinetra'}. I hope you are doing well. Do you have 30 seconds to speak?"
+                    else:
+                        if language in ['hinglish', 'hi-IN']:
+                            greeting_message = f"Namaste ji, main Trinetra AI se {bot_name} bol {'rahi' if gender_tag=='female' else 'raha'} hoon. Kya main 30 second ke liye aapka time le {'sakti' if gender_tag=='female' else 'sakta'} hoon?"
+                        else:
+                            greeting_message = f"Hello, this is {bot_name} calling from {profile_data.get('company_name') or 'Trinetra'}. I hope you are doing well. Do you have 30 seconds to speak?"
                 elif customer:
                     cust_name = customer.get("full_name") or ""
                     cust_tags = customer.get("tags") or []
@@ -1222,7 +1420,33 @@ async def run_agent(room_name: str, agent_id: str | None = None):
                     else:
                         greeting_message = "Hello! Thank you for calling. May I know who I'm speaking with?"
 
-                if customer:
+                if campaign_contact:
+                    c_name = campaign_contact.get("full_name") or ""
+                    is_name_valid = c_name and str(c_name).strip() and str(c_name).lower() != "null"
+                    c_company = campaign_contact.get("company_name") or ""
+                    is_company_valid = c_company and str(c_company).strip() and str(c_company).lower() != "null"
+                    c_notes = campaign_contact.get("notes") or ""
+                    is_notes_valid = c_notes and str(c_notes).strip() and str(c_notes).lower() != "null"
+
+                    comp_part = f" from {c_company}" if is_company_valid else ""
+                    notes_part = f"\nReason for calling: {c_notes}" if is_notes_valid else ""
+                    
+                    if is_name_valid:
+                        personalized_context = (
+                            f"\n\n## PERSONALIZED CALL CONTEXT:\n"
+                            f"You are calling {c_name}{comp_part}.\n"
+                            f"{notes_part}\n"
+                            f"Greet them by name naturally."
+                        )
+                    else:
+                        personalized_context = (
+                            f"\n\n## PERSONALIZED CALL CONTEXT:\n"
+                            f"You are calling a customer{comp_part}.\n"
+                            f"{notes_part}\n"
+                            f"Greet them naturally."
+                        )
+                    system_prompt += personalized_context
+                elif customer:
                     cust_name = customer.get("full_name") or ""
                     cust_tags = customer.get("tags") or []
                     cust_notes = customer.get("notes") or ""
@@ -1376,14 +1600,30 @@ async def run_agent(room_name: str, agent_id: str | None = None):
             try:
                 if agent_id and user_id:
                     duration = int(time.time() - call_start_time)
+                    
+                    # Always increment minutes/quota if duration > 0, regardless of transcript
+                    if duration > 0:
+                        try:
+                            from app.services.usage_service import UsageService
+                            usage_service = UsageService(supabase_admin)
+                            await usage_service.increment_minutes(agent_id, duration)
+                            logger.info(f"[In-Process Agent] Incremented minutes usage for agent {agent_id} by {duration} seconds.")
+                        except Exception as usage_err:
+                            logger.error(f"Failed to increment usage minutes: {usage_err}")
+
                     if hasattr(agent_instance, 'chat_ctx'):
                         messages = agent_instance.chat_ctx.messages
                         transcript = "\n".join([f"{m.role}: {m.content}" for m in messages if m.role in ("user", "assistant")])
                     else:
                         transcript = ""
+                    
+                    call_sid = None
+                    if room_name and room_name.startswith("twilio-"):
+                        call_sid = room_name.replace("twilio-", "")
+
                     if transcript:
                         logger.info(f"[In-Process Agent] Awaiting final call save ({duration}s)...")
-                        await extract_and_save_lead(transcript, agent_id, user_id, organization_id, duration)
+                        await extract_and_save_lead(transcript, agent_id, user_id, organization_id, duration, call_sid=call_sid, contact_id=contact_id)
             except Exception as e:
                 logger.error(f"[In-Process Agent] Error saving stats: {e}")
 

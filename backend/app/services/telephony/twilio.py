@@ -262,8 +262,16 @@ class TwilioProvider(AbstractTelephonyProvider):
         except TwilioRestException as e:
             self._handle_twilio_exception(e, "create_outbound_session")
 
-    async def make_outbound_call(self, to_number: str, from_number: str, webhook_url: str) -> dict:
+    async def make_outbound_call(self, to_number: str, from_number: str, webhook_url: str, custom_parameters: Optional[dict] = None) -> dict:
         logger.info(f"[{self.provider_name}] Placing outbound call to {to_number} from {from_number} (webhook: {webhook_url})")
+        if custom_parameters:
+            import urllib.parse
+            url_parts = list(urllib.parse.urlparse(webhook_url))
+            query = dict(urllib.parse.parse_qsl(url_parts[4]))
+            query.update({k: str(v) for k, v in custom_parameters.items() if v is not None})
+            url_parts[4] = urllib.parse.urlencode(query)
+            webhook_url = urllib.parse.urlunparse(url_parts)
+            logger.info(f"[{self.provider_name}] Appended custom parameters to webhook URL: {webhook_url}")
         try:
             call = self.client.calls.create(
                 to=to_number,
