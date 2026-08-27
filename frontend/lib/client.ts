@@ -12,7 +12,15 @@ export function createClient() {
     get(target, prop) {
       if (!globalClient) {
         const isProd = process.env.NODE_ENV === 'production'
-        const cookieDomain = isProd ? '.trinetraedu-ai.com' : undefined
+        let cookieDomain: string | undefined = undefined
+        if (isProd && typeof window !== 'undefined') {
+          const hostname = window.location.hostname
+          if (hostname.endsWith('trinetraedu-ai.com')) {
+            cookieDomain = '.trinetraedu-ai.com'
+          } else if (hostname.endsWith('trinetra.ai')) {
+            cookieDomain = '.trinetra.ai'
+          }
+        }
 
         globalClient = createBrowserClient(
           process.env.NEXT_PUBLIC_SUPABASE_URL!,

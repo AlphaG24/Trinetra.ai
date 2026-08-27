@@ -19,8 +19,19 @@ export const GET = safeApiHandler(async (request: Request) => {
 
   if (code) {
     const cookieStore = await cookies()
+    const headerList = await headers()
+    const host = headerList.get('host') || ''
+    const cleanHost = host.split(':')[0]
+    let cookieDomain: string | undefined = undefined
+
     const isProd = process.env.NODE_ENV === 'production'
-    const cookieDomain = isProd ? '.trinetraedu-ai.com' : undefined
+    if (isProd && cleanHost) {
+      if (cleanHost.endsWith('trinetraedu-ai.com')) {
+        cookieDomain = '.trinetraedu-ai.com'
+      } else if (cleanHost.endsWith('trinetra.ai')) {
+        cookieDomain = '.trinetra.ai'
+      }
+    }
 
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
