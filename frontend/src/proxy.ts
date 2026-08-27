@@ -373,28 +373,7 @@ export async function proxy(request: NextRequest) {
     supabaseResponse.headers.set('X-RateLimit-Remaining', String(remaining))
     supabaseResponse.headers.set('X-RateLimit-Reset', String(resetSeconds))
   } else {
-    // In-memory sliding window rate limiting for general static assets/pages
-    const { maxRequests, windowMs } = getRateLimitConfig(currentPath)
-    const rateLimitKey = `mem:${ip}:general`
-    const { limited, retryAfterSeconds } = isRateLimited(rateLimitKey, maxRequests, windowMs)
-
-    if (limited) {
-      logSecurityEvent('RATE_LIMIT_EXCEEDED_IN_MEMORY', { ip, path: currentPath, limit: maxRequests })
-      const response = new NextResponse(
-        JSON.stringify({ error: 'Too many requests. Please try again later.' }),
-        {
-          status: 429,
-          headers: {
-            'Content-Type': 'application/json',
-            'Retry-After': String(retryAfterSeconds),
-            'X-RateLimit-Limit': String(maxRequests),
-            'X-RateLimit-Remaining': '0',
-            'X-RateLimit-Reset': String(retryAfterSeconds),
-          },
-        }
-      )
-      return applySecurityHeaders(response)
-    }
+    // General static assets and pages bypass rate limiting to prevent false-positive blocks
   }
 
   // ------------------------------------------------------------------
