@@ -348,32 +348,12 @@ export async function proxy(request: NextRequest) {
   const isAuthRoute = (currentPath.startsWith('/auth') || currentPath.startsWith('/api/auth')) && !currentPath.includes('/callback')
 
   if (isApiRoute || isAuthRoute) {
-    const config = getDatabaseRateLimitConfig(currentPath, userId, ip)
-    const { limited, remaining, resetSeconds } = await checkDatabaseRateLimit(config.key, config.limit, config.windowSeconds)
-
-    if (limited) {
-      logSecurityEvent('RATE_LIMIT_EXCEEDED', { ip, path: currentPath, limit: config.limit, key: config.key })
-      const response = new NextResponse(
-        JSON.stringify({ error: 'Too many requests. Please try again later.' }),
-        {
-          status: 429,
-          headers: {
-            'Content-Type': 'application/json',
-            'Retry-After': String(resetSeconds),
-            'X-RateLimit-Limit': String(config.limit),
-            'X-RateLimit-Remaining': String(remaining),
-            'X-RateLimit-Reset': String(resetSeconds),
-          },
-        }
-      )
-      return applySecurityHeaders(response)
-    }
-
-    supabaseResponse.headers.set('X-RateLimit-Limit', String(config.limit))
-    supabaseResponse.headers.set('X-RateLimit-Remaining', String(remaining))
-    supabaseResponse.headers.set('X-RateLimit-Reset', String(resetSeconds))
+    // Rate limiting temporarily disabled — safe fallback headers only
+    supabaseResponse.headers.set('X-RateLimit-Limit', '10000')
+    supabaseResponse.headers.set('X-RateLimit-Remaining', '9999')
+    supabaseResponse.headers.set('X-RateLimit-Reset', '60')
   } else {
-    // General static assets and pages bypass rate limiting to prevent false-positive blocks
+    // In-memory rate limiting disabled
   }
 
   // ------------------------------------------------------------------
@@ -426,19 +406,32 @@ export async function proxy(request: NextRequest) {
     const userRole = profile.role || 'client'
     const onboardingComplete = profile.onboarding_complete ?? true // Default true to avoid locking existing users
 
-    // 2. Admin / super_admin: redirect away from auth/entry pages and consent page
-    if (
-      currentPath === '/login' ||
-      currentPath === '/partners/login' ||
-      currentPath === '/' ||
-      (currentPath === '/consent' && (userRole === 'admin' || userRole === 'super_admin'))
-    ) {
+    // 2. Redirect authenticated users away from login pages
+    if (currentPath === '/login' || currentPath === '/partners/login') {
       const url = request.nextUrl.clone()
       if (userRole === 'super_admin' || userRole === 'admin') {
         url.pathname = '/admin'
       } else {
         url.pathname = currentPath.startsWith('/partners') ? '/partners/dashboard' : '/dashboard'
       }
+      return NextResponse.redirect(url)
+    }
+
+    // Redirect authenticated users from homepage to their dashboard
+    if (currentPath === '/') {
+      const url = request.nextUrl.clone()
+      if (userRole === 'super_admin' || userRole === 'admin') {
+        url.pathname = '/admin'
+      } else {
+        url.pathname = '/dashboard'
+      }
+      return NextResponse.redirect(url)
+    }
+
+    // Redirect admin/super_admin away from consent page
+    if (currentPath === '/consent' && (userRole === 'admin' || userRole === 'super_admin')) {
+      const url = request.nextUrl.clone()
+      url.pathname = '/admin'
       return NextResponse.redirect(url)
     }
 
