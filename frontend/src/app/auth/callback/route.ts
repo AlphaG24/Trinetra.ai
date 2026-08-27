@@ -29,7 +29,7 @@ export const GET = safeApiHandler(async (request: Request) => {
                     setAll(cookiesToSet) {
                         const isProd = process.env.NODE_ENV === 'production'
                         let domain: string | undefined = undefined
-                        if (isProd && cleanHost) {
+                        if (isProd && cleanHost && !cleanHost.includes('dev.')) {
                             if (cleanHost.endsWith('trinetraedu-ai.com')) {
                                 domain = '.trinetraedu-ai.com'
                             } else if (cleanHost.endsWith('trinetra.ai')) {

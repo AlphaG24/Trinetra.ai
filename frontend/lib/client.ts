@@ -15,10 +15,12 @@ export function createClient() {
         let cookieDomain: string | undefined = undefined
         if (isProd && typeof window !== 'undefined') {
           const hostname = window.location.hostname
-          if (hostname.endsWith('trinetraedu-ai.com')) {
-            cookieDomain = '.trinetraedu-ai.com'
-          } else if (hostname.endsWith('trinetra.ai')) {
-            cookieDomain = '.trinetra.ai'
+          if (!hostname.includes('dev.')) {
+            if (hostname.endsWith('trinetraedu-ai.com')) {
+              cookieDomain = '.trinetraedu-ai.com'
+            } else if (hostname.endsWith('trinetra.ai')) {
+              cookieDomain = '.trinetra.ai'
+            }
           }
         }
 
