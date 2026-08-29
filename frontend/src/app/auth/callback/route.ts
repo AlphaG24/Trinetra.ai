@@ -21,6 +21,9 @@ export const GET = safeApiHandler(async (request: Request) => {
         // THE FIX: We must await the cookies() function in newer Next.js versions
         const cookieStore = await cookies()
 
+        const cookieChanges: { name: string, value: string, options: any }[] = []
+        let cookieDomain: string | undefined = undefined
+
         const supabase = createServerClient(
             process.env.NEXT_PUBLIC_SUPABASE_URL!,
             process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -31,21 +34,21 @@ export const GET = safeApiHandler(async (request: Request) => {
                     },
                     setAll(cookiesToSet) {
                         const isProd = process.env.NODE_ENV === 'production'
-                        let domain: string | undefined = undefined
                         if (isProd && cleanHost && !cleanHost.includes('dev.')) {
                             if (cleanHost.endsWith('trinetraedu-ai.com')) {
-                                domain = '.trinetraedu-ai.com'
+                                cookieDomain = '.trinetraedu-ai.com'
                             } else if (cleanHost.endsWith('trinetra.ai')) {
-                                domain = '.trinetra.ai'
+                                cookieDomain = '.trinetra.ai'
                             }
                         }
                         cookiesToSet.forEach(({ name, value, options }) => {
+                            cookieChanges.push({ name, value, options })
                             const setOptions: any = {
                                 ...options,
                                 path: '/',
                             }
-                            if (domain) {
-                                setOptions.domain = domain
+                            if (cookieDomain) {
+                                setOptions.domain = cookieDomain
                             }
                             cookieStore.set(name, value, setOptions)
                         })
@@ -126,10 +129,24 @@ export const GET = safeApiHandler(async (request: Request) => {
               </html>
             `;
 
-            return new NextResponse(html, {
+            const response = new NextResponse(html, {
                 status: 200,
                 headers: { 'Content-Type': 'text/html' },
             });
+
+            // Explicitly set the session cookies on the response object
+            cookieChanges.forEach(({ name, value, options }) => {
+                const setOptions: any = {
+                    ...options,
+                    path: '/',
+                }
+                if (cookieDomain) {
+                    setOptions.domain = cookieDomain
+                }
+                response.cookies.set(name, value, setOptions)
+            })
+
+            return response
         }
     }
 
