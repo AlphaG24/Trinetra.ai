@@ -82,7 +82,13 @@ export const GET = safeApiHandler(async (request: Request) => {
                 }
             }
 
+            const isProdEnv = process.env.NODE_ENV === 'production' && !cleanHost.includes('localhost') && !cleanHost.includes('127.0.0.1')
+            const APP_BASE = 'https://app.trinetraedu-ai.com'
+            const ADMIN_BASE = 'https://admin.trinetraedu-ai.com'
+
+            // Default: use origin (works for localhost)
             let targetUrl = `${origin}${next}`
+
             if (type === 'recovery') {
                 targetUrl = `${origin}/reset-password`
             } else {
@@ -91,26 +97,57 @@ export const GET = safeApiHandler(async (request: Request) => {
                     // Fetch user role
                     const { data: profile } = await supabase
                         .from('profiles')
-                        .select('role')
+                        .select('role, onboarding_complete')
                         .eq('id', user.id)
                         .single()
 
                     const role = (profile?.role || 'client').toLowerCase()
-                    
-                    if (role !== 'admin' && role !== 'super_admin' && role === 'client') {
-                        const { data: consent } = await supabase
-                            .from('consent_records')
-                            .select('id')
-                            .eq('user_id', user.id)
-                            .maybeSingle()
-                        
-                        if (!consent) {
-                            targetUrl = `${origin}/consent`
+                    const isAdmin = role === 'admin' || role === 'super_admin'
+                    const onboardingComplete = profile?.onboarding_complete ?? false
+
+                    console.log('[AUTH] Callback: user role =', role, '| isProd =', isProdEnv)
+
+                    if (isProdEnv) {
+                        // In production, always redirect to the correct subdomain
+                        if (isAdmin) {
+                            targetUrl = `${ADMIN_BASE}/admin`
+                            console.log('[AUTH] Callback redirecting admin to:', targetUrl)
+                        } else {
+                            // Check consent first
+                            const { data: consent } = await supabase
+                                .from('consent_records')
+                                .select('id')
+                                .eq('user_id', user.id)
+                                .maybeSingle()
+
+                            if (!consent) {
+                                // Consent must be on main domain (it's a public page)
+                                targetUrl = `${origin}/consent`
+                            } else if (!onboardingComplete) {
+                                targetUrl = `${APP_BASE}/dashboard/onboarding`
+                            } else {
+                                targetUrl = `${APP_BASE}/dashboard`
+                            }
+                            console.log('[AUTH] Callback redirecting client to:', targetUrl)
+                        }
+                    } else {
+                        // Localhost: relative paths work fine
+                        if (isAdmin) {
+                            targetUrl = `${origin}/admin`
+                        } else {
+                            const { data: consent } = await supabase
+                                .from('consent_records')
+                                .select('id')
+                                .eq('user_id', user.id)
+                                .maybeSingle()
+
+                            if (!consent) {
+                                targetUrl = `${origin}/consent`
+                            } else {
+                                targetUrl = `${origin}/dashboard`
+                            }
                         }
                     }
-                }
-                if (next.includes('trinetraedu-ai.com')) {
-                    targetUrl = next.startsWith('http') ? next : `https://${next}`
                 }
             }
 
