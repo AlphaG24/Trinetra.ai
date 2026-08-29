@@ -1,5 +1,4 @@
 import { redirect } from 'next/navigation'
-import { headers } from 'next/headers'
 import { createClient } from '@/utils/supabase/server'
 import { Layout } from "@/components/layout/Layout";
 import { Hero } from "@/components/landing/Hero";
@@ -22,23 +21,15 @@ export default async function Home() {
   const { data: { user } } = await supabase.auth.getUser()
 
   if (user) {
-    const host = (await headers()).get('host') || ''
-    const cleanHost = host.split(':')[0].toLowerCase()
-    const isProd = process.env.NODE_ENV === 'production' && !cleanHost.includes('localhost') && !cleanHost.includes('127.0.0.1')
-
-    if (isProd) {
-      // Fetch role for proper subdomain routing
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', user.id)
-        .single()
-      const role = (profile?.role || 'client').toLowerCase()
-      const isAdmin = role === 'admin' || role === 'super_admin'
-      redirect(isAdmin ? 'https://admin.trinetraedu-ai.com/admin' : 'https://app.trinetraedu-ai.com/dashboard')
-    } else {
-      redirect('/dashboard')
-    }
+    // Fetch role for proper routing
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single()
+    const role = (profile?.role || 'client').toLowerCase()
+    const isAdmin = role === 'admin' || role === 'super_admin'
+    redirect(isAdmin ? '/admin' : '/dashboard')
   }
 
   return (
