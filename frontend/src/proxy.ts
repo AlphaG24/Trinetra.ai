@@ -35,10 +35,18 @@ export async function proxy(request: NextRequest) {
     return supabaseResponse
   }
 
-  // Detect Next.js client-side prefetch or routing fetches
+  // Detect if this is a browser navigation vs a fetch/XHR request.
+  // Cross-origin NextResponse.redirect() is ONLY safe for browser navigations (sec-fetch-mode: navigate).
+  // For all fetch-like requests (RSC, prefetch, XHR, fetch()), a cross-origin redirect response
+  // triggers a CORS preflight failure. In those cases we pass through and let the
+  // Server Components (page.tsx, layouts) call redirect() which Next.js converts
+  // to a client-side window.location.assign() — completely bypassing CORS.
+  const secFetchMode = request.headers.get('sec-fetch-mode')
+  const isNavigation = secFetchMode === 'navigate' || secFetchMode === null // null = older browsers / SSR
   const isRsc = request.headers.get('rsc') === '1' || request.nextUrl.searchParams.has('_rsc')
-  const isPrefetch = request.headers.get('x-middleware-prefetch') === '1'
-  const isNextFetch = isRsc || isPrefetch
+  const isNextPrefetch = request.headers.get('next-router-prefetch') === '1' || request.headers.get('x-middleware-prefetch') === '1'
+  // Any non-navigation fetch should NOT be cross-origin redirected
+  const isFetchLike = !isNavigation || isRsc || isNextPrefetch
 
   // Get host details to determine environment and domains
   const host = request.headers.get('host') || ''
@@ -52,14 +60,12 @@ export async function proxy(request: NextRequest) {
   const isAppDomain = cleanHost === 'app.trinetraedu-ai.com'
   const isAdminDomain = cleanHost === 'admin.trinetraedu-ai.com'
 
-  // Safe redirect helper to prevent CORS blocks on cross-origin prefetch/RSC requests
+  // Safe redirect helper: for cross-origin targets on fetch-like requests, pass through instead
+  // of redirecting — Server Components will do the final redirect client-side via window.location.
   const safeRedirect = (targetUrl: string) => {
     try {
       const targetUrlObj = new URL(targetUrl, request.url)
-      if (targetUrlObj.hostname !== cleanHost && isNextFetch) {
-        // Return 200 next response to let the current page load.
-        // The layout / page server component will handle absolute redirection
-        // which triggers a clean client-side hard window.location change.
+      if (targetUrlObj.hostname !== cleanHost && isFetchLike) {
         return supabaseResponse
       }
     } catch (e) {
