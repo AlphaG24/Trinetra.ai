@@ -6,6 +6,11 @@ export async function proxy(request: NextRequest) {
     request: { headers: request.headers },
   })
 
+  // 1. Bypass OPTIONS preflight requests immediately (CWS/CORS spec allows no redirects here)
+  if (request.method === 'OPTIONS') {
+    return supabaseResponse
+  }
+
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -30,6 +35,11 @@ export async function proxy(request: NextRequest) {
     return supabaseResponse
   }
 
+  // Detect Next.js client-side prefetch or routing fetches
+  const isRsc = request.headers.get('rsc') === '1' || request.nextUrl.searchParams.has('_rsc')
+  const isPrefetch = request.headers.get('x-middleware-prefetch') === '1'
+  const isNextFetch = isRsc || isPrefetch
+
   // Get host details to determine environment and domains
   const host = request.headers.get('host') || ''
   const cleanHost = host.split(':')[0].toLowerCase()
@@ -42,16 +52,32 @@ export async function proxy(request: NextRequest) {
   const isAppDomain = cleanHost === 'app.trinetraedu-ai.com'
   const isAdminDomain = cleanHost === 'admin.trinetraedu-ai.com'
 
+  // Safe redirect helper to prevent CORS blocks on cross-origin prefetch/RSC requests
+  const safeRedirect = (targetUrl: string) => {
+    try {
+      const targetUrlObj = new URL(targetUrl, request.url)
+      if (targetUrlObj.hostname !== cleanHost && isNextFetch) {
+        // Return 200 next response to let the current page load.
+        // The layout / page server component will handle absolute redirection
+        // which triggers a clean client-side hard window.location change.
+        return supabaseResponse
+      }
+    } catch (e) {
+      console.error('[proxy] safeRedirect parse error:', e)
+    }
+    return NextResponse.redirect(targetUrl)
+  }
+
   // 1. Unauthenticated users
   if (!user) {
     if (isProd) {
       if (isAppDomain || isAdminDomain) {
         // Force redirect to login page on the main domain
-        return NextResponse.redirect(`${mainBase}/login`)
+        return safeRedirect(`${mainBase}/login`)
       }
       // On main domain, protect dashboard, admin, and consent pages
       if (currentPath.startsWith('/dashboard') || currentPath.startsWith('/admin') || currentPath === '/consent') {
-        return NextResponse.redirect(`${mainBase}/login`)
+        return safeRedirect(`${mainBase}/login`)
       }
     } else {
       // Localhost: redirect to login
@@ -91,12 +117,12 @@ export async function proxy(request: NextRequest) {
       if (isAdminDomain) {
         // Super admin system gate check
         if (currentPath.startsWith('/admin/system') && userRole !== 'super_admin') {
-          return NextResponse.redirect(adminBase)
+          return safeRedirect(adminBase)
         }
       } else {
         // On main or app domains: redirect if they hit entry or protected routes
         if (isEntryRoute || isProtectedRoute) {
-          return NextResponse.redirect(adminBase)
+          return safeRedirect(adminBase)
         }
       }
     } else {
@@ -105,17 +131,17 @@ export async function proxy(request: NextRequest) {
         // Onboarding check
         if (!onboardingComplete) {
           if (!currentPath.startsWith('/dashboard/onboarding')) {
-            return NextResponse.redirect(`${appBase}/dashboard/onboarding`)
+            return safeRedirect(`${appBase}/dashboard/onboarding`)
           }
         } else {
           if (currentPath.startsWith('/dashboard/onboarding')) {
-            return NextResponse.redirect(appBase)
+            return safeRedirect(appBase)
           }
         }
       } else {
         // On main or admin domains: redirect if they hit entry or protected routes
         if (isEntryRoute || isProtectedRoute) {
-          return NextResponse.redirect(appBase)
+          return safeRedirect(appBase)
         }
       }
     }
