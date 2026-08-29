@@ -102,8 +102,30 @@ function LoginForm() {
             return
           }
         }
-        
-        router.push('/dashboard')
+
+        // Fetch role for subdomain-aware redirect
+        try {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('role')
+            .eq('id', data.user.id)
+            .single()
+          const role = (profile?.role || 'client').toLowerCase()
+          const isAdmin = role === 'admin' || role === 'super_admin'
+          const isProd = !window.location.hostname.includes('localhost') && !window.location.hostname.includes('127.0.0.1')
+
+          console.log('[AUTH] Email login: role =', role, '| isProd =', isProd)
+
+          if (isProd) {
+            window.location.href = isAdmin
+              ? 'https://admin.trinetraedu-ai.com/admin'
+              : 'https://app.trinetraedu-ai.com/dashboard'
+          } else {
+            router.push(isAdmin ? '/admin' : '/dashboard')
+          }
+        } catch {
+          router.push('/dashboard')
+        }
       }
     } catch (err) {
       console.error("Unexpected login failure caught:", err)
