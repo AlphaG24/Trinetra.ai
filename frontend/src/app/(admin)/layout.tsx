@@ -1,5 +1,4 @@
 import { redirect } from 'next/navigation'
-import { headers } from 'next/headers'
 import { createClient } from '@/lib/server'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
 import { AdminSidebar } from '@/src/components/admin/AdminSidebar'
@@ -15,15 +14,6 @@ export default async function AdminLayout({
 }: {
   children: React.ReactNode
 }) {
-  const host = (await headers()).get('host') || ''
-  const cleanHost = host.split(':')[0].toLowerCase()
-  const isProd = process.env.NODE_ENV === 'production' && !cleanHost.includes('localhost') && !cleanHost.includes('127.0.0.1')
-  const adminBase = 'https://admin.trinetraedu-ai.com'
-
-  if (isProd && cleanHost !== 'admin.trinetraedu-ai.com') {
-    redirect(adminBase)
-  }
-
   const supabase = await createClient()
   const { data: { user }, error: authError } = await supabase.auth.getUser()
 

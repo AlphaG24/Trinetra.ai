@@ -103,7 +103,7 @@ function LoginForm() {
           }
         }
 
-        // Fetch role for subdomain-aware redirect
+        // Fetch role for redirect
         try {
           const { data: profile } = await supabase
             .from('profiles')
@@ -112,19 +112,11 @@ function LoginForm() {
             .single()
           const role = (profile?.role || 'client').toLowerCase()
           const isAdmin = role === 'admin' || role === 'super_admin'
-          const isProd = !window.location.hostname.includes('localhost') && !window.location.hostname.includes('127.0.0.1')
 
-          console.log('[AUTH] Email login: role =', role, '| isProd =', isProd)
-
-          if (isProd) {
-            window.location.href = isAdmin
-              ? 'https://admin.trinetraedu-ai.com/admin'
-              : 'https://app.trinetraedu-ai.com/dashboard'
-          } else {
-            router.push(isAdmin ? '/admin' : '/dashboard')
-          }
+          console.log('[AUTH] Email login: role =', role)
+          window.location.href = isAdmin ? '/admin' : '/dashboard'
         } catch {
-          router.push('/dashboard')
+          window.location.href = '/dashboard'
         }
       }
     } catch (err) {
