@@ -255,6 +255,7 @@ class VikramAgent(Agent):
     def __init__(self, instructions: str, voice_provider='sarvam', voice_id='shubh', voice_speed=1.0, voice_pitch=1.0, language='en-US'):
         groq_api_key = os.getenv("GROQ_API_KEY", "")
         logger.info(f"[VikramAgent] __init__: GROQ_API_KEY length is {len(groq_api_key)}")
+        logger.info(f"Using voice: {voice_id}")
         
         self.language = language
         
@@ -312,15 +313,28 @@ class VikramAgent(Agent):
         # Wrap TTS to parse SSML tags on speech synthesis
         wrapped_tts = ExpressiveTTSWrapper(tts_plugin, provider=voice_provider)
 
+        stt_lang = "hi" if language in ('hinglish', 'hi-IN') else "en"
         super().__init__(
             instructions=instructions,
-            stt=sarvam.STT(language="unknown", model="saarika:v2.5", mode="transcribe", flush_signal=True),
+            stt=openai.STT(
+                model="whisper-large-v3",
+                base_url="https://api.groq.com/openai/v1",
+                api_key=groq_api_key,
+                language=stt_lang,
+            ),
             llm=openai.LLM(
                 model="groq/compound",
                 base_url="https://api.groq.com/openai/v1",
                 api_key=groq_api_key,
+                temperature=0.7,
+                max_completion_tokens=150,
             ),
             tts=wrapped_tts,
+            vad=vad_model,
+            min_endpointing_delay=1.5,
+            max_endpointing_delay=4.0,
+            min_consecutive_speech_delay=0.3,
+            use_tts_aligned_transcript=True,
         )
 
     async def on_enter(self):
@@ -773,7 +787,8 @@ async def entrypoint(ctx: JobContext):
 - Reference earlier parts of this call: "As we discussed earlier..."
 - Reference past calls (if customer recognized): "I see you called last week about..."
 """
-                system_prompt += expressive_instructions
+                if "## HUMAN EXPRESSIVENESS RULES" not in system_prompt:
+                    system_prompt += expressive_instructions
 
                 # Extract default greeting from system_prompt
                 default_greeting = None
@@ -1052,6 +1067,46 @@ async def entrypoint(ctx: JobContext):
             except Exception as hook_err:
                 logger.warning(f"[MULTI-PERSONALITY] Speech hook error (non-fatal): {hook_err}")
     # --- END MULTI-PERSONALITY HOOK ---
+
+    # --- TRANSCRIBE & GOODBYE HOOKS TO FRONTEND (entrypoint path) ---
+    @session.on("user_speech_committed")
+    def _on_user_speech_ep(event):
+        try:
+            txt = getattr(event, 'transcript', None) or getattr(event, 'text', None) or ""
+            if txt and txt.strip():
+                payload = json.dumps({
+                    "type": "transcript",
+                    "speaker": "customer",
+                    "text": txt
+                }).encode("utf-8")
+                asyncio.create_task(ctx.room.local_participant.publish_data(payload))
+        except Exception as err:
+            logger.warning(f"Error publishing user transcript: {err}")
+
+    @session.on("agent_speech_committed")
+    def _on_agent_speech_ep(event):
+        try:
+            txt = getattr(event, 'transcript', None) or getattr(event, 'text', None) or ""
+            if txt and txt.strip():
+                # Publish real-time transcript to room
+                payload = json.dumps({
+                    "type": "transcript",
+                    "speaker": "agent",
+                    "text": txt
+                }).encode("utf-8")
+                asyncio.create_task(ctx.room.local_participant.publish_data(payload))
+                
+                # Detect goodbye / call termination
+                closing_phrases = ["thank you", "goodbye", "bye", "dhanyavad", "alvida", "phir milenge", "baat karke achha laga"]
+                if any(phrase in txt.lower() for phrase in closing_phrases):
+                    logger.info("Call ended after closing message")
+                    async def disconnect_call():
+                        await asyncio.sleep(1.0)
+                        if ctx.room:
+                            await ctx.room.disconnect()
+                    asyncio.create_task(disconnect_call())
+        except Exception as err:
+            logger.warning(f"Error publishing agent transcript: {err}")
 
     try:
         # Blocks until session completes (i.e. client disconnects)
@@ -1586,6 +1641,16 @@ async def run_agent(room_name: str, agent_id: str | None = None, contact_id: str
                         "text": txt
                     }).encode("utf-8")
                     asyncio.create_task(room.local_participant.publish_data(payload))
+                    
+                    # Detect goodbye / call termination
+                    closing_phrases = ["thank you", "goodbye", "bye", "dhanyavad", "alvida", "phir milenge", "baat karke achha laga"]
+                    if any(phrase in txt.lower() for phrase in closing_phrases):
+                        logger.info("Call ended after closing message")
+                        async def disconnect_call():
+                            await asyncio.sleep(1.0)
+                            if room:
+                                await room.disconnect()
+                        asyncio.create_task(disconnect_call())
             except Exception as err:
                 logger.warning(f"Error publishing agent transcript: {err}")
 
