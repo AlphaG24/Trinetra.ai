@@ -887,7 +887,7 @@ export function AgentOverviewTab({
                               <p>{t.text}</p>
                             </div>
                             <span className="text-[8px] text-[var(--muted)] font-semibold uppercase tracking-wider px-1 mt-0.5">
-                              {!isAgent ? 'Customer' : (t.speaker || agent.name.split(' ')[0])}
+                              {!isAgent ? 'You' : 'Agent'}
                             </span>
                           </div>
                         )

@@ -24,9 +24,28 @@ class UsageService:
         
         a = res.data
         db_limit = a.get("minutes_limit", 0) or 0
-        used = a.get("minutes_used", 0) or 0
         org_id = a.get("organization_id")
         config = a.get("config", {}) or {}
+        
+        # Calculate dynamic minutes used by this agent this month from voice_calls
+        start_of_month = datetime.utcnow().replace(day=1, hour=0, minute=0, second=0).isoformat()
+        try:
+            calls_res = await asyncio.to_thread(
+                self.supabase.table("voice_calls")
+                .select("duration_seconds")
+                .eq("agent_id", agent_id)
+                .gte("created_at", start_of_month).execute
+            )
+            total_seconds = sum(c.get("duration_seconds", 0) or 0 for c in (calls_res.data or []))
+            used = round(total_seconds / 60)
+            
+            # Sync back to agents table so the cached value in the DB matches
+            await asyncio.to_thread(
+                self.supabase.table("agents").update({"minutes_used": used}).eq("id", agent_id).execute
+            )
+        except Exception as e:
+            logger.error(f"Failed to fetch dynamic minutes for agent {agent_id}: {e}")
+            used = a.get("minutes_used", 0) or 0
         
         # 1. Resolve from agent config
         config_limit = config.get("minutes_limit")
@@ -201,7 +220,8 @@ class UsageService:
     
     async def increment_minutes(self, agent_id: str, duration_seconds: int):
         """Add call duration to agent's minutes used"""
-        minutes = max(1, round(duration_seconds / 60))
+        import math
+        minutes = max(1, math.ceil(duration_seconds / 60))
         
         agent_res = await asyncio.to_thread(
             self.supabase.table("agents").select("minutes_used").eq("id", agent_id).single().execute
@@ -315,6 +335,7 @@ class UsageService:
         return res.count if res.count is not None else 0
     
     async def _get_monthly_minutes(self, org_id: str) -> int:
+        import math
         start_of_month = datetime.utcnow().replace(day=1, hour=0, minute=0, second=0).isoformat()
         res = await asyncio.to_thread(
             self.supabase.table("voice_calls")
@@ -324,7 +345,7 @@ class UsageService:
         )
         
         total_seconds = sum(c.get("duration_seconds", 0) or 0 for c in (res.data or []))
-        return round(total_seconds / 60)
+        return math.ceil(total_seconds / 60)
     
     async def _get_org_id(self, agent_id: str) -> str:
         res = await asyncio.to_thread(

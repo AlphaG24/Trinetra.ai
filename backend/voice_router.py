@@ -1029,6 +1029,14 @@ async def twilio_audio_stream(websocket: WebSocket, room_name: str):
             track_tasks[track.sid].cancel()
             del track_tasks[track.sid]
 
+    @room.on("disconnected")
+    def on_disconnected(reason=None):
+        print(f"[Twilio WebSocket] LiveKit room disconnected: {reason}. Closing Twilio WebSocket.", flush=True)
+        try:
+            asyncio.create_task(websocket.close())
+        except Exception as close_err:
+            print(f"[Twilio WebSocket] Error closing websocket: {close_err}", flush=True)
+
     async def send_to_twilio():
         nonlocal stream_sid, ratecv_state_out
         try:
