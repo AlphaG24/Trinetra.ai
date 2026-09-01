@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { 
   Phone, Plus, Upload, Trash2, Edit2, Search, RefreshCw, 
-  CheckCircle, AlertCircle, PhoneCall, Smartphone, MapPin, DollarSign, FileText
+  CheckCircle, AlertCircle, PhoneCall, Smartphone, MapPin, DollarSign, FileText, UserX
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -34,6 +34,11 @@ export default function AdminPhoneNumbersPage() {
   const [editingNumber, setEditingNumber] = useState<any>(null);
   const [editPriceRupees, setEditPriceRupees] = useState("");
   const [submittingEdit, setSubmittingEdit] = useState(false);
+
+  // Unassign Modal State
+  const [unassigningNumber, setUnassigningNumber] = useState<any>(null);
+  const [customUnassignMessage, setCustomUnassignMessage] = useState("");
+  const [submittingUnassign, setSubmittingUnassign] = useState(false);
 
   const fetchPoolNumbers = async () => {
     try {
@@ -195,6 +200,31 @@ export default function AdminPhoneNumbersPage() {
       fetchPoolNumbers();
     } catch (err: any) {
       toast.error(err.message || "Failed to delete number");
+    }
+  };
+
+  const handleUnassignNumber = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!unassigningNumber) return;
+
+    try {
+      setSubmittingUnassign(true);
+      const res = await fetch(`/api/admin/phone-numbers/${unassigningNumber.id}/unassign`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ custom_message: customUnassignMessage })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to unassign number");
+
+      toast.success(data.message || "Number unassigned successfully!");
+      setUnassigningNumber(null);
+      setCustomUnassignMessage("");
+      fetchPoolNumbers();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to unassign number");
+    } finally {
+      setSubmittingUnassign(false);
     }
   };
 
@@ -408,6 +438,18 @@ export default function AdminPhoneNumbersPage() {
                         >
                           <Edit2 size={13} />
                         </button>
+                        {num.status === "assigned" && (
+                          <button
+                            onClick={() => {
+                              setUnassigningNumber(num);
+                              setCustomUnassignMessage("");
+                            }}
+                            className="p-1.5 rounded-lg border border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 transition-all flex items-center gap-1 text-[10px] font-bold uppercase"
+                            title="Unassign Number from User"
+                          >
+                            <UserX size={13} /> Unassign
+                          </button>
+                        )}
                         {num.status !== "assigned" && (
                           <button
                             onClick={() => handleDeleteNumber(num.id, num.phone_number)}
@@ -602,6 +644,55 @@ export default function AdminPhoneNumbersPage() {
                   className="px-5 py-2 rounded-lg bg-violet-600 hover:bg-violet-700 text-white font-bold text-xs uppercase tracking-wider flex items-center gap-1.5"
                 >
                   {submittingEdit ? <RefreshCw className="animate-spin" size={14} /> : "Update Price"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+      {/* Unassign Number Modal */}
+      {unassigningNumber && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl w-full max-w-md p-6 shadow-2xl">
+            <h3 className="text-base font-bold text-[var(--heading)] mb-1 flex items-center gap-2">
+              <UserX className="text-amber-500" size={18} />
+              Unassign Phone Number
+            </h3>
+            <p className="text-xs font-mono text-[var(--heading)] font-bold mb-3">{unassigningNumber.phone_number}</p>
+
+            <div className="p-3 bg-[var(--secondary)] rounded-xl border border-[var(--border)] text-xs mb-4 space-y-1">
+              <p className="text-[var(--muted)]">Assigned Org: <span className="text-[var(--heading)] font-bold">{unassigningNumber.assigned_organization?.name || "Assigned Org"}</span></p>
+              {unassigningNumber.assigned_agent && (
+                <p className="text-[var(--muted)]">Assigned Agent: <span className="text-violet-400 font-bold">{unassigningNumber.assigned_agent.name}</span></p>
+              )}
+            </div>
+
+            <form onSubmit={handleUnassignNumber} className="space-y-4 text-xs">
+              <div>
+                <label className="block text-[10px] uppercase font-bold text-[var(--muted)] mb-1">Custom Apology Message to User (Optional)</label>
+                <textarea
+                  rows={4}
+                  placeholder={`We regret to inform you that your phone number ${unassigningNumber.phone_number} has been unassigned by our team...`}
+                  value={customUnassignMessage}
+                  onChange={(e) => setCustomUnassignMessage(e.target.value)}
+                  className="w-full p-2.5 bg-[var(--background)] border border-[var(--border)] rounded-lg text-[var(--heading)] text-xs outline-none focus:border-amber-500"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-[var(--border)]">
+                <button
+                  type="button"
+                  onClick={() => setUnassigningNumber(null)}
+                  className="px-4 py-2 rounded-lg border border-[var(--border)] text-[var(--muted)] font-bold text-xs"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submittingUnassign}
+                  className="px-5 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white font-bold text-xs uppercase tracking-wider flex items-center gap-1.5 shadow-md shadow-red-600/20"
+                >
+                  {submittingUnassign ? <RefreshCw className="animate-spin" size={14} /> : "Confirm Unassign"}
                 </button>
               </div>
             </form>

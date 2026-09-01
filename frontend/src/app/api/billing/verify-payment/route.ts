@@ -204,12 +204,14 @@ export async function POST(request: Request) {
         if (poolNumber) {
           const renewalDateIso = new Date(Date.now() + 30 * 86400000).toISOString()
 
-          // 1. Mark pool number as assigned
+          // 1. Mark pool number as assigned in phone_number_pool
           await adminClient
             .from('phone_number_pool')
             .update({
               status: 'assigned',
+              is_assigned: true,
               assigned_organization_id: profile.organization_id,
+              assigned_org_id: profile.organization_id,
               renewal_date: renewalDateIso,
               updated_at: new Date().toISOString()
             })
