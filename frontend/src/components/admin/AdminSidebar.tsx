@@ -15,7 +15,8 @@ import {
   ScrollText,
   Sparkles,
   Bell,
-  PhoneCall
+  PhoneCall,
+  Phone
 } from 'lucide-react'
 
 const navItems = [
@@ -32,6 +33,7 @@ const navItems = [
   { name: 'Audit Logs', href: '/admin/audit-logs', icon: ScrollText },
   { name: 'System Config', href: '/admin/system', icon: Sliders },
   { name: 'Telephony', href: '/admin/telephony', icon: PhoneCall },
+  { name: 'Phone Numbers', href: '/admin/phone-numbers', icon: Phone },
   { name: 'Security Settings', href: '/admin/system/security', icon: ShieldCheck },
 ]
 
