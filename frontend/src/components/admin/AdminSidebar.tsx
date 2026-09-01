@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { useState, useEffect } from 'react'
 import { 
   LayoutDashboard, 
   FileText, 
@@ -16,7 +17,9 @@ import {
   Sparkles,
   Bell,
   PhoneCall,
-  Phone
+  Phone,
+  KeyRound,
+  Lock
 } from 'lucide-react'
 
 const navItems = [
@@ -29,16 +32,21 @@ const navItems = [
   { name: 'Support Tickets', href: '/admin/support', icon: LifeBuoy },
   { name: 'Notifications', href: '/admin/notifications', icon: Bell },
   { name: 'Consent Records', href: '/admin/consent-records', icon: ShieldCheck },
-  { name: 'Developer Requests', href: '/admin/developer-requests', icon: ShieldCheck },
+  { name: 'Developer Requests', href: '/admin/developer-requests', icon: KeyRound },
   { name: 'Audit Logs', href: '/admin/audit-logs', icon: ScrollText },
   { name: 'System Config', href: '/admin/system', icon: Sliders },
   { name: 'Telephony', href: '/admin/telephony', icon: PhoneCall },
   { name: 'Phone Numbers', href: '/admin/phone-numbers', icon: Phone },
-  { name: 'Security Settings', href: '/admin/system/security', icon: ShieldCheck },
+  { name: 'Security Settings', href: '/admin/system/security', icon: Lock },
 ]
 
 export function AdminSidebar() {
   const pathname = usePathname()
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   return (
     <aside className="w-64 bg-zinc-950 border-r border-zinc-800/80 min-h-screen flex flex-col justify-between p-4 selection:bg-violet-500/30">
@@ -63,7 +71,7 @@ export function AdminSidebar() {
         <nav className="space-y-1">
           {navItems.map((item) => {
             const Icon = item.icon
-            const isActive = pathname === item.href || (item.href !== '/admin' && pathname?.startsWith(item.href))
+            const isActive = mounted && (pathname === item.href || (item.href !== '/admin' && pathname?.startsWith(item.href)))
 
             return (
               <Link

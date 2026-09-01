@@ -35,9 +35,8 @@ export async function GET(request: Request) {
                     )
                 )
             `)
-            .eq("organization_id", profile.organization_id)
-            .in("status", ["provisioning", "active"])
-            .order("provisioned_at", { ascending: false });
+            .or(`organization_id.eq.${profile.organization_id},assigned_org_id.eq.${profile.organization_id}`)
+            .order("created_at", { ascending: false });
             
         if (dbError) {
             console.error('[API] Database Error:', dbError);
