@@ -12,40 +12,37 @@ function getAdminClient() {
 
 export async function GET(request: Request) {
     try {
-        const { authenticated, profile, error } = await authenticateRequest();
+        const { authenticated, user, profile, error } = await authenticateRequest();
         
-        if (!authenticated || !profile) {
+        if (!authenticated || !user || !profile) {
             return NextResponse.json({ error: error || "Unauthorized" }, { status: 401 });
         }
         
-        if (!profile.organization_id) {
-            return NextResponse.json({ error: "No organization found" }, { status: 400 });
-        }
-
-        const orgId = profile.organization_id;
+        const orgId = profile.organization_id || user.id;
+        const userId = user.id;
         const adminClient = getAdminClient();
 
-        // 1. Fetch assigned pool numbers for this organization (bypassing RLS limitations)
+        // 1. Fetch assigned pool numbers for this organization or user
         const { data: poolAssigned, error: poolError } = await adminClient
             .from("phone_number_pool")
             .select(`
                 *,
                 assigned_agent:agents(id, name)
             `)
-            .or(`assigned_organization_id.eq.${orgId},assigned_org_id.eq.${orgId}`);
+            .or(`assigned_organization_id.eq.${orgId},assigned_organization_id.eq.${userId},assigned_org_id.eq.${orgId},assigned_org_id.eq.${userId}`);
 
         if (poolError) {
             console.error('[API] Database Error in phone_number_pool:', poolError);
         }
 
-        // Active pool numbers assigned to this organization
+        // Filter to only those that are assigned
         const activePoolAssigned = (poolAssigned || []).filter(
             p => p.status?.toLowerCase() === "assigned" || p.is_assigned === true
         );
 
         const numberMap = new Map<string, any>();
 
-        // Add pool numbers assigned to this organization
+        // Add pool numbers assigned to this user/organization
         activePoolAssigned.forEach((poolNum: any) => {
             const rawPhone = poolNum.phone_number || "";
             const cleanKey = rawPhone.replace(/[\s\-\(\)]/g, "");
@@ -71,22 +68,25 @@ export async function GET(request: Request) {
             });
         });
 
-        // 2. Fetch all pool numbers to build master ownership table
+        // 2. Fetch all pool numbers to establish master ownership table
         const { data: allPoolNumbers } = await adminClient
             .from("phone_number_pool")
             .select("phone_number, status, assigned_organization_id, assigned_org_id");
 
-        const poolMasterOwnership = new Map<string, { status: string; ownerOrg: string | null }>();
+        const poolMasterOwnership = new Map<string, { status: string; ownerOrgs: Set<string> }>();
         (allPoolNumbers || []).forEach((p: any) => {
             const cleanKey = (p.phone_number || "").replace(/[\s\-\(\)]/g, "");
-            const ownerOrg = p.assigned_organization_id || p.assigned_org_id || null;
+            const owners = new Set<string>();
+            if (p.assigned_organization_id) owners.add(p.assigned_organization_id);
+            if (p.assigned_org_id) owners.add(p.assigned_org_id);
+
             poolMasterOwnership.set(cleanKey, {
                 status: (p.status || "").toLowerCase(),
-                ownerOrg
+                ownerOrgs: owners
             });
         });
 
-        // 3. Fetch phone_numbers table records for this organization
+        // 3. Fetch phone_numbers table records for this user/organization
         const { data: phone_numbers, error: dbError } = await adminClient
             .from("phone_numbers")
             .select(`
@@ -99,7 +99,7 @@ export async function GET(request: Request) {
                     )
                 )
             `)
-            .or(`organization_id.eq.${orgId},assigned_org_id.eq.${orgId}`)
+            .or(`organization_id.eq.${orgId},organization_id.eq.${userId},assigned_org_id.eq.${orgId},assigned_org_id.eq.${userId}`)
             .order("created_at", { ascending: false });
 
         if (dbError) {
@@ -107,16 +107,16 @@ export async function GET(request: Request) {
         }
 
         // Process phone_numbers table records:
-        // Only include if NOT in pool, OR if pool master ownership belongs to THIS orgId!
+        // Only include if NOT in pool, OR if pool master ownership includes THIS orgId/userId!
         (phone_numbers || []).forEach((num: any) => {
             const rawPhone = num.phone_number || "";
             const cleanKey = rawPhone.replace(/[\s\-\(\)]/g, "");
             
             const master = poolMasterOwnership.get(cleanKey);
             if (master) {
-                // If this number exists in the pool, check master ownership
-                if (master.ownerOrg !== orgId || master.status !== "assigned") {
-                    // Belongs to another org in pool or is unassigned in pool! Skip!
+                const belongsToMe = master.ownerOrgs.has(orgId) || master.ownerOrgs.has(userId);
+                if (!belongsToMe || master.status !== "assigned") {
+                    // Belongs to another user in pool or is unassigned in pool! Skip!
                     return;
                 }
             } else {
