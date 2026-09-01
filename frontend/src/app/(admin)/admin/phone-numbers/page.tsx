@@ -438,27 +438,37 @@ export default function AdminPhoneNumbersPage() {
                         >
                           <Edit2 size={13} />
                         </button>
-                        {num.status === "assigned" && (
-                          <button
-                            onClick={() => {
-                              setUnassigningNumber(num);
-                              setCustomUnassignMessage("");
-                            }}
-                            className="p-1.5 rounded-lg border border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 transition-all flex items-center gap-1 text-[10px] font-bold uppercase"
-                            title="Unassign Number from User"
-                          >
-                            <UserX size={13} /> Unassign
-                          </button>
-                        )}
-                        {num.status !== "assigned" && (
-                          <button
-                            onClick={() => handleDeleteNumber(num.id, num.phone_number)}
-                            className="p-1.5 rounded-lg border border-red-500/20 bg-red-500/10 hover:bg-red-500/20 text-red-400 transition-all"
-                            title="Remove from Pool"
-                          >
-                            <Trash2 size={13} />
-                          </button>
-                        )}
+                        {(() => {
+                          const isAssigned = 
+                            num.status?.toLowerCase() === "assigned" || 
+                            num.is_assigned === true || 
+                            Boolean(num.assigned_organization || num.assigned_organization_id || num.assigned_org_id);
+                          
+                          if (isAssigned) {
+                            return (
+                              <button
+                                onClick={() => {
+                                  setUnassigningNumber(num);
+                                  setCustomUnassignMessage("");
+                                }}
+                                className="px-2 py-1.5 rounded-lg border border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 transition-all flex items-center gap-1 text-[10px] font-bold uppercase shadow-sm"
+                                title="Unassign Number from User"
+                              >
+                                <UserX size={13} /> Unassign
+                              </button>
+                            );
+                          } else {
+                            return (
+                              <button
+                                onClick={() => handleDeleteNumber(num.id, num.phone_number)}
+                                className="p-1.5 rounded-lg border border-red-500/20 bg-red-500/10 hover:bg-red-500/20 text-red-400 transition-all"
+                                title="Remove from Pool"
+                              >
+                                <Trash2 size={13} />
+                              </button>
+                            );
+                          }
+                        })()}
                       </div>
                     </td>
                   </tr>

@@ -41,8 +41,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Selected phone number not found" }, { status: 404 });
     }
 
-    if (poolNumber.status !== "available") {
-      return NextResponse.json({ error: "This phone number is no longer available" }, { status: 400 });
+    if (poolNumber.status?.toLowerCase() !== "available" || poolNumber.is_assigned || poolNumber.assigned_organization_id) {
+      return NextResponse.json({ error: "This phone number is already assigned to another organization" }, { status: 409 });
     }
 
     // 2. Load system payment configuration for Razorpay
