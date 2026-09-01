@@ -113,51 +113,37 @@ export async function POST(request: Request) {
         // ── POOL ALLOCATION STRATEGY ──────────────────────────────────────────
         // First try to resolve and assign the number from our database pre-purchased pool
         if (phone_number) {
-            const { data: poolNumber } = await supabase
-                .from('phone_number_pool')
+            // Initialize Admin Client (using supabase service role key) to bypass RLS to update pool
+            const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+            const { createClient: createSupabaseClient } = await import('@supabase/supabase-js');
+            const supabaseAdmin = createSupabaseClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, serviceRoleKey!);
+
+            const { data: poolNumber } = await supabaseAdmin
+                .from('phone_numbers')
                 .select('*')
                 .eq('phone_number', phone_number)
-                .eq('status', 'available')
+                .eq('is_assigned', false)
                 .maybeSingle();
 
             if (poolNumber) {
                 console.log(`[Pool Provision] Allocating pre-purchased number ${phone_number} from database pool`);
                 
-                // Initialize Admin Client (using supabase service role key) to bypass RLS to update pool
-                const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-                const { createClient: createSupabaseClient } = await import('@supabase/supabase-js');
-                const supabaseAdmin = createSupabaseClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, serviceRoleKey!);
-
-                // Update pool status
-                await supabaseAdmin
-                    .from('phone_number_pool')
-                    .update({
-                        status: 'assigned',
-                        assigned_organization_id: profile.organization_id
-                    })
-                    .eq('id', poolNumber.id);
-
-                // Insert into phone_numbers table
-                const { data: phoneRow, error: phoneInsertError } = await supabaseAdmin
+                // Update pool status in phone_numbers directly
+                const { data: phoneRow, error: phoneUpdateError } = await supabaseAdmin
                     .from('phone_numbers')
-                    .insert({
-                        organization_id: profile.organization_id,
-                        provider: 'twilio',
-                        phone_number: poolNumber.phone_number,
-                        did_type: 'mobile',
+                    .update({
                         status: 'active',
-                        monthly_cost_paisa: poolNumber.monthly_cost_paisa,
-                        retail_price_paisa: poolNumber.retail_price_paisa,
-                        metadata: {
-                            pool_id: poolNumber.id,
-                            allocated_via: 'pool_provision'
-                        }
+                        is_assigned: true,
+                        assigned_org_id: profile.organization_id,
+                        organization_id: profile.organization_id,
+                        updated_at: new Date().toISOString()
                     })
+                    .eq('id', poolNumber.id)
                     .select()
                     .single();
 
-                if (!phoneInsertError && phoneRow) {
-                    await supabase.from("activity_log").insert({
+                if (!phoneUpdateError && phoneRow) {
+                    await supabaseAdmin.from("activity_log").insert({
                         user_id: user.id,
                         organization_id: profile.organization_id,
                         activity_type: 'number_provisioned',

@@ -21,6 +21,7 @@ CREATE INDEX IF NOT EXISTS idx_phone_number_pool_assigned_org ON public.phone_nu
 ALTER TABLE public.phone_number_pool ENABLE ROW LEVEL SECURITY;
 
 -- 1. Anyone authenticated can read available numbers
+DROP POLICY IF EXISTS "Users can view available or assigned numbers" ON public.phone_number_pool;
 CREATE POLICY "Users can view available or assigned numbers" ON public.phone_number_pool
     FOR SELECT TO authenticated
     USING (status = 'available' OR assigned_organization_id IN (
@@ -28,6 +29,7 @@ CREATE POLICY "Users can view available or assigned numbers" ON public.phone_num
     ));
 
 -- 2. Admins/Super Admins have full access
+DROP POLICY IF EXISTS "Admins have full access to phone_number_pool" ON public.phone_number_pool;
 CREATE POLICY "Admins have full access to phone_number_pool" ON public.phone_number_pool
     FOR ALL TO authenticated
     USING (EXISTS (

@@ -1,5 +1,14 @@
 import { NextResponse } from "next/server";
 import { authenticateRequest } from "@/lib/api-helpers";
+import { createClient as createSupabaseClient } from "@supabase/supabase-js";
+
+function getAdminClient() {
+  return createSupabaseClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  );
+}
 
 export async function POST(
     request: Request,
@@ -10,7 +19,7 @@ export async function POST(
         const { authenticated, user, profile, error, supabase } = await authenticateRequest();
         
         if (!authenticated || !user) {
-            return NextResponse.json({ error }, { status: 401 });
+            return NextResponse.json({ error: error || "Unauthorized" }, { status: 401 });
         }
         
         if (!profile?.organization_id) {
@@ -24,18 +33,37 @@ export async function POST(
             return NextResponse.json({ error: "agent_id is required" }, { status: 400 });
         }
 
-        // Verify phone number ownership
-        const { data: phone_number, error: phoneError } = await supabase
-            .from("phone_numbers")
-            .select("organization_id, phone_number")
-            .eq("id", phone_number_id)
-            .single();
+        const orgId = profile.organization_id;
+        const adminClient = getAdminClient();
 
-        if (phoneError || !phone_number) {
+        let phoneNumberRecord: {
+            id: string;
+            phone_number: string;
+            provider: string;
+            organization_id?: string;
+            assigned_org_id?: string;
+        } | null = null;
+
+        // Try finding in phone_numbers table
+        const { data: phoneRow } = await supabase
+            .from("phone_numbers")
+            .select("id, organization_id, assigned_org_id, phone_number, provider")
+            .eq("id", phone_number_id)
+            .maybeSingle();
+
+        if (phoneRow) {
+            phoneNumberRecord = phoneRow;
+        }
+
+        if (!phoneNumberRecord) {
             return NextResponse.json({ error: "Phone number not found" }, { status: 404 });
         }
 
-        if (phone_number.organization_id !== profile.organization_id) {
+        const ownsNumber = 
+            phoneNumberRecord.organization_id === orgId || 
+            phoneNumberRecord.assigned_org_id === orgId;
+
+        if (!ownsNumber) {
             return NextResponse.json({ error: "Forbidden: You do not own this phone number" }, { status: 403 });
         }
 
@@ -50,17 +78,19 @@ export async function POST(
             return NextResponse.json({ error: "Agent not found" }, { status: 404 });
         }
 
-        if (agent.organization_id !== profile.organization_id) {
+        if (agent.organization_id !== orgId) {
             return NextResponse.json({ error: "Forbidden: You do not own this agent" }, { status: 403 });
         }
+
+        const targetPhoneId = phoneNumberRecord.id;
 
         // Check if already assigned
         const { data: existingAssignment } = await supabase
             .from("agent_phone_numbers")
             .select("phone_number_id")
-            .eq("phone_number_id", phone_number_id)
+            .eq("phone_number_id", targetPhoneId)
             .eq("agent_id", agent_id)
-            .single();
+            .maybeSingle();
 
         if (is_primary) {
             // Unset primary for other numbers of this agent
@@ -72,63 +102,52 @@ export async function POST(
 
         if (existingAssignment) {
             if (is_primary) {
-                // Update existing assignment to be primary
-                const { error: updateError } = await supabase
+                await supabase
                     .from("agent_phone_numbers")
                     .update({ is_primary: true })
                     .eq("agent_id", agent_id)
-                    .eq("phone_number_id", phone_number_id);
-                
-                if (updateError) {
-                    return NextResponse.json({ error: "Database error during assignment update" }, { status: 500 });
-                }
-            } else {
-                return NextResponse.json({ error: "Number already assigned to this agent" }, { status: 409 });
+                    .eq("phone_number_id", targetPhoneId);
             }
         } else {
-            // Insert assignment
-            const { error: insertError } = await supabase
+            await adminClient
                 .from("agent_phone_numbers")
                 .insert({
                     agent_id,
-                    phone_number_id,
+                    phone_number_id: targetPhoneId,
                     is_primary
                 });
-
-            if (insertError) {
-                console.error('[API] Error assigning number:', insertError);
-                return NextResponse.json({ error: "Database error during assignment" }, { status: 500 });
-            }
         }
+
+        // Update assigned_agent_id on phone_numbers table
+        await adminClient
+            .from("phone_numbers")
+            .update({ assigned_agent_id: agent_id, is_assigned: true })
+            .eq("id", targetPhoneId);
 
         // Keep agents table in sync if this is primary number
         if (is_primary) {
-            const { error: agentUpdateError } = await supabase
+            await adminClient
                 .from("agents")
                 .update({
-                    phone_number: phone_number.phone_number,
-                    telephony_provider: phone_number.provider || "twilio"
+                    phone_number: phoneNumberRecord.phone_number,
+                    telephony_provider: phoneNumberRecord.provider || "twilio"
                 })
                 .eq("id", agent_id);
-                
-            if (agentUpdateError) {
-                console.error('[API] Error updating agent record:', agentUpdateError);
-            }
         }
 
         // Write to activity_log
-        await supabase.from("activity_log").insert({
+        await adminClient.from("activity_log").insert({
             user_id: user.id,
-            organization_id: profile.organization_id,
+            organization_id: orgId,
             activity_type: 'number_assigned',
             title: 'Phone Number Assigned',
-            description: `Assigned ${phone_number.phone_number} to agent ${agent.name}`
+            description: `Assigned ${phoneNumberRecord.phone_number} to agent ${agent.name}`
         });
 
         return NextResponse.json({
             success: true,
             data: {
-                assignment: { agent_id, phone_number_id, is_primary }
+                assignment: { agent_id, phone_number_id: targetPhoneId, is_primary }
             }
         });
 

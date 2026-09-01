@@ -3,7 +3,7 @@ import { createClient } from '@/utils/supabase/server'
 import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 
 interface CartItem {
-  type: 'subscription' | 'phone_number' | 'bundle'
+  type: 'subscription' | 'phone_number' | 'bundle' | 'number_pool' | 'number_renewal'
   key: string // 'starter', 'professional', bundle UUID, or 'phone_number'
   quantity: number
 }

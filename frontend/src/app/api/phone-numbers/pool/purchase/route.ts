@@ -22,12 +22,19 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Missing poolNumberId or agentId.' }, { status: 400 })
     }
 
-    // 1. Fetch available pool number
-    const { data: poolNumber, error: poolError } = await supabase
-      .from('phone_number_pool')
+    // Initialize Service Role Admin Client to bypass RLS policies
+    const supabaseAdmin = createSupabaseClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      { auth: { autoRefreshToken: false, persistSession: false } }
+    )
+
+    // 1. Fetch available pool number from phone_numbers table
+    const { data: poolNumber, error: poolError } = await supabaseAdmin
+      .from('phone_numbers')
       .select('*')
       .eq('id', poolNumberId)
-      .eq('status', 'available')
+      .eq('is_assigned', false)
       .single()
 
     if (poolError || !poolNumber) {
@@ -46,63 +53,40 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Target agent not found in your organization.' }, { status: 404 })
     }
 
-    // Initialize Service Role Admin Client to bypass RLS policies
-    const supabaseAdmin = createSupabaseClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
-      { auth: { autoRefreshToken: false, persistSession: false } }
-    )
-
     // 3. Mock Razorpay transaction
     const mockTransactionId = `pay_mock_${Math.random().toString(36).substring(2, 12)}`
     console.log(`[Razorpay Mock] Success. TxId: ${mockTransactionId}`)
 
-    // 4. Update the number status in phone_number_pool
-    const { error: poolUpdateError } = await supabaseAdmin
-      .from('phone_number_pool')
+    // 4. Update the number status in phone_numbers
+    const { data: phoneRow, error: phoneUpdateError } = await supabaseAdmin
+      .from('phone_numbers')
       .update({
-        status: 'assigned',
-        assigned_organization_id: profile.organization_id
+        is_assigned: true,
+        status: 'active',
+        assigned_org_id: profile.organization_id,
+        organization_id: profile.organization_id,
+        assigned_agent_id: agentId,
+        metadata: {
+          transaction_id: mockTransactionId
+        },
+        updated_at: new Date().toISOString()
       })
       .eq('id', poolNumberId)
-
-    if (poolUpdateError) {
-      return NextResponse.json({ error: `Pool reservation failed: ${poolUpdateError.message}` }, { status: 500 })
-    }
-
-    // 5. Insert number into phone_numbers table
-    const { data: phoneRow, error: phoneInsertError } = await supabaseAdmin
-      .from('phone_numbers')
-      .insert({
-        organization_id: profile.organization_id,
-        provider: 'twilio',
-        phone_number: poolNumber.phone_number,
-        did_type: 'mobile',
-        status: 'active',
-        monthly_cost_paisa: poolNumber.monthly_cost_paisa,
-        retail_price_paisa: poolNumber.retail_price_paisa,
-        metadata: {
-          transaction_id: mockTransactionId,
-          pool_id: poolNumber.id
-        }
-      })
       .select()
       .single()
 
-    if (phoneInsertError || !phoneRow) {
-      console.error('[Pool Purchase] phone_numbers insert error:', phoneInsertError)
-      // Rollback pool allocation
-      await supabaseAdmin.from('phone_number_pool').update({ status: 'available', assigned_organization_id: null }).eq('id', poolNumberId)
+    if (phoneUpdateError || !phoneRow) {
+      console.error('[Pool Purchase] phone_numbers update error:', phoneUpdateError)
       return NextResponse.json({ error: 'Failed to provision number to organization inventory.' }, { status: 500 })
     }
 
-    // 6. Delete any existing mappings for this agent
+    // 5. Delete any existing mappings for this agent
     await supabaseAdmin
       .from('agent_phone_numbers')
       .delete()
       .eq('agent_id', agentId)
 
-    // 7. Insert into agent_phone_numbers
+    // 6. Insert into agent_phone_numbers
     const { error: mappingError } = await supabaseAdmin
       .from('agent_phone_numbers')
       .insert({
@@ -115,6 +99,15 @@ export async function POST(request: Request) {
       console.error('[Pool Purchase] agent_phone_numbers mapping error:', mappingError)
       return NextResponse.json({ error: 'Failed to bind phone number to selected agent.' }, { status: 500 })
     }
+
+    // Keep agents table in sync
+    await supabaseAdmin
+      .from('agents')
+      .update({
+        phone_number: phoneRow.phone_number,
+        telephony_provider: phoneRow.provider || 'voicelink'
+      })
+      .eq('id', agentId)
 
     // Log Activity
     try {

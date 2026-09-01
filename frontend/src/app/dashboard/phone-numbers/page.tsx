@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { 
   Phone, Zap, ChevronDown, ChevronUp, Globe, MapPin, 
   Smartphone, CreditCard, Check, Copy, HelpCircle, AlertCircle,
-  Search, RefreshCw, SlidersHorizontal, XCircle, Info, PhoneCall
+  Search, RefreshCw, SlidersHorizontal, XCircle, Info, PhoneCall, ShoppingBag
 } from "lucide-react";
 import { NumberCard } from "@/src/components/phone-numbers/NumberCard";
 import { ProvisionNumberModal } from "@/src/components/phone-numbers/ProvisionNumberModal";
@@ -45,41 +45,92 @@ export default function PhoneNumbersPage() {
 
   // Purchased Numbers State
   const [numbers, setNumbers] = useState<any[]>([]);
-  const [pricingInfo, setPricingInfo] = useState<any>(null);
   const [purchasedLoading, setPurchasedLoading] = useState(true);
   const [purchasedError, setPurchasedError] = useState("");
   const [maxLimit, setMaxLimit] = useState(5);
-  
-  // Selection/Search State
-  const userCountry = (profile as any)?.country || "US";
-  const [country, setCountry] = useState(userCountry);
-  const [provider, setProvider] = useState(userCountry === 'IN' ? 'voicelink' : 'twilio');
-  const [areaCode, setAreaCode] = useState('');
-  const [city, setCity] = useState('');
-  const [didType, setDidType] = useState('local');
-  
-  // Available Numbers Results State
-  const [availableNumbers, setAvailableNumbers] = useState<any[]>([]);
-  const [searchLoading, setSearchLoading] = useState(false);
-  const [hasSearched, setHasSearched] = useState(false);
-  const [visibleCount, setVisibleCount] = useState(6);
-  
-  // Provisioning state
-  const [provisioningNum, setProvisioningNum] = useState<string | null>(null);
-  
+
+  // Available Pool Numbers State
+  const [poolNumbers, setPoolNumbers] = useState<any[]>([]);
+  const [poolLoading, setPoolLoading] = useState(true);
+  const [buyingId, setBuyingId] = useState<string | null>(null);
+  const [renewingId, setRenewingId] = useState<string | null>(null);
+
   // Modals state
   const [isProvisionModalOpen, setIsProvisionModalOpen] = useState(false);
   const [manageNumberId, setManageNumberId] = useState<string | null>(null);
 
-  // Sync country and provider when profile loads
-  useEffect(() => {
-    if (profile) {
-      const cntry = (profile as any).country || "US";
-      setCountry(cntry);
-      setProvider(cntry === 'IN' ? 'voicelink' : 'twilio');
-      setDidType(cntry === 'IN' ? 'mobile' : 'local');
+  // Pool Bidding State
+  const [poolCategoryFilter, setPoolCategoryFilter] = useState<"all" | "available_now" | "bidding" | "assigned_bidding">("all");
+  const [bidModalNumber, setBidModalNumber] = useState<any>(null);
+  const [bidAmountRupees, setBidAmountRupees] = useState("");
+  const [submittingBid, setSubmittingBid] = useState(false);
+  const [claimingBidId, setClaimingBidId] = useState<string | null>(null);
+
+  const handleOpenBidModal = (num: any) => {
+    setBidModalNumber(num);
+    const minRequiredPaisa = num.current_bid_paisa 
+      ? num.current_bid_paisa + 100 
+      : (num.minimum_bid_paisa || 29900);
+    setBidAmountRupees((minRequiredPaisa / 100).toString());
+  };
+
+  const handlePlaceBid = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!bidModalNumber) return;
+
+    try {
+      setSubmittingBid(true);
+      const res = await fetch(`/api/phone-numbers/${bidModalNumber.id}/bid`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bid_amount_rupees: bidAmountRupees })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to place bid");
+
+      toast.success(data.message || "Bid placed successfully!");
+      setBidModalNumber(null);
+      setBidAmountRupees("");
+      fetchPoolNumbers();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to place bid");
+    } finally {
+      setSubmittingBid(false);
     }
-  }, [profile]);
+  };
+
+  const handleClaimBid = async (num: any) => {
+    try {
+      setClaimingBidId(num.id);
+      const res = await fetch(`/api/phone-numbers/${num.id}/claim-bid`, {
+        method: "POST"
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to claim number");
+
+      toast.success(data.message || "Number claimed and assigned successfully!");
+      fetchPurchasedNumbers();
+      fetchPoolNumbers();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to claim number");
+    } finally {
+      setClaimingBidId(null);
+    }
+  };
+
+  const loadRazorpayScript = () => {
+    return new Promise((resolve) => {
+      if ((window as any).Razorpay) {
+        resolve(true);
+        return;
+      }
+      const script = document.createElement("script");
+      script.src = "https://checkout.razorpay.com/v1/checkout.js";
+      script.onload = () => resolve(true);
+      script.onerror = () => resolve(false);
+      document.body.appendChild(script);
+    });
+  };
 
   const fetchPurchasedNumbers = async () => {
     try {
@@ -100,131 +151,168 @@ export default function PhoneNumbersPage() {
     }
   };
 
-  const fetchPricing = async () => {
+  const fetchPoolNumbers = async () => {
     try {
-      const res = await fetch("/api/phone-numbers/pricing");
+      setPoolLoading(true);
+      const res = await fetch("/api/phone-numbers/pool");
       const data = await res.json();
-      if (res.ok) {
-        setPricingInfo(data.data);
+      if (res.ok && data.success) {
+        setPoolNumbers(data.data || []);
       }
     } catch (err) {
-      console.error("Failed to load pricing info", err);
+      console.error("Failed to load pool numbers", err);
+    } finally {
+      setPoolLoading(false);
     }
   };
 
   useEffect(() => {
     fetchPurchasedNumbers();
-    fetchPricing();
-
-    // Trigger sync in the background without blocking the initial UI load
-    fetch("/api/phone-numbers/sync", { method: "POST" })
-      .then(res => {
-        if (res.ok) return res.json();
-        throw new Error("Sync returned non-200");
-      })
-      .then(data => {
-        if (data.success) {
-          // Silently refresh numbers list in case sync changed something
-          fetchPurchasedNumbers();
-        }
-      })
-      .catch(err => {
-        console.error("Background auto-sync failed", err);
-      });
+    fetchPoolNumbers();
   }, []);
 
-  const handleCountryChange = (newCountry: string) => {
-    setCountry(newCountry);
-    setProvider(newCountry === 'IN' ? 'voicelink' : 'twilio');
-    setDidType(newCountry === 'IN' ? 'mobile' : 'local');
-    setAreaCode('');
-    setCity('');
-    setAvailableNumbers([]);
-    setHasSearched(false);
-    setVisibleCount(6);
-  };
-
-  const handleSearchAvailable = async () => {
-    setSearchLoading(true);
-    setHasSearched(true);
-    setVisibleCount(6);
-    
-    try {
-      const params = new URLSearchParams({
-        provider,
-        did_type: didType,
-        city: city || ''
-      });
-      if (areaCode) {
-        // Strip zeros for US area code
-        const cleanArea = provider === 'twilio' ? areaCode.replace(/^0+/, '') : areaCode;
-        params.append('area_code', cleanArea);
-      }
-      
-      const res = await fetch(`/api/phone-numbers/available?${params.toString()}`);
-      const data = await res.json();
-      
-      if (!res.ok) throw new Error(data.error || "Failed to search numbers");
-      
-      setAvailableNumbers(data.data?.available_numbers || []);
-    } catch (err: any) {
-      toast.error(err.message || "Search failed");
-      setAvailableNumbers([]);
-    } finally {
-      setSearchLoading(false);
-    }
-  };
-
-  const handleBuyNumber = async (num: any) => {
+  const handleBuyPoolNumber = async (poolNum: any) => {
     const isAtLimit = Array.isArray(numbers) ? numbers.length >= maxLimit : false;
     if (isAtLimit) {
       toast.error(`You have reached the maximum limit of ${maxLimit} numbers.`);
       return;
     }
-    
-    setProvisioningNum(num.phone_number);
+
     try {
-      const res = await fetch('/api/phone-numbers/provision', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          phone_number: num.phone_number,
-          did_type: num.did_type,
-          provider: num.provider,
-          area_code: num.area_code,
-          city: num.city
-        })
+      setBuyingId(poolNum.id);
+      const res = await fetch("/api/phone-numbers/purchase", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ number_id: poolNum.id })
       });
-      
+
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to purchase number");
-      
-      toast.success('Number purchased successfully!');
-      
-      // Remove from available numbers list
-      setAvailableNumbers(prev => prev.filter(n => n.phone_number !== num.phone_number));
-      
-      await fetchPurchasedNumbers();
-    } catch (err: any) {
-      const message = err.message || "Purchase failed";
-      if (message.includes("Trial accounts are limited") || message.includes("limited to one")) {
-        toast.error(message, {
-          action: {
-            label: "View Purchased",
-            onClick: () => {
-              const element = document.getElementById("purchased-numbers-section");
-              if (element) {
-                element.scrollIntoView({ behavior: "smooth" });
-              }
-            }
-          },
-          duration: 10000
-        });
-      } else {
-        toast.error(message);
+      if (!res.ok) throw new Error(data.error || "Failed to initialize purchase");
+
+      const scriptLoaded = await loadRazorpayScript();
+      if (!scriptLoaded) {
+        toast.error("Failed to load payment gateway SDK");
+        return;
       }
+
+      const options = {
+        key: data.data.key,
+        amount: data.data.amount,
+        currency: data.data.currency,
+        name: "Trinetra AI",
+        description: `Purchase Phone Number ${data.data.phone_number}`,
+        order_id: data.data.order_id,
+        prefill: {
+          name: data.data.user_name,
+          email: data.data.user_email,
+        },
+        theme: { color: "#7c3aed" },
+        handler: async function (response: any) {
+          try {
+            const verifyRes = await fetch("/api/billing/verify-payment", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_signature: response.razorpay_signature,
+                items: [{
+                  type: "number_pool",
+                  key: data.data.number_id,
+                  quantity: 1
+                }]
+              })
+            });
+
+            const verifyData = await verifyRes.json();
+            if (verifyRes.ok) {
+              toast.success("Phone number purchased successfully!");
+              fetchPurchasedNumbers();
+              fetchPoolNumbers();
+            } else {
+              toast.error(verifyData.error || "Payment verification failed");
+            }
+          } catch (err: any) {
+            toast.error(err.message || "Payment verification failed");
+          }
+        }
+      };
+
+      const rzp = new (window as any).Razorpay(options);
+      rzp.open();
+
+    } catch (err: any) {
+      toast.error(err.message || "Purchase failed");
     } finally {
-      setProvisioningNum(null);
+      setBuyingId(null);
+    }
+  };
+
+  const handleRenewNumber = async (phoneId: string) => {
+    try {
+      setRenewingId(phoneId);
+      const res = await fetch(`/api/phone-numbers/${phoneId}/renew`, {
+        method: "POST"
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to initialize renewal");
+
+      const scriptLoaded = await loadRazorpayScript();
+      if (!scriptLoaded) {
+        toast.error("Failed to load payment gateway SDK");
+        return;
+      }
+
+      const options = {
+        key: data.data.key,
+        amount: data.data.amount,
+        currency: data.data.currency,
+        name: "Trinetra AI",
+        description: `30-Day Renewal for ${data.data.phone_number}`,
+        order_id: data.data.order_id,
+        prefill: {
+          name: data.data.user_name,
+          email: data.data.user_email,
+        },
+        theme: { color: "#7c3aed" },
+        handler: async function (response: any) {
+          try {
+            const verifyRes = await fetch("/api/billing/verify-payment", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_signature: response.razorpay_signature,
+                items: [{
+                  type: "number_renewal",
+                  key: data.data.number_id,
+                  quantity: 1
+                }]
+              })
+            });
+
+            const verifyData = await verifyRes.json();
+            if (verifyRes.ok) {
+              toast.success("Phone number renewed for 30 days!");
+              fetchPurchasedNumbers();
+            } else {
+              toast.error(verifyData.error || "Payment verification failed");
+            }
+          } catch (err: any) {
+            toast.error(err.message || "Renewal verification failed");
+          }
+        }
+      };
+
+      const rzp = new (window as any).Razorpay(options);
+      rzp.open();
+
+    } catch (err: any) {
+      toast.error(err.message || "Renewal failed");
+    } finally {
+      setRenewingId(null);
     }
   };
 
@@ -234,10 +322,6 @@ export default function PhoneNumbersPage() {
 
   const selectedNumber = Array.isArray(numbers) ? numbers.find((n: any) => n.id === manageNumberId) : undefined;
   const isAtLimit = Array.isArray(numbers) ? numbers.length >= maxLimit : false;
-
-  const popularAreaCodes = country === 'US' 
-    ? ['212', '310', '312', '415', '617']
-    : ['022', '011', '080', '044', '033'];
 
   if (!profile) {
     return (
@@ -264,10 +348,10 @@ export default function PhoneNumbersPage() {
       {/* Header Info Banner */}
       <div className="mb-6 p-4 rounded-xl bg-gradient-to-r from-violet-600/10 to-indigo-600/10 border border-violet-500/20 flex items-start gap-3">
         <Info className="w-5 h-5 text-violet-500 shrink-0 mt-0.5" />
-        <div className="text-[family-name:var(--font-merriweather)]">
-          <h4 className="text-sm font-bold text-[var(--heading)] font-[family-name:var(--font-montserrat)]">Telephony Infrastructure Dashboard</h4>
+        <div>
+          <h4 className="text-sm font-bold text-[var(--heading)]">Telephony Infrastructure Dashboard</h4>
           <p className="text-xs text-[var(--muted)] mt-1 leading-relaxed">
-            Acquire phone numbers to connect with your virtual AI assistants. We support domestic Indian lines via **VoiceLink** and US/UK international connections via **Twilio**.
+            Acquire phone numbers to connect with your virtual AI assistants. Select from pre-purchased pool lines or request custom line provisioning.
           </p>
         </div>
       </div>
@@ -275,7 +359,7 @@ export default function PhoneNumbersPage() {
       {/* Header Section */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8">
         <div>
-          <h1 className="font-playfair text-3xl font-bold text-[var(--heading)] font-[family-name:var(--font-playfair)]">Phone Numbers</h1>
+          <h1 className="font-playfair text-3xl font-bold text-[var(--heading)]">Phone Numbers</h1>
           <p className="text-sm text-[var(--muted)] mt-1 font-medium">
             Acquire and manage dedicated channels for customer interactions.
           </p>
@@ -298,274 +382,138 @@ export default function PhoneNumbersPage() {
         </div>
       </div>
 
-      {/* Search and Filters Bar */}
-      <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-6 mb-8 shadow-sm">
-        <h3 className="text-sm font-bold text-[var(--heading)] uppercase tracking-wider mb-4 flex items-center gap-2">
-          <SlidersHorizontal size={14} className="text-violet-500" />
-          Find New Phone Numbers
-        </h3>
-        
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-          {/* Country */}
-          <div className="flex flex-col gap-1.5">
-            <label className="text-[10px] uppercase tracking-wider font-bold text-[var(--muted)]">Country</label>
-            <select
-              value={country}
-              onChange={(e) => handleCountryChange(e.target.value)}
-              className="w-full rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--heading)] outline-none focus:border-violet-500 transition-colors"
-            >
-              <option value="US">🇺🇸 United States</option>
-              <option value="IN">🇮🇳 India</option>
-            </select>
-          </div>
+      {/* SECTION 1: AVAILABLE NUMBERS FROM SHARED POOL */}
+      <div className="mb-12">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-[var(--border)] pb-3 mb-6 gap-3">
+          <h2 className="font-playfair text-xl font-bold text-[var(--heading)] flex items-center gap-2">
+            <ShoppingBag className="w-5 h-5 text-violet-400" />
+            Pool Numbers & Bidding Inventory ({poolNumbers.length})
+          </h2>
 
-          {/* Provider */}
-          <div className="flex flex-col gap-1.5">
-            <label className="text-[10px] uppercase tracking-wider font-bold text-[var(--muted)]">Provider</label>
-            <select
-              value={provider}
-              onChange={(e) => setProvider(e.target.value)}
-              className="w-full rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--heading)] outline-none focus:border-violet-500 transition-colors"
-            >
-              {country === 'IN' ? (
-                <option value="voicelink">VoiceLink (IN)</option>
-              ) : (
-                <>
-                  <option value="twilio">Twilio (US/Global)</option>
-                  <option value="simulated">Simulated (Sandbox)</option>
-                </>
-              )}
-            </select>
-          </div>
-
-          {/* Area Code */}
-          <div className="flex flex-col gap-1.5">
-            <label className="text-[10px] uppercase tracking-wider font-bold text-[var(--muted)]">Area Code</label>
-            <div className="relative">
-              <input
-                type="text"
-                placeholder={provider === 'voicelink' ? 'e.g. 022' : 'e.g. 212'}
-                value={areaCode}
-                onChange={(e) => setAreaCode(e.target.value)}
-                maxLength={4}
-                className="w-full rounded-lg border border-[var(--border)] bg-[var(--background)] pl-8 pr-3 py-2 text-sm text-[var(--heading)] outline-none focus:border-violet-500 transition-colors"
-              />
-              <Search className="absolute left-2.5 top-2.5 w-4 h-4 text-[var(--muted)]" />
-            </div>
-          </div>
-
-          {/* City */}
-          <div className="flex flex-col gap-1.5">
-            <label className="text-[10px] uppercase tracking-wider font-bold text-[var(--muted)]">City</label>
-            <input
-              type="text"
-              placeholder="e.g. Chicago"
-              value={city}
-              onChange={(e) => setCity(e.target.value)}
-              className="w-full rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--heading)] outline-none focus:border-violet-500 transition-colors"
-            />
-          </div>
-
-          {/* DID Type */}
-          <div className="flex flex-col gap-1.5">
-            <label className="text-[10px] uppercase tracking-wider font-bold text-[var(--muted)]">Number Type</label>
-            <select
-              value={didType}
-              onChange={(e) => setDidType(e.target.value)}
-              className="w-full rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--heading)] outline-none focus:border-violet-500 transition-colors"
-            >
-              {provider === 'voicelink' ? (
-                <>
-                  <option value="mobile">Mobile</option>
-                  <option value="landline">Landline</option>
-                  <option value="tollfree">Toll-Free</option>
-                </>
-              ) : (
-                <>
-                  <option value="local">Local</option>
-                  <option value="mobile">Mobile</option>
-                </>
-              )}
-            </select>
-          </div>
-        </div>
-
-        {/* Action Button & Suggestions */}
-        <div className="mt-5 pt-4 border-t border-[var(--border)] flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-[10px] font-bold text-[var(--muted)] uppercase tracking-wider">Suggestions:</span>
-            {popularAreaCodes.map((code) => (
-              <button
-                key={code}
-                type="button"
-                onClick={() => setAreaCode(code)}
-                className="px-2.5 py-1 text-xs rounded bg-[var(--secondary)] border border-[var(--border)] text-[var(--heading)] hover:border-violet-500 transition-all font-semibold"
-              >
-                {code}
-              </button>
-            ))}
-          </div>
-          
-          <button
-            onClick={handleSearchAvailable}
-            disabled={searchLoading}
-            className="px-6 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-700 text-white font-bold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2"
-          >
-            {searchLoading ? (
-              <>
-                <RefreshCw size={14} className="animate-spin" /> Searching...
-              </>
-            ) : (
-              <>
-                <Search size={14} /> Search Available Numbers
-              </>
-            )}
-          </button>
-        </div>
-      </div>
-
-      {/* Available Numbers Section */}
-      {hasSearched && (
-        <div className="mb-10">
-          <div className="flex items-center justify-between border-b border-[var(--border)] pb-3 mb-6">
-            <h2 className="font-playfair text-xl font-bold text-[var(--heading)] flex items-center gap-2 font-[family-name:var(--font-playfair)]">
-              Available Numbers ({availableNumbers.length} found)
-            </h2>
+          <div className="flex items-center gap-2 flex-wrap">
             <button
-              onClick={handleSearchAvailable}
-              className="text-xs font-bold text-violet-500 hover:underline flex items-center gap-1 cursor-pointer font-[family-name:var(--font-montserrat)]"
+              onClick={() => setPoolCategoryFilter("all")}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                poolCategoryFilter === "all"
+                  ? "bg-violet-600 text-white shadow-md shadow-violet-600/20"
+                  : "bg-[var(--secondary)] text-[var(--muted)] hover:text-[var(--heading)]"
+              }`}
             >
-              <RefreshCw size={12} /> Refresh List
+              All ({poolNumbers.length})
+            </button>
+            <button
+              onClick={() => setPoolCategoryFilter("available_now")}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                poolCategoryFilter === "available_now"
+                  ? "bg-violet-600 text-white shadow-md shadow-violet-600/20"
+                  : "bg-[var(--secondary)] text-[var(--muted)] hover:text-[var(--heading)]"
+              }`}
+            >
+              Available Now
+            </button>
+            <button
+              onClick={() => setPoolCategoryFilter("bidding")}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                poolCategoryFilter === "bidding"
+                  ? "bg-emerald-600 text-white shadow-md shadow-emerald-600/20"
+                  : "bg-[var(--secondary)] text-[var(--muted)] hover:text-[var(--heading)]"
+              }`}
+            >
+              Open for Bidding
+            </button>
+            <button
+              onClick={() => setPoolCategoryFilter("assigned_bidding")}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                poolCategoryFilter === "assigned_bidding"
+                  ? "bg-amber-600 text-white shadow-md shadow-amber-600/20"
+                  : "bg-[var(--secondary)] text-[var(--muted)] hover:text-[var(--heading)]"
+              }`}
+            >
+              Bid for Next Cycle
+            </button>
+            <button
+              onClick={fetchPoolNumbers}
+              className="p-2 rounded-lg bg-[var(--secondary)] text-[var(--muted)] hover:text-[var(--heading)] ml-auto"
+              title="Refresh Pool"
+            >
+              <RefreshCw size={12} className={poolLoading ? "animate-spin" : ""} />
             </button>
           </div>
-
-          {searchLoading ? (
-            /* Skeleton Loading Grid */
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {[1, 2, 3, 4, 5, 6].map((i) => (
-                <div key={i} className="bg-[var(--card-bg)] border border-[var(--border)] rounded-xl p-5 h-44 flex flex-col animate-pulse">
-                  <div className="w-32 h-6 bg-[var(--secondary)] rounded mb-3"></div>
-                  <div className="w-44 h-4 bg-[var(--secondary)] rounded mb-2"></div>
-                  <div className="w-20 h-5 bg-[var(--secondary)] rounded-full mb-auto"></div>
-                  <div className="w-full h-9 bg-[var(--secondary)] rounded-lg"></div>
-                </div>
-              ))}
-            </div>
-          ) : availableNumbers.length === 0 ? (
-            /* Empty State */
-            <div className="flex flex-col items-center justify-center py-12 text-center bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-6">
-              <XCircle size={44} className="text-red-500 mb-3" />
-              <h3 className="text-base font-bold text-[var(--heading)] mb-1">No Numbers Found</h3>
-              <p className="text-xs text-[var(--muted)] mb-5 max-w-xs font-medium">
-                No active inventory was resolved for area code {areaCode || "any"}. Try searching a different city or region code.
-              </p>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => { setAreaCode(''); setCity(''); }}
-                  className="px-4 py-2 text-xs font-bold rounded-lg border border-[var(--border)] text-[var(--heading)] hover:bg-[var(--secondary)]"
-                >
-                  Clear Filters
-                </button>
-              </div>
-            </div>
-          ) : (
-            /* Available Grid List */
-            <div className="space-y-6">
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                {availableNumbers.slice(0, visibleCount).map((num) => {
-                  const isBuying = provisioningNum === num.phone_number;
-                  return (
-                    <div 
-                      key={num.phone_number}
-                      className="bg-[var(--card-bg)] border border-[var(--border)] hover:border-violet-500/50 rounded-2xl p-5 flex flex-col transition-all hover:shadow-md"
-                    >
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-xs font-bold text-[var(--muted)] uppercase tracking-wider capitalize">
-                          {num.provider}
-                        </span>
-                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-violet-500 bg-violet-500/10 px-2 py-0.5 rounded-full capitalize font-[family-name:var(--font-montserrat)]">
-                          <Smartphone size={10} />
-                          {num.did_type}
-                        </span>
-                      </div>
-
-                      <h3 className="font-mono text-xl font-bold text-[var(--heading)] tracking-wider mb-2">
-                        {num.phone_number}
-                      </h3>
-
-                      <div className="flex items-center gap-1.5 text-xs text-[var(--body)] font-medium mb-5">
-                        <MapPin size={13} className="text-[var(--muted)] shrink-0" />
-                        <span className="truncate">{num.city || "United States"}</span>
-                      </div>
-
-                      <div className="mt-auto pt-3 border-t border-[var(--border)] flex items-center justify-between gap-3">
-                        <div className="flex flex-col text-left">
-                          <span className="text-[9px] uppercase tracking-wider font-bold text-[var(--muted)]">Subscription</span>
-                          <span className="text-xs font-black text-[var(--heading)]">
-                            {pricingInfo?.display_text || "Billed monthly"}
-                          </span>
-                        </div>
-
-                        <button
-                          onClick={() => handleBuyNumber(num)}
-                          disabled={isBuying || isAtLimit}
-                          className={`px-4 py-2 rounded-lg font-bold text-xs uppercase tracking-wider transition-all flex items-center gap-1.5 ${
-                            isAtLimit
-                              ? "bg-[var(--secondary)] text-[var(--muted)] cursor-not-allowed border border-[var(--border)]"
-                              : "bg-violet-600 hover:bg-violet-700 text-white shadow-sm shadow-violet-600/10"
-                          }`}
-                        >
-                          {isBuying ? (
-                            <>
-                              <RefreshCw size={12} className="animate-spin" /> Buying...
-                            </>
-                          ) : (
-                            <>
-                              <CreditCard size={12} /> Buy Line
-                            </>
-                          )}
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* Load More Pagination */}
-              {availableNumbers.length > visibleCount && (
-                <div className="flex flex-col items-center gap-2 pt-4">
-                  <p className="text-xs text-[var(--muted)] font-medium">
-                    Showing {Math.min(visibleCount, availableNumbers.length)} of {availableNumbers.length} numbers
-                  </p>
-                  <button
-                    onClick={() => setVisibleCount(prev => prev + 6)}
-                    className="px-5 py-2 text-xs font-bold rounded-lg border border-[var(--border)] text-[var(--heading)] hover:bg-[var(--secondary)] transition-all cursor-pointer"
-                  >
-                    Load More Numbers
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
         </div>
-      )}
 
-      {/* Purchased Numbers Grid Section */}
+        {poolLoading ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-5 h-44 animate-pulse"></div>
+            ))}
+          </div>
+        ) : poolNumbers.filter((num) => {
+            if (poolCategoryFilter === "available_now") return !num.is_assigned && !num.bidding_enabled;
+            if (poolCategoryFilter === "bidding") return !num.is_assigned && num.bidding_enabled;
+            if (poolCategoryFilter === "assigned_bidding") return num.is_assigned && num.bidding_enabled;
+            return true;
+          }).length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-10 text-center bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-6">
+            <PhoneCall size={36} className="text-[var(--muted)] mb-3" />
+            <h3 className="text-base font-bold text-[var(--heading)] mb-1">No Numbers in this Category</h3>
+            <p className="text-xs text-[var(--muted)] max-w-xs font-medium">
+              No numbers currently match the selected filter category. Click "Express Setup" for custom provisioning.
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {poolNumbers
+              .filter((num) => {
+                if (poolCategoryFilter === "available_now") return !num.is_assigned && !num.bidding_enabled;
+                if (poolCategoryFilter === "bidding") return !num.is_assigned && num.bidding_enabled;
+                if (poolCategoryFilter === "assigned_bidding") return num.is_assigned && num.bidding_enabled;
+                return true;
+              })
+              .map((num) => (
+                <NumberCard
+                  key={num.id}
+                  phoneNumber={{
+                    id: num.id,
+                    phone_number: num.phone_number,
+                    city: num.city || "Mumbai",
+                    did_type: num.did_type || "mobile",
+                    provider: num.provider || "voicelink",
+                    status: num.is_assigned ? "assigned" : "available",
+                    retail_price_paisa: num.retail_price_paisa || 29900,
+                    bidding_enabled: num.bidding_enabled,
+                    current_bid_paisa: num.current_bid_paisa,
+                    minimum_bid_paisa: num.minimum_bid_paisa,
+                    bid_count: num.bid_count,
+                    is_assigned: num.is_assigned,
+                    renewal_date: num.renewal_date
+                  }}
+                  isPoolItem={true}
+                  isBuying={buyingId === num.id}
+                  onBuyNow={handleBuyPoolNumber}
+                  onPlaceBid={() => handleOpenBidModal(num)}
+                  onClaimBid={() => handleClaimBid(num)}
+                />
+              ))}
+          </div>
+        )}
+      </div>
+
+      {/* SECTION 2: MY NUMBERS */}
       <div id="purchased-numbers-section">
         <div className="border-b border-[var(--border)] pb-3 mb-6 flex items-center justify-between">
-          <h2 className="font-playfair text-xl font-bold text-[var(--heading)] font-[family-name:var(--font-playfair)]">
-            Your Purchased Numbers ({numbers.length})
+          <h2 className="font-playfair text-xl font-bold text-[var(--heading)] flex items-center gap-2">
+            <Phone className="w-5 h-5 text-emerald-400" />
+            My Numbers ({numbers.length})
           </h2>
           <button 
             onClick={fetchPurchasedNumbers}
-            className="text-xs font-bold text-[var(--muted)] hover:text-[var(--heading)] flex items-center gap-1 cursor-pointer font-[family-name:var(--font-montserrat)]"
+            className="text-xs font-bold text-[var(--muted)] hover:text-[var(--heading)] flex items-center gap-1 cursor-pointer"
           >
-            <RefreshCw size={12} /> Refresh
+            <RefreshCw size={12} className={purchasedLoading ? "animate-spin" : ""} /> Refresh
           </button>
         </div>
 
         {purchasedLoading ? (
-          /* Purchased Skeletons */
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {[1, 2].map((i) => (
               <div key={i} className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-5 h-44 animate-pulse"></div>
@@ -577,7 +525,6 @@ export default function PhoneNumbersPage() {
             <button onClick={fetchPurchasedNumbers} className="underline cursor-pointer">Retry</button>
           </div>
         ) : numbers.length === 0 ? (
-          /* Empty Purchased State */
           <div className="flex flex-col items-center justify-center py-12 text-center bg-[var(--secondary)] border border-[var(--border)] rounded-2xl p-6">
             <PhoneCall size={36} className="text-[var(--muted)] mb-3" />
             <h3 className="text-base font-bold text-[var(--heading)] mb-1">No purchased numbers</h3>
@@ -585,21 +532,38 @@ export default function PhoneNumbersPage() {
               You haven't acquired any phone lines yet.
             </p>
             <p className="text-xs text-[var(--muted)] max-w-xs font-medium">
-              Search above or click "Express Setup" to register a line instantly.
+              Browse available numbers above or click "Express Setup" to register a line instantly.
             </p>
           </div>
         ) : (
-          /* Numbers List */
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 font-[family-name:var(--font-montserrat)]">
             {numbers.map((number: any) => (
-              <NumberCard 
-                key={number.id} 
-                phoneNumber={{
-                  ...number,
-                  display_price: pricingInfo?.display_text || "Billed monthly"
-                }} 
-                onManage={handleManage} 
-              />
+              <div key={number.id} className="space-y-2">
+                {number.bidding_enabled && number.bid_count > 0 && (
+                  <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl text-xs space-y-1">
+                    <p className="font-bold text-amber-400 flex items-center gap-1.5">
+                      <AlertCircle size={14} />
+                      ⚠️ You have {number.bid_count} active bid(s) on this number
+                    </p>
+                    {number.current_bid_paisa && (
+                      <p className="text-[11px] text-[var(--muted)]">
+                        Highest bid: <span className="font-mono font-bold text-emerald-400">₹{(number.current_bid_paisa / 100).toFixed(2)}</span>
+                      </p>
+                    )}
+                    <p className="text-[10px] text-[var(--muted)] italic">
+                      If you renew before your expiration date, your line remains safe.
+                    </p>
+                  </div>
+                )}
+                <NumberCard 
+                  phoneNumber={{
+                    ...number,
+                    display_price: "₹299/mo"
+                  }} 
+                  onManage={handleManage}
+                  onRenew={handleRenewNumber}
+                />
+              </div>
             ))}
           </div>
         )}
@@ -612,7 +576,7 @@ export default function PhoneNumbersPage() {
         onSuccess={() => {
           fetchPurchasedNumbers();
         }}
-        userCountry={userCountry}
+        userCountry={(profile as any)?.country || "IN"}
       />
 
       {selectedNumber && (
@@ -621,10 +585,72 @@ export default function PhoneNumbersPage() {
           onClose={() => setManageNumberId(null)} 
           phoneNumber={{
             ...selectedNumber,
-            display_price: pricingInfo?.display_text || "Billed monthly"
+            display_price: "₹299/mo"
           }}
           onUpdate={fetchPurchasedNumbers}
         />
+      )}
+
+      {/* Place Bid Modal */}
+      {bidModalNumber && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl w-full max-w-md p-6 shadow-2xl">
+            <h3 className="text-base font-bold text-[var(--heading)] mb-1 flex items-center gap-2">
+              <ShoppingBag className="text-emerald-500" size={18} />
+              Place Bid on {bidModalNumber.phone_number}
+            </h3>
+            <p className="text-xs text-[var(--muted)] mb-4">
+              {bidModalNumber.is_assigned 
+                ? "This number is currently assigned. If the owner doesn't renew, the highest bidder gets priority to purchase."
+                : "Submit a competing bid for priority purchase on this open line."}
+            </p>
+
+            <div className="p-3 bg-[var(--secondary)] rounded-xl border border-[var(--border)] text-xs mb-4 space-y-1">
+              <p className="text-[var(--muted)]">Number Type: <span className="text-[var(--heading)] font-semibold uppercase">{bidModalNumber.did_type || "mobile"}</span></p>
+              <p className="text-[var(--muted)]">Provider: <span className="text-[var(--heading)] font-semibold capitalize">{bidModalNumber.provider || "voicelink"}</span></p>
+              {bidModalNumber.current_bid_paisa ? (
+                <p className="text-emerald-400 font-bold">Current Highest Bid: ₹{(bidModalNumber.current_bid_paisa / 100).toFixed(2)}</p>
+              ) : bidModalNumber.minimum_bid_paisa ? (
+                <p className="text-emerald-400 font-bold">Minimum Bid Required: ₹{(bidModalNumber.minimum_bid_paisa / 100).toFixed(2)}</p>
+              ) : null}
+            </div>
+
+            <form onSubmit={handlePlaceBid} className="space-y-4 text-xs">
+              <div>
+                <label className="block text-[10px] uppercase font-bold text-[var(--muted)] mb-1">Your Bid Amount (₹)</label>
+                <input
+                  type="number"
+                  min={(bidModalNumber.current_bid_paisa ? (bidModalNumber.current_bid_paisa + 100) / 100 : (bidModalNumber.minimum_bid_paisa || 0) / 100).toString()}
+                  step="1"
+                  required
+                  value={bidAmountRupees}
+                  onChange={(e) => setBidAmountRupees(e.target.value)}
+                  className="w-full p-2.5 bg-[var(--background)] border border-[var(--border)] rounded-lg text-[var(--heading)] text-sm font-mono font-bold outline-none focus:border-emerald-500"
+                />
+                <p className="text-[10px] text-[var(--muted)] mt-1">
+                  Must be higher than current bid (min ₹{((bidModalNumber.current_bid_paisa ? bidModalNumber.current_bid_paisa + 100 : bidModalNumber.minimum_bid_paisa || 0) / 100).toFixed(2)})
+                </p>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-[var(--border)]">
+                <button
+                  type="button"
+                  onClick={() => setBidModalNumber(null)}
+                  className="px-4 py-2 rounded-lg border border-[var(--border)] text-[var(--muted)] font-bold text-xs"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submittingBid}
+                  className="px-5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs uppercase tracking-wider flex items-center gap-1.5 shadow-md shadow-emerald-600/20"
+                >
+                  {submittingBid ? <RefreshCw className="animate-spin" size={14} /> : "Submit Bid"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
     </div>
   );

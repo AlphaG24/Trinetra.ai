@@ -24,8 +24,9 @@ export async function GET(request: Request) {
         
         // Check local database pool for available numbers first
         const { data: poolNumbers } = await supabase
-            .from('phone_number_pool')
+            .from('phone_numbers')
             .select('*')
+            .eq('is_assigned', false)
             .eq('status', 'available')
             .limit(10);
 

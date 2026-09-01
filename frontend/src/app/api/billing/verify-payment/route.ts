@@ -8,7 +8,7 @@ import fs from 'fs'
 import path from 'path'
 
 interface CartItem {
-  type: 'subscription' | 'phone_number' | 'bundle'
+  type: 'subscription' | 'phone_number' | 'bundle' | 'number_pool' | 'number_renewal'
   key: string
   quantity: number
 }
@@ -193,6 +193,98 @@ export async function POST(request: Request) {
           discount: itemDiscount,
           amount: finalPrice
         })
+      } else if (item.type === 'number_pool') {
+        // Pool Number Purchase Processing
+        const { data: poolNumber } = await adminClient
+          .from('phone_numbers')
+          .select('*')
+          .eq('id', item.key)
+          .single()
+
+        if (poolNumber) {
+          const renewalDateIso = new Date(Date.now() + 30 * 86400000).toISOString()
+
+          // 1. Mark pool number as assigned in phone_numbers
+          await adminClient
+            .from('phone_numbers')
+            .update({
+              status: 'active',
+              is_assigned: true,
+              organization_id: profile.organization_id,
+              assigned_org_id: profile.organization_id,
+              renewal_date: renewalDateIso,
+              metadata: {
+                payment_id: razorpay_payment_id
+              },
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', poolNumber.id)
+
+          // 3. Activity log
+          await adminClient.from('activity_log').insert({
+            user_id: user.id,
+            organization_id: profile.organization_id,
+            activity_type: 'number_provisioned',
+            title: 'Phone Number Purchased from Pool',
+            description: `Purchased number ${poolNumber.phone_number} (${poolNumber.city || 'Local'})`
+          })
+
+          const itemRate = poolNumber.retail_price_paisa || 29900
+          const itemTotal = itemRate * item.quantity
+          totalPaidPaisa += itemTotal
+
+          invoiceLines.push({
+            item: `Virtual Phone Number Purchase (${poolNumber.phone_number})`,
+            quantity: item.quantity,
+            rate: itemRate,
+            discount: 0,
+            amount: itemTotal
+          })
+        }
+      } else if (item.type === 'number_renewal') {
+        // Phone Number Renewal Processing
+        const { data: phoneRow } = await adminClient
+          .from('phone_numbers')
+          .select('*')
+          .eq('id', item.key)
+          .single()
+
+        if (phoneRow) {
+          const currentRenewal = phoneRow.renewal_date ? new Date(phoneRow.renewal_date).getTime() : Date.now()
+          const baseTime = currentRenewal > Date.now() ? currentRenewal : Date.now()
+          const newRenewalDateIso = new Date(baseTime + 30 * 86400000).toISOString()
+
+          // Extend renewal date on phone_numbers
+          await adminClient
+            .from('phone_numbers')
+            .update({
+              renewal_date: newRenewalDateIso,
+              status: 'active',
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', phoneRow.id)
+
+          // Activity log
+          await adminClient.from('activity_log').insert({
+            user_id: user.id,
+            organization_id: profile.organization_id,
+            activity_type: 'number_renewed',
+            title: 'Phone Number Renewed',
+            description: `Extended subscription for ${phoneRow.phone_number} by 30 days`
+          })
+
+          const itemRate = phoneRow.retail_price_paisa || 29900
+          const itemTotal = itemRate * item.quantity
+          totalPaidPaisa += itemTotal
+
+          invoiceLines.push({
+            item: `Virtual Phone Number 30-Day Renewal (${phoneRow.phone_number})`,
+            quantity: item.quantity,
+            rate: itemRate,
+            discount: 0,
+            amount: itemTotal
+          })
+        }
       } else if (item.type === 'bundle') {
         const bundle = bundleMap[item.key]
         if (bundle) {

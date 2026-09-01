@@ -4,12 +4,10 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/utils/supabase/client'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Sun, Moon, Menu, Bell, LogOut, User } from 'lucide-react'
-import { useTheme } from '@/src/components/ui/theme-provider'
+import { Menu, Bell, LogOut, User } from 'lucide-react'
 import { ThemeToggle } from '@/src/components/ui/theme-toggle'
 
 export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
-  const { theme, toggleTheme, mounted } = useTheme()
   const [profile, setProfile] = useState<{ full_name?: string; avatar_url?: string } | null>(null)
   const [user, setUser] = useState<{ email?: string; user_metadata?: { full_name?: string } } | null>(null)
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
@@ -93,20 +91,20 @@ export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
   const avatarUrl = profile?.avatar_url
 
   return (
-    <header className="fixed top-0 right-0 left-0 h-16 bg-[var(--card-bg)] border-b border-[var(--border)] z-30 transition-colors duration-200">
+    <header className="fixed top-0 right-0 left-0 h-16 bg-[var(--card-bg)] border-b border-[var(--border)] z-[999] transition-colors duration-200">
       <div className="flex items-center justify-between h-full px-6">
         {/* Left side: Logo + Mobile Menu */}
         <div className="flex items-center gap-3">
           {onMenuClick && (
             <button
               onClick={onMenuClick}
-              className="lg:hidden text-[var(--muted)] hover:text-[var(--heading)] transition-colors mr-1"
+              className="lg:hidden p-2 rounded-lg text-[var(--muted)] hover:bg-[var(--hover-bg)] hover:text-[var(--heading)] transition-colors"
               aria-label="Open menu"
             >
-              <Menu className="w-6 h-6" />
+              <Menu className="w-5 h-5" />
             </button>
           )}
-          <Link href="/dashboard" className="flex items-center ml-1">
+          <Link href="/dashboard" className="flex items-center gap-2">
             <img
               src="/trident.png"
               alt="Trinetra"
@@ -132,8 +130,8 @@ export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
             
             {showNotifDropdown && (
               <>
-                <div className="fixed inset-0 z-40 bg-transparent" onClick={() => setShowNotifDropdown(false)} />
-                <div className="absolute right-0 mt-2 w-80 bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl shadow-xl overflow-hidden z-50 py-1">
+                <div className="fixed inset-0 z-[9998] bg-transparent" onClick={() => setShowNotifDropdown(false)} />
+                <div className="absolute right-0 mt-2 w-80 bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl shadow-xl overflow-hidden z-[9999] py-1">
                   <div className="px-4 py-2.5 border-b border-[var(--border)] flex items-center justify-between">
                     <span className="font-playfair font-bold text-sm text-gray-300">Recent Notifications</span>
                     {unreadCount > 0 && <span className="text-[10px] font-bold bg-rose-500/15 text-rose-500 px-1.5 py-0.5 rounded-full">{unreadCount} new</span>}
@@ -197,10 +195,10 @@ export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
             {isDropdownOpen && (
               <>
                 <div
-                  className="fixed inset-0 z-40 bg-transparent"
+                  className="fixed inset-0 z-[9998] bg-transparent"
                   onClick={() => setIsDropdownOpen(false)}
                 />
-                <div className="absolute right-0 mt-2 w-48 bg-[var(--card-bg)] border border-[var(--border)] rounded-xl shadow-xl overflow-hidden py-1 z-50">
+                <div className="absolute right-0 mt-2 w-48 bg-[var(--card-bg)] border border-[var(--border)] rounded-xl shadow-xl overflow-hidden py-1 z-[9999]">
                   <Link
                     href="/dashboard/profile"
                     onClick={() => setIsDropdownOpen(false)}

@@ -1,29 +1,29 @@
 import { NextResponse } from "next/server";
 import { authenticateRequest } from "@/lib/api-helpers";
-import { createClient } from "@supabase/supabase-js";
+import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 
-// We need an admin client to fetch pricing safely or we can just fetch without pricing, 
-// wait the instructions say: "Or simpler: frontend will fetch pricing separately — just return the number data"
-// I will do that to keep it simple.
+function getAdminClient() {
+  return createSupabaseClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  );
+}
 
 export async function GET(request: Request) {
     try {
-        const { authenticated, profile, error, supabase } = await authenticateRequest();
+        const { authenticated, user, profile, error } = await authenticateRequest();
         
-        if (!authenticated) {
-            return NextResponse.json({ error }, { status: 401 });
+        if (!authenticated || !user || !profile) {
+            return NextResponse.json({ error: error || "Unauthorized" }, { status: 401 });
         }
         
-        if (!profile?.organization_id) {
-            return NextResponse.json({ error: "No organization found" }, { status: 400 });
-        }
+        const orgId = profile.organization_id;
+        const userId = user.id;
+        const adminClient = getAdminClient();
 
-        // We can use Supabase JS SDK to do the join, or RPC, but for simplicity and safety
-        // the instructions gave exact SQL:
-        // SELECT phone_numbers.*, array_agg(...) as assigned_agents FROM phone_numbers LEFT JOIN ...
-        // Since we can't do raw SQL directly via the client, we can use the JS SDK relational querying.
-        
-        const { data: phone_numbers, error: dbError } = await supabase
+        // Fetch phone_numbers table records for this user/organization
+        let query = adminClient
             .from("phone_numbers")
             .select(`
                 *,
@@ -35,18 +35,24 @@ export async function GET(request: Request) {
                     )
                 )
             `)
-            .eq("organization_id", profile.organization_id)
-            .in("status", ["provisioning", "active"])
-            .order("provisioned_at", { ascending: false });
-            
-        if (dbError) {
-            console.error('[API] Database Error:', dbError);
-            return NextResponse.json({ success: false, error: "Database error" }, { status: 500 });
+            .eq("is_assigned", true)
+            .order("created_at", { ascending: false });
+
+        if (orgId) {
+            query = query.or(`organization_id.eq.${orgId},assigned_org_id.eq.${orgId}`);
+        } else {
+            query = query.or(`organization_id.eq.${userId},assigned_org_id.eq.${userId}`);
         }
 
-        // Format the nested assigned_agents to match the requested output
+        const { data: phone_numbers, error: dbError } = await query;
+
+        if (dbError) {
+            console.error('[API] Database Error in phone_numbers:', dbError);
+        }
+
         const formattedNumbers = (phone_numbers || []).map((num: any) => ({
             ...num,
+            status: num.status || "active",
             assigned_agents: (num.assigned_agents || []).map((assignment: any) => ({
                 agent_id: assignment.agent_id,
                 agent_name: assignment.agents?.name || "Unknown",
