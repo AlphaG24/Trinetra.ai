@@ -27,7 +27,7 @@ export async function POST(
         // Verify phone number ownership
         const { data: phone_number, error: phoneError } = await supabase
             .from("phone_numbers")
-            .select("organization_id, phone_number")
+            .select("organization_id, assigned_org_id, phone_number, provider")
             .eq("id", phone_number_id)
             .single();
 
@@ -35,7 +35,11 @@ export async function POST(
             return NextResponse.json({ error: "Phone number not found" }, { status: 404 });
         }
 
-        if (phone_number.organization_id !== profile.organization_id) {
+        const ownsNumber = 
+            phone_number.organization_id === profile.organization_id || 
+            phone_number.assigned_org_id === profile.organization_id;
+
+        if (!ownsNumber) {
             return NextResponse.json({ error: "Forbidden: You do not own this phone number" }, { status: 403 });
         }
 
@@ -100,6 +104,18 @@ export async function POST(
                 return NextResponse.json({ error: "Database error during assignment" }, { status: 500 });
             }
         }
+
+        // Update assigned_agent_id on phone_numbers table
+        await supabase
+            .from("phone_numbers")
+            .update({ assigned_agent_id: agent_id, is_assigned: true })
+            .eq("id", phone_number_id);
+
+        // Also update assigned_agent_id on phone_number_pool table if matching number
+        await supabase
+            .from("phone_number_pool")
+            .update({ assigned_agent_id: agent_id, status: 'assigned' })
+            .eq("phone_number", phone_number.phone_number);
 
         // Keep agents table in sync if this is primary number
         if (is_primary) {
