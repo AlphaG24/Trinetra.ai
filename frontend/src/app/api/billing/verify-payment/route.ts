@@ -8,7 +8,7 @@ import fs from 'fs'
 import path from 'path'
 
 interface CartItem {
-  type: 'subscription' | 'phone_number' | 'bundle'
+  type: 'subscription' | 'phone_number' | 'bundle' | 'number_pool' | 'number_renewal'
   key: string
   quantity: number
 }
