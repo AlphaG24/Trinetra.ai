@@ -1,5 +1,14 @@
 import { NextResponse } from 'next/server'
 import { authenticateRequest } from '@/lib/api-helpers'
+import { createClient as createSupabaseClient } from "@supabase/supabase-js";
+
+function getAdminClient() {
+  return createSupabaseClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  );
+}
 
 export const dynamic = 'force-dynamic'
 
@@ -10,11 +19,13 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const adminClient = getAdminClient();
+
     // Retrieve all available numbers from the pool
-    const { data: availableNumbers, error } = await supabase
-      .from('phone_number_pool')
+    const { data: availableNumbers, error } = await adminClient
+      .from('phone_numbers')
       .select('*')
-      .eq('status', 'available')
+      .eq('is_assigned', false)
       .order('created_at', { ascending: false })
 
     if (error) {

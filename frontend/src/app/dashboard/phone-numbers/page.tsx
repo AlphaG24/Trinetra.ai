@@ -59,6 +59,65 @@ export default function PhoneNumbersPage() {
   const [isProvisionModalOpen, setIsProvisionModalOpen] = useState(false);
   const [manageNumberId, setManageNumberId] = useState<string | null>(null);
 
+  // Pool Bidding State
+  const [poolCategoryFilter, setPoolCategoryFilter] = useState<"all" | "available_now" | "bidding" | "assigned_bidding">("all");
+  const [bidModalNumber, setBidModalNumber] = useState<any>(null);
+  const [bidAmountRupees, setBidAmountRupees] = useState("");
+  const [submittingBid, setSubmittingBid] = useState(false);
+  const [claimingBidId, setClaimingBidId] = useState<string | null>(null);
+
+  const handleOpenBidModal = (num: any) => {
+    setBidModalNumber(num);
+    const minRequiredPaisa = num.current_bid_paisa 
+      ? num.current_bid_paisa + 100 
+      : (num.minimum_bid_paisa || 29900);
+    setBidAmountRupees((minRequiredPaisa / 100).toString());
+  };
+
+  const handlePlaceBid = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!bidModalNumber) return;
+
+    try {
+      setSubmittingBid(true);
+      const res = await fetch(`/api/phone-numbers/${bidModalNumber.id}/bid`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bid_amount_rupees: bidAmountRupees })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to place bid");
+
+      toast.success(data.message || "Bid placed successfully!");
+      setBidModalNumber(null);
+      setBidAmountRupees("");
+      fetchPoolNumbers();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to place bid");
+    } finally {
+      setSubmittingBid(false);
+    }
+  };
+
+  const handleClaimBid = async (num: any) => {
+    try {
+      setClaimingBidId(num.id);
+      const res = await fetch(`/api/phone-numbers/${num.id}/claim-bid`, {
+        method: "POST"
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to claim number");
+
+      toast.success(data.message || "Number claimed and assigned successfully!");
+      fetchPurchasedNumbers();
+      fetchPoolNumbers();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to claim number");
+    } finally {
+      setClaimingBidId(null);
+    }
+  };
+
   const loadRazorpayScript = () => {
     return new Promise((resolve) => {
       if ((window as any).Razorpay) {
@@ -325,17 +384,61 @@ export default function PhoneNumbersPage() {
 
       {/* SECTION 1: AVAILABLE NUMBERS FROM SHARED POOL */}
       <div className="mb-12">
-        <div className="flex items-center justify-between border-b border-[var(--border)] pb-3 mb-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-[var(--border)] pb-3 mb-6 gap-3">
           <h2 className="font-playfair text-xl font-bold text-[var(--heading)] flex items-center gap-2">
             <ShoppingBag className="w-5 h-5 text-violet-400" />
-            Available Numbers in Pool ({poolNumbers.length})
+            Pool Numbers & Bidding Inventory ({poolNumbers.length})
           </h2>
-          <button
-            onClick={fetchPoolNumbers}
-            className="text-xs font-bold text-violet-400 hover:underline flex items-center gap-1 cursor-pointer"
-          >
-            <RefreshCw size={12} className={poolLoading ? "animate-spin" : ""} /> Refresh Pool
-          </button>
+
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              onClick={() => setPoolCategoryFilter("all")}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                poolCategoryFilter === "all"
+                  ? "bg-violet-600 text-white shadow-md shadow-violet-600/20"
+                  : "bg-[var(--secondary)] text-[var(--muted)] hover:text-[var(--heading)]"
+              }`}
+            >
+              All ({poolNumbers.length})
+            </button>
+            <button
+              onClick={() => setPoolCategoryFilter("available_now")}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                poolCategoryFilter === "available_now"
+                  ? "bg-violet-600 text-white shadow-md shadow-violet-600/20"
+                  : "bg-[var(--secondary)] text-[var(--muted)] hover:text-[var(--heading)]"
+              }`}
+            >
+              Available Now
+            </button>
+            <button
+              onClick={() => setPoolCategoryFilter("bidding")}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                poolCategoryFilter === "bidding"
+                  ? "bg-emerald-600 text-white shadow-md shadow-emerald-600/20"
+                  : "bg-[var(--secondary)] text-[var(--muted)] hover:text-[var(--heading)]"
+              }`}
+            >
+              Open for Bidding
+            </button>
+            <button
+              onClick={() => setPoolCategoryFilter("assigned_bidding")}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                poolCategoryFilter === "assigned_bidding"
+                  ? "bg-amber-600 text-white shadow-md shadow-amber-600/20"
+                  : "bg-[var(--secondary)] text-[var(--muted)] hover:text-[var(--heading)]"
+              }`}
+            >
+              Bid for Next Cycle
+            </button>
+            <button
+              onClick={fetchPoolNumbers}
+              className="p-2 rounded-lg bg-[var(--secondary)] text-[var(--muted)] hover:text-[var(--heading)] ml-auto"
+              title="Refresh Pool"
+            >
+              <RefreshCw size={12} className={poolLoading ? "animate-spin" : ""} />
+            </button>
+          </div>
         </div>
 
         {poolLoading ? (
@@ -344,33 +447,53 @@ export default function PhoneNumbersPage() {
               <div key={i} className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-5 h-44 animate-pulse"></div>
             ))}
           </div>
-        ) : poolNumbers.length === 0 ? (
+        ) : poolNumbers.filter((num) => {
+            if (poolCategoryFilter === "available_now") return !num.is_assigned && !num.bidding_enabled;
+            if (poolCategoryFilter === "bidding") return !num.is_assigned && num.bidding_enabled;
+            if (poolCategoryFilter === "assigned_bidding") return num.is_assigned && num.bidding_enabled;
+            return true;
+          }).length === 0 ? (
           <div className="flex flex-col items-center justify-center py-10 text-center bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-6">
             <PhoneCall size={36} className="text-[var(--muted)] mb-3" />
-            <h3 className="text-base font-bold text-[var(--heading)] mb-1">No Pool Numbers Currently Available</h3>
+            <h3 className="text-base font-bold text-[var(--heading)] mb-1">No Numbers in this Category</h3>
             <p className="text-xs text-[var(--muted)] max-w-xs font-medium">
-              All shared pool numbers are assigned. Click "Express Setup" to request custom line provisioning.
+              No numbers currently match the selected filter category. Click "Express Setup" for custom provisioning.
             </p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {poolNumbers.map((num) => (
-              <NumberCard
-                key={num.id}
-                phoneNumber={{
-                  id: num.id,
-                  phone_number: num.phone_number,
-                  city: num.city || "Mumbai",
-                  did_type: num.did_type || "mobile",
-                  provider: num.provider || "voicelink",
-                  status: "available",
-                  retail_price_paisa: num.retail_price_paisa || 29900
-                }}
-                isPoolItem={true}
-                isBuying={buyingId === num.id}
-                onBuyNow={handleBuyPoolNumber}
-              />
-            ))}
+            {poolNumbers
+              .filter((num) => {
+                if (poolCategoryFilter === "available_now") return !num.is_assigned && !num.bidding_enabled;
+                if (poolCategoryFilter === "bidding") return !num.is_assigned && num.bidding_enabled;
+                if (poolCategoryFilter === "assigned_bidding") return num.is_assigned && num.bidding_enabled;
+                return true;
+              })
+              .map((num) => (
+                <NumberCard
+                  key={num.id}
+                  phoneNumber={{
+                    id: num.id,
+                    phone_number: num.phone_number,
+                    city: num.city || "Mumbai",
+                    did_type: num.did_type || "mobile",
+                    provider: num.provider || "voicelink",
+                    status: num.is_assigned ? "assigned" : "available",
+                    retail_price_paisa: num.retail_price_paisa || 29900,
+                    bidding_enabled: num.bidding_enabled,
+                    current_bid_paisa: num.current_bid_paisa,
+                    minimum_bid_paisa: num.minimum_bid_paisa,
+                    bid_count: num.bid_count,
+                    is_assigned: num.is_assigned,
+                    renewal_date: num.renewal_date
+                  }}
+                  isPoolItem={true}
+                  isBuying={buyingId === num.id}
+                  onBuyNow={handleBuyPoolNumber}
+                  onPlaceBid={() => handleOpenBidModal(num)}
+                  onClaimBid={() => handleClaimBid(num)}
+                />
+              ))}
           </div>
         )}
       </div>
@@ -415,15 +538,32 @@ export default function PhoneNumbersPage() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 font-[family-name:var(--font-montserrat)]">
             {numbers.map((number: any) => (
-              <NumberCard 
-                key={number.id} 
-                phoneNumber={{
-                  ...number,
-                  display_price: "₹299/mo"
-                }} 
-                onManage={handleManage}
-                onRenew={handleRenewNumber}
-              />
+              <div key={number.id} className="space-y-2">
+                {number.bidding_enabled && number.bid_count > 0 && (
+                  <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl text-xs space-y-1">
+                    <p className="font-bold text-amber-400 flex items-center gap-1.5">
+                      <AlertCircle size={14} />
+                      ⚠️ You have {number.bid_count} active bid(s) on this number
+                    </p>
+                    {number.current_bid_paisa && (
+                      <p className="text-[11px] text-[var(--muted)]">
+                        Highest bid: <span className="font-mono font-bold text-emerald-400">₹{(number.current_bid_paisa / 100).toFixed(2)}</span>
+                      </p>
+                    )}
+                    <p className="text-[10px] text-[var(--muted)] italic">
+                      If you renew before your expiration date, your line remains safe.
+                    </p>
+                  </div>
+                )}
+                <NumberCard 
+                  phoneNumber={{
+                    ...number,
+                    display_price: "₹299/mo"
+                  }} 
+                  onManage={handleManage}
+                  onRenew={handleRenewNumber}
+                />
+              </div>
             ))}
           </div>
         )}
@@ -449,6 +589,68 @@ export default function PhoneNumbersPage() {
           }}
           onUpdate={fetchPurchasedNumbers}
         />
+      )}
+
+      {/* Place Bid Modal */}
+      {bidModalNumber && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl w-full max-w-md p-6 shadow-2xl">
+            <h3 className="text-base font-bold text-[var(--heading)] mb-1 flex items-center gap-2">
+              <ShoppingBag className="text-emerald-500" size={18} />
+              Place Bid on {bidModalNumber.phone_number}
+            </h3>
+            <p className="text-xs text-[var(--muted)] mb-4">
+              {bidModalNumber.is_assigned 
+                ? "This number is currently assigned. If the owner doesn't renew, the highest bidder gets priority to purchase."
+                : "Submit a competing bid for priority purchase on this open line."}
+            </p>
+
+            <div className="p-3 bg-[var(--secondary)] rounded-xl border border-[var(--border)] text-xs mb-4 space-y-1">
+              <p className="text-[var(--muted)]">Number Type: <span className="text-[var(--heading)] font-semibold uppercase">{bidModalNumber.did_type || "mobile"}</span></p>
+              <p className="text-[var(--muted)]">Provider: <span className="text-[var(--heading)] font-semibold capitalize">{bidModalNumber.provider || "voicelink"}</span></p>
+              {bidModalNumber.current_bid_paisa ? (
+                <p className="text-emerald-400 font-bold">Current Highest Bid: ₹{(bidModalNumber.current_bid_paisa / 100).toFixed(2)}</p>
+              ) : bidModalNumber.minimum_bid_paisa ? (
+                <p className="text-emerald-400 font-bold">Minimum Bid Required: ₹{(bidModalNumber.minimum_bid_paisa / 100).toFixed(2)}</p>
+              ) : null}
+            </div>
+
+            <form onSubmit={handlePlaceBid} className="space-y-4 text-xs">
+              <div>
+                <label className="block text-[10px] uppercase font-bold text-[var(--muted)] mb-1">Your Bid Amount (₹)</label>
+                <input
+                  type="number"
+                  min={(bidModalNumber.current_bid_paisa ? (bidModalNumber.current_bid_paisa + 100) / 100 : (bidModalNumber.minimum_bid_paisa || 0) / 100).toString()}
+                  step="1"
+                  required
+                  value={bidAmountRupees}
+                  onChange={(e) => setBidAmountRupees(e.target.value)}
+                  className="w-full p-2.5 bg-[var(--background)] border border-[var(--border)] rounded-lg text-[var(--heading)] text-sm font-mono font-bold outline-none focus:border-emerald-500"
+                />
+                <p className="text-[10px] text-[var(--muted)] mt-1">
+                  Must be higher than current bid (min ₹{((bidModalNumber.current_bid_paisa ? bidModalNumber.current_bid_paisa + 100 : bidModalNumber.minimum_bid_paisa || 0) / 100).toFixed(2)})
+                </p>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-[var(--border)]">
+                <button
+                  type="button"
+                  onClick={() => setBidModalNumber(null)}
+                  className="px-4 py-2 rounded-lg border border-[var(--border)] text-[var(--muted)] font-bold text-xs"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submittingBid}
+                  className="px-5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs uppercase tracking-wider flex items-center gap-1.5 shadow-md shadow-emerald-600/20"
+                >
+                  {submittingBid ? <RefreshCw className="animate-spin" size={14} /> : "Submit Bid"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
     </div>
   );

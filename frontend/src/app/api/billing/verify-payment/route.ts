@@ -196,7 +196,7 @@ export async function POST(request: Request) {
       } else if (item.type === 'number_pool') {
         // Pool Number Purchase Processing
         const { data: poolNumber } = await adminClient
-          .from('phone_number_pool')
+          .from('phone_numbers')
           .select('*')
           .eq('id', item.key)
           .single()
@@ -204,45 +204,21 @@ export async function POST(request: Request) {
         if (poolNumber) {
           const renewalDateIso = new Date(Date.now() + 30 * 86400000).toISOString()
 
-          // 1. Mark pool number as assigned in phone_number_pool
+          // 1. Mark pool number as assigned in phone_numbers
           await adminClient
-            .from('phone_number_pool')
+            .from('phone_numbers')
             .update({
-              status: 'assigned',
+              status: 'active',
               is_assigned: true,
-              assigned_organization_id: profile.organization_id,
+              organization_id: profile.organization_id,
               assigned_org_id: profile.organization_id,
               renewal_date: renewalDateIso,
+              metadata: {
+                payment_id: razorpay_payment_id
+              },
               updated_at: new Date().toISOString()
             })
             .eq('id', poolNumber.id)
-
-          // 2. Insert into organization phone_numbers inventory
-          const { data: insertedPhone, error: phoneInsErr } = await adminClient
-            .from('phone_numbers')
-            .upsert({
-              organization_id: profile.organization_id,
-              assigned_org_id: profile.organization_id,
-              phone_number: poolNumber.phone_number,
-              city: poolNumber.city || 'India',
-              did_type: poolNumber.did_type || 'mobile',
-              provider: poolNumber.provider || 'voicelink',
-              is_assigned: true,
-              status: 'active',
-              monthly_cost_paisa: poolNumber.monthly_cost_paisa || 10000,
-              retail_price_paisa: poolNumber.retail_price_paisa || 29900,
-              renewal_date: renewalDateIso,
-              metadata: {
-                payment_id: razorpay_payment_id,
-                pool_id: poolNumber.id
-              }
-            }, { onConflict: 'phone_number' })
-            .select()
-            .single()
-
-          if (phoneInsErr) {
-            console.error('[Verify Payment] phone_numbers insert error for pool purchase:', phoneInsErr)
-          }
 
           // 3. Activity log
           await adminClient.from('activity_log').insert({
@@ -287,15 +263,6 @@ export async function POST(request: Request) {
               updated_at: new Date().toISOString()
             })
             .eq('id', phoneRow.id)
-
-          // Also extend on phone_number_pool if mapped
-          await adminClient
-            .from('phone_number_pool')
-            .update({
-              renewal_date: newRenewalDateIso,
-              updated_at: new Date().toISOString()
-            })
-            .eq('phone_number', phoneRow.phone_number)
 
           // Activity log
           await adminClient.from('activity_log').insert({

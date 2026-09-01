@@ -44,7 +44,7 @@ export async function POST(
             assigned_org_id?: string;
         } | null = null;
 
-        // 1. Try finding in phone_numbers table first
+        // Try finding in phone_numbers table
         const { data: phoneRow } = await supabase
             .from("phone_numbers")
             .select("id, organization_id, assigned_org_id, phone_number, provider")
@@ -53,43 +53,6 @@ export async function POST(
 
         if (phoneRow) {
             phoneNumberRecord = phoneRow;
-        } else {
-            // 2. Fallback: try finding in phone_number_pool table
-            const { data: poolRow } = await supabase
-                .from("phone_number_pool")
-                .select("id, assigned_organization_id, assigned_org_id, phone_number, provider")
-                .eq("id", phone_number_id)
-                .maybeSingle();
-
-            if (poolRow) {
-                phoneNumberRecord = {
-                    id: poolRow.id,
-                    phone_number: poolRow.phone_number,
-                    provider: poolRow.provider || "voicelink",
-                    organization_id: poolRow.assigned_organization_id || poolRow.assigned_org_id,
-                    assigned_org_id: poolRow.assigned_organization_id || poolRow.assigned_org_id
-                };
-
-                // Ensure a corresponding row exists in phone_numbers table
-                const { data: upsertedPhone } = await adminClient
-                    .from("phone_numbers")
-                    .upsert({
-                        organization_id: orgId,
-                        assigned_org_id: orgId,
-                        phone_number: poolRow.phone_number,
-                        city: "India",
-                        did_type: "mobile",
-                        provider: poolRow.provider || "voicelink",
-                        is_assigned: true,
-                        status: "active"
-                    }, { onConflict: "phone_number" })
-                    .select("id")
-                    .single();
-
-                if (upsertedPhone) {
-                    phoneNumberRecord.id = upsertedPhone.id;
-                }
-            }
         }
 
         if (!phoneNumberRecord) {
@@ -160,12 +123,6 @@ export async function POST(
             .from("phone_numbers")
             .update({ assigned_agent_id: agent_id, is_assigned: true })
             .eq("id", targetPhoneId);
-
-        // Also update assigned_agent_id on phone_number_pool table if matching number
-        await adminClient
-            .from("phone_number_pool")
-            .update({ assigned_agent_id: agent_id, status: 'assigned' })
-            .eq("phone_number", phoneNumberRecord.phone_number);
 
         // Keep agents table in sync if this is primary number
         if (is_primary) {

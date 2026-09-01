@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { 
   Phone, Plus, Upload, Trash2, Edit2, Search, RefreshCw, 
-  CheckCircle, AlertCircle, PhoneCall, Smartphone, MapPin, DollarSign, FileText, UserX
+  CheckCircle, AlertCircle, PhoneCall, Smartphone, MapPin, DollarSign, FileText, UserX, Gavel, Calendar
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -39,6 +39,70 @@ export default function AdminPhoneNumbersPage() {
   const [unassigningNumber, setUnassigningNumber] = useState<any>(null);
   const [customUnassignMessage, setCustomUnassignMessage] = useState("");
   const [submittingUnassign, setSubmittingUnassign] = useState(false);
+
+  // Bidding Modal State
+  const [biddingNumber, setBiddingNumber] = useState<any>(null);
+  const [biddingForm, setBiddingForm] = useState({
+    bidding_enabled: false,
+    minimum_bid_rupees: "0",
+    auction_ends_at: ""
+  });
+  const [bidsList, setBidsList] = useState<any[]>([]);
+  const [loadingBids, setLoadingBids] = useState(false);
+  const [submittingBidding, setSubmittingBidding] = useState(false);
+
+  const openBiddingModal = async (num: any) => {
+    setBiddingNumber(num);
+    setBiddingForm({
+      bidding_enabled: num.bidding_enabled || false,
+      minimum_bid_rupees: num.minimum_bid_paisa ? (num.minimum_bid_paisa / 100).toString() : "0",
+      auction_ends_at: num.auction_ends_at ? new Date(num.auction_ends_at).toISOString().slice(0, 16) : ""
+    });
+    setBidsList([]);
+    
+    try {
+      setLoadingBids(true);
+      const res = await fetch(`/api/admin/phone-numbers/${num.id}/bidding`);
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setBidsList(data.data.bids || []);
+      }
+    } catch (err) {
+      console.error("Error fetching bids:", err);
+    } finally {
+      setLoadingBids(false);
+    }
+  };
+
+  const handleSaveBidding = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!biddingNumber) return;
+
+    try {
+      setSubmittingBidding(true);
+      const minPaisa = Math.round(parseFloat(biddingForm.minimum_bid_rupees || "0") * 100);
+
+      const res = await fetch(`/api/admin/phone-numbers/${biddingNumber.id}/bidding`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          bidding_enabled: biddingForm.bidding_enabled,
+          minimum_bid_paisa: minPaisa,
+          auction_ends_at: biddingForm.auction_ends_at || null
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to update bidding settings");
+
+      toast.success("Bidding settings updated!");
+      setBiddingNumber(null);
+      fetchPoolNumbers();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to update bidding settings");
+    } finally {
+      setSubmittingBidding(false);
+    }
+  };
 
   const fetchPoolNumbers = async () => {
     try {
@@ -228,14 +292,22 @@ export default function AdminPhoneNumbersPage() {
     }
   };
 
+  const isNumAssigned = (num: any) => {
+    return (
+      num.is_assigned === true ||
+      num.status?.toLowerCase() === "assigned" ||
+      Boolean(num.assigned_organization || num.assigned_org_id || num.assigned_agent_id)
+    );
+  };
+
   const filteredNumbers = numbers.filter((num) => {
     const matchesSearch = 
       num.phone_number?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       num.city?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       num.provider?.toLowerCase().includes(searchQuery.toLowerCase());
     
-    if (filterStatus === "available") return matchesSearch && num.status === "available";
-    if (filterStatus === "assigned") return matchesSearch && num.status === "assigned";
+    if (filterStatus === "available") return matchesSearch && !isNumAssigned(num);
+    if (filterStatus === "assigned") return matchesSearch && isNumAssigned(num);
     return matchesSearch;
   });
 
@@ -285,7 +357,7 @@ export default function AdminPhoneNumbersPage() {
           <div>
             <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted)]">Available for Purchase</p>
             <h3 className="text-2xl font-black text-emerald-500 mt-1">
-              {numbers.filter(n => n.status === 'available').length}
+              {numbers.filter(n => !isNumAssigned(n)).length}
             </h3>
           </div>
           <div className="w-10 h-10 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-500">
@@ -297,7 +369,7 @@ export default function AdminPhoneNumbersPage() {
           <div>
             <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted)]">Assigned / Sold</p>
             <h3 className="text-2xl font-black text-amber-500 mt-1">
-              {numbers.filter(n => n.status === 'assigned').length}
+              {numbers.filter(n => isNumAssigned(n)).length}
             </h3>
           </div>
           <div className="w-10 h-10 rounded-lg bg-amber-500/10 flex items-center justify-center text-amber-500">
@@ -404,7 +476,7 @@ export default function AdminPhoneNumbersPage() {
                       ₹{((num.retail_price_paisa || 29900) / 100).toFixed(2)}/mo
                     </td>
                     <td className="py-3.5 px-4">
-                      {num.status === "available" ? (
+                      {!isNumAssigned(num) ? (
                         <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
                           Available
                         </span>
@@ -437,6 +509,17 @@ export default function AdminPhoneNumbersPage() {
                           title="Edit Retail Price"
                         >
                           <Edit2 size={13} />
+                        </button>
+                        <button
+                          onClick={() => openBiddingModal(num)}
+                          className={`p-1.5 rounded-lg border transition-all ${
+                            num.bidding_enabled
+                              ? "border-violet-500/40 bg-violet-500/10 text-violet-400 font-bold"
+                              : "border-[var(--border)] hover:bg-[var(--secondary)] text-[var(--muted)] hover:text-[var(--heading)]"
+                          }`}
+                          title="Configure Bidding & View Bids"
+                        >
+                          <Gavel size={13} />
                         </button>
                         {(() => {
                           const isAssigned = 
@@ -677,6 +760,10 @@ export default function AdminPhoneNumbersPage() {
               )}
             </div>
 
+            <p className="text-red-400 font-bold text-xs mb-4 bg-red-500/10 p-3 rounded-xl border border-red-500/20">
+              This will permanently remove this number from the user's account. The user will lose access to this number across agents, campaigns, and callbacks.
+            </p>
+
             <form onSubmit={handleUnassignNumber} className="space-y-4 text-xs">
               <div>
                 <label className="block text-[10px] uppercase font-bold text-[var(--muted)] mb-1">Custom Apology Message to User (Optional)</label>
@@ -706,6 +793,117 @@ export default function AdminPhoneNumbersPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Configure Bidding Modal */}
+      {biddingNumber && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl w-full max-w-lg p-6 shadow-2xl overflow-y-auto max-h-[90vh]">
+            <h3 className="text-base font-bold text-[var(--heading)] mb-1 flex items-center gap-2">
+              <Gavel className="text-violet-500" size={18} />
+              Configure Number Bidding
+            </h3>
+            <p className="text-xs font-mono text-[var(--heading)] font-bold mb-4">{biddingNumber.phone_number}</p>
+
+            <form onSubmit={handleSaveBidding} className="space-y-4 text-xs">
+              <div className="flex items-center justify-between p-3 bg-[var(--secondary)] rounded-xl border border-[var(--border)]">
+                <div>
+                  <p className="font-bold text-[var(--heading)]">Enable Bidding for this Number</p>
+                  <p className="text-[10px] text-[var(--muted)]">Allow users to place competing purchase bids</p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input 
+                    type="checkbox" 
+                    checked={biddingForm.bidding_enabled}
+                    onChange={(e) => setBiddingForm({ ...biddingForm, bidding_enabled: e.target.checked })}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-violet-600"></div>
+                </label>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[10px] uppercase font-bold text-[var(--muted)] mb-1">Minimum Bid Amount (₹)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="1"
+                    value={biddingForm.minimum_bid_rupees}
+                    onChange={(e) => setBiddingForm({ ...biddingForm, minimum_bid_rupees: e.target.value })}
+                    className="w-full p-2.5 bg-[var(--background)] border border-[var(--border)] rounded-lg text-[var(--heading)] text-xs outline-none focus:border-violet-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] uppercase font-bold text-[var(--muted)] mb-1">Auction End Date & Time</label>
+                  <input
+                    type="datetime-local"
+                    value={biddingForm.auction_ends_at}
+                    onChange={(e) => setBiddingForm({ ...biddingForm, auction_ends_at: e.target.value })}
+                    className="w-full p-2.5 bg-[var(--background)] border border-[var(--border)] rounded-lg text-[var(--heading)] text-xs outline-none focus:border-violet-500"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-[var(--border)]">
+                <button
+                  type="button"
+                  onClick={() => setBiddingNumber(null)}
+                  className="px-4 py-2 rounded-lg border border-[var(--border)] text-[var(--muted)] font-bold text-xs"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submittingBidding}
+                  className="px-5 py-2 rounded-lg bg-violet-600 hover:bg-violet-700 text-white font-bold text-xs uppercase tracking-wider flex items-center gap-1.5 shadow-md shadow-violet-600/20"
+                >
+                  {submittingBidding ? <RefreshCw className="animate-spin" size={14} /> : "Save Bidding Settings"}
+                </button>
+              </div>
+            </form>
+
+            {/* Existing Bids List */}
+            <div className="mt-6 pt-4 border-t border-[var(--border)]">
+              <h4 className="text-xs font-bold text-[var(--heading)] mb-2 flex items-center justify-between">
+                <span>Active & Historic Bids ({bidsList.length})</span>
+                {biddingNumber.current_bid_paisa && (
+                  <span className="text-[11px] font-mono text-emerald-400">Current Highest: ₹{(biddingNumber.current_bid_paisa / 100).toFixed(2)}</span>
+                )}
+              </h4>
+
+              {loadingBids ? (
+                <div className="p-4 text-center text-xs text-[var(--muted)]">Loading bids...</div>
+              ) : bidsList.length === 0 ? (
+                <div className="p-4 text-center text-xs text-[var(--muted)] italic bg-[var(--secondary)]/50 rounded-xl">
+                  No bids have been placed on this number yet.
+                </div>
+              ) : (
+                <div className="max-h-44 overflow-y-auto divide-y divide-[var(--border)] border border-[var(--border)] rounded-xl bg-[var(--background)]">
+                  {bidsList.map((b) => (
+                    <div key={b.id} className="p-2.5 flex items-center justify-between text-xs">
+                      <div>
+                        <p className="font-semibold text-[var(--heading)]">{b.bidder_profile?.full_name || b.bidder_profile?.email || "Unknown User"}</p>
+                        <p className="text-[10px] text-[var(--muted)]">{b.bidder_org?.name || "Independent Account"}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-mono font-bold text-emerald-400">₹{(b.bid_amount_paisa / 100).toFixed(2)}</p>
+                        <span className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded ${
+                          b.status === 'won' ? 'bg-emerald-500/20 text-emerald-400' :
+                          b.status === 'purchased' ? 'bg-violet-500/20 text-violet-400' :
+                          b.status === 'active' ? 'bg-amber-500/20 text-amber-400' : 'bg-gray-500/20 text-gray-400'
+                        }`}>
+                          {b.status}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}

@@ -30,9 +30,9 @@ export async function POST(request: Request) {
     const { number_id } = body;
     const adminClient = getAdminClient();
 
-    // 1. Fetch phone number from phone_number_pool
+    // 1. Fetch phone number from phone_numbers table
     const { data: poolNumber, error: poolError } = await adminClient
-      .from("phone_number_pool")
+      .from("phone_numbers")
       .select("*")
       .eq("id", number_id)
       .single();
@@ -41,7 +41,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Selected phone number not found" }, { status: 404 });
     }
 
-    if (poolNumber.status?.toLowerCase() !== "available" || poolNumber.is_assigned || poolNumber.assigned_organization_id) {
+    if (poolNumber.is_assigned || poolNumber.organization_id || poolNumber.assigned_org_id) {
       return NextResponse.json({ error: "This phone number is already assigned to another organization" }, { status: 409 });
     }
 

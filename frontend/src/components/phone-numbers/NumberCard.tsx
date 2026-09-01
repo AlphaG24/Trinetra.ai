@@ -14,6 +14,11 @@ export interface NumberCardProps {
     provisioned_at?: string;
     retail_price_paisa?: number;
     renewal_date?: string;
+    bidding_enabled?: boolean;
+    current_bid_paisa?: number;
+    minimum_bid_paisa?: number;
+    bid_count?: number;
+    is_assigned?: boolean;
     assigned_agents?: Array<{
       agent_id: string;
       agent_name: string;
@@ -24,8 +29,11 @@ export interface NumberCardProps {
   onManage?: (id: string) => void;
   onRenew?: (id: string) => void;
   onBuyNow?: (num: any) => void;
+  onPlaceBid?: (num: any) => void;
+  onClaimBid?: (num: any) => void;
   isPoolItem?: boolean;
   isBuying?: boolean;
+  hasWinningBid?: boolean;
 }
 
 export function NumberCard({ 
@@ -33,8 +41,11 @@ export function NumberCard({
   onManage, 
   onRenew, 
   onBuyNow, 
+  onPlaceBid,
+  onClaimBid,
   isPoolItem = false,
-  isBuying = false 
+  isBuying = false,
+  hasWinningBid = false
 }: NumberCardProps) {
   const [copied, setCopied] = useState(false);
 
@@ -139,19 +150,44 @@ export function NumberCard({
       <div className="pt-3 border-t border-[var(--border)] flex items-center justify-between gap-2">
         <div className="flex flex-col text-left">
           <span className="text-[10px] font-bold text-violet-400 font-mono">{formattedPrice}</span>
+          {phoneNumber.bidding_enabled && (
+            <span className="text-[9px] font-bold text-emerald-400 font-mono mt-0.5">
+              {phoneNumber.current_bid_paisa 
+                ? `Highest Bid: ₹${(phoneNumber.current_bid_paisa / 100).toFixed(0)}`
+                : phoneNumber.minimum_bid_paisa 
+                  ? `Min Bid: ₹${(phoneNumber.minimum_bid_paisa / 100).toFixed(0)}` 
+                  : "Bidding Open"}
+            </span>
+          )}
           {formattedRenewal && (
             <span className="text-[9px] text-[var(--muted)] font-medium">Renews: {formattedRenewal}</span>
           )}
         </div>
 
-        {isPoolItem ? (
+        {hasWinningBid ? (
           <button
-            onClick={() => onBuyNow && onBuyNow(phoneNumber)}
-            disabled={isBuying}
-            className="px-4 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-700 text-white font-bold text-xs uppercase tracking-wider transition-all shadow-sm shadow-violet-600/20"
+            onClick={() => onClaimBid && onClaimBid(phoneNumber)}
+            className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs uppercase tracking-wider transition-all shadow-md shadow-emerald-600/20 animate-pulse"
           >
-            {isBuying ? "Processing..." : "Buy Now"}
+            Claim Winning Bid
           </button>
+        ) : isPoolItem ? (
+          phoneNumber.bidding_enabled ? (
+            <button
+              onClick={() => onPlaceBid && onPlaceBid(phoneNumber)}
+              className="px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs uppercase tracking-wider transition-all shadow-sm shadow-emerald-600/20"
+            >
+              {phoneNumber.is_assigned ? "Bid for Next Cycle" : "Bid Now"}
+            </button>
+          ) : (
+            <button
+              onClick={() => onBuyNow && onBuyNow(phoneNumber)}
+              disabled={isBuying}
+              className="px-4 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-700 text-white font-bold text-xs uppercase tracking-wider transition-all shadow-sm shadow-violet-600/20"
+            >
+              {isBuying ? "Processing..." : "Buy Now"}
+            </button>
+          )
         ) : (
           <div className="flex items-center gap-2">
             {onRenew && (

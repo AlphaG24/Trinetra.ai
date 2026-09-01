@@ -25,10 +25,10 @@ export async function GET() {
 
     const adminClient = getAdminClient();
     const { data: poolNumbers, error } = await adminClient
-      .from("phone_number_pool")
+      .from("phone_numbers")
       .select(`
         *,
-        assigned_organization:organizations(id, name, slug),
+        assigned_organization:organizations!phone_numbers_assigned_org_id_fkey(id, name, slug),
         assigned_agent:agents(id, name)
       `)
       .order("created_at", { ascending: false });
@@ -88,13 +88,14 @@ export async function POST(request: Request) {
 
       rowsToInsert.push({
         phone_number: cleanPhone,
-        country: num.country || "IN",
         city: num.city || "Mumbai",
         did_type: num.did_type || "mobile",
         provider: num.provider || "voicelink",
         monthly_cost_paisa: num.monthly_cost_paisa ? parseInt(num.monthly_cost_paisa, 10) : 10000,
         retail_price_paisa: num.retail_price_paisa ? parseInt(num.retail_price_paisa, 10) : 29900,
-        status: "available"
+        status: "active",
+        is_assigned: false,
+        metadata: { country: num.country || "IN" }
       });
     }
 
@@ -103,20 +104,47 @@ export async function POST(request: Request) {
     }
 
     const adminClient = getAdminClient();
-    const { data: inserted, error } = await adminClient
-      .from("phone_number_pool")
-      .upsert(rowsToInsert, { onConflict: "phone_number" })
-      .select();
+    const insertedRows = [];
 
-    if (error) {
-      console.error("[Admin Phone Numbers] Insert error:", error);
-      return NextResponse.json({ error: "Failed to insert numbers into pool" }, { status: 500 });
+    for (const row of rowsToInsert) {
+      const { data: existing } = await adminClient
+        .from("phone_numbers")
+        .select("id")
+        .eq("phone_number", row.phone_number)
+        .maybeSingle();
+
+      if (existing) {
+        const { data: updated, error: updateErr } = await adminClient
+          .from("phone_numbers")
+          .update(row)
+          .eq("id", existing.id)
+          .select()
+          .single();
+
+        if (updateErr) {
+          console.error("[Admin Phone Numbers] Update row error:", updateErr);
+        } else if (updated) {
+          insertedRows.push(updated);
+        }
+      } else {
+        const { data: inserted, error: insertErr } = await adminClient
+          .from("phone_numbers")
+          .insert(row)
+          .select()
+          .single();
+
+        if (insertErr) {
+          console.error("[Admin Phone Numbers] Insert row error:", insertErr);
+        } else if (inserted) {
+          insertedRows.push(inserted);
+        }
+      }
     }
 
     return NextResponse.json({
       success: true,
-      count: inserted?.length || 0,
-      data: inserted
+      count: insertedRows.length,
+      data: insertedRows
     });
   } catch (err: any) {
     console.error("[Admin Phone Numbers] POST Error:", err);
@@ -157,7 +185,7 @@ export async function PATCH(request: Request) {
 
     const adminClient = getAdminClient();
     const { data: updated, error } = await adminClient
-      .from("phone_number_pool")
+      .from("phone_numbers")
       .update(updates)
       .eq("id", id)
       .select()
@@ -200,19 +228,18 @@ export async function DELETE(request: Request) {
 
     const adminClient = getAdminClient();
 
-    // Verify status before deleting
     const { data: existing } = await adminClient
-      .from("phone_number_pool")
-      .select("status")
+      .from("phone_numbers")
+      .select("status, is_assigned, assigned_org_id")
       .eq("id", id)
       .single();
 
-    if (existing && existing.status === "assigned") {
-      return NextResponse.json({ error: "Cannot delete an assigned phone number" }, { status: 400 });
+    if (existing && (existing.is_assigned === true || Boolean(existing.assigned_org_id))) {
+      return NextResponse.json({ error: "Cannot delete an assigned phone number. Please unassign it first." }, { status: 400 });
     }
 
     const { error } = await adminClient
-      .from("phone_number_pool")
+      .from("phone_numbers")
       .delete()
       .eq("id", id);
 
