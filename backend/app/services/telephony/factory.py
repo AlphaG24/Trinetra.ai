@@ -1,6 +1,6 @@
 import os
 import logging
-from typing import Dict
+from typing import Dict, Any
 
 from app.services.telephony.base import AbstractTelephonyProvider
 from app.services.telephony.simulated import SimulatedProvider

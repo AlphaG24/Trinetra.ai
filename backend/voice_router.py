@@ -7,7 +7,7 @@ import httpx
 import traceback
 from datetime import datetime
 from typing import Dict, Any, Optional
-from fastapi import APIRouter, Header, HTTPException, Request, BackgroundTasks, File, UploadFile, Form, Response, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Header, HTTPException, Request, BackgroundTasks, File, UploadFile, Form, Response, WebSocket, WebSocketDisconnect, Query
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from database import supabase, supabase_admin
@@ -1073,33 +1073,40 @@ async def trigger_sarvam_outbound_call(req: SarvamOutboundRequest):
 
 
 class SarvamTestCallRequest(BaseModel):
-    agent_id: str
+    agent_id: Optional[str] = None
 
 @router.post("/sarvam-test-call")
-async def start_sarvam_test_call(req: SarvamTestCallRequest):
+async def start_sarvam_test_call(
+    agent_id: Optional[str] = Query(None),
+    body_req: Optional[SarvamTestCallRequest] = None
+):
     """
     Starts an interactive browser test call session with Sarvam Voice Agent.
+    Supports both query param ?agent_id=... and JSON body { "agent_id": "..." }.
     """
+    target_agent_id = agent_id or (body_req.agent_id if body_req else None) or "demo-agent"
     from app.services.sarvam_voice_service import SarvamVoiceService
     sarvam = SarvamVoiceService()
 
-    sarvam_agent_id = req.agent_id
+    sarvam_agent_id = target_agent_id
     try:
-        agent_res = supabase_admin.table("agents").select("*").eq("id", req.agent_id).maybe_single().execute()
+        agent_res = supabase_admin.table("agents").select("*").eq("id", target_agent_id).maybe_single().execute()
         if agent_res.data:
             agent_row = agent_res.data
-            sarvam_agent_id = agent_row.get("sarvam_agent_id") or agent_row.get("vapi_agent_id") or req.agent_id
+            sarvam_agent_id = agent_row.get("sarvam_agent_id") or agent_row.get("vapi_agent_id") or target_agent_id
             
             # If Sarvam agent is not yet provisioned, register it automatically
             if not agent_row.get("sarvam_agent_id"):
                 reg_res = await sarvam.create_agent(
                     name=agent_row.get("name", "Voice Agent"),
                     prompt=agent_row.get("system_prompt", "You are a helpful AI sales assistant."),
-                    voice=agent_row.get("voice_id", "meera")
+                    greeting=agent_row.get("greeting_message", "Namaste, main aapki kya sahayata kar sakta hoon?"),
+                    voice=agent_row.get("voice_id", "meera"),
+                    language=agent_row.get("primary_language", "hi-IN")
                 )
                 if reg_res.get("agent_id"):
                     sarvam_agent_id = reg_res["agent_id"]
-                    supabase_admin.table("agents").update({"sarvam_agent_id": sarvam_agent_id}).eq("id", req.agent_id).execute()
+                    supabase_admin.table("agents").update({"sarvam_agent_id": sarvam_agent_id}).eq("id", target_agent_id).execute()
     except Exception as err:
         print(f"[Sarvam Test Call Agent Lookup Error] {err}", flush=True)
 
