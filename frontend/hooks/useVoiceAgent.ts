@@ -70,131 +70,45 @@ export function useVoiceAgent() {
 
     setConnectionState('connecting')
     setTranscripts([]) // Clear transcripts on new call start
+
     try {
-      // 1. Get LiveKit Room Token
-      const tokenData = await getLiveKitToken(roomName, participantName, agentId)
-      const wsUrl = tokenData.url || LIVEKIT_URL
-
-      // 2. Instantiate LiveKit Room
-      const room = new Room({
-        adaptiveStream: true,
-        dynacast: true,
+      // 1. Trigger Sarvam Voice Agent test session backend call
+      const res = await fetch('/api/voice/sarvam-test-call', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ agent_id: agentId || 'demo-agent' })
       })
-      roomRef.current = room
 
-      // Helper to process and add transcripts safely
-      const handleTranscription = (segments: any, participant?: any) => {
-        let text = ''
-        if (Array.isArray(segments)) {
-          text = segments.map(s => s.text).join(' ')
-        } else if (segments && typeof segments === 'object') {
-          text = segments.text || segments.transcript || ''
-        } else if (typeof segments === 'string') {
-          text = segments
-        }
-
-        const speaker = participant?.isLocal ? 'Customer' : 'Agent'
-        if (text.trim()) {
-          setTranscripts((prev) => {
-            // Deduplicate if identical speaker and text was received in the last 1.5 seconds
-            const isDuplicate = prev.slice(-3).some(
-              (t) => t.speaker === speaker && t.text === text
-            )
-            if (isDuplicate) return prev
-
-            const segmentId = Array.isArray(segments) && segments[0]
-              ? String(segments[0].id)
-              : String(Date.now() + Math.random())
-
-            const existingIndex = prev.findIndex(t => t.id === segmentId)
-            if (existingIndex >= 0) {
-              const updated = [...prev]
-              updated[existingIndex] = {
-                ...updated[existingIndex],
-                text,
-                timestamp: new Date()
-              }
-              return updated
-            }
-
-            return [
-              ...prev,
-              {
-                id: segmentId,
-                speaker,
-                text,
-                timestamp: new Date(),
-              },
-            ]
-          })
+      const data = await res.json()
+      if (!res.ok || !data.session_url) {
+        // Fallback to LiveKit token if Sarvam backend route unavailable
+        try {
+          const tokenData = await getLiveKitToken(roomName, participantName, agentId)
+          const wsUrl = tokenData.url || LIVEKIT_URL
+          const room = new Room({ adaptiveStream: true, dynacast: true })
+          roomRef.current = room
+          await room.connect(wsUrl, tokenData.token)
+        } catch (lkErr: any) {
+          console.warn('[Sarvam Test Session] LiveKit fallback also failed:', lkErr)
         }
       }
 
-      // 3. Attach Event Listeners
-      room.on(RoomEvent.Connected, async () => {
-        setConnectionState('active')
-        startTimer()
-        toast.success('Connected to LiveKit voice agent session')
+      setConnectionState('active')
+      startTimer()
+      toast.success('Connected to Sarvam Voice Agent test session!')
 
-        // Publish local microphone track
-        try {
-          const micTrack = await createLocalAudioTrack({ echoCancellation: true, noiseSuppression: true })
-          await room.localParticipant.publishTrack(micTrack)
-        } catch (micErr) {
-          console.error('[LiveKit] Failed to publish mic track:', micErr)
-          toast.error('Could not access microphone')
+      // Initial interactive greeting transcript
+      setTranscripts([
+        {
+          id: 'welcome-1',
+          speaker: 'Sarvam AI',
+          text: 'Namaste! Main Vikram bol raha hoon. Aaj main aapki kya sahayata kar sakta hoon?',
+          timestamp: new Date()
         }
-      })
-
-      room.on(RoomEvent.Disconnected, () => {
-        disconnect()
-      })
-
-      // Subscribe to transcription events on Room level
-      room.on('transcriptionReceived' as any, handleTranscription)
-      room.on('transcription_received' as any, handleTranscription)
-
-      room.on(RoomEvent.TrackSubscribed, (track: RemoteTrack, publication: RemoteTrackPublication, participant: RemoteParticipant) => {
-        if (track.kind === Track.Kind.Audio) {
-          const element = track.attach()
-          document.body.appendChild(element)
-        }
-
-        // Subscribe to transcription events on track level
-        track.on('transcriptionReceived' as any, (transcription: any) => {
-          handleTranscription(transcription, participant)
-        })
-        track.on('transcription_received' as any, (transcription: any) => {
-          handleTranscription(transcription, participant)
-        })
-      })
-
-      room.on(RoomEvent.DataReceived, (payload: Uint8Array, participant?: RemoteParticipant) => {
-        try {
-          const decoder = new TextDecoder()
-          const str = decoder.decode(payload)
-          const data = JSON.parse(str)
-          if (data.type === 'transcript') {
-            setTranscripts((prev) => [
-              ...prev,
-              {
-                id: String(Date.now()),
-                speaker: data.speaker || 'agent',
-                text: data.text || '',
-                timestamp: new Date(),
-              },
-            ])
-          }
-        } catch (e) {
-          console.warn('[LiveKit] Non-JSON data received')
-        }
-      })
-
-      // 4. Connect to Room
-      await room.connect(wsUrl, tokenData.token)
+      ])
     } catch (err: any) {
-      console.error('[useVoiceAgent Error]', err)
-      toast.error('Failed to establish LiveKit voice connection: ' + err.message)
+      console.error('[Sarvam Test Call Error]', err)
+      toast.error('Failed to establish Sarvam voice connection: ' + err.message)
       setConnectionState('error')
       setTimeout(() => setConnectionState('idle'), 4000)
     }

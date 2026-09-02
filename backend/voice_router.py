@@ -1071,3 +1071,44 @@ async def trigger_sarvam_outbound_call(req: SarvamOutboundRequest):
 
     return call_res
 
+
+class SarvamTestCallRequest(BaseModel):
+    agent_id: str
+
+@router.post("/sarvam-test-call")
+async def start_sarvam_test_call(req: SarvamTestCallRequest):
+    """
+    Starts an interactive browser test call session with Sarvam Voice Agent.
+    """
+    from app.services.sarvam_voice_service import SarvamVoiceService
+    sarvam = SarvamVoiceService()
+
+    sarvam_agent_id = req.agent_id
+    try:
+        agent_res = supabase_admin.table("agents").select("*").eq("id", req.agent_id).maybe_single().execute()
+        if agent_res.data:
+            agent_row = agent_res.data
+            sarvam_agent_id = agent_row.get("sarvam_agent_id") or agent_row.get("vapi_agent_id") or req.agent_id
+            
+            # If Sarvam agent is not yet provisioned, register it automatically
+            if not agent_row.get("sarvam_agent_id"):
+                reg_res = await sarvam.create_agent(
+                    name=agent_row.get("name", "Voice Agent"),
+                    prompt=agent_row.get("system_prompt", "You are a helpful AI sales assistant."),
+                    voice=agent_row.get("voice_id", "meera")
+                )
+                if reg_res.get("agent_id"):
+                    sarvam_agent_id = reg_res["agent_id"]
+                    supabase_admin.table("agents").update({"sarvam_agent_id": sarvam_agent_id}).eq("id", req.agent_id).execute()
+    except Exception as err:
+        print(f"[Sarvam Test Call Agent Lookup Error] {err}", flush=True)
+
+    session = await sarvam.create_test_session(sarvam_agent_id)
+    return {
+        "status": "success",
+        "session_id": session.get("session_id"),
+        "session_url": session.get("session_url"),
+        "token": session.get("token")
+    }
+
+
