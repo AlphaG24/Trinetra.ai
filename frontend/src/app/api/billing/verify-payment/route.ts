@@ -227,7 +227,7 @@ export async function POST(request: Request) {
             .eq('organization_id', profile.organization_id)
             .eq('is_assigned', true)
 
-          if (assignedCount === undefined || assignedCount <= 1) {
+          if (assignedCount === null || assignedCount === undefined || assignedCount <= 1) {
             const { data: recentAgent } = await adminClient
               .from('agents')
               .select('id, name')
