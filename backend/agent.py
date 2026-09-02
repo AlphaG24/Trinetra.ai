@@ -1204,6 +1204,37 @@ async def entrypoint(ctx: JobContext):
         ]
         return any(phrase in t for phrase in closing_keywords)
 
+    @session.on("conversation_item_added")
+    def _on_conversation_item_added_ep(event):
+        try:
+            item = getattr(event, 'item', None)
+            if not item:
+                return
+            role = getattr(item, 'role', '')
+            text = getattr(item, 'text_content', '') or getattr(item, 'content', '')
+            if isinstance(text, list):
+                text = " ".join(str(t) for t in text)
+            text = str(text).strip()
+            if not text:
+                return
+
+            speaker = "agent" if role in ("assistant", "system") else "customer"
+            clean_txt = clean_ssml(text, is_transcript=True)
+            if clean_txt:
+                payload = json.dumps({
+                    "type": "transcript",
+                    "speaker": speaker,
+                    "text": clean_txt
+                }).encode("utf-8")
+                asyncio.create_task(ctx.room.local_participant.publish_data(payload))
+
+            # Trigger intent disconnect if assistant says goodbye
+            if role == "assistant" and check_closing_intent(text):
+                logger.info(f"[Intent Call Cut] Closing utterance by assistant: '{text}' -> cutting call in 2.5s")
+                asyncio.create_task(execute_intent_disconnect(delay_seconds=2.5))
+        except Exception as err:
+            logger.warning(f"Error in conversation_item_added hook: {err}")
+
     @session.on("user_speech_committed")
     def _on_user_speech_ep(event):
         try:
@@ -1793,6 +1824,36 @@ async def run_agent(room_name: str, agent_id: str | None = None, contact_id: str
                         asyncio.create_task(room.local_participant.publish_data(payload))
             except Exception as err:
                 logger.warning(f"Error publishing user transcript: {err}")
+
+        @session.on("conversation_item_added")
+        def _on_conversation_item_added_ra(event):
+            try:
+                item = getattr(event, 'item', None)
+                if not item:
+                    return
+                role = getattr(item, 'role', '')
+                text = getattr(item, 'text_content', '') or getattr(item, 'content', '')
+                if isinstance(text, list):
+                    text = " ".join(str(t) for t in text)
+                text = str(text).strip()
+                if not text:
+                    return
+
+                speaker = "agent" if role in ("assistant", "system") else "customer"
+                clean_txt = clean_ssml(text, is_transcript=True)
+                if clean_txt:
+                    payload = json.dumps({
+                        "type": "transcript",
+                        "speaker": speaker,
+                        "text": clean_txt
+                    }).encode("utf-8")
+                    asyncio.create_task(room.local_participant.publish_data(payload))
+
+                if role == "assistant" and check_closing_intent_ra(text):
+                    logger.info(f"[Intent Call Cut - RA] Closing utterance by assistant: '{text}' -> cutting call in 2.5s")
+                    asyncio.create_task(execute_intent_disconnect_ra(delay_seconds=2.5))
+            except Exception as err:
+                logger.warning(f"Error in conversation_item_added RA hook: {err}")
 
         @session.on("agent_speech_committed")
         def _on_agent_speech(event):
