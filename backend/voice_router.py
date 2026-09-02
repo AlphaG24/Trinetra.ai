@@ -1112,3 +1112,15 @@ async def start_sarvam_test_call(req: SarvamTestCallRequest):
     }
 
 
+@router.delete("/sarvam-agent/{sarvam_agent_id}")
+async def delete_sarvam_agent_endpoint(sarvam_agent_id: str):
+    """
+    Deletes a Sarvam Voice Agent when an agent is deleted in Trinetra.
+    """
+    from app.services.sarvam_voice_service import SarvamVoiceService
+    sarvam = SarvamVoiceService()
+    success = await sarvam.delete_agent(sarvam_agent_id)
+    return {"status": "success" if success else "failed", "sarvam_agent_id": sarvam_agent_id}
+
+
+

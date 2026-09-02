@@ -49,6 +49,24 @@ export async function PATCH(
       return NextResponse.json({ error: updateError.message }, { status: 500 });
     }
 
+    // Sync updated settings to Sarvam AI agent
+    try {
+      const backendUrl = process.env.BACKEND_INTERNAL_URL || 'http://127.0.0.1:8000';
+      await fetch(`${backendUrl}/api/voice/sarvam-agent`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          agent_id: updatedAgent.id,
+          name: updatedAgent.name,
+          prompt: updatedAgent.system_prompt,
+          greeting: updatedAgent.greeting_message,
+          voice: updatedAgent.voice_id || 'meera'
+        })
+      });
+    } catch (sarvamUpdateErr) {
+      console.warn('[Sarvam Lifecycle Update Warning]', sarvamUpdateErr);
+    }
+
     return NextResponse.json({ success: true, agent: updatedAgent });
   } catch (error: any) {
     console.error("[Agent Update API] Catch Error:", error);
@@ -77,10 +95,10 @@ export async function DELETE(
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
 
-    // 3. Fetch agent first using service role to check ownership
+    // 3. Fetch agent first using service role to check ownership and get sarvam_agent_id
     const { data: agent, error: fetchError } = await adminClient
       .from('agents')
-      .select('user_id')
+      .select('user_id, sarvam_agent_id')
       .eq('id', agentId)
       .maybeSingle();
 
@@ -97,6 +115,18 @@ export async function DELETE(
     if (agent.user_id !== user.id) {
       console.warn(`[Agent Delete API] User ${user.id} attempted to delete agent owned by ${agent.user_id}`);
       return NextResponse.json({ error: "Forbidden: You do not own this agent." }, { status: 403 });
+    }
+
+    // Delete corresponding Sarvam Agent via backend service
+    if (agent.sarvam_agent_id) {
+      try {
+        const backendUrl = process.env.BACKEND_INTERNAL_URL || 'http://127.0.0.1:8000';
+        await fetch(`${backendUrl}/api/voice/sarvam-agent/${agent.sarvam_agent_id}`, {
+          method: 'DELETE'
+        });
+      } catch (sarvamDelErr) {
+        console.warn('[Sarvam Lifecycle Delete Warning]', sarvamDelErr);
+      }
     }
 
     // 4. Perform the hard delete using service role client

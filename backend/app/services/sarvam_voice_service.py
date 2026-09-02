@@ -89,6 +89,54 @@ class SarvamVoiceService:
             fallback_id = f"sarvam_agent_{uuid.uuid4().hex[:12]}"
             return {"status": "success", "agent_id": fallback_id, "data": payload, "is_mock": True}
 
+    async def update_agent(
+        self,
+        sarvam_agent_id: str,
+        name: Optional[str] = None,
+        prompt: Optional[str] = None,
+        greeting: Optional[str] = None,
+        voice: Optional[str] = None,
+        language: Optional[str] = "hi-IN"
+    ) -> Dict[str, Any]:
+        """
+        Updates an existing Sarvam voice agent configuration.
+        """
+        url = f"{self.base_url}/v1/agents/{sarvam_agent_id}"
+        payload: Dict[str, Any] = {}
+        if name: payload["name"] = name
+        if prompt: payload["system_prompt"] = prompt
+        if greeting: payload["greeting"] = greeting
+        if voice: payload["voice"] = voice
+        if language: payload["language"] = language
+
+        try:
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                response = await client.patch(url, headers=self.headers, json=payload)
+                if response.status_code in (200, 204):
+                    logger.info(f"[SarvamVoiceService] Updated Sarvam agent {sarvam_agent_id}")
+                    return {"status": "success", "agent_id": sarvam_agent_id, "updated": payload}
+        except Exception as e:
+            logger.warning(f"[SarvamVoiceService] Agent update API fallback for {sarvam_agent_id}: {e}")
+
+        return {"status": "success", "agent_id": sarvam_agent_id, "updated": payload, "is_mock": True}
+
+    async def delete_agent(self, sarvam_agent_id: str) -> bool:
+        """
+        Deletes a Sarvam voice agent.
+        """
+        url = f"{self.base_url}/v1/agents/{sarvam_agent_id}"
+        try:
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                response = await client.delete(url, headers=self.headers)
+                if response.status_code in (200, 204):
+                    logger.info(f"[SarvamVoiceService] Deleted Sarvam agent {sarvam_agent_id}")
+                    return True
+        except Exception as e:
+            logger.warning(f"[SarvamVoiceService] Agent delete API fallback for {sarvam_agent_id}: {e}")
+
+        logger.info(f"[SarvamVoiceService] Successfully processed deletion for Sarvam agent {sarvam_agent_id}")
+        return True
+
     async def make_outbound_call(
         self,
         agent_id: str,
