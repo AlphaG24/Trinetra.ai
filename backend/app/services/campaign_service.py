@@ -488,45 +488,45 @@ class CampaignService:
 
         # Place the outbound call via Twilio or Simulated fallback
         try:
-                if not is_simulated:
-                    call_res = await provider.make_outbound_call(
-                        contact_phone, 
-                        agent_phone, 
-                        webhook_url,
-                        custom_parameters={
-                            "contact_name": contact_name,
-                            "company_name": company_name,
-                            "notes": notes
-                        }
+            if not is_simulated:
+                call_res = await provider.make_outbound_call(
+                    contact_phone, 
+                    agent_phone, 
+                    webhook_url,
+                    custom_parameters={
+                        "contact_name": contact_name,
+                        "company_name": company_name,
+                        "notes": notes
+                    }
+                )
+                call_sid = call_res.get("call_sid")
+                outcome = "connected"
+                logger.info(f"[Campaign Outbound] Twilio call placed successfully: SID={call_sid} to {contact_phone}")
+            else:
+                call_sid = f"sim-{uuid.uuid4()}"
+                outcome = "connected"
+                logger.info(f"[Campaign Outbound] Simulated call placed: SID={call_sid} to {contact_phone}")
+                
+                # Spawn background task to simulate call completion
+                asyncio.create_task(
+                    simulate_call_completion(
+                        call_sid=call_sid,
+                        contact_id=contact_id,
+                        contact_phone=contact_phone,
+                        contact_name=contact_name,
+                        company_name=company_name,
+                        notes=notes,
+                        agent_id=agent_id,
+                        user_id=agent.get("user_id"),
+                        organization_id=organization_id,
+                        campaign_id=campaign_id,
+                        agent_name=agent_name
                     )
-                    call_sid = call_res.get("call_sid")
-                    outcome = "connected"
-                    logger.info(f"[Campaign Outbound] Twilio call placed successfully: SID={call_sid} to {contact_phone}")
-                else:
-                    call_sid = f"sim-{uuid.uuid4()}"
-                    outcome = "connected"
-                    logger.info(f"[Campaign Outbound] Simulated call placed: SID={call_sid} to {contact_phone}")
-                    
-                    # Spawn background task to simulate call completion
-                    asyncio.create_task(
-                        simulate_call_completion(
-                            call_sid=call_sid,
-                            contact_id=contact_id,
-                            contact_phone=contact_phone,
-                            contact_name=contact_name,
-                            company_name=company_name,
-                            notes=notes,
-                            agent_id=agent_id,
-                            user_id=agent.get("user_id"),
-                            organization_id=organization_id,
-                            campaign_id=campaign_id,
-                            agent_name=agent_name
-                        )
-                    )
-            except Exception as dial_err:
-                logger.error(f"[Campaign Outbound] Call FAILED to {contact_phone}: {dial_err}")
-                outcome = "failed"
-                call_sid = None
+                )
+        except Exception as dial_err:
+            logger.error(f"[Campaign Outbound] Call FAILED to {contact_phone}: {dial_err}")
+            outcome = "failed"
+            call_sid = None
 
         call_id = None
         lead_id = None
