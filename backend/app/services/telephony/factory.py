@@ -4,15 +4,15 @@ from typing import Dict
 
 from app.services.telephony.base import AbstractTelephonyProvider
 from app.services.telephony.simulated import SimulatedProvider
-from app.services.telephony.voicelink import VoiceLinkProvider
 from app.services.telephony.twilio import TwilioProvider
+from app.services.sarvam_voice_service import SarvamVoiceService
 from database import supabase_admin
 
 logger = logging.getLogger("TelephonyFactory")
 
-_provider_cache: Dict[str, AbstractTelephonyProvider] = {}
+_provider_cache: Dict[str, Any] = {}
 
-def get_provider(provider_name: str) -> AbstractTelephonyProvider:
+def get_provider(provider_name: str) -> Any:
     provider_name = provider_name.lower()
     
     if provider_name in _provider_cache:
@@ -23,8 +23,8 @@ def get_provider(provider_name: str) -> AbstractTelephonyProvider:
     
     if provider_name == "simulated":
         provider = SimulatedProvider()
-    elif provider_name == "voicelink":
-        provider = VoiceLinkProvider()
+    elif provider_name in ("sarvam", "voicelink"):
+        provider = SarvamVoiceService()
     elif provider_name == "twilio":
         provider = TwilioProvider()
     else:
@@ -34,8 +34,11 @@ def get_provider(provider_name: str) -> AbstractTelephonyProvider:
     return provider
 
 def get_best_provider(country_code: str = 'IN') -> str:
-    # For now, use Twilio for everything until VoiceLink is activated
-    logger.info(f"Selected twilio as primary provider (country: {country_code})")
+    country = (country_code or '').upper().strip()
+    if country in ('IN', 'INDIA'):
+        logger.info(f"Selected sarvam as primary provider for country: {country}")
+        return 'sarvam'
+    logger.info(f"Selected twilio as primary provider for country: {country}")
     return 'twilio'
 
 def get_provider_for_organization(organization_id: str) -> AbstractTelephonyProvider:

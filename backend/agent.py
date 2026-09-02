@@ -58,6 +58,22 @@ def _count_enabled_personalities(personalities_raw) -> int:
         return 0
 
 
+def _get_transcript_messages(agent_instance):
+    """Safely extract ChatMessage list from agent_instance's chat_ctx."""
+    if not agent_instance:
+        return []
+    chat_ctx = getattr(agent_instance, 'chat_ctx', None)
+    if not chat_ctx and hasattr(agent_instance, 'session'):
+        chat_ctx = getattr(agent_instance.session, 'chat_ctx', None)
+    if not chat_ctx:
+        return []
+    raw_msgs = getattr(chat_ctx, 'messages', None)
+    if not raw_msgs:
+        return []
+    msgs = raw_msgs() if callable(raw_msgs) else raw_msgs
+    return msgs if isinstance(msgs, (list, tuple)) else []
+
+
 async def apply_multi_personality_prompt(
     agent_instance,
     user_message: str,
@@ -81,15 +97,15 @@ async def apply_multi_personality_prompt(
 
         # Build context from existing chat history
         context = ""
-        if hasattr(agent_instance, 'chat_ctx'):
-            try:
-                msgs = agent_instance.chat_ctx.messages[-6:]  # last 3 exchanges
-                context = "\n".join(
-                    f"{m.role}: {m.content}" for m in msgs
-                    if m.role in ("user", "assistant") and m.content
-                )
-            except Exception:
-                pass
+        try:
+            msgs = _get_transcript_messages(agent_instance)
+            recent_msgs = msgs[-6:] if msgs else []
+            context = "\n".join(
+                f"{getattr(m, 'role', '')}: {getattr(m, 'content', '')}" for m in recent_msgs
+                if hasattr(m, 'role') and getattr(m, 'role', '') in ("user", "assistant") and getattr(m, 'content', None)
+            )
+        except Exception:
+            pass
 
         classifier = IntentClassifier()
         new_intent = await classifier.classify(user_message, enabled_personalities, context)
@@ -128,19 +144,24 @@ async def apply_multi_personality_prompt(
         logger.warning(f"[MULTI-PERSONALITY] apply_multi_personality_prompt failed (non-fatal): {e}")
 
 def clean_ssml(text: str) -> str:
-    """Strip all SSML tags, markdown ** modifiers, and custom speed/pitch brackets from text before TTS synthesis"""
-    import re
     if not text:
         return ""
-    # Remove XML-like tags (e.g. <break time="300ms"/>, <emphasis>, etc.)
-    text = re.sub(r'<[^>]+>', '', text)
-    # Remove markdown bold/italics markers
-    text = text.replace('**', '').replace('*', '')
-    # Remove custom speech/pitch tags like ((slow)), ((/slow)), ((warm)), ((/warm))
+    import re
+    # Remove markdown bold
+    text = re.sub(r'\*\*(.+?)\*\*', r'\1', text)
+    text = text.replace('**', '')
+    # Remove custom speech tags
     text = re.sub(r'\(\(/?[a-zA-Z0-9_-]+\)\)', '', text)
-    # Clean up double spaces
-    text = re.sub(r'\s+', ' ', text)
-    return text.strip()
+    # Remove emojis
+    text = re.sub(r'[\U0001F600-\U0001F64F\U0001F300-\U0001F5FF\U0001F680-\U0001F6FF]', '', text)
+    # Remove text emoticons
+    text = text.replace(':)', '').replace(':(', '').replace(':D', '')
+    # Clean whitespace
+    text = re.sub(r'\s+', ' ', text).strip()
+    # Fallback for empty text
+    if len(text) < 2:
+        return "Haan ji, main sun raha hoon."
+    return text
 
 def text_to_ssml(text: str, provider: str = "sarvam") -> str:
     """Convert marker-rich text to SSML for expressive TTS (legacy fallback, clean_ssml takes priority)"""
@@ -313,7 +334,7 @@ class VikramAgent(Agent):
         # Wrap TTS to parse SSML tags on speech synthesis
         wrapped_tts = ExpressiveTTSWrapper(tts_plugin, provider=voice_provider)
 
-        stt_lang = "hi" if language in ('hinglish', 'hi-IN') else "en"
+        stt_lang = "en"
         super().__init__(
             instructions=instructions,
             stt=openai.STT(
@@ -323,7 +344,7 @@ class VikramAgent(Agent):
                 language=stt_lang,
             ),
             llm=openai.LLM(
-                model="groq/compound",
+                model=os.getenv("GROQ_LLM_MODEL", "llama-3.1-8b-instant"),
                 base_url="https://api.groq.com/openai/v1",
                 api_key=groq_api_key,
                 temperature=0.7,
@@ -331,9 +352,9 @@ class VikramAgent(Agent):
             ),
             tts=wrapped_tts,
             vad=vad_model,
-            min_endpointing_delay=1.5,
-            max_endpointing_delay=4.0,
-            min_consecutive_speech_delay=0.3,
+            min_endpointing_delay=0.3,
+            max_endpointing_delay=1.0,
+            min_consecutive_speech_delay=0.8,
             use_tts_aligned_transcript=True,
         )
 
@@ -356,7 +377,7 @@ class VikramAgent(Agent):
             
         await self.session.say(
             greeting,
-            allow_interruptions=True
+            allow_interruptions=False
         )
 
 async def fetch_knowledge_base(agent_id: str) -> list:
@@ -414,7 +435,7 @@ Only return valid JSON. No other text."""
             "https://api.groq.com/openai/v1/chat/completions",
             headers={"Authorization": f"Bearer {groq_key}", "Content-Type": "application/json"},
             json={
-                "model": "groq/compound",
+                "model": os.getenv("GROQ_LLM_MODEL", "llama-3.1-8b-instant"),
                 "messages": [{"role": "user", "content": prompt}],
                 "temperature": 0.1,
                 "max_tokens": 600,
@@ -692,9 +713,39 @@ Only return valid JSON. No other text."""
 
 server = AgentServer(num_idle_processes=1)
 
+_active_livekit_rooms = set()
+
+def _cleanup_livekit_rooms():
+    logger.info("[PROCESS SHUTDOWN] Disconnecting active LiveKit agent rooms...")
+    for r in list(_active_livekit_rooms):
+        try:
+            if hasattr(r, 'disconnect'):
+                asyncio.run(r.disconnect())
+        except Exception:
+            pass
+
+import atexit
+import signal
+atexit.register(_cleanup_livekit_rooms)
+try:
+    signal.signal(signal.SIGTERM, lambda s, f: (_cleanup_livekit_rooms(), os._exit(0)))
+except Exception:
+    pass
+
 @server.rtc_session()
 async def entrypoint(ctx: JobContext):
     logger.info(f"User connected: {ctx.room.name}")
+    
+    # Guard: Check if an agent participant is already connected to this room
+    if ctx.room and hasattr(ctx.room, 'remote_participants'):
+        for p in ctx.room.remote_participants.values():
+            p_identity = getattr(p, 'identity', '') or ''
+            if p_identity.startswith("agent_") or p_identity.startswith("Vikram") or "agent" in p_identity.lower():
+                logger.warning(f"[DUPLICATE WORKER GUARD] Room '{ctx.room.name}' already has connected agent participant '{p_identity}'. Skipping duplicate worker join.")
+                return
+
+    if ctx.room:
+        _active_livekit_rooms.add(ctx.room)
     
     # Default fallback settings
     provider = 'sarvam'
@@ -837,7 +888,7 @@ async def entrypoint(ctx: JobContext):
                         call_res = await asyncio.to_thread(
                             supabase_admin.table("voice_calls").select("metadata").eq("metadata->>provider_call_id", call_sid).maybe_single().execute
                         )
-                        if call_res.data and call_res.data.get("metadata"):
+                        if call_res and hasattr(call_res, 'data') and call_res.data and call_res.data.get("metadata"):
                             contact_id = call_res.data["metadata"].get("contact_id")
                     except Exception as e:
                         logger.error(f"Failed to resolve contact_id from voice_calls metadata in entrypoint: {e}")
@@ -1122,18 +1173,16 @@ async def entrypoint(ctx: JobContext):
                 # Always increment minutes/quota if duration > 0, regardless of transcript
                 if duration > 0:
                     try:
+                        import math
                         from app.services.usage_service import UsageService
                         usage_service = UsageService(supabase_admin)
                         await usage_service.increment_minutes(agent_id, duration)
-                        logger.info(f"Incremented minutes usage for agent {agent_id} by {duration} seconds.")
+                        logger.info(f"Incremented usage for agent {agent_id}: {duration}s call -> {math.ceil(duration / 60)} minutes charged.")
                     except Exception as usage_err:
                         logger.error(f"Failed to increment usage minutes: {usage_err}")
 
-                if hasattr(agent_instance, 'chat_ctx'):
-                    messages = agent_instance.chat_ctx.messages
-                    transcript = "\n".join([f"{m.role}: {m.content}" for m in messages if m.role in ("user", "assistant")])
-                else:
-                    transcript = ""
+                messages = _get_transcript_messages(agent_instance)
+                transcript = "\n".join([f"{getattr(m, 'role', '')}: {getattr(m, 'content', '')}" for m in messages if hasattr(m, 'role') and getattr(m, 'role', '') in ("user", "assistant")])
                 
                 call_sid = None
                 contact_id = None
@@ -1152,7 +1201,10 @@ async def entrypoint(ctx: JobContext):
                     logger.info(f"Awaiting save/extraction of completed call details ({duration}s)...")
                     await extract_and_save_lead(transcript, agent_id, user_id, organization_id, duration, call_sid=call_sid, contact_id=contact_id)
         except Exception as err:
-            logger.error(f"Failed to execute final disconnect log save: {err}")
+            logger.error("Failed to execute final disconnect log save", exc_info=True)
+        finally:
+            if ctx.room:
+                _active_livekit_rooms.discard(ctx.room)
 
 
 
@@ -1380,10 +1432,10 @@ async def run_agent(room_name: str, agent_id: str | None = None, contact_id: str
                             caller_number = cleaned
                             break
 
-                # Fetch contact_id from voice_calls metadata if twilio room
+                # Fetch contact_id from voice_calls metadata if twilio / sip room
                 campaign_contact = None
-                if not contact_id and room_name and room_name.startswith("twilio-"):
-                    call_sid = room_name.replace("twilio-", "")
+                if not contact_id and room_name and ("twilio-" in room_name or "sip-" in room_name):
+                    call_sid = room_name.split("_")[0].replace("twilio-", "").replace("sip-", "")
                     try:
                         call_res = supabase_admin.table("voice_calls").select("metadata").eq("metadata->>provider_call_id", call_sid).maybe_single().execute()
                         if call_res.data and call_res.data.get("metadata"):
@@ -1656,6 +1708,17 @@ async def run_agent(room_name: str, agent_id: str | None = None, contact_id: str
 
         try:
             await room.connect(livekit_url, token)
+            _active_livekit_rooms.add(room)
+            
+            # Guard: Check if an agent participant is already connected
+            if room.remote_participants:
+                for p in room.remote_participants.values():
+                    p_identity = getattr(p, 'identity', '') or ''
+                    if p_identity.startswith("agent_") or p_identity.startswith("Vikram") or "agent" in p_identity.lower():
+                        logger.warning(f"[DUPLICATE WORKER GUARD] Room '{room_name}' already has connected agent participant '{p_identity}'. Disconnecting duplicate in-process agent.")
+                        await room.disconnect()
+                        return
+
             await session.start(agent=agent_instance, room=room)
             await done.wait()
         except Exception as e:
@@ -1669,30 +1732,29 @@ async def run_agent(room_name: str, agent_id: str | None = None, contact_id: str
                     # Always increment minutes/quota if duration > 0, regardless of transcript
                     if duration > 0:
                         try:
+                            import math
                             from app.services.usage_service import UsageService
                             usage_service = UsageService(supabase_admin)
                             await usage_service.increment_minutes(agent_id, duration)
-                            logger.info(f"[In-Process Agent] Incremented minutes usage for agent {agent_id} by {duration} seconds.")
+                            logger.info(f"[In-Process Agent] Incremented usage for agent {agent_id}: {duration}s call -> {math.ceil(duration / 60)} minutes charged.")
                         except Exception as usage_err:
                             logger.error(f"Failed to increment usage minutes: {usage_err}")
 
-                    if hasattr(agent_instance, 'chat_ctx'):
-                        messages = agent_instance.chat_ctx.messages
-                        transcript = "\n".join([f"{m.role}: {m.content}" for m in messages if m.role in ("user", "assistant")])
-                    else:
-                        transcript = ""
+                    messages = _get_transcript_messages(agent_instance)
+                    transcript = "\n".join([f"{getattr(m, 'role', '')}: {getattr(m, 'content', '')}" for m in messages if hasattr(m, 'role') and getattr(m, 'role', '') in ("user", "assistant")])
                     
                     call_sid = None
-                    if room_name and room_name.startswith("twilio-"):
-                        call_sid = room_name.replace("twilio-", "")
+                    if room_name and ("twilio-" in room_name or "sip-" in room_name):
+                        call_sid = room_name.split("_")[0].replace("twilio-", "").replace("sip-", "")
 
                     if transcript:
                         logger.info(f"[In-Process Agent] Awaiting final call save ({duration}s)...")
                         await extract_and_save_lead(transcript, agent_id, user_id, organization_id, duration, call_sid=call_sid, contact_id=contact_id)
             except Exception as e:
-                logger.error(f"[In-Process Agent] Error saving stats: {e}")
+                logger.error("[In-Process Agent] Error saving stats", exc_info=True)
 
             try:
+                _active_livekit_rooms.discard(room)
                 await room.disconnect()
             except Exception:
                 pass

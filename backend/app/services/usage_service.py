@@ -36,8 +36,8 @@ class UsageService:
                 .eq("agent_id", agent_id)
                 .gte("created_at", start_of_month).execute
             )
-            total_seconds = sum(c.get("duration_seconds", 0) or 0 for c in (calls_res.data or []))
-            used = round(total_seconds / 60)
+            import math
+            used = sum(max(1, math.ceil((c.get("duration_seconds", 0) or 0) / 60)) for c in (calls_res.data or []) if (c.get("duration_seconds", 0) or 0) > 0)
             
             # Sync back to agents table so the cached value in the DB matches
             await asyncio.to_thread(
@@ -227,13 +227,16 @@ class UsageService:
             self.supabase.table("agents").select("minutes_used").eq("id", agent_id).single().execute
         )
         
+        current = 0
         if agent_res.data:
             current = agent_res.data.get("minutes_used", 0) or 0
+            new_used = current + minutes
             await asyncio.to_thread(
                 self.supabase.table("agents").update({
-                    "minutes_used": current + minutes
+                    "minutes_used": new_used
                 }).eq("id", agent_id).execute
             )
+            logger.info(f"[UsageService] Incremented agent {agent_id} minutes_used: raw_duration={duration_seconds}s -> ceil_minutes={minutes}m | previous={current}m -> new={new_used}m written to DB")
         
         # Check limits after increment
         await self.check_agent_minutes(agent_id)

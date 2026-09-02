@@ -220,6 +220,48 @@ export async function POST(request: Request) {
             })
             .eq('id', poolNumber.id)
 
+          // 2. Check if this is the organization's FIRST assigned number; if so, auto-assign to most recently created agent
+          const { count: assignedCount } = await adminClient
+            .from('phone_numbers')
+            .select('id', { count: 'exact', head: true })
+            .eq('organization_id', profile.organization_id)
+            .eq('is_assigned', true)
+
+          if (assignedCount === undefined || assignedCount <= 1) {
+            const { data: recentAgent } = await adminClient
+              .from('agents')
+              .select('id, name')
+              .eq('organization_id', profile.organization_id)
+              .order('created_at', { ascending: false })
+              .limit(1)
+              .maybeSingle()
+
+            if (recentAgent) {
+              await adminClient
+                .from('phone_numbers')
+                .update({ assigned_agent_id: recentAgent.id })
+                .eq('id', poolNumber.id)
+
+              await adminClient
+                .from('agent_phone_numbers')
+                .upsert({
+                  agent_id: recentAgent.id,
+                  phone_number_id: poolNumber.id,
+                  is_primary: true
+                })
+
+              await adminClient
+                .from('agents')
+                .update({
+                  phone_number: poolNumber.phone_number,
+                  telephony_provider: poolNumber.provider || 'sarvam'
+                })
+                .eq('id', recentAgent.id)
+
+              console.log(`[First Number Auto-Assignment] Assigned ${poolNumber.phone_number} to recent agent ${recentAgent.name} (${recentAgent.id})`)
+            }
+          }
+
           // 3. Activity log
           await adminClient.from('activity_log').insert({
             user_id: user.id,

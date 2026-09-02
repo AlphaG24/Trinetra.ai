@@ -62,7 +62,7 @@ class ContentModeration:
                         {"role": "system", "content": system_prompt},
                         {"role": "user", "content": f"Text to analyze: {text[:4000]}"}
                     ],
-                    model="llama3-8b-8192",
+                    model=os.getenv("GROQ_LIGHT_LLM_MODEL", os.getenv("GROQ_LLM_MODEL", "openai/gpt-oss-20b")),
                     temperature=0.1,
                     response_format={"type": "json_object"}
                 )

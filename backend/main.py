@@ -14,6 +14,7 @@ from app.routers.analytics_router import router as analytics_router
 from app.routers.integration_router import router as integration_router
 from app.routers.usage_router import router as usage_router
 from app.routers.blog_ai_router import router as blog_ai_router
+from app.routers.sarvam_webhook import router as sarvam_webhook_router
 
 app = FastAPI(title="Trinetra API")
 
@@ -39,6 +40,7 @@ app.include_router(analytics_router)
 app.include_router(integration_router)
 app.include_router(usage_router)
 app.include_router(blog_ai_router)
+app.include_router(sarvam_webhook_router)
 
 @app.get("/")
 def read_root():

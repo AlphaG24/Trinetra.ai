@@ -588,7 +588,7 @@ OUTPUT: Return the FULL enhanced prompt (original + additions). Keep it concise.
             "https://api.groq.com/openai/v1/chat/completions",
             headers={"Authorization": f"Bearer {groq_key}", "Content-Type": "application/json"},
             json={
-                "model": "groq/compound",
+                "model": os.getenv("GROQ_LLM_MODEL", "openai/gpt-oss-120b"),
                 "messages": [{
                     "role": "system",
                     "content": system_prompt
@@ -672,7 +672,7 @@ ENDING: {req.ending or '(empty)'}"""
             "https://api.groq.com/openai/v1/chat/completions",
             headers={"Authorization": f"Bearer {groq_key}", "Content-Type": "application/json"},
             json={
-                "model": "groq/compound",
+                "model": os.getenv("GROQ_LLM_MODEL", "openai/gpt-oss-120b"),
                 "messages": [
                     {"role": "system", "content": prompt},
                     {"role": "user", "content": messages_text}
@@ -905,17 +905,16 @@ async def handle_twilio_voice_webhook(
             except Exception as spawn_err:
                 print(f"[Twilio Agent Spawn] {spawn_err}", flush=True)
 
-        # 4. Return TwiML with Connect Stream
-        host = request.headers.get("host") or "localhost:8000"
-        scheme = "wss" if request.url.scheme == "https" or "trycloudflare.com" in host or "ngrok-free.dev" in host else "ws"
-        stream_url = f"{scheme}://{host}/api/voice/webhooks/voice/twilio/stream/{room_name}"
+        # 4. Return TwiML with LiveKit SIP Dial
+        sip_domain = os.getenv("LIVEKIT_SIP_DOMAIN", "vaakriti-mphqnns0.sip.livekit.cloud")
+        inbound_trunk = os.getenv("LIVEKIT_SIP_INBOUND_TRUNK", "twilio-inbound")
+        sip_uri = f"sip:{inbound_trunk}@{sip_domain}"
         
         twiml_response = f"""<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-    <Connect>
-        <Stream url="{stream_url}" />
-    </Connect>
-    <Pause length="3600" />
+    <Dial>
+        <Sip>{sip_uri}</Sip>
+    </Dial>
 </Response>"""
 
         return Response(content=twiml_response.strip(), media_type="application/xml")
@@ -974,142 +973,101 @@ async def handle_twilio_voice_status(
         return {"status": "error", "message": str(e)}
 
 
-# --- TWILIO BI-DIRECTIONAL WEBSOCKET AUDIO BRIDGE ---
-
+# --- TWILIO NATIVE SIP TRUNKING NOTICE ---
+# Note: Manual WebSocket u-law audio stream has been replaced with LiveKit native SIP Trunking.
 @router.websocket("/webhooks/voice/twilio/stream/{room_name}")
 async def twilio_audio_stream(websocket: WebSocket, room_name: str):
     await websocket.accept()
-    print(f"[Twilio WebSocket] Connected for room: {room_name}", flush=True)
+    print(f"[Twilio WebSocket Deprecated] Call for room: {room_name} is using native LiveKit SIP trunking.", flush=True)
+    await websocket.close()
+
+
+class SarvamAgentCreateRequest(BaseModel):
+    agent_id: Optional[str] = None
+    name: str
+    prompt: str
+    greeting: Optional[str] = None
+    voice: str = "meera"
+    language: str = "hi-IN"
+
+@router.post("/sarvam-agent")
+async def create_sarvam_agent_endpoint(req: SarvamAgentCreateRequest):
+    """
+    Creates a new Sarvam Voice Agent or registers sarvam_agent_id on an existing agent.
+    """
+    from app.services.sarvam_voice_service import SarvamVoiceService
+    sarvam = SarvamVoiceService()
     
-    # 1. Connect to LiveKit room
-    room = rtc.Room()
-    token = generate_agent_token(room_name)
-    livekit_url = os.getenv("LIVEKIT_URL", "ws://127.0.0.1:7880").strip()
+    res = await sarvam.create_agent(
+        name=req.name,
+        prompt=req.prompt,
+        greeting=req.greeting,
+        voice=req.voice,
+        language=req.language
+    )
     
+    sarvam_agent_id = res.get("agent_id")
+    
+    # Store sarvam_agent_id in agents table if agent_id supplied
+    if req.agent_id and sarvam_agent_id:
+        try:
+            supabase_admin.table("agents").update({
+                "sarvam_agent_id": sarvam_agent_id
+            }).eq("id", req.agent_id).execute()
+        except Exception as db_err:
+            print(f"[Sarvam Agent DB Update Error] {db_err}", flush=True)
+
+    return {
+        "status": "success",
+        "sarvam_agent_id": sarvam_agent_id,
+        "details": res
+    }
+
+
+class SarvamOutboundRequest(BaseModel):
+    agent_id: str
+    phone_number: str
+    customer_name: Optional[str] = None
+    company_name: Optional[str] = None
+    business_name: Optional[str] = None
+    agent_name: Optional[str] = None
+    reason: Optional[str] = None
+    variables: Optional[Dict[str, Any]] = None
+
+@router.post("/sarvam-outbound")
+async def trigger_sarvam_outbound_call(req: SarvamOutboundRequest):
+    """
+    Triggers an outbound call using Sarvam Voice Service with dynamic variable substitution.
+    """
+    from app.services.sarvam_voice_service import SarvamVoiceService
+    sarvam = SarvamVoiceService()
+
+    # Look up agent's sarvam_agent_id if UUID supplied
+    sarvam_agent_id = req.agent_id
     try:
-        await room.connect(livekit_url, token)
-        print(f"[Twilio WebSocket] Connected to LiveKit room: {room_name}", flush=True)
-    except Exception as conn_err:
-        print(f"[Twilio WebSocket] LiveKit connection failed: {conn_err}", flush=True)
-        await websocket.close()
-        return
-
-    # 2. Setup Audio Source & Track
-    audio_source = rtc.AudioSource(sample_rate=16000, num_channels=1)
-    audio_track = rtc.LocalAudioTrack.create_audio_track("twilio-inbound", audio_source)
-    await room.local_participant.publish_track(audio_track)
-    print("[Twilio WebSocket] Inbound audio track published", flush=True)
-    
-    stream_sid = None
-    ratecv_state_in = None
-    ratecv_state_out = None
-    
-    audio_queue = asyncio.Queue()
-    track_tasks = {}
-
-    async def read_track(track: rtc.RemoteAudioTrack):
-        try:
-            audio_stream = rtc.AudioStream(track)
-            async for event in audio_stream:
-                await audio_queue.put(event.frame)
-        except Exception as read_err:
-            print(f"[Twilio WebSocket] Error reading track: {read_err}", flush=True)
-
-    @room.on("track_subscribed")
-    def on_track_subscribed(track: rtc.RemoteAudioTrack, publication: rtc.RemoteTrackPublication, participant: rtc.RemoteParticipant):
-        print(f"[Twilio WebSocket] Track subscribed: {track.sid} from {participant.identity} (kind: {track.kind})", flush=True)
-        if track.kind == rtc.TrackKind.KIND_AUDIO:
-            task = asyncio.create_task(read_track(track))
-            track_tasks[track.sid] = task
-
-    @room.on("track_unsubscribed")
-    def on_track_unsubscribed(track: rtc.RemoteAudioTrack, publication: rtc.RemoteTrackPublication, participant: rtc.RemoteParticipant):
-        print(f"[Twilio WebSocket] Track unsubscribed: {track.sid}", flush=True)
-        if track.sid in track_tasks:
-            track_tasks[track.sid].cancel()
-            del track_tasks[track.sid]
-
-    @room.on("disconnected")
-    def on_disconnected(reason=None):
-        print(f"[Twilio WebSocket] LiveKit room disconnected: {reason}. Closing Twilio WebSocket.", flush=True)
-        try:
-            asyncio.create_task(websocket.close())
-        except Exception as close_err:
-            print(f"[Twilio WebSocket] Error closing websocket: {close_err}", flush=True)
-
-    async def send_to_twilio():
-        nonlocal stream_sid, ratecv_state_out
-        try:
-            while True:
-                frame = await audio_queue.get()
-                if not stream_sid:
-                    continue
-                
-                pcm_data = frame.data
-                sample_rate = frame.sample_rate
-                
-                pcm_8k, ratecv_state_out = audioop.ratecv(
-                    pcm_data, 2, 1, sample_rate, 8000, ratecv_state_out
-                )
-                
-                mulaw_data = audioop.lin2ulaw(pcm_8k, 2)
-                payload = base64.b64encode(mulaw_data).decode("utf-8")
-                await websocket.send_json({
-                    "event": "media",
-                    "streamSid": stream_sid,
-                    "media": {
-                        "payload": payload
-                    }
-                })
-        except asyncio.CancelledError:
-            pass
-        except Exception as send_err:
-            print(f"[Twilio WebSocket] Send task error: {send_err}", flush=True)
-
-    send_task = asyncio.create_task(send_to_twilio())
-    
-    try:
-        while True:
-            data = await websocket.receive_text()
-            msg = json.loads(data)
-            event = msg.get("event")
-            
-            if event == "start":
-                stream_sid = msg["start"]["streamSid"]
-                print(f"[Twilio WebSocket] Media stream active: {stream_sid}", flush=True)
-                
-            elif event == "media":
-                media = msg.get("media", {})
-                payload_b64 = media.get("payload")
-                if payload_b64:
-                    mulaw_data = base64.b64decode(payload_b64)
-                    
-                    pcm_8k = audioop.ulaw2lin(mulaw_data, 2)
-                    pcm_16k, ratecv_state_in = audioop.ratecv(
-                        pcm_8k, 2, 1, 8000, 16000, ratecv_state_in
-                    )
-                    
-                    samples_per_channel = len(pcm_16k) // 2
-                    frame = rtc.AudioFrame(
-                        data=pcm_16k,
-                        sample_rate=16000,
-                        num_channels=1,
-                        samples_per_channel=samples_per_channel
-                    )
-                    await audio_source.capture_frame(frame)
-                    
-            elif event == "stop":
-                print("[Twilio WebSocket] Media stream stopped by Twilio", flush=True)
-                break
-    except WebSocketDisconnect:
-        print("[Twilio WebSocket] Client disconnected", flush=True)
+        agent_res = supabase_admin.table("agents").select("sarvam_agent_id, name").eq("id", req.agent_id).maybe_single().execute()
+        if agent_res.data and agent_res.data.get("sarvam_agent_id"):
+            sarvam_agent_id = agent_res.data["sarvam_agent_id"]
     except Exception as e:
-        print(f"[Twilio WebSocket] Bridge exception: {e}", flush=True)
-    finally:
-        send_task.cancel()
-        for t in track_tasks.values():
-            t.cancel()
-        await room.disconnect()
-        print(f"[Twilio WebSocket] Connection for room {room_name} closed & cleaned up", flush=True)
+        print(f"[Sarvam Outbound Lookup] {e}", flush=True)
 
+    vars_dict = req.variables or {}
+    if req.customer_name:
+        vars_dict["customer_name"] = req.customer_name
+    if req.company_name:
+        vars_dict["company_name"] = req.company_name
+    if req.business_name:
+        vars_dict["business_name"] = req.business_name
+    if req.agent_name:
+        vars_dict["agent_name"] = req.agent_name
+    if req.reason:
+        vars_dict["reason"] = req.reason
+
+    call_res = await sarvam.make_outbound_call(
+        agent_id=sarvam_agent_id,
+        phone_number=req.phone_number,
+        variables=vars_dict
+    )
+
+    return call_res
 

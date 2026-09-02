@@ -20,6 +20,15 @@ running_campaign_tasks = set()
 
 class CampaignService:
     @staticmethod
+    def get_provider_for_number(phone_number: str) -> str:
+        if not phone_number:
+            return 'sarvam'
+        cleaned = phone_number.strip()
+        if cleaned.startswith('+91') or cleaned.startswith('91') or (len(cleaned.replace('+', '')) == 10):
+            return 'sarvam'  # Indian number -> Sarvam
+        return 'twilio'       # International number -> Twilio
+
+    @staticmethod
     def clean_phone(phone_str: str) -> str:
         if not phone_str:
             return ""
@@ -476,52 +485,91 @@ class CampaignService:
         outcome = "failed"
         duration = 0
 
-        contact_name = contact.get("full_name") or ""
-        company_name = contact.get("company_name") or ""
+        contact_name = contact.get("full_name") or contact.get("name") or ""
+        company_name = contact.get("company_name") or contact.get("company") or ""
         notes = contact.get("notes") or ""
+        agent_name = agent.get("name") or "Agent"
+        business_name = campaign_data.get("name") or "Trinetra AI"
 
-        # Place the outbound call via Twilio or Simulated
-        try:
-            if not is_simulated:
-                call_res = await provider.make_outbound_call(
-                    contact_phone, 
-                    agent_phone, 
-                    webhook_url,
-                    custom_parameters={
-                        "contact_name": contact_name,
-                        "company_name": company_name,
-                        "notes": notes
-                    }
-                )
-                call_sid = call_res.get("call_sid")
-                outcome = "connected"
-                logger.info(f"[Campaign Outbound] Twilio call placed successfully: SID={call_sid} to {contact_phone}")
-            else:
-                call_sid = f"sim-{uuid.uuid4()}"
-                outcome = "connected"
-                logger.info(f"[Campaign Outbound] Simulated call placed: SID={call_sid} to {contact_phone}")
+        # Determine target provider based on phone number (+91 Indian -> Sarvam, International -> Twilio)
+        target_provider = CampaignService.get_provider_for_number(contact_phone)
+        sarvam_api_key = os.getenv("SARVAM_API_KEY")
+
+        if target_provider == "sarvam" and sarvam_api_key:
+            try:
+                from app.services.sarvam_voice_service import SarvamVoiceService
+                sarvam_service = SarvamVoiceService(api_key=sarvam_api_key)
                 
-                # Spawn background task to simulate call completion
-                agent_name = agent.get("name") or "Agent"
-                asyncio.create_task(
-                    simulate_call_completion(
-                        call_sid=call_sid,
-                        contact_id=contact_id,
-                        contact_phone=contact_phone,
-                        contact_name=contact_name,
-                        company_name=company_name,
-                        notes=notes,
-                        agent_id=agent_id,
-                        user_id=agent.get("user_id"),
-                        organization_id=organization_id,
-                        campaign_id=campaign_id,
-                        agent_name=agent_name
-                    )
+                # Fetch stored sarvam_agent_id if present
+                sarvam_agent_id = agent.get("sarvam_agent_id") or agent.get("vapi_agent_id") or agent_id
+
+                # Dynamic variable mappings for Sarvam Voice agent
+                sarvam_vars = {
+                    "customer_name": contact_name,
+                    "company_name": company_name,
+                    "business_name": business_name,
+                    "agent_name": agent_name,
+                    "reason": notes,
+                    "contact_id": contact_id,
+                    "campaign_id": campaign_id,
+                    "user_id": agent.get("user_id")
+                }
+
+                sarvam_res = await sarvam_service.make_outbound_call(
+                    agent_id=sarvam_agent_id,
+                    phone_number=contact_phone,
+                    variables=sarvam_vars
                 )
-        except Exception as dial_err:
-            logger.error(f"[Campaign Outbound] Call FAILED to {contact_phone}: {dial_err}")
-            outcome = "failed"
-            call_sid = None
+
+                call_sid = sarvam_res.get("call_id")
+                outcome = "connected"
+                logger.info(f"[Campaign Outbound] Sarvam Voice API call placed: call_id={call_sid} to {contact_phone}")
+            except Exception as sarvam_err:
+                logger.error(f"[Campaign Outbound] Sarvam call error to {contact_phone}: {sarvam_err}")
+                call_sid = f"sarvam-err-{uuid.uuid4()}"
+                outcome = "failed"
+        # Place the outbound call via Twilio or Simulated fallback
+        else:
+            try:
+                if not is_simulated:
+                    call_res = await provider.make_outbound_call(
+                        contact_phone, 
+                        agent_phone, 
+                        webhook_url,
+                        custom_parameters={
+                            "contact_name": contact_name,
+                            "company_name": company_name,
+                            "notes": notes
+                        }
+                    )
+                    call_sid = call_res.get("call_sid")
+                    outcome = "connected"
+                    logger.info(f"[Campaign Outbound] Twilio call placed successfully: SID={call_sid} to {contact_phone}")
+                else:
+                    call_sid = f"sim-{uuid.uuid4()}"
+                    outcome = "connected"
+                    logger.info(f"[Campaign Outbound] Simulated call placed: SID={call_sid} to {contact_phone}")
+                    
+                    # Spawn background task to simulate call completion
+                    asyncio.create_task(
+                        simulate_call_completion(
+                            call_sid=call_sid,
+                            contact_id=contact_id,
+                            contact_phone=contact_phone,
+                            contact_name=contact_name,
+                            company_name=company_name,
+                            notes=notes,
+                            agent_id=agent_id,
+                            user_id=agent.get("user_id"),
+                            organization_id=organization_id,
+                            campaign_id=campaign_id,
+                            agent_name=agent_name
+                        )
+                    )
+            except Exception as dial_err:
+                logger.error(f"[Campaign Outbound] Call FAILED to {contact_phone}: {dial_err}")
+                outcome = "failed"
+                call_sid = None
 
         call_id = None
         lead_id = None

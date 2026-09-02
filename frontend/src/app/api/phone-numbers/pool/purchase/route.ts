@@ -105,7 +105,7 @@ export async function POST(request: Request) {
       .from('agents')
       .update({
         phone_number: phoneRow.phone_number,
-        telephony_provider: phoneRow.provider || 'voicelink'
+        telephony_provider: phoneRow.provider || 'sarvam'
       })
       .eq('id', agentId)
 

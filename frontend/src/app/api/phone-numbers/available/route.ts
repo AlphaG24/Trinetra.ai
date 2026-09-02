@@ -17,7 +17,7 @@ export async function GET(request: Request) {
         let provider = url.searchParams.get("provider");
 
         if (!provider) {
-            provider = profile?.country === 'IN' ? 'voicelink' : 'twilio';
+            provider = profile?.country === 'IN' ? 'sarvam' : 'twilio';
         }
 
         const supabase = await createClient();
@@ -99,10 +99,10 @@ export async function GET(request: Request) {
             console.warn('[API] FastAPI available numbers fetch failed, returning mock/empty available numbers:', fetchErr?.message || fetchErr);
             
             // Return some fallback numbers in case backend is offline so the UI doesn't look completely empty or break
-            const mockNumbers = provider === 'voicelink' ? [
-                { did_id: "mock-vl-1", phone_number: "+91 98765 43210", city: "Mumbai", area_code: "022", did_type: "mobile", provider: "voicelink" },
-                { did_id: "mock-vl-2", phone_number: "+91 98765 43211", city: "Delhi", area_code: "011", did_type: "mobile", provider: "voicelink" },
-                { did_id: "mock-vl-3", phone_number: "+91 98765 43212", city: "Bangalore", area_code: "080", did_type: "mobile", provider: "voicelink" }
+            const mockNumbers = (provider === 'sarvam' || provider === 'voicelink') ? [
+                { did_id: "mock-sv-1", phone_number: "+91 98765 43210", city: "Mumbai", area_code: "022", did_type: "mobile", provider: "sarvam" },
+                { did_id: "mock-sv-2", phone_number: "+91 98765 43211", city: "Delhi", area_code: "011", did_type: "mobile", provider: "sarvam" },
+                { did_id: "mock-sv-3", phone_number: "+91 98765 43212", city: "Bangalore", area_code: "080", did_type: "mobile", provider: "sarvam" }
             ] : [
                 { did_id: "mock-tw-1", phone_number: "+1 (555) 019-2831", city: "New York", area_code: "212", did_type: "local", provider: "twilio" },
                 { did_id: "mock-tw-2", phone_number: "+1 (555) 019-2832", city: "Los Angeles", area_code: "310", did_type: "local", provider: "twilio" },

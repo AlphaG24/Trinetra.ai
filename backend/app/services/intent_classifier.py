@@ -108,7 +108,7 @@ Respond with ONLY one word from the enabled list above. No explanation. No punct
                     "Content-Type": "application/json",
                 },
                 json={
-                    "model": "groq/compound",
+                    "model": os.getenv("GROQ_LIGHT_LLM_MODEL", os.getenv("GROQ_LLM_MODEL", "openai/gpt-oss-20b")),
                     "messages": [{"role": "user", "content": prompt}],
                     "temperature": 0.1,
                     "max_tokens": 10,

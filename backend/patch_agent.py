@@ -43,7 +43,7 @@ Only return valid JSON. No other text.\"\"\"
             "https://api.groq.com/openai/v1/chat/completions",
             headers={"Authorization": f"Bearer {groq_key}", "Content-Type": "application/json"},
             json={
-                "model": "groq/compound",
+                "model": os.getenv("GROQ_LLM_MODEL", "openai/gpt-oss-120b"),
                 "messages": [{"role": "user", "content": prompt}],
                 "temperature": 0.1,
                 "max_tokens": 500,
@@ -134,8 +134,9 @@ disconnect_logic = """
             
             # Extract transcript from the chat context (assuming livekit agent context)
             if hasattr(agent_instance, 'chat_ctx'):
-                messages = agent_instance.chat_ctx.messages
-                transcript = "\\n".join([f"{m.role}: {m.content}" for m in messages if m.role in ("user", "assistant")])
+                raw_msgs = getattr(agent_instance.chat_ctx, 'messages', None)
+                messages = raw_msgs() if callable(raw_msgs) else (raw_msgs or [])
+                transcript = "\\n".join([f"{m.role}: {m.content}" for m in messages if hasattr(m, 'role') and getattr(m, 'role', '') in ("user", "assistant")])
             else:
                 transcript = ""
             

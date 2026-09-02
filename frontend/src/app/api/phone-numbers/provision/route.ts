@@ -29,13 +29,13 @@ export async function POST(request: Request) {
         }
 
         if (!provider) {
-            provider = profile.country === 'IN' ? 'voicelink' : 'twilio';
+            provider = profile.country === 'IN' ? 'sarvam' : 'twilio';
         }
 
         // Only validate area_code if phone_number is NOT provided
         if (!phone_number) {
             if (!area_code) {
-                area_code = provider === 'voicelink' ? '022' : '212';
+                area_code = provider === 'sarvam' ? '022' : '212';
             }
 
             if (provider === 'twilio') {
@@ -47,7 +47,7 @@ export async function POST(request: Request) {
                         error: 'US area code must be exactly 3 digits' 
                     }, { status: 400 });
                 }
-            } else if (provider === 'voicelink') {
+            } else if (provider === 'sarvam' || provider === 'voicelink') {
                 if (!/^\d{3,4}$/.test(area_code)) {
                     return NextResponse.json({
                         success: false,

@@ -272,11 +272,19 @@ class TwilioProvider(AbstractTelephonyProvider):
             url_parts[4] = urllib.parse.urlencode(query)
             webhook_url = urllib.parse.urlunparse(url_parts)
             logger.info(f"[{self.provider_name}] Appended custom parameters to webhook URL: {webhook_url}")
+            
+        sip_domain = os.getenv("LIVEKIT_SIP_DOMAIN", "vaakriti-mphqnns0.sip.livekit.cloud")
+        outbound_trunk = os.getenv("LIVEKIT_SIP_OUTBOUND_TRUNK", "twilio-outbound")
+        sip_uri = f"sip:{outbound_trunk}@{sip_domain}"
+        sip_twiml = f'<?xml version="1.0" encoding="UTF-8"?><Response><Dial><Sip>{sip_uri}</Sip></Dial></Response>'
+        
         try:
+            # Place outbound call via Twilio pointing to LiveKit SIP trunk
             call = self.client.calls.create(
                 to=to_number,
                 from_=from_number,
-                url=webhook_url  # TwiML URL that connects to LiveKit / agent handler
+                url=webhook_url if webhook_url else None,
+                twiml=sip_twiml if not webhook_url else None
             )
             return {"call_sid": call.sid, "status": call.status}
         except TwilioRestException as e:
