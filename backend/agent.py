@@ -143,16 +143,19 @@ async def apply_multi_personality_prompt(
     except Exception as e:
         logger.warning(f"[MULTI-PERSONALITY] apply_multi_personality_prompt failed (non-fatal): {e}")
 
-def clean_ssml(text: str) -> str:
+def clean_ssml(text: str, is_transcript: bool = False) -> str:
     if not text:
-        return "Haan ji, main sun raha hoon."
-    import re
+        return "" if is_transcript else "Haan ji, main sun raha hoon."
     # Remove markdown bold/italics
     text = re.sub(r'\*\*(.+?)\*\*', r'\1', text)
     text = text.replace('**', '')
     text = re.sub(r'\*(.+?)\*', r'\1', text)
-    # Remove custom speech tags like ((warm)), ((slow)), ((/warm))
-    text = re.sub(r'\(\(/?[a-zA-Z0-9_-]+\)\)', '', text)
+    # Remove any double parenthesis tags like ((warm)), ((/warm)), ((pause)), ((slow))
+    text = re.sub(r'\(\([^)]*\)\)', '', text)
+    # Remove single parentheses with common tone tags like (pause), (warm), (laugh)
+    text = re.sub(r'\((?:warm|slow|pause|laugh|chuckle|breath|sigh|whisper|emph)\)', '', text, flags=re.IGNORECASE)
+    # Remove double brackets like [[...]]
+    text = re.sub(r'\[\[[^\]]*\]\]', '', text)
     # Remove XML / SSML tags like <break>, <emphasis>
     text = re.sub(r'<[^>]+>', '', text)
     # Remove emojis
@@ -163,7 +166,7 @@ def clean_ssml(text: str) -> str:
     text = re.sub(r'\s+', ' ', text).strip()
     # Fallback for empty text
     if len(text) < 2:
-        return "Haan ji, main sun raha hoon."
+        return "" if is_transcript else "Haan ji, main sun raha hoon."
     return text
 
 def text_to_ssml(text: str, provider: str = "sarvam") -> str:
@@ -340,14 +343,15 @@ class VikramAgent(Agent):
         sarvam_api_key = os.getenv("SARVAM_API_KEY", "").strip()
         gemini_api_key = (os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY") or "").strip()
 
-        # 1. Speech-to-Text: Use Sarvam Saarika v2.5 for native Hindi/Hinglish understanding, or Whisper with language detection
+        # 1. Speech-to-Text: Use Sarvam Saaras v3 in codemix mode for Hinglish (transcribes in user's spoken script)
         if sarvam_api_key and (voice_provider == 'sarvam' or language in ['hinglish', 'hi-IN']):
             stt_plugin = sarvam.STT(
-                model="saarika:v2.5",
+                model="saaras:v3",
                 language="hi-IN",
+                mode="codemix",
                 api_key=sarvam_api_key,
             )
-            logger.info("[VikramAgent] Using Sarvam STT (saarika:v2.5, hi-IN) for native Hinglish/Hindi speech recognition")
+            logger.info("[VikramAgent] Using Sarvam STT (saaras:v3, mode=codemix, hi-IN) for code-mixed Hinglish recognition")
         else:
             stt_plugin = openai.STT(
                 model="whisper-large-v3",
@@ -838,21 +842,14 @@ async def entrypoint(ctx: JobContext):
                 expressive_instructions = """
 ## HUMAN EXPRESSIVENESS RULES
 
-### Pauses (Use ... for short pause, .... for longer pause):
-- Before answering complex questions: "Let me check that for you...."
-- Before giving important info: "Your appointment is at.... 4 PM today."
-- When "thinking": "Dekhiye... actually... hmm..."
+### Clean Spoken Output (CRITICAL):
+- Output ONLY plain, natural conversational dialogue meant to be spoken out loud.
+- NEVER output tone tags, annotations, or markers like ((warm)), ((slow)), ((pause)), ((/warm)).
+- NEVER output markdown formatting such as **bold**, *italic*, or bullet points.
+- Match the user's language and script naturally (if user speaks Hinglish, respond in natural Hinglish).
 
-### Emphasis (Use **word** for important words):
-- "That's an **excellent** question!"
-- "I **highly** recommend the annual plan."
-- "Your confirmation number is **A3872B** — please save this."
-
-### Tone Variation:
-- ((warm)) for empathy: "I completely understand your frustration. Let me fix this right away.((/warm))"
-- ((slow)) for important details: "((slow))Your policy number is AB-9823-XYZ. Please note this down.((/slow))"
-
-### Natural Fillers (Hindi/Hinglish):
+### Natural Speech Rhythm:
+- Use natural punctuation for pacing: commas, periods, or ellipses (...) for slight breath pauses.
 - Thinking: "Dekhiye...", "Actually...", "Hmm..."
 - Agreement: "Bilkul...", "Haan ji...", "Of course..."
 - Transition: "To...", "Alright...", "Achha..."
@@ -1149,18 +1146,77 @@ async def entrypoint(ctx: JobContext):
                 logger.warning(f"[MULTI-PERSONALITY] Speech hook error (non-fatal): {hook_err}")
     # --- END MULTI-PERSONALITY HOOK ---
 
-    # --- TRANSCRIBE & GOODBYE HOOKS TO FRONTEND (entrypoint path) ---
+    # --- TRANSCRIBE & INTENT-BASED CALL CUT HOOKS TO FRONTEND (entrypoint path) ---
+    call_ending_in_progress = False
+
+    async def execute_intent_disconnect(delay_seconds: float = 2.5):
+        nonlocal call_ending_in_progress
+        if call_ending_in_progress:
+            return
+        call_ending_in_progress = True
+        logger.info(f"[Intent Call Cut] Triggered intent disconnect, executing in {delay_seconds}s...")
+        await asyncio.sleep(delay_seconds)
+
+        # 1. Notify browser client to hang up immediately
+        try:
+            call_end_signal = json.dumps({
+                "type": "call_ended",
+                "reason": "intent_goodbye"
+            }).encode("utf-8")
+            if ctx.room and ctx.room.local_participant:
+                await ctx.room.local_participant.publish_data(call_end_signal)
+                logger.info("[Intent Call Cut] Sent 'call_ended' signal to browser")
+        except Exception as sig_err:
+            logger.warning(f"Error publishing call_ended signal: {sig_err}")
+
+        # 2. Force delete room on LiveKit API to disconnect all participants
+        try:
+            lk_url = os.getenv("LIVEKIT_URL")
+            lk_key = os.getenv("LIVEKIT_API_KEY")
+            lk_sec = os.getenv("LIVEKIT_API_SECRET")
+            if lk_url and lk_key and lk_sec and ctx.room:
+                from livekit.api import LiveKitAPI, DeleteRoomRequest
+                lk_api = LiveKitAPI(lk_url, lk_key, lk_sec)
+                await lk_api.room.delete_room(DeleteRoomRequest(room=ctx.room.name))
+                await lk_api.aclose()
+                logger.info(f"[Intent Call Cut] LiveKit server room '{ctx.room.name}' deleted")
+        except Exception as lk_err:
+            logger.warning(f"LiveKit API delete room warning: {lk_err}")
+
+        # 3. Disconnect local room
+        try:
+            if ctx.room:
+                await ctx.room.disconnect()
+        except Exception:
+            pass
+
+    def check_closing_intent(text: str) -> bool:
+        if not text:
+            return False
+        t = text.lower()
+        closing_keywords = [
+            "goodbye", "good bye", "bye bye", "bye", "take care", "have a nice day",
+            "talk to you later", "see you", "alvida", "dhanyavad", "shukriya",
+            "phir milenge", "baat karke achha laga", "baat karke accha laga",
+            "call cut", "phone rakh raha hoon", "phone rakh rahi hoon", "phone kaat",
+            "call disconnect", "अलविदा", "गुडबाय", "गुड बाय", "बाय बाय", "बाय",
+            "धन्यवाद", "शुक्रिया", "फिर मिलेंगे"
+        ]
+        return any(phrase in t for phrase in closing_keywords)
+
     @session.on("user_speech_committed")
     def _on_user_speech_ep(event):
         try:
             txt = getattr(event, 'transcript', None) or getattr(event, 'text', None) or ""
             if txt and txt.strip():
-                payload = json.dumps({
-                    "type": "transcript",
-                    "speaker": "customer",
-                    "text": txt
-                }).encode("utf-8")
-                asyncio.create_task(ctx.room.local_participant.publish_data(payload))
+                clean_txt = clean_ssml(txt, is_transcript=True)
+                if clean_txt:
+                    payload = json.dumps({
+                        "type": "transcript",
+                        "speaker": "customer",
+                        "text": clean_txt
+                    }).encode("utf-8")
+                    asyncio.create_task(ctx.room.local_participant.publish_data(payload))
         except Exception as err:
             logger.warning(f"Error publishing user transcript: {err}")
 
@@ -1169,23 +1225,18 @@ async def entrypoint(ctx: JobContext):
         try:
             txt = getattr(event, 'transcript', None) or getattr(event, 'text', None) or ""
             if txt and txt.strip():
-                # Publish real-time transcript to room
-                payload = json.dumps({
-                    "type": "transcript",
-                    "speaker": "agent",
-                    "text": txt
-                }).encode("utf-8")
-                asyncio.create_task(ctx.room.local_participant.publish_data(payload))
+                clean_txt = clean_ssml(txt, is_transcript=True)
+                if clean_txt:
+                    payload = json.dumps({
+                        "type": "transcript",
+                        "speaker": "agent",
+                        "text": clean_txt
+                    }).encode("utf-8")
+                    asyncio.create_task(ctx.room.local_participant.publish_data(payload))
                 
-                # Detect goodbye / call termination
-                closing_phrases = ["thank you", "goodbye", "bye", "dhanyavad", "alvida", "phir milenge", "baat karke achha laga"]
-                if any(phrase in txt.lower() for phrase in closing_phrases):
-                    logger.info("Call ended after closing message")
-                    async def disconnect_call():
-                        await asyncio.sleep(1.0)
-                        if ctx.room:
-                            await ctx.room.disconnect()
-                    asyncio.create_task(disconnect_call())
+                # Detect goodbye / intent-based call termination
+                if check_closing_intent(txt):
+                    asyncio.create_task(execute_intent_disconnect(delay_seconds=2.5))
         except Exception as err:
             logger.warning(f"Error publishing agent transcript: {err}")
 
@@ -1400,21 +1451,14 @@ async def run_agent(room_name: str, agent_id: str | None = None, contact_id: str
                 expressive_instructions = """
 ## HUMAN EXPRESSIVENESS RULES
 
-### Pauses (Use ... for short pause, .... for longer pause):
-- Before answering complex questions: "Let me check that for you...."
-- Before giving important info: "Your appointment is at.... 4 PM today."
-- When "thinking": "Dekhiye... actually... hmm..."
+### Clean Spoken Output (CRITICAL):
+- Output ONLY plain, natural conversational dialogue meant to be spoken out loud.
+- NEVER output tone tags, annotations, or markers like ((warm)), ((slow)), ((pause)), ((/warm)).
+- NEVER output markdown formatting such as **bold**, *italic*, or bullet points.
+- Match the user's language and script naturally (if user speaks Hinglish, respond in natural Hinglish).
 
-### Emphasis (Use **word** for important words):
-- "That's an **excellent** question!"
-- "I **highly** recommend the annual plan."
-- "Your confirmation number is **A3872B** — please save this."
-
-### Tone Variation:
-- ((warm)) for empathy: "I completely understand your frustration. Let me fix this right away.((/warm))"
-- ((slow)) for important details: "((slow))Your policy number is AB-9823-XYZ. Please note this down.((/slow))"
-
-### Natural Fillers (Hindi/Hinglish):
+### Natural Speech Rhythm:
+- Use natural punctuation for pacing: commas, periods, or ellipses (...) for slight breath pauses.
 - Thinking: "Dekhiye...", "Actually...", "Hmm..."
 - Agreement: "Bilkul...", "Haan ji...", "Of course..."
 - Transition: "To...", "Alright...", "Achha..."
@@ -1698,17 +1742,55 @@ async def run_agent(room_name: str, agent_id: str | None = None, contact_id: str
         # --- END MULTI-PERSONALITY HOOK ---
         
         # --- TRANSCRIBE HOOKS TO FRONTEND ---
+        call_ending_in_progress_ra = False
+
+        async def execute_intent_disconnect_ra(delay_seconds: float = 2.5):
+            nonlocal call_ending_in_progress_ra
+            if call_ending_in_progress_ra:
+                return
+            call_ending_in_progress_ra = True
+            logger.info(f"[Intent Call Cut - RA] Triggered intent disconnect, executing in {delay_seconds}s...")
+            await asyncio.sleep(delay_seconds)
+            try:
+                call_end_signal = json.dumps({"type": "call_ended", "reason": "intent_goodbye"}).encode("utf-8")
+                if room and room.local_participant:
+                    await room.local_participant.publish_data(call_end_signal)
+            except Exception as sig_err:
+                logger.warning(f"Error publishing call_ended signal: {sig_err}")
+
+            try:
+                if room:
+                    await room.disconnect()
+            except Exception:
+                pass
+
+        def check_closing_intent_ra(text: str) -> bool:
+            if not text:
+                return False
+            t = text.lower()
+            closing_keywords = [
+                "goodbye", "good bye", "bye bye", "bye", "take care", "have a nice day",
+                "talk to you later", "see you", "alvida", "dhanyavad", "shukriya",
+                "phir milenge", "baat karke achha laga", "baat karke accha laga",
+                "call cut", "phone rakh raha hoon", "phone rakh rahi hoon", "phone kaat",
+                "call disconnect", "अलविदा", "गुडबाय", "गुड बाय", "बाय बाय", "बाय",
+                "धन्यवाद", "शुक्रिया", "फिर मिलेंगे"
+            ]
+            return any(phrase in t for phrase in closing_keywords)
+
         @session.on("user_speech_committed")
         def _on_user_speech(event):
             try:
                 txt = getattr(event, 'transcript', None) or getattr(event, 'text', None) or ""
                 if txt and txt.strip():
-                    payload = json.dumps({
-                        "type": "transcript",
-                        "speaker": "customer",
-                        "text": txt
-                    }).encode("utf-8")
-                    asyncio.create_task(room.local_participant.publish_data(payload))
+                    clean_txt = clean_ssml(txt, is_transcript=True)
+                    if clean_txt:
+                        payload = json.dumps({
+                            "type": "transcript",
+                            "speaker": "customer",
+                            "text": clean_txt
+                        }).encode("utf-8")
+                        asyncio.create_task(room.local_participant.publish_data(payload))
             except Exception as err:
                 logger.warning(f"Error publishing user transcript: {err}")
 
@@ -1717,22 +1799,18 @@ async def run_agent(room_name: str, agent_id: str | None = None, contact_id: str
             try:
                 txt = getattr(event, 'transcript', None) or getattr(event, 'text', None) or ""
                 if txt and txt.strip():
-                    payload = json.dumps({
-                        "type": "transcript",
-                        "speaker": "agent",
-                        "text": txt
-                    }).encode("utf-8")
-                    asyncio.create_task(room.local_participant.publish_data(payload))
+                    clean_txt = clean_ssml(txt, is_transcript=True)
+                    if clean_txt:
+                        payload = json.dumps({
+                            "type": "transcript",
+                            "speaker": "agent",
+                            "text": clean_txt
+                        }).encode("utf-8")
+                        asyncio.create_task(room.local_participant.publish_data(payload))
                     
-                    # Detect goodbye / call termination
-                    closing_phrases = ["thank you", "goodbye", "bye", "dhanyavad", "alvida", "phir milenge", "baat karke achha laga"]
-                    if any(phrase in txt.lower() for phrase in closing_phrases):
-                        logger.info("Call ended after closing message")
-                        async def disconnect_call():
-                            await asyncio.sleep(1.0)
-                            if room:
-                                await room.disconnect()
-                        asyncio.create_task(disconnect_call())
+                    # Detect goodbye / intent-based call termination
+                    if check_closing_intent_ra(txt):
+                        asyncio.create_task(execute_intent_disconnect_ra(delay_seconds=2.5))
             except Exception as err:
                 logger.warning(f"Error publishing agent transcript: {err}")
 

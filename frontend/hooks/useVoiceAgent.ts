@@ -47,6 +47,10 @@ export function useVoiceAgent() {
     }
   }, [])
 
+  const clearTranscripts = useCallback(() => {
+    setTranscripts([])
+  }, [])
+
   const disconnect = useCallback(() => {
     if (roomRef.current) {
       try {
@@ -58,7 +62,10 @@ export function useVoiceAgent() {
     }
     stopTimer()
     setConnectionState('ended')
-    setTimeout(() => setConnectionState('idle'), 3000)
+    setTimeout(() => {
+      setConnectionState('idle')
+      setTranscripts([])
+    }, 1500)
   }, [stopTimer])
 
   const startCall = useCallback(async (
@@ -173,16 +180,37 @@ export function useVoiceAgent() {
           const decoder = new TextDecoder()
           const str = decoder.decode(payload)
           const data = JSON.parse(str)
+
+          // 1. Handle intent-based automatic call cut
+          if (data.type === 'call_ended') {
+            console.log('[useVoiceAgent] Received call_ended signal from server')
+            disconnect()
+            return
+          }
+
+          // 2. Handle transcript message with client-side SSML/tag sanitization
           if (data.type === 'transcript') {
-            setTranscripts((prev) => [
-              ...prev,
-              {
-                id: String(Date.now()),
-                speaker: data.speaker || 'agent',
-                text: data.text || '',
-                timestamp: new Date(),
-              },
-            ])
+            const rawText = data.text || ''
+            const cleaned = rawText
+              .replace(/\(\([^)]*\)\)/g, '')
+              .replace(/\((?:warm|slow|pause|laugh|chuckle|breath|sigh|whisper|emph)\)/gi, '')
+              .replace(/\[\[[^\]]*\]\]/g, '')
+              .replace(/\*\*(.+?)\*\*/g, '$1')
+              .replace(/\*(.+?)\*/g, '$1')
+              .replace(/<[^>]+>/g, '')
+              .trim()
+
+            if (cleaned) {
+              setTranscripts((prev) => [
+                ...prev,
+                {
+                  id: String(Date.now()) + Math.random().toString().slice(2, 6),
+                  speaker: data.speaker || 'agent',
+                  text: cleaned,
+                  timestamp: new Date(),
+                },
+              ])
+            }
           }
         } catch (e) {
           console.warn('[LiveKit] Non-JSON data received')
@@ -229,5 +257,6 @@ export function useVoiceAgent() {
     startCall,
     endCall: disconnect,
     toggleMute,
+    clearTranscripts,
   }
 }
