@@ -661,38 +661,6 @@ Industry: ${profile?.business_type || 'General'}
             );
         }
 
-        if (insertedAgent) {
-            // Provision corresponding Sarvam AI Agent
-            try {
-                const backendUrl = process.env.BACKEND_INTERNAL_URL || 'http://127.0.0.1:8000';
-                const sarvamRes = await fetch(`${backendUrl}/api/voice/sarvam-agent`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        agent_id: insertedAgent.id,
-                        name: agentName,
-                        prompt: systemPrompt,
-                        greeting: firstMessage,
-                        voice: safeVoiceId,
-                        language: 'hi-IN'
-                    })
-                });
-                if (sarvamRes.ok) {
-                    const sarvamData = await sarvamRes.json();
-                    if (sarvamData.sarvam_agent_id) {
-                        insertedAgent.sarvam_agent_id = sarvamData.sarvam_agent_id;
-                        await supabaseAdmin
-                            .from('agents')
-                            .update({ sarvam_agent_id: sarvamData.sarvam_agent_id })
-                            .eq('id', insertedAgent.id);
-                        console.log(`[Sarvam Lifecycle] Provisioned sarvam_agent_id=${sarvamData.sarvam_agent_id} for agent ${insertedAgent.id}`);
-                    }
-                }
-            } catch (sarvamErr) {
-                console.warn('[Sarvam Lifecycle] Provisioning warning:', sarvamErr);
-            }
-        }
-
         // 5c. Update profile with onboarding details (only columns that actually exist)
         const profileUpdatePayload: Record<string, any> = {
             onboarding_complete: true,

@@ -145,13 +145,16 @@ async def apply_multi_personality_prompt(
 
 def clean_ssml(text: str) -> str:
     if not text:
-        return ""
+        return "Haan ji, main sun raha hoon."
     import re
-    # Remove markdown bold
+    # Remove markdown bold/italics
     text = re.sub(r'\*\*(.+?)\*\*', r'\1', text)
     text = text.replace('**', '')
-    # Remove custom speech tags
+    text = re.sub(r'\*(.+?)\*', r'\1', text)
+    # Remove custom speech tags like ((warm)), ((slow)), ((/warm))
     text = re.sub(r'\(\(/?[a-zA-Z0-9_-]+\)\)', '', text)
+    # Remove XML / SSML tags like <break>, <emphasis>
+    text = re.sub(r'<[^>]+>', '', text)
     # Remove emojis
     text = re.sub(r'[\U0001F600-\U0001F64F\U0001F300-\U0001F5FF\U0001F680-\U0001F6FF]', '', text)
     # Remove text emoticons
@@ -1633,7 +1636,7 @@ async def run_agent(room_name: str, agent_id: str | None = None, contact_id: str
 
         if greeting_message:
             async def custom_on_enter():
-                await agent_instance.session.say(greeting_message, allow_interruptions=True)
+                await agent_instance.session.say(greeting_message, allow_interruptions=False)
             agent_instance.on_enter = custom_on_enter
 
         session = AgentSession(vad=vad_model)

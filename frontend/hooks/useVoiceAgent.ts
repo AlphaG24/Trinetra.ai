@@ -1,6 +1,17 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback } from 'react'
+import { 
+  Room, 
+  RoomEvent, 
+  Track, 
+  createLocalAudioTrack,
+  RemoteTrack,
+  RemoteTrackPublication,
+  RemoteParticipant,
+  LocalTrackPublication
+} from 'livekit-client'
+import { getLiveKitToken, LIVEKIT_URL } from '@/lib/livekit'
 import toast from 'react-hot-toast'
 
 export type ConnectionState = 'idle' | 'connecting' | 'active' | 'ended' | 'error'
@@ -17,12 +28,8 @@ export function useVoiceAgent() {
   const [isMuted, setIsMuted] = useState(false)
   const [secondsConnected, setSecondsConnected] = useState(0)
   const [transcripts, setTranscripts] = useState<TranscriptMessage[]>([])
-  const [sessionUrl, setSessionUrl] = useState<string | null>(null)
-  const [currentAgentId, setCurrentAgentId] = useState<string | null>(null)
 
-  const wsRef = useRef<WebSocket | null>(null)
-  const mediaStreamRef = useRef<MediaStream | null>(null)
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
+  const roomRef = useRef<Room | null>(null)
   const timerRef = useRef<NodeJS.Timeout | null>(null)
 
   const startTimer = useCallback(() => {
@@ -40,189 +47,171 @@ export function useVoiceAgent() {
     }
   }, [])
 
-  const saveCallData = useCallback(async (agentId: string, finalTranscripts: TranscriptMessage[], durationSecs: number) => {
-    try {
-      await fetch('/api/voice/save-call', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          agent_id: agentId,
-          transcript: finalTranscripts,
-          duration_seconds: durationSecs,
-          duration: durationSecs
-        })
-      })
-      console.log('[Sarvam Test Call] Call data saved successfully')
-    } catch (err) {
-      console.warn('[Sarvam Test Call] Failed to save call data:', err)
-    }
-  }, [])
-
   const disconnect = useCallback(() => {
-    if (wsRef.current) {
+    if (roomRef.current) {
       try {
-        wsRef.current.close()
+        roomRef.current.disconnect()
       } catch (err) {
-        console.warn('[useVoiceAgent] WebSocket close error:', err)
+        console.warn('[useVoiceAgent] Disconnect error:', err)
       }
-      wsRef.current = null
+      roomRef.current = null
     }
-
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-      try {
-        mediaRecorderRef.current.stop()
-      } catch (e) {
-        // ignore
-      }
-      mediaRecorderRef.current = null
-    }
-
-    if (mediaStreamRef.current) {
-      mediaStreamRef.current.getTracks().forEach((track) => track.stop())
-      mediaStreamRef.current = null
-    }
-
     stopTimer()
     setConnectionState('ended')
     setTimeout(() => setConnectionState('idle'), 3000)
   }, [stopTimer])
-
-  const endCall = useCallback(() => {
-    if (currentAgentId) {
-      saveCallData(currentAgentId, transcripts, secondsConnected)
-    }
-    disconnect()
-  }, [currentAgentId, transcripts, secondsConnected, saveCallData, disconnect])
 
   const startCall = useCallback(async (
     roomName: string = 'trinetra-demo-room',
     participantName?: string,
     agentId?: string
   ) => {
-    const targetAgentId = agentId || (typeof roomName === 'string' && roomName.includes('-') ? roomName : 'demo-agent')
     if (connectionState !== 'idle' && connectionState !== 'ended') return
 
     setConnectionState('connecting')
     setTranscripts([]) // Clear transcripts on new call start
-    setCurrentAgentId(targetAgentId)
 
     try {
-      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || process.env.NEXT_PUBLIC_FASTAPI_URL || 'http://127.0.0.1:8000'
-      const res = await fetch(`${backendUrl}/api/voice/sarvam-test-call?agent_id=${encodeURIComponent(targetAgentId)}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ agent_id: targetAgentId })
-      })
+      // 1. Get LiveKit Room Token
+      const tokenData = await getLiveKitToken(roomName, participantName, agentId)
+      const wsUrl = tokenData.url || LIVEKIT_URL
 
-      const data = await res.json()
-      if (!res.ok || data.status === 'error') {
-        throw new Error(data.message || 'Failed to start Sarvam test session')
+      // 2. Instantiate LiveKit Room
+      const room = new Room({
+        adaptiveStream: true,
+        dynacast: true,
+      })
+      roomRef.current = room
+
+      // Helper to process and add transcripts safely
+      const handleTranscription = (segments: any, participant?: any) => {
+        let text = ''
+        if (Array.isArray(segments)) {
+          text = segments.map(s => s.text).join(' ')
+        } else if (segments && typeof segments === 'object') {
+          text = segments.text || segments.transcript || ''
+        } else if (typeof segments === 'string') {
+          text = segments
+        }
+
+        const speaker = participant?.isLocal ? 'Customer' : 'Agent'
+        if (text.trim()) {
+          setTranscripts((prev) => {
+            const isDuplicate = prev.slice(-3).some(
+              (t) => t.speaker === speaker && t.text === text
+            )
+            if (isDuplicate) return prev
+
+            const segmentId = Array.isArray(segments) && segments[0]
+              ? String(segments[0].id)
+              : String(Date.now() + Math.random())
+
+            const existingIndex = prev.findIndex(t => t.id === segmentId)
+            if (existingIndex >= 0) {
+              const updated = [...prev]
+              updated[existingIndex] = {
+                ...updated[existingIndex],
+                text,
+                timestamp: new Date()
+              }
+              return updated
+            }
+
+            return [
+              ...prev,
+              {
+                id: segmentId,
+                speaker,
+                text,
+                timestamp: new Date(),
+              },
+            ]
+          })
+        }
       }
 
-      const sUrl = data.session_url || `https://indus.sarvam.ai/samvaad/embed/${targetAgentId}`
-      setSessionUrl(sUrl)
-
-      // If session URL is WebSocket URL (ws:// or wss://)
-      if (sUrl.startsWith('ws://') || sUrl.startsWith('wss://')) {
-        const ws = new WebSocket(sUrl)
-        wsRef.current = ws
-
-        ws.onopen = async () => {
-          setConnectionState('active')
-          startTimer()
-          toast.success('Connected to Sarvam Voice Agent WebSocket session')
-
-          // Start Microphone Audio Stream
-          try {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-            mediaStreamRef.current = stream
-            
-            if (typeof MediaRecorder !== 'undefined') {
-              const recorder = new MediaRecorder(stream, { mimeType: 'audio/webm' })
-              mediaRecorderRef.current = recorder
-
-              recorder.ondataavailable = (event) => {
-                if (event.data.size > 0 && ws.readyState === WebSocket.OPEN) {
-                  ws.send(event.data)
-                }
-              }
-
-              recorder.start(250) // Slice audio every 250ms
-            }
-          } catch (micErr) {
-            console.warn('[Sarvam Audio Stream] Microphone permission denied:', micErr)
-            toast.error('Could not access microphone for live test call')
-          }
-        }
-
-        ws.onmessage = (event) => {
-          try {
-            const msg = JSON.parse(event.data)
-            if (msg.type === 'transcript' || msg.text) {
-              const textStr = msg.text || msg.transcript || ''
-              const speakerStr = msg.speaker || (msg.role === 'user' ? 'You' : 'Agent')
-              if (textStr.trim()) {
-                setTranscripts((prev) => [
-                  ...prev,
-                  {
-                    id: String(Date.now() + Math.random()),
-                    speaker: speakerStr,
-                    text: textStr,
-                    timestamp: new Date()
-                  }
-                ])
-              }
-            }
-          } catch (e) {
-            console.warn('[Sarvam WS] Non-JSON payload received')
-          }
-        }
-
-        ws.onerror = (err) => {
-          console.error('[Sarvam WS Error]', err)
-          toast.error('Sarvam WebSocket connection error')
-          setConnectionState('error')
-        }
-
-        ws.onclose = () => {
-          setConnectionState('ended')
-          stopTimer()
-          if (targetAgentId) {
-            saveCallData(targetAgentId, transcripts, secondsConnected)
-          }
-        }
-      } else {
-        // HTTP embed session URL fallback
+      // 3. Attach Event Listeners
+      room.on(RoomEvent.Connected, async () => {
         setConnectionState('active')
         startTimer()
-        toast.success('Connected to Sarvam Voice Agent test session!')
+        toast.success('Connected to LiveKit voice agent session')
 
-        // Initial interactive greeting
-        setTranscripts([
-          {
-            id: 'welcome-1',
-            speaker: 'Sarvam AI',
-            text: 'Namaste! Main aapka Voice Agent bol raha hoon. Aaj main aapki kya sahayata kar sakta hoon?',
-            timestamp: new Date()
+        // Publish local microphone track
+        try {
+          const micTrack = await createLocalAudioTrack({ echoCancellation: true, noiseSuppression: true })
+          await room.localParticipant.publishTrack(micTrack)
+        } catch (micErr) {
+          console.error('[LiveKit] Failed to publish mic track:', micErr)
+          toast.error('Could not access microphone')
+        }
+      })
+
+      room.on(RoomEvent.Disconnected, () => {
+        disconnect()
+      })
+
+      // Subscribe to transcription events
+      room.on('transcriptionReceived' as any, handleTranscription)
+      room.on('transcription_received' as any, handleTranscription)
+
+      room.on(RoomEvent.TrackSubscribed, (track: RemoteTrack, publication: RemoteTrackPublication, participant: RemoteParticipant) => {
+        if (track.kind === Track.Kind.Audio) {
+          const element = track.attach()
+          document.body.appendChild(element)
+        }
+
+        track.on('transcriptionReceived' as any, (transcription: any) => {
+          handleTranscription(transcription, participant)
+        })
+        track.on('transcription_received' as any, (transcription: any) => {
+          handleTranscription(transcription, participant)
+        })
+      })
+
+      room.on(RoomEvent.DataReceived, (payload: Uint8Array, participant?: RemoteParticipant) => {
+        try {
+          const decoder = new TextDecoder()
+          const str = decoder.decode(payload)
+          const data = JSON.parse(str)
+          if (data.type === 'transcript') {
+            setTranscripts((prev) => [
+              ...prev,
+              {
+                id: String(Date.now()),
+                speaker: data.speaker || 'agent',
+                text: data.text || '',
+                timestamp: new Date(),
+              },
+            ])
           }
-        ])
-      }
+        } catch (e) {
+          console.warn('[LiveKit] Non-JSON data received')
+        }
+      })
+
+      // 4. Connect to Room
+      await room.connect(wsUrl, tokenData.token)
     } catch (err: any) {
-      console.error('[Sarvam Test Call Error]', err)
-      toast.error('Failed to establish Sarvam voice connection: ' + err.message)
+      console.error('[useVoiceAgent Error]', err)
+      toast.error('Failed to establish LiveKit voice connection: ' + err.message)
       setConnectionState('error')
       setTimeout(() => setConnectionState('idle'), 4000)
     }
-  }, [connectionState, startTimer, stopTimer, saveCallData, secondsConnected, transcripts])
+  }, [connectionState, disconnect, startTimer])
 
   const toggleMute = useCallback(() => {
-    if (mediaStreamRef.current) {
-      const audioTracks = mediaStreamRef.current.getAudioTracks()
-      const newMuteState = !isMuted
-      audioTracks.forEach((track) => {
-        track.enabled = !newMuteState
+    if (roomRef.current) {
+      const isCurrentlyMuted = !isMuted
+      roomRef.current.localParticipant.audioTrackPublications.forEach((pub: LocalTrackPublication) => {
+        if (pub.track) {
+          if (isCurrentlyMuted) {
+            pub.track.mute()
+          } else {
+            pub.track.unmute()
+          }
+        }
       })
-      setIsMuted(newMuteState)
+      setIsMuted(isCurrentlyMuted)
     }
   }, [isMuted])
 
@@ -237,9 +226,8 @@ export function useVoiceAgent() {
     isMuted,
     secondsConnected,
     transcripts,
-    sessionUrl,
     startCall,
-    endCall,
+    endCall: disconnect,
     toggleMute,
   }
 }
