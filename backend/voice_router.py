@@ -271,8 +271,8 @@ async def generate_livekit_token(req: LiveKitTokenRequest):
         print(f"[LIVEKIT TOKEN ERROR] PyJWT generation failed: {str(e)}", flush=True)
         token = f"dev_token_{identity}_{room_name}"
 
-    # Spawn the agent worker in the background (only if not disabled)
-    if os.getenv("DISABLE_IN_PROCESS_AGENT", "false").lower() != "true":
+    # Spawn in-process agent worker only if explicitly requested (default: false, worker handles calls)
+    if os.getenv("ENABLE_IN_PROCESS_AGENT", "false").lower() == "true":
         print(f"[LIVEKIT AGENT] Spawning agent worker to join room: {room_name} with agent_id: {req.agent_id}", flush=True)
         try:
             async def safe_run_agent(r_name: str, a_id: str):
@@ -288,7 +288,7 @@ async def generate_livekit_token(req: LiveKitTokenRequest):
         except Exception as spawn_err:
             print(f"[LIVEKIT AGENT SPAWN ERROR] Failed to spawn agent task: {spawn_err}", flush=True)
     else:
-        print(f"[LIVEKIT AGENT] Skipping in-process agent spawn (DISABLE_IN_PROCESS_AGENT is true)", flush=True)
+        print(f"[LIVEKIT AGENT] External LiveKit worker active; skipping in-process agent spawn to prevent duplicate voices", flush=True)
 
     return {
         "status": "success",

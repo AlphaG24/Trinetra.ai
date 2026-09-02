@@ -10,7 +10,7 @@ import jwt
 from dotenv import load_dotenv
 from livekit.agents import JobContext, WorkerOptions, cli, AgentServer, tts
 from livekit.agents.voice import Agent, AgentSession
-from livekit.plugins import sarvam, silero, openai, elevenlabs
+from livekit.plugins import sarvam, silero, openai, elevenlabs, google
 from database import supabase_admin
 
 load_dotenv()
@@ -337,22 +337,49 @@ class VikramAgent(Agent):
         # Wrap TTS to parse SSML tags on speech synthesis
         wrapped_tts = ExpressiveTTSWrapper(tts_plugin, provider=voice_provider)
 
-        stt_lang = "en"
-        super().__init__(
-            instructions=instructions,
-            stt=openai.STT(
+        sarvam_api_key = os.getenv("SARVAM_API_KEY", "").strip()
+        gemini_api_key = (os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY") or "").strip()
+
+        # 1. Speech-to-Text: Use Sarvam Saarika v2.5 for native Hindi/Hinglish understanding, or Whisper with language detection
+        if sarvam_api_key and (voice_provider == 'sarvam' or language in ['hinglish', 'hi-IN']):
+            stt_plugin = sarvam.STT(
+                model="saarika:v2.5",
+                language="hi-IN",
+                api_key=sarvam_api_key,
+            )
+            logger.info("[VikramAgent] Using Sarvam STT (saarika:v2.5, hi-IN) for native Hinglish/Hindi speech recognition")
+        else:
+            stt_plugin = openai.STT(
                 model="whisper-large-v3",
                 base_url="https://api.groq.com/openai/v1",
                 api_key=groq_api_key,
-                language=stt_lang,
-            ),
-            llm=openai.LLM(
-                model=os.getenv("GROQ_LLM_MODEL", "llama-3.1-8b-instant"),
+                detect_language=True,
+                prompt="Namaste, Haan, Haanji, Batao, Hindi, Hinglish, English conversation.",
+            )
+            logger.info("[VikramAgent] Using Groq Whisper STT (whisper-large-v3, detect_language=True)")
+
+        # 2. LLM: Use Gemini 2.5 Flash for ultra-fast, robust responses without reasoning token depletion
+        if gemini_api_key:
+            llm_plugin = google.LLM(
+                model="gemini-2.5-flash",
+                api_key=gemini_api_key,
+                temperature=0.7,
+            )
+            logger.info("[VikramAgent] Using Google Gemini 2.5 Flash LLM")
+        else:
+            llm_plugin = openai.LLM(
+                model=os.getenv("GROQ_LLM_MODEL", "openai/gpt-oss-120b"),
                 base_url="https://api.groq.com/openai/v1",
                 api_key=groq_api_key,
                 temperature=0.7,
-                max_completion_tokens=150,
-            ),
+                max_completion_tokens=350,
+            )
+            logger.info(f"[VikramAgent] Using Groq LLM ({os.getenv('GROQ_LLM_MODEL', 'openai/gpt-oss-120b')})")
+
+        super().__init__(
+            instructions=instructions,
+            stt=stt_plugin,
+            llm=llm_plugin,
             tts=wrapped_tts,
             vad=vad_model,
             min_endpointing_delay=0.3,
@@ -768,6 +795,7 @@ async def entrypoint(ctx: JobContext):
 
     user_id = None
     organization_id = None
+    agent_data = None
     
     # 1. Fetch Agent settings from Supabase synchronously/concurrently before instantiation
     if agent_id:
@@ -934,8 +962,7 @@ async def entrypoint(ctx: JobContext):
 
                 if raw_greeting:
                     # Clean [slug] prefix and suffixes like - Demo / - Trial
-                    import re
-                    raw_name = agent_data.get('name', 'Agent')
+                    raw_name = agent_data.get('name', 'Agent') if agent_data else 'Agent'
                     clean_name = re.sub(r'^\[[^\]]+\]\s*', '', raw_name)
                     clean_name = re.sub(r'\s*-\s*(Demo|Trial)\s*$', '', clean_name, flags=re.IGNORECASE)
                     
