@@ -73,7 +73,8 @@ export function useVoiceAgent() {
 
     try {
       // 1. Trigger Sarvam Voice Agent test session backend call
-      const res = await fetch('/api/voice/sarvam-test-call', {
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || process.env.NEXT_PUBLIC_FASTAPI_URL || 'http://127.0.0.1:8000'
+      const res = await fetch(`${backendUrl}/api/voice/sarvam-test-call`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ agent_id: agentId || 'demo-agent' })

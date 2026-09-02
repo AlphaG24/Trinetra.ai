@@ -99,10 +99,15 @@ const nextConfig: NextConfig = {
     ];
   },
   async rewrites() {
+    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || process.env.NEXT_PUBLIC_FASTAPI_URL || 'http://127.0.0.1:8000';
     return [
       {
+        source: '/api/voice/:path*',
+        destination: `${backendUrl}/api/voice/:path*`,
+      },
+      {
         source: '/api/backend/:path*',
-        destination: `${process.env.NEXT_PUBLIC_BACKEND_URL || 'https://api.trinetraedu-ai.com'}/:path*`,
+        destination: `${backendUrl}/:path*`,
       }
     ];
   },
