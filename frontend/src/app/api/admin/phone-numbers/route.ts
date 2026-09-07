@@ -90,9 +90,10 @@ export async function POST(request: Request) {
         phone_number: cleanPhone,
         city: num.city || "Mumbai",
         did_type: num.did_type || "mobile",
-        provider: num.provider || "voicelink",
+        provider: num.provider || "sarvam",
         monthly_cost_paisa: num.monthly_cost_paisa ? parseInt(num.monthly_cost_paisa, 10) : 10000,
         retail_price_paisa: num.retail_price_paisa ? parseInt(num.retail_price_paisa, 10) : 29900,
+        validity_days: num.validity_days ? parseInt(num.validity_days, 10) : 30,
         status: "active",
         is_assigned: false,
         metadata: { country: num.country || "IN" }
@@ -170,7 +171,7 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: "Missing number ID" }, { status: 400 });
     }
 
-    const { id, retail_price_paisa, monthly_cost_paisa, city, did_type, provider, status } = body;
+    const { id, retail_price_paisa, monthly_cost_paisa, city, did_type, provider, status, validity_days } = body;
 
     const updates: Record<string, any> = {
       updated_at: new Date().toISOString()
@@ -178,6 +179,7 @@ export async function PATCH(request: Request) {
 
     if (retail_price_paisa !== undefined) updates.retail_price_paisa = parseInt(retail_price_paisa, 10);
     if (monthly_cost_paisa !== undefined) updates.monthly_cost_paisa = parseInt(monthly_cost_paisa, 10);
+    if (validity_days !== undefined) updates.validity_days = parseInt(validity_days, 10);
     if (city !== undefined) updates.city = city;
     if (did_type !== undefined) updates.did_type = did_type;
     if (provider !== undefined) updates.provider = provider;

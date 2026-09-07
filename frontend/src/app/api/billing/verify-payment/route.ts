@@ -202,7 +202,8 @@ export async function POST(request: Request) {
           .single()
 
         if (poolNumber) {
-          const renewalDateIso = new Date(Date.now() + 30 * 86400000).toISOString()
+          const validityDays = poolNumber.validity_days || 30
+          const renewalDateIso = new Date(Date.now() + validityDays * 86400000).toISOString()
 
           // 1. Mark pool number as assigned in phone_numbers
           await adminClient
@@ -212,7 +213,9 @@ export async function POST(request: Request) {
               is_assigned: true,
               organization_id: profile.organization_id,
               assigned_org_id: profile.organization_id,
+              validity_days: validityDays,
               renewal_date: renewalDateIso,
+              expiry_alerts_sent: [],
               metadata: {
                 payment_id: razorpay_payment_id
               },
@@ -292,9 +295,10 @@ export async function POST(request: Request) {
           .single()
 
         if (phoneRow) {
+          const validityDays = phoneRow.validity_days || 30
           const currentRenewal = phoneRow.renewal_date ? new Date(phoneRow.renewal_date).getTime() : Date.now()
           const baseTime = currentRenewal > Date.now() ? currentRenewal : Date.now()
-          const newRenewalDateIso = new Date(baseTime + 30 * 86400000).toISOString()
+          const newRenewalDateIso = new Date(baseTime + validityDays * 86400000).toISOString()
 
           // Extend renewal date on phone_numbers
           await adminClient
@@ -302,6 +306,7 @@ export async function POST(request: Request) {
             .update({
               renewal_date: newRenewalDateIso,
               status: 'active',
+              expiry_alerts_sent: [],
               updated_at: new Date().toISOString()
             })
             .eq('id', phoneRow.id)
@@ -312,7 +317,7 @@ export async function POST(request: Request) {
             organization_id: profile.organization_id,
             activity_type: 'number_renewed',
             title: 'Phone Number Renewed',
-            description: `Extended subscription for ${phoneRow.phone_number} by 30 days`
+            description: `Extended subscription for ${phoneRow.phone_number} by ${validityDays} days`
           })
 
           const itemRate = phoneRow.retail_price_paisa || 29900
@@ -414,6 +419,9 @@ export async function POST(request: Request) {
                   ? `Hello, main ${cleanName} bol rahi hoon ${companyName} support team se. Kaise help kar sakti hoon?`
                   : `Hello, main ${cleanName} bol raha hoon ${companyName} se. Kaise hain aap?`
 
+                const bundleValidityDays = bundle.validity_days || 30;
+                const subscriptionExpiresAt = new Date(Date.now() + bundleValidityDays * 86400000).toISOString();
+
                 const agentPayload = {
                   user_id: user.id,
                   organization_id: profile.organization_id || null,
@@ -425,6 +433,9 @@ export async function POST(request: Request) {
                   system_prompt: systemPrompt,
                   greeting_message: greetingMessage,
                   fallback_message: 'Mujhe yeh samajh nahi aaya, kripya dubara bataiye.',
+                  validity_days: bundleValidityDays,
+                  subscription_expires_at: subscriptionExpiresAt,
+                  expiry_alerts_sent: [],
                   config: {
                     plan_tier: prod.tier || (dbAgentType === 'multi_agent' ? 'professional' : 'starter'),
                     minutes_limit: 1000

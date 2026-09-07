@@ -239,18 +239,17 @@ async def generate_livekit_token(req: LiveKitTokenRequest):
                             
                             print(f"[DEMO CHECK] Agent: {req.agent_id} | Days Active: {days_active}/5 | Mins Used: {demo_minutes_used}/{demo_minutes_limit}", flush=True)
 
-                            if days_active > 5:
-                                print(f"[DEMO EXPIRED] Agent {req.agent_id} is older than 5 days ({days_active} days)", flush=True)
-                                raise HTTPException(
-                                    status_code=403, 
-                                    detail="Demo agent expired: older than 5 days. Please upgrade your plan."
-                                )
+                            # Trinetra Dignity Quota Guarantee:
+                            # Users keep their remaining voice quota minutes even after timeline expires.
+                            # Only block if minutes quota is completely exhausted.
                             if demo_minutes_used >= demo_minutes_limit:
-                                print(f"[DEMO EXPIRED] Agent {req.agent_id} reached minutes limit ({demo_minutes_used} >= {demo_minutes_limit})", flush=True)
+                                print(f"[QUOTA EXHAUSTED] Agent {req.agent_id} reached minutes limit ({demo_minutes_used} >= {demo_minutes_limit})", flush=True)
                                 raise HTTPException(
                                     status_code=403, 
-                                    detail="Demo minutes limit reached. Please upgrade your plan."
+                                    detail="Voice minutes quota exhausted. Please upgrade or top-up your plan to continue."
                                 )
+                            elif days_active > 5:
+                                print(f"[DIGNITY GUARANTEE ACTIVE] Agent {req.agent_id} timeline expired ({days_active} days), but has remaining quota ({demo_minutes_used}/{demo_minutes_limit}). Permitting call.", flush=True)
         except HTTPException:
             raise
         except Exception as err:

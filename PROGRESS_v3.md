@@ -36,9 +36,10 @@
 | 2.5 | **Number Bidding / Auction system** | ✅ COMPLETED | Users can place bids on active numbers; if owner fails to renew, top bidder gets 24-hour priority purchase window. |
 | 2.6 | **Bundled purchase flow** | ✅ COMPLETED | Agent + Number bundles handled via checkout and auto-provisioning. |
 | 2.7 | **Manual 30-Day Renewal** | ✅ COMPLETED | Working via `/api/phone-numbers/[id]/renew` + Razorpay webhook extending `renewal_date` by +30 days. |
-| 2.8 | **Auto-release on non-renewal** | ⚠️ PARTIAL | `/api/cron/process-auctions` auto-releases numbers with `bidding_enabled=true`. Needs expansion to auto-release regular (non-auction) expired numbers. |
-| 2.9 | **Pre-Expiration Expiry Alerts** | ❌ PENDING | Alert notification system to warn users (e.g. 3 days & 24 hours before expiration) before their number time limit runs out. |
-| 2.10 | **Domestic Telephony Testing** | ⏳ IN PROGRESS | Testing Sarvam telephony connectivity; Exotel fallback ready if Sarvam SIP trunking encounters carrier limits. |
+| 2.8 | **Universal Auto-Release on Non-Renewal** | ✅ COMPLETED | `/api/cron/process-auctions` handles both bidding auctions and universal auto-release of standard expired phone numbers back to the pool. |
+| 2.9 | **Pre-Expiration Alerts & Dignity Quota Guarantee** | ✅ COMPLETED | Configurable `validity_days` in admin. Automatic 3-day and 24-hour alerts for phone numbers and voice agents via existing `notifications` table. Trinetra Dignity Quota Guarantee preserves active voice minutes even after timeline expiry. |
+| 2.10 | **Domestic Telephony Architecture** | ⏳ IN PROGRESS | Sarvam voice & speech integration active; Exotel recommended carrier for high-scale 100% TRAI/DLT Indian DIDs. |
+| 2.11 | **Database Audit & Dead Table Cleanup** | ✅ COMPLETED | Cleaned 13 legacy MSME/scheme tables (`schemes`, `msme_app_config`, `user_matches`, etc.) and structured lifecycle columns (`validity_days`, `subscription_expires_at`, `expiry_alerts_sent`). |
 
 
 ---
@@ -93,6 +94,6 @@
 ---
 
 ### **Immediate Next Actions**
-1. **Pre-Expiration Alerts & Universal Auto-Release**: Add warning notifications (3 days & 24 hours prior) for phone number expirations in `/api/cron/process-auctions`, and ensure regular non-auction expired numbers are auto-released back to the available pool.
-2. **Kick off Phase 3** — Inbound Support Agent & Customer DB (Inbound call handling, caller recognition, upserting customer profiles, and post-call notifications).
+1. **Kick off Phase 3** — Inbound Support Agent & Customer DB (Inbound call handling, caller recognition, upserting customer profiles, and post-call notifications).
+2. **Execute Database Migration in Supabase SQL Editor** — Run `database/migrations/20260908_db_cleanup_and_validity_lifecycle.sql` to permanently drop the empty legacy tables and add the check indexes.
 
