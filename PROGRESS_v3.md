@@ -24,17 +24,22 @@
 
 ---
 
-### **Phase 2 — Number Pool & Assignment**
-> **Goal:** Admin buys numbers (from your Twilio account, later bulk), lists them in `/dashboard/phone-numbers` for users to purchase, and numbers get assigned to agents.
+### **Phase 2 — Number Pool, Bidding & Lifecycle Management**
+> **Goal:** Admin lists pool numbers, users purchase or bid via Razorpay, numbers get assigned to agents, and renewal/release lifecycles are enforced.
 
-| # | Task | Details |
-|---|------|---------|
-| 2.1 | **Number pool table** | Use existing `phone_numbers` table. Add `is_assigned` boolean + `assigned_org_id` / `assigned_agent_id`. |
-| 2.2 | **Admin purchase flow** | Admin can buy numbers via Twilio (using your account) and add them to the pool with a retail price. |
-| 2.3 | **User purchase** | User selects an available number from pool → payment via Razorpay → number marked `assigned=true`, linked to their org. |
-| 2.4 | **Assignment to agent** | After purchase, user can assign number to any of their agents (already built UI). |
-| 2.5 | **Auto-release on non-renewal** | After 30 days, if not renewed, mark `assigned=false` so number returns to pool. |
-| 2.6 | **Bundled purchase** | Bundle (agents+numbers) already implemented; ensure it auto-assigns numbers and agents. |
+| # | Task | Status | Details |
+|---|------|--------|---------|
+| 2.1 | **Number pool table & schema** | ✅ COMPLETED | `phone_numbers` table enhanced with `is_assigned`, `assigned_org_id`, `assigned_agent_id`, `retail_price_paisa`, `renewal_date`, and `bidding_enabled`. |
+| 2.2 | **Admin pool management & provisioning** | ✅ COMPLETED | Admin can provision Twilio numbers, set retail prices, toggle bidding, and list them in the available pool. |
+| 2.3 | **User purchase via Razorpay** | ✅ COMPLETED | Users purchase numbers from available pool via Razorpay checkout; ownership links to organization and sets 30-day `renewal_date`. |
+| 2.4 | **Assignment to agent** | ✅ COMPLETED | Users can assign/unassign numbers to their voice agents directly from dashboard. |
+| 2.5 | **Number Bidding / Auction system** | ✅ COMPLETED | Users can place bids on active numbers; if owner fails to renew, top bidder gets 24-hour priority purchase window. |
+| 2.6 | **Bundled purchase flow** | ✅ COMPLETED | Agent + Number bundles handled via checkout and auto-provisioning. |
+| 2.7 | **Manual 30-Day Renewal** | ✅ COMPLETED | Working via `/api/phone-numbers/[id]/renew` + Razorpay webhook extending `renewal_date` by +30 days. |
+| 2.8 | **Auto-release on non-renewal** | ⚠️ PARTIAL | `/api/cron/process-auctions` auto-releases numbers with `bidding_enabled=true`. Needs expansion to auto-release regular (non-auction) expired numbers. |
+| 2.9 | **Pre-Expiration Expiry Alerts** | ❌ PENDING | Alert notification system to warn users (e.g. 3 days & 24 hours before expiration) before their number time limit runs out. |
+| 2.10 | **Domestic Telephony Testing** | ⏳ IN PROGRESS | Testing Sarvam telephony connectivity; Exotel fallback ready if Sarvam SIP trunking encounters carrier limits. |
+
 
 ---
 
@@ -88,5 +93,6 @@
 ---
 
 ### **Immediate Next Actions**
-1. **Proceed with Phase 2** — Number Pool & Assignment: List available numbers, integrate Razorpay checkout, and implement number assignment logic.
-2. **Setup auto-release scheduler** for number pools.
+1. **Pre-Expiration Alerts & Universal Auto-Release**: Add warning notifications (3 days & 24 hours prior) for phone number expirations in `/api/cron/process-auctions`, and ensure regular non-auction expired numbers are auto-released back to the available pool.
+2. **Kick off Phase 3** — Inbound Support Agent & Customer DB (Inbound call handling, caller recognition, upserting customer profiles, and post-call notifications).
+
