@@ -74,6 +74,19 @@
 
 ---
 
+### **Phase 6 — The "Joe Girard Engine" (Top-of-Mind Lifecycle Nurturing & Referral Automation)**
+> **Inspiration:** Joe Girard (Guinness World Record for World's Greatest Salesman — 13,000+ cars sold by staying top-of-mind with every lead through consistent occasion cards & relationship warmth).
+> **Goal:** Transform Trinetra AI from a one-time dialer into an automated lifelong relationship & referral-generating machine for any business.
+
+| # | Task | Status | Details |
+|---|------|--------|---------|
+| 6.1 | **Occasion & Festival Nurture Scheduler** | 📋 PLANNED | Scheduled engine that automatically sends personalized warm WhatsApp / SMS greetings (Diwali, New Year, Eid, Birthdays, Milestones) to *all* past leads (cold, closed, or open) with zero pitch. |
+| 6.2 | **Zero-Pitch "Care Ping" Voice Call** | 📋 PLANNED | Low-friction 30-second AI check-in call scheduled 30/60 days after initial contact to keep the business top-of-mind (*"Sir, koi pitch nahi hai, bas ek quick check-in tha ki aapka kaam kaisa chal raha hai"*). |
+| 6.3 | **Automated Referral Generator** | 📋 PLANNED | When lead sentiment is positive or after successful onboarding/appointment, agent naturally triggers referral request (*"Agar aapke circle me kisi ko automated voice agent ki need ho, toh unka contact zaroor share kijiyega"*). |
+| 6.4 | **Reactivation Campaign Pipeline** | 📋 PLANNED | Automatic transition of "cold / not interested" leads into a 90-day re-engagement funnel with new offers or relevant value drops. |
+
+---
+
 ### **Immediate Next Actions**
 1. **Proceed with Phase 2** — Number Pool & Assignment: List available numbers, integrate Razorpay checkout, and implement number assignment logic.
-2. **Setup auto-release scheduler** for number pools.
+2. **Setup auto-release scheduler** for number pools.
