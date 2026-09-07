@@ -17,6 +17,7 @@ logger = logging.getLogger("CampaignService")
 
 # Global set to hold reference to background running tasks to prevent garbage collection
 running_campaign_tasks = set()
+active_campaign_ids = set()
 
 class CampaignService:
     @staticmethod
@@ -316,11 +317,69 @@ class CampaignService:
             .eq("id", campaign_id)
             .execute
         )
+        # Transition any contacts left in 'dialing' state to 'answered'
+        try:
+            await asyncio.to_thread(
+                supabase_admin.table("campaign_contacts")
+                .update({"call_status": "answered"})
+                .eq("campaign_id", campaign_id)
+                .eq("call_status", "dialing")
+                .execute
+            )
+        except Exception as e:
+            logger.warning(f"Error resetting dialing contacts on pause: {e}")
         return res.data[0] if res.data else {}
 
     @staticmethod
     async def resume_campaign(campaign_id: str) -> Dict:
         logger.info(f"Resuming campaign: {campaign_id}")
+        
+        # 1. Check if there are any pending contacts
+        pending_check = await asyncio.to_thread(
+            supabase_admin.table("campaign_contacts")
+            .select("id")
+            .eq("campaign_id", campaign_id)
+            .eq("call_status", "pending")
+            .limit(1)
+            .execute
+        )
+        if not pending_check.data:
+            # Check if there are unreached / failed / no_answer / cancelled contacts to retry
+            unreached = await asyncio.to_thread(
+                supabase_admin.table("campaign_contacts")
+                .select("id")
+                .eq("campaign_id", campaign_id)
+                .in_("call_status", ["no_answer", "failed", "dialing", "cancelled"])
+                .execute
+            )
+            if unreached.data:
+                await asyncio.to_thread(
+                    supabase_admin.table("campaign_contacts")
+                    .update({"call_status": "pending"})
+                    .eq("campaign_id", campaign_id)
+                    .in_("call_status", ["no_answer", "failed", "dialing", "cancelled"])
+                    .execute
+                )
+                logger.info(f"Reset {len(unreached.data)} unreached contacts to pending for campaign {campaign_id}")
+            else:
+                # All contacts were marked answered; reset all non-DND contacts to pending for a complete rerun
+                all_contacts = await asyncio.to_thread(
+                    supabase_admin.table("campaign_contacts")
+                    .select("id")
+                    .eq("campaign_id", campaign_id)
+                    .neq("call_status", "dnd")
+                    .execute
+                )
+                if all_contacts.data:
+                    await asyncio.to_thread(
+                        supabase_admin.table("campaign_contacts")
+                        .update({"call_status": "pending"})
+                        .eq("campaign_id", campaign_id)
+                        .neq("call_status", "dnd")
+                        .execute
+                    )
+                    logger.info(f"Reset {len(all_contacts.data)} contacts to pending for full campaign rerun {campaign_id}")
+
         res = await asyncio.to_thread(
             supabase_admin.table("campaigns")
             .update({"status": "running"})
@@ -328,66 +387,121 @@ class CampaignService:
             .execute
         )
         
-        # Spawn background dialer loop
-        task = asyncio.create_task(CampaignService.run_campaign_loop(campaign_id))
+        # Clear any stale active_campaign_ids lock
+        active_campaign_ids.discard(campaign_id)
+
+        # Spawn background dialer loop with bypass_hours=True for immediate execution
+        task = asyncio.create_task(CampaignService.run_campaign_loop(campaign_id, bypass_hours=True))
         running_campaign_tasks.add(task)
         task.add_done_callback(running_campaign_tasks.discard)
         
         return res.data[0] if res.data else {}
 
     @staticmethod
-    async def run_campaign_loop(campaign_id: str):
+    async def run_campaign_loop(campaign_id: str, bypass_hours: bool = False):
+        if campaign_id in active_campaign_ids:
+            logger.info(f"Campaign runner already active for {campaign_id}. Skipping duplicate spawn.")
+            return
+        active_campaign_ids.add(campaign_id)
         logger.info(f"Background dialing runner initialized for campaign {campaign_id}")
-        while True:
-            # 1. Fetch current status
-            campaign_res = await asyncio.to_thread(
-                supabase_admin.table("campaigns").select("*").eq("id", campaign_id).single().execute
-            )
-            
-            if not campaign_res.data:
-                logger.error(f"Campaign {campaign_id} not found. Terminating runner.")
-                break
-                
-            campaign = campaign_res.data
-            status = campaign.get("status")
-            
-            if status != "running":
-                logger.info(f"Campaign {campaign_id} status changed to {status}. Stopping background runner.")
-                break
-                
-            # 2. Check calling hours
-            start_hours = campaign.get("calling_hours_start") or "10:00"
-            end_hours = campaign.get("calling_hours_end") or "18:00"
-            timezone_str = campaign.get("timezone") or "Asia/Kolkata"
-            
-            within_hours, log_msg = CampaignService.is_within_calling_hours(start_hours, end_hours, timezone_str)
-            if not within_hours:
-                logger.info(f"Campaign {campaign_id} is outside calling hours. {log_msg} Sleeping 60s...")
-                await asyncio.sleep(60.0) # Check again in a minute
-                continue
-                
-            # 3. Process next contact
-            has_more = await CampaignService.process_next_contact(campaign_id, campaign)
-            if not has_more:
-                logger.info(f"Campaign {campaign_id} completed: No more pending contacts.")
-                await asyncio.to_thread(
-                    supabase_admin.table("campaigns")
-                    .update({
-                        "status": "completed",
-                        "completed_at": datetime.now(timezone.utc).isoformat()
-                    })
-                    .eq("id", campaign_id)
-                    .execute
-                )
-                # Dispatch consolidated campaign report notification
+        is_first_iteration = True
+        try:
+            while True:
                 try:
-                    await CampaignService.dispatch_campaign_report(campaign_id, campaign)
-                except Exception as report_err:
-                    logger.error(f"Failed to dispatch campaign report: {report_err}")
-                break
-                
-            # Simulate a calling cooldown/processing interval
-            await asyncio.sleep(3.0)
+                    # 1. Fetch current status
+                    campaign_res = await asyncio.to_thread(
+                        supabase_admin.table("campaigns").select("*").eq("id", campaign_id).single().execute
+                    )
+                    
+                    if not campaign_res.data:
+                        logger.error(f"Campaign {campaign_id} not found. Terminating runner.")
+                        break
+                        
+                    campaign = campaign_res.data
+                    status = campaign.get("status")
+                    
+                    if status != "running":
+                        logger.info(f"Campaign {campaign_id} status changed to {status}. Stopping background runner.")
+                        break
+                        
+                    # 2. Check calling hours (bypass on first iteration if explicitly requested via manual retry)
+                    if not (bypass_hours and is_first_iteration):
+                        start_hours = campaign.get("calling_hours_start") or "10:00"
+                        end_hours = campaign.get("calling_hours_end") or "18:00"
+                        timezone_str = campaign.get("timezone") or "Asia/Kolkata"
+                        
+                        within_hours, log_msg = CampaignService.is_within_calling_hours(start_hours, end_hours, timezone_str)
+                        if not within_hours:
+                            logger.info(f"Campaign {campaign_id} is outside calling hours. {log_msg} Sleeping 60s...")
+                            await asyncio.sleep(60.0) # Check again in a minute
+                            continue
+                    
+                    is_first_iteration = False
+                        
+                    # 3. Process next contact
+                    try:
+                        has_more = await CampaignService.process_next_contact(campaign_id, campaign)
+                    except Exception as step_err:
+                        logger.error(f"[Campaign Loop Error] Error processing next contact: {step_err}")
+                        await asyncio.sleep(3)
+                        continue
+
+                    if not has_more:
+                        # Check if there are any lingering contacts in "dialing"
+                        dialing_contacts = await asyncio.to_thread(
+                            supabase_admin.table("campaign_contacts")
+                            .select("id, last_attempt_at")
+                            .eq("campaign_id", campaign_id)
+                            .eq("call_status", "dialing")
+                            .execute
+                        )
+                        if dialing_contacts.data:
+                            now = datetime.now(timezone.utc)
+                            all_resolved = True
+                            for dc in dialing_contacts.data:
+                                last_att = dc.get("last_attempt_at")
+                                if last_att:
+                                    try:
+                                        dt = datetime.fromisoformat(last_att.replace("Z", "+00:00"))
+                                        if (now - dt).total_seconds() > 45:
+                                            await asyncio.to_thread(
+                                                supabase_admin.table("campaign_contacts")
+                                                .update({"call_status": "no_answer"})
+                                                .eq("id", dc["id"])
+                                                .execute
+                                            )
+                                        else:
+                                            all_resolved = False
+                                    except Exception:
+                                        pass
+                            if not all_resolved:
+                                await asyncio.sleep(4.0)
+                                continue
+
+                        logger.info(f"Campaign {campaign_id} completed: All contacts finished.")
+                        await asyncio.to_thread(
+                            supabase_admin.table("campaigns")
+                            .update({
+                                "status": "completed",
+                                "completed_at": datetime.now(timezone.utc).isoformat()
+                            })
+                            .eq("id", campaign_id)
+                            .execute
+                        )
+                        # Dispatch consolidated campaign report notification
+                        try:
+                            await CampaignService.dispatch_campaign_report(campaign_id, campaign)
+                        except Exception as report_err:
+                            logger.error(f"Failed to dispatch campaign report: {report_err}")
+                        break
+                        
+                    # Simulate a calling cooldown/processing interval
+                    await asyncio.sleep(3.0)
+                except Exception as loop_iter_err:
+                    logger.error(f"[Campaign Loop Error] Unexpected error in iteration: {loop_iter_err}")
+                    await asyncio.sleep(3.0)
+        finally:
+            active_campaign_ids.discard(campaign_id)
 
     @staticmethod
     async def process_next_contact(campaign_id: str, campaign_data: Dict) -> bool:
@@ -453,8 +567,9 @@ class CampaignService:
         is_simulated = not (twilio_sid and twilio_token)
         
         provider = get_provider("twilio" if not is_simulated else "simulated")
+        unique_room = f"twilio--{agent_id}--{contact_id}--{uuid.uuid4().hex[:8]}" if agent_id else f"twilio--noagent--{contact_id}--{uuid.uuid4().hex[:8]}"
         webhook_base = ConfigService.get("TRINETRA_WEBHOOK_BASE_URL") or os.getenv("TRINETRA_WEBHOOK_BASE_URL") or "http://localhost:8000"
-        webhook_url = f"{webhook_base}/api/voice/webhooks/voice/twilio/{organization_id}?agent_id={agent_id}&contact_id={contact_id}"
+        webhook_url = f"{webhook_base}/api/voice/webhooks/voice/twilio/{organization_id}?agent_id={agent_id}&contact_id={contact_id}&room_name={unique_room}"
         
         agent_phone = agent.get("phone_number") or os.getenv("TWILIO_PHONE_NUMBER") or "+12282950908"
         if agent_phone and not str(agent_phone).startswith("+"):
@@ -496,14 +611,19 @@ class CampaignService:
                     custom_parameters={
                         "contact_name": contact_name,
                         "company_name": company_name,
-                        "notes": notes
+                        "notes": notes,
+                        "agent_id": agent_id,
+                        "contact_id": contact_id,
+                        "room_name": unique_room
                     }
                 )
                 call_sid = call_res.get("call_sid")
+                room_name = call_res.get("room_name") or unique_room
                 outcome = "connected"
-                logger.info(f"[Campaign Outbound] Twilio call placed successfully: SID={call_sid} to {contact_phone}")
+                logger.info(f"[Campaign Outbound] Twilio call placed successfully: SID={call_sid} to {contact_phone}, room={room_name}. External LiveKit worker will connect agent {agent_id}.")
             else:
                 call_sid = f"sim-{uuid.uuid4()}"
+                room_name = f"sim-{uuid.uuid4().hex[:8]}"
                 outcome = "connected"
                 logger.info(f"[Campaign Outbound] Simulated call placed: SID={call_sid} to {contact_phone}")
                 
@@ -527,11 +647,12 @@ class CampaignService:
             logger.error(f"[Campaign Outbound] Call FAILED to {contact_phone}: {dial_err}")
             outcome = "failed"
             call_sid = None
+            room_name = None
 
         call_id = None
         lead_id = None
         
-        # 5. If call connected, log the outbound call record
+        # 5. If call placed, log the outbound call record
         #    The actual transcript and sentiment will be populated by the voice webhook
         #    once the AI agent conversation completes.
         if outcome == "connected":
@@ -543,11 +664,15 @@ class CampaignService:
                     "caller_phone": contact["phone"],
                     "status": "in_progress",
                     "duration_seconds": 0,
+                    "transcript": "",
                     "metadata": {
                         "from_number": agent_phone,
                         "to_number": contact["phone"],
                         "provider_call_id": call_sid,
-                        "session_id": call_sid
+                        "session_id": call_sid,
+                        "room_name": room_name,
+                        "contact_id": contact_id,
+                        "campaign_id": campaign_id
                     }
                 }
                 call_res = await asyncio.to_thread(
@@ -559,14 +684,18 @@ class CampaignService:
             except Exception as call_log_err:
                 logger.error(f"Failed to log outbound call record: {call_log_err}")
                     
-        # 6. Finalize contact status
-        final_call_status = "answered" if outcome == "connected" else outcome
+        # 6. Update contact status:
+        # If simulated, simulate_call_completion handles final status.
+        # If real telephony (Twilio), status is "dialing" until callee answers or status callback arrives.
+        # If failed to place, status is "failed".
+        final_call_status = "dialing" if outcome == "connected" else "failed"
         await asyncio.to_thread(
             supabase_admin.table("campaign_contacts")
             .update({
                 "call_status": final_call_status,
                 "call_id": call_id,
-                "lead_id": lead_id
+                "lead_id": lead_id,
+                "last_attempt_at": datetime.now(timezone.utc).isoformat()
             })
             .eq("id", contact_id)
             .execute
@@ -577,7 +706,9 @@ class CampaignService:
             "contacts_called": campaign_data["contacts_called"] + 1,
         }
         if outcome == "connected":
-            campaign_update["contacts_connected"] = campaign_data["contacts_connected"] + 1
+            # Real connections will update contacts_connected when answered in webhook/status callback
+            if is_simulated:
+                campaign_update["contacts_connected"] = campaign_data["contacts_connected"] + 1
             if lead_id:
                 campaign_update["leads_generated"] = campaign_data["leads_generated"] + 1
                 
@@ -594,7 +725,7 @@ class CampaignService:
     async def list_campaigns(organization_id: str):
         result = await asyncio.to_thread(
             supabase_admin.table("campaigns")
-            .select("*, agents(name)")
+            .select("*, agents(name, phone_number, telephony_provider)")
             .eq("organization_id", organization_id)
             .order("created_at", desc=True)
             .execute
@@ -629,16 +760,28 @@ class CampaignService:
         callbacks_count = callbacks_res.count or 0
 
         # 3. Retrieve user profile
-        user_res = await asyncio.to_thread(
-            supabase_admin.table("profiles")
-            .select("telegram_chat_id")
-            .eq("id", campaign_data.get("user_id") or "")
-            .maybe_single()
-            .execute
-        )
+        user_id = campaign_data.get("user_id")
+        user_res = None
+        if user_id:
+            user_res = await asyncio.to_thread(
+                supabase_admin.table("profiles")
+                .select("telegram_chat_id")
+                .eq("id", user_id)
+                .maybe_single()
+                .execute
+            )
+        elif campaign_data.get("organization_id"):
+            user_res = await asyncio.to_thread(
+                supabase_admin.table("profiles")
+                .select("telegram_chat_id")
+                .eq("organization_id", campaign_data.get("organization_id"))
+                .limit(1)
+                .maybe_single()
+                .execute
+            )
 
         telegram_chat_id = None
-        if user_res.data:
+        if user_res and user_res.data:
             telegram_chat_id = user_res.data.get("telegram_chat_id")
 
         # 4. Construct report message

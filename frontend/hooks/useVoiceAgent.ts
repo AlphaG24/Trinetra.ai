@@ -32,6 +32,8 @@ export function useVoiceAgent() {
   const roomRef = useRef<Room | null>(null)
   const timerRef = useRef<NodeJS.Timeout | null>(null)
 
+  const audioElementsRef = useRef<HTMLMediaElement[]>([])
+
   const startTimer = useCallback(() => {
     if (timerRef.current) clearInterval(timerRef.current)
     setSecondsConnected(0)
@@ -52,6 +54,16 @@ export function useVoiceAgent() {
   }, [])
 
   const disconnect = useCallback(() => {
+    // Detach and clean up all audio elements to prevent audio leaks/conflicts
+    audioElementsRef.current.forEach(el => {
+      try {
+        el.pause()
+        el.srcObject = null
+        el.remove()
+      } catch {}
+    })
+    audioElementsRef.current = []
+
     if (roomRef.current) {
       try {
         roomRef.current.disconnect()
@@ -90,58 +102,18 @@ export function useVoiceAgent() {
       })
       roomRef.current = room
 
-      // Helper to process and add transcripts safely
-      const handleTranscription = (segments: any, participant?: any) => {
-        let text = ''
-        if (Array.isArray(segments)) {
-          text = segments.map(s => s.text).join(' ')
-        } else if (segments && typeof segments === 'object') {
-          text = segments.text || segments.transcript || ''
-        } else if (typeof segments === 'string') {
-          text = segments
-        }
-
-        const speaker = participant?.isLocal ? 'Customer' : 'Agent'
-        if (text.trim()) {
-          setTranscripts((prev) => {
-            const isDuplicate = prev.slice(-3).some(
-              (t) => t.speaker === speaker && t.text === text
-            )
-            if (isDuplicate) return prev
-
-            const segmentId = Array.isArray(segments) && segments[0]
-              ? String(segments[0].id)
-              : String(Date.now() + Math.random())
-
-            const existingIndex = prev.findIndex(t => t.id === segmentId)
-            if (existingIndex >= 0) {
-              const updated = [...prev]
-              updated[existingIndex] = {
-                ...updated[existingIndex],
-                text,
-                timestamp: new Date()
-              }
-              return updated
-            }
-
-            return [
-              ...prev,
-              {
-                id: segmentId,
-                speaker,
-                text,
-                timestamp: new Date(),
-              },
-            ]
-          })
-        }
-      }
-
       // 3. Attach Event Listeners
       room.on(RoomEvent.Connected, async () => {
         setConnectionState('active')
         startTimer()
         toast.success('Connected to LiveKit voice agent session')
+
+        // Ensure browser audio playback is unlocked
+        try {
+          await room.startAudio()
+        } catch (audioErr) {
+          console.warn('[LiveKit] startAudio on connected warning:', audioErr)
+        }
 
         // Publish local microphone track
         try {
@@ -157,22 +129,40 @@ export function useVoiceAgent() {
         disconnect()
       })
 
-      // Subscribe to transcription events
-      room.on('transcriptionReceived' as any, handleTranscription)
-      room.on('transcription_received' as any, handleTranscription)
+      room.on(RoomEvent.AudioPlaybackStatusChanged, async () => {
+        if (!room.canPlaybackAudio) {
+          try {
+            await room.startAudio()
+          } catch (e) {
+            console.warn('[LiveKit] Auto-resume audio failed:', e)
+          }
+        }
+      })
 
       room.on(RoomEvent.TrackSubscribed, (track: RemoteTrack, publication: RemoteTrackPublication, participant: RemoteParticipant) => {
         if (track.kind === Track.Kind.Audio) {
           const element = track.attach()
+          element.autoplay = true
+          audioElementsRef.current.push(element)
           document.body.appendChild(element)
+          element.play().catch(err => {
+            console.warn('[LiveKit] Audio element play error (autoplay blocked?):', err)
+          })
         }
+      })
 
-        track.on('transcriptionReceived' as any, (transcription: any) => {
-          handleTranscription(transcription, participant)
-        })
-        track.on('transcription_received' as any, (transcription: any) => {
-          handleTranscription(transcription, participant)
-        })
+      room.on(RoomEvent.TrackUnsubscribed, (track: RemoteTrack) => {
+        if (track.kind === Track.Kind.Audio) {
+          const detached = track.detach()
+          detached.forEach(el => {
+            try {
+              el.pause()
+              el.srcObject = null
+              el.remove()
+            } catch {}
+          })
+          audioElementsRef.current = audioElementsRef.current.filter(el => !detached.includes(el))
+        }
       })
 
       room.on(RoomEvent.DataReceived, (payload: Uint8Array, participant?: RemoteParticipant) => {
@@ -201,15 +191,24 @@ export function useVoiceAgent() {
               .trim()
 
             if (cleaned) {
-              setTranscripts((prev) => [
-                ...prev,
-                {
-                  id: String(Date.now()) + Math.random().toString().slice(2, 6),
-                  speaker: data.speaker || 'agent',
-                  text: cleaned,
-                  timestamp: new Date(),
-                },
-              ])
+              const speakerRole = data.speaker === 'customer' || data.speaker === 'user' ? 'Customer' : 'Agent'
+              setTranscripts((prev) => {
+                // Deduplicate: skip if last 5 entries already have same speaker+text
+                const isDuplicate = prev.slice(-5).some(
+                  (t) => t.speaker === speakerRole && t.text === cleaned
+                )
+                if (isDuplicate) return prev
+
+                return [
+                  ...prev,
+                  {
+                    id: String(Date.now()) + Math.random().toString().slice(2, 6),
+                    speaker: speakerRole,
+                    text: cleaned,
+                    timestamp: new Date(),
+                  },
+                ]
+              })
             }
           }
         } catch (e) {
@@ -219,6 +218,13 @@ export function useVoiceAgent() {
 
       // 4. Connect to Room
       await room.connect(wsUrl, tokenData.token)
+
+      // Unlock AudioContext immediately after connection
+      try {
+        await room.startAudio()
+      } catch (audioUnlockErr) {
+        console.warn('[LiveKit] startAudio post-connect warning:', audioUnlockErr)
+      }
     } catch (err: any) {
       console.error('[useVoiceAgent Error]', err)
       toast.error('Failed to establish LiveKit voice connection: ' + err.message)

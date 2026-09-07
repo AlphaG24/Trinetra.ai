@@ -20,7 +20,7 @@ export async function DELETE(
     const adminSupabase = createAdminClient();
     const { data: lead, error: fetchError } = await adminSupabase
       .from("leads")
-      .select("user_id, organization_id")
+      .select("user_id")
       .eq("id", id)
       .maybeSingle();
 
@@ -30,17 +30,20 @@ export async function DELETE(
 
     const { data: profile } = await supabase
       .from("profiles")
-      .select("role, organization_id")
+      .select("role")
       .eq("id", user.id)
       .single();
 
     const isOwner = lead.user_id === user.id;
-    const isSameOrg = lead.organization_id && profile?.organization_id && lead.organization_id === profile.organization_id;
     const isAdmin = profile && ['admin', 'super_admin'].includes(profile.role || '');
 
-    if (!isOwner && !isSameOrg && !isAdmin) {
+    if (!isOwner && !isAdmin) {
       return NextResponse.json({ error: "Forbidden: Access denied" }, { status: 403 });
     }
+
+    // Disconnect references in campaign_contacts & callbacks before delete
+    await adminSupabase.from("campaign_contacts").update({ lead_id: null }).eq("lead_id", id);
+    await adminSupabase.from("callbacks").update({ lead_id: null }).eq("lead_id", id);
 
     // Delete Lead using Admin Client (bypassing RLS)
     const { data, error } = await adminSupabase
@@ -103,7 +106,7 @@ export async function PATCH(
     const adminSupabase = createAdminClient();
     const { data: lead, error: fetchError } = await adminSupabase
       .from("leads")
-      .select("user_id, organization_id")
+      .select("user_id")
       .eq("id", id)
       .maybeSingle();
 
@@ -113,15 +116,14 @@ export async function PATCH(
 
     const { data: profile } = await supabase
       .from("profiles")
-      .select("role, organization_id")
+      .select("role")
       .eq("id", user.id)
       .single();
 
     const isOwner = lead.user_id === user.id;
-    const isSameOrg = lead.organization_id && profile?.organization_id && lead.organization_id === profile.organization_id;
     const isAdmin = profile && ['admin', 'super_admin'].includes(profile.role || '');
 
-    if (!isOwner && !isSameOrg && !isAdmin) {
+    if (!isOwner && !isAdmin) {
       return NextResponse.json({ error: "Forbidden: Access denied" }, { status: 403 });
     }
 

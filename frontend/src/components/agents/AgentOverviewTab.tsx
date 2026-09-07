@@ -449,6 +449,32 @@ export function AgentOverviewTab({
     }
   }
 
+  const getTranscriptString = (transcript: any): string => {
+    if (!transcript) return ''
+    if (typeof transcript === 'string') return transcript
+    if (Array.isArray(transcript)) {
+      return transcript
+        .map((t: any) => {
+          if (typeof t === 'string') return t
+          if (t && typeof t === 'object') {
+            const role = t.role || t.speaker || ''
+            const text = t.content || t.text || ''
+            return role ? `${role}: ${text}` : text
+          }
+          return String(t)
+        })
+        .join('\n')
+    }
+    if (typeof transcript === 'object') {
+      try {
+        return JSON.stringify(transcript)
+      } catch {
+        return String(transcript)
+      }
+    }
+    return String(transcript)
+  }
+
   const formatTime = (totalSecs: number) => {
     const mins = Math.floor(totalSecs / 60)
     const secs = totalSecs % 60
@@ -595,7 +621,7 @@ export function AgentOverviewTab({
                         <div className="p-4 bg-[var(--background)]/30 border-t border-[var(--border)] space-y-2">
                           <h4 className="text-[10px] uppercase tracking-wider font-montserrat font-bold text-[var(--muted)]">Transcript:</h4>
                           <p className="text-xs font-sans text-[var(--body)] leading-relaxed bg-[var(--card-bg)] p-3 rounded-lg border border-[var(--border)] max-h-40 overflow-y-auto whitespace-pre-wrap">
-                            {log.transcript || 'No transcript generated for this call.'}
+                            {getTranscriptString(log.transcript) || 'No transcript generated for this call.'}
                           </p>
                         </div>
                       )}

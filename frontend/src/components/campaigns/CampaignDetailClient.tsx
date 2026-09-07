@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import { 
   Megaphone, ArrowLeft, Play, Pause, RefreshCw, 
   Search, ChevronLeft, ChevronRight, AlertCircle, 
-  Bot, Clock, Globe, ShieldAlert, PhoneCall, CheckCircle, 
+  Bot, Clock, Globe, ShieldAlert, Phone, PhoneCall, CheckCircle, 
   XOctagon, Ban, Hourglass, Trash2, HelpCircle, Loader2, BarChart3
 } from 'lucide-react'
 import Link from 'next/link'
@@ -12,6 +12,7 @@ import toast from 'react-hot-toast'
 import { useRouter } from 'next/navigation'
 import { AgentCallingStatus } from '../agents/AgentCallingStatus'
 import { createClient } from '@/utils/supabase/client'
+import { TranscriptModal } from '../modals/TranscriptModal'
 
 interface Contact {
   id: string
@@ -42,6 +43,8 @@ interface CampaignDetail {
   agent_id?: string
   agents?: {
     name: string
+    phone_number?: string | null
+    telephony_provider?: string | null
   }
 }
 
@@ -71,23 +74,60 @@ export function CampaignDetailClient({ campaignId }: CampaignDetailClientProps) 
   const [statusFilter, setStatusFilter] = useState('all')
   
   const [actionLoading, setActionLoading] = useState(false)
+  const [retryingContactId, setRetryingContactId] = useState<string | null>(null)
+  const [showTranscriptModal, setShowTranscriptModal] = useState(false)
+  const [selectedTranscript, setSelectedTranscript] = useState<any>(null)
+  const [selectedCallerName, setSelectedCallerName] = useState<string>('Contact')
+
+  const handleOpenTranscript = async (callId: string, contactName: string) => {
+    try {
+      setSelectedCallerName(contactName || 'Contact')
+      setSelectedTranscript(null)
+      setShowTranscriptModal(true)
+
+      const supabase = createClient()
+      const { data } = await supabase
+        .from('voice_calls')
+        .select('transcript')
+        .eq('id', callId)
+        .maybeSingle()
+
+      if (data?.transcript) {
+        setSelectedTranscript(data.transcript)
+      } else {
+        const { data: callData } = await supabase
+          .from('calls')
+          .select('transcript')
+          .eq('session_id', callId)
+          .maybeSingle()
+        setSelectedTranscript(callData?.transcript || 'No transcript registered for this call yet.')
+      }
+    } catch (err) {
+      console.error('Error loading transcript:', err)
+      setSelectedTranscript('Failed to load transcript.')
+    }
+  }
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null)
 
   // Fetch agent details once campaign is loaded
   useEffect(() => {
+    if (campaign?.agents) {
+      if (campaign.agents.phone_number) setAgentPhone(campaign.agents.phone_number)
+      if (campaign.agents.telephony_provider) setAgentProvider(campaign.agents.telephony_provider)
+    }
     if (campaign?.agent_id) {
       fetchAgentInfo(campaign.agent_id)
     }
-  }, [campaign?.agent_id])
+  }, [campaign?.agent_id, campaign?.agents])
 
   const fetchAgentInfo = async (agentId: string) => {
     try {
       setAgentLoading(true)
       const res = await fetch(`/api/agents/${agentId}`)
       const data = await res.json()
-      if (res.ok && data.success) {
-        setAgentPhone(data.data?.phone_number || null)
-        setAgentProvider(data.data?.telephony_provider || null)
+      if (res.ok && data.success && data.data) {
+        setAgentPhone(data.data.phone_number || null)
+        setAgentProvider(data.data.telephony_provider || (data.data.phone_number ? 'twilio' : null))
       }
     } catch (err) {
       console.error("Failed to fetch agent info for campaign:", err)
@@ -154,19 +194,16 @@ export function CampaignDetailClient({ campaignId }: CampaignDetailClientProps) 
     fetchCampaignContacts()
   }, [campaignId, page, search, statusFilter])
 
-  // Poll progress if campaign is active
+  // Poll progress: only as a slow fallback (every 20s) when campaign is actively running/dialing
+  // Supabase Realtime below already pushes instant changes without exhausting Disk IO budget
   useEffect(() => {
-    const status = campaign?.status
-    if (status === 'running' || status === 'dialing') {
-      pollIntervalRef.current = setInterval(() => {
-        fetchCampaignInfo(true)
-        fetchCampaignContacts(true)
-      }, 5000)
-    } else {
-      if (pollIntervalRef.current) {
-        clearInterval(pollIntervalRef.current)
-      }
-    }
+    const isActive = campaign?.status === 'running' || campaign?.status === 'dialing'
+    if (!isActive) return
+
+    pollIntervalRef.current = setInterval(() => {
+      fetchCampaignInfo(true)
+      fetchCampaignContacts(true)
+    }, 20000)
 
     return () => {
       if (pollIntervalRef.current) {
@@ -282,22 +319,22 @@ export function CampaignDetailClient({ campaignId }: CampaignDetailClientProps) 
     }
   }
 
-  // Handle cancel/delete
-  const handleCancel = async () => {
-    if (!window.confirm("Are you sure you want to cancel this campaign? Dials will stop immediately.")) return
+  // Handle campaign delete
+  const handleDelete = async () => {
+    if (!window.confirm("Are you sure you want to delete this campaign? All contacts and call history for this campaign will be removed.")) return
     try {
       setActionLoading(true)
       const res = await fetch(`/api/campaigns/${campaignId}`, { method: 'DELETE' })
       if (res.ok) {
-        toast.success('Campaign successfully cancelled')
+        toast.success('Campaign successfully deleted')
         router.push('/dashboard/campaigns')
       } else {
         const data = await res.json()
-        toast.error(data.error || 'Failed to cancel campaign')
+        toast.error(data.error || 'Failed to delete campaign')
       }
     } catch (err) {
       console.error(err)
-      toast.error('Error cancelling campaign')
+      toast.error('Error deleting campaign')
     } finally {
       setActionLoading(false)
     }
@@ -306,18 +343,21 @@ export function CampaignDetailClient({ campaignId }: CampaignDetailClientProps) 
   // Handle manual contact retry
   const handleRetryContact = async (contactId: string) => {
     try {
+      setRetryingContactId(contactId)
       const res = await fetch(`/api/campaigns/${campaignId}/contacts/${contactId}/retry`, { method: 'POST' })
       const data = await res.json()
       if (res.ok) {
-        toast.success('Contact call status reset to pending!')
-        fetchCampaignInfo(true)
-        fetchCampaignContacts()
+        toast.success('Calling contact...')
+        await fetchCampaignInfo(true)
+        await fetchCampaignContacts(true)
       } else {
         toast.error(data.error || 'Failed to reset contact')
       }
     } catch (err) {
       console.error(err)
       toast.error('Error resetting contact')
+    } finally {
+      setRetryingContactId(null)
     }
   }
 
@@ -345,9 +385,13 @@ export function CampaignDetailClient({ campaignId }: CampaignDetailClientProps) 
     )
   }
 
-  const calledPercentage = campaign.total_contacts > 0 
-    ? Math.round((campaign.contacts_called / campaign.total_contacts) * 100) 
-    : 0;
+  const completedCount = contacts.filter(c => ['answered', 'completed', 'no_answer', 'busy', 'failed', 'dnd'].includes((c.call_status || '').toLowerCase())).length;
+  const pendingCount = contacts.filter(c => (c.call_status || '').toLowerCase() === 'pending').length;
+  const dialingCount = contacts.filter(c => (c.call_status || '').toLowerCase() === 'dialing').length;
+
+  const calledPercentage = campaign.status === 'completed' 
+    ? 100 
+    : (contactsCount > 0 ? Math.min(100, Math.round((completedCount / contactsCount) * 100)) : 0);
 
   const totalPages = Math.ceil(contactsCount / limit) || 1;
 
@@ -412,10 +456,11 @@ export function CampaignDetailClient({ campaignId }: CampaignDetailClientProps) 
             <button
               onClick={handleStart}
               disabled={actionLoading || isSimulated}
-              className="px-4 py-2 bg-emerald-555 hover:bg-emerald-666 text-white text-xs font-bold uppercase rounded-xl tracking-wider transition-all flex items-center gap-1.5 shadow-md cursor-pointer disabled:opacity-50"
+              className="px-4 py-2 text-xs font-bold uppercase rounded-xl tracking-wider transition-all flex items-center gap-1.5 shadow-md cursor-pointer disabled:opacity-50"
+              style={{ backgroundColor: '#059669', color: '#ffffff' }}
               title={isSimulated ? "Outbound calling requires real number and provider connected" : undefined}
             >
-              <Play className="w-4 h-4" />
+              <Play className="w-4 h-4 fill-white" />
               Start Campaign
             </button>
           )}
@@ -424,9 +469,10 @@ export function CampaignDetailClient({ campaignId }: CampaignDetailClientProps) 
             <button
               onClick={handlePause}
               disabled={actionLoading}
-              className="px-4 py-2 bg-amber-555 hover:bg-amber-666 text-white text-xs font-bold uppercase rounded-xl tracking-wider transition-all flex items-center gap-1.5 shadow-md cursor-pointer disabled:opacity-50"
+              className="px-4 py-2 text-xs font-bold uppercase rounded-xl tracking-wider transition-all flex items-center gap-1.5 shadow-md cursor-pointer disabled:opacity-50"
+              style={{ backgroundColor: '#d97706', color: '#ffffff' }}
             >
-              <Pause className="w-4 h-4" />
+              <Pause className="w-4 h-4 fill-white" />
               Pause Calling
             </button>
           )}
@@ -435,10 +481,11 @@ export function CampaignDetailClient({ campaignId }: CampaignDetailClientProps) 
             <button
               onClick={handleResume}
               disabled={actionLoading || isSimulated}
-              className="px-4 py-2 bg-emerald-555 hover:bg-emerald-666 text-white text-xs font-bold uppercase rounded-xl tracking-wider transition-all flex items-center gap-1.5 shadow-md cursor-pointer disabled:opacity-50"
+              className="px-4 py-2 text-xs font-bold uppercase rounded-xl tracking-wider transition-all flex items-center gap-1.5 shadow-md cursor-pointer disabled:opacity-50"
+              style={{ backgroundColor: '#059669', color: '#ffffff' }}
               title={isSimulated ? "Outbound calling requires real number and provider connected" : undefined}
             >
-              <Play className="w-4 h-4" />
+              <Play className="w-4 h-4 fill-white" />
               Resume Calling
             </button>
           )}
@@ -446,16 +493,16 @@ export function CampaignDetailClient({ campaignId }: CampaignDetailClientProps) 
           {/* Analytics Link */}
           <Link
             href={`/dashboard/campaigns/${campaignId}/analytics`}
-            className="px-4 py-2 border border-violet-500/20 bg-violet-500/10 hover:bg-violet-500/25 text-violet-400 text-xs font-bold uppercase rounded-xl tracking-wider transition-all flex items-center gap-1.5 shadow-sm cursor-pointer"
+            className="px-4 py-2 border border-violet-500/30 bg-violet-500/10 hover:bg-violet-500/20 text-violet-700 dark:text-violet-300 text-xs font-bold uppercase rounded-xl tracking-wider transition-all flex items-center gap-1.5 shadow-sm cursor-pointer"
           >
             <BarChart3 className="w-4 h-4" />
             Analytics
           </Link>
 
           <button
-            onClick={handleCancel}
+            onClick={handleDelete}
             disabled={actionLoading}
-            className="px-4 py-2 border border-red-500/20 bg-red-500/10 hover:bg-red-500/20 text-red-500 text-xs font-bold uppercase rounded-xl tracking-wider transition-all flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
+            className="px-4 py-2 border border-red-500/30 bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 text-xs font-bold uppercase rounded-xl tracking-wider transition-all flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
           >
             <Trash2 className="w-4 h-4" />
             Delete
@@ -508,8 +555,8 @@ export function CampaignDetailClient({ campaignId }: CampaignDetailClientProps) 
         {/* Total Contacts Card */}
         <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-6 space-y-2">
           <p className="text-[10px] text-[var(--muted)] uppercase font-bold tracking-wider">Dialing Quota</p>
-          <p className="text-3xl font-extrabold text-[var(--heading)] font-mono">{campaign.total_contacts}</p>
-          <p className="text-[10px] text-[var(--muted)] font-sans">{campaign.contacts_called} contacts placed so far ({campaign.total_contacts - campaign.contacts_called} pending)</p>
+          <p className="text-3xl font-extrabold text-[var(--heading)] font-mono">{contactsCount || campaign.total_contacts}</p>
+          <p className="text-[10px] text-[var(--muted)] font-sans">{contactsCount || campaign.total_contacts} total contacts ({pendingCount} pending{dialingCount > 0 ? `, ${dialingCount} dialing` : ''})</p>
         </div>
 
         {/* Connected Calls Card */}
@@ -518,7 +565,7 @@ export function CampaignDetailClient({ campaignId }: CampaignDetailClientProps) 
           <p className="text-3xl font-extrabold text-blue-500 font-mono">
             {campaign.contacts_connected} 
             <span className="text-xs text-[var(--muted)] font-sans font-bold ml-1.5">
-              ({campaign.contacts_called > 0 ? Math.round((campaign.contacts_connected / campaign.contacts_called) * 100) : 0}% connected)
+              ({campaign.contacts_called > 0 ? Math.min(100, Math.round((campaign.contacts_connected / campaign.contacts_called) * 100)) : 0}% connected)
             </span>
           </p>
           <p className="text-[10px] text-[var(--muted)] font-sans">Total calls answered by active customer contacts</p>
@@ -662,17 +709,29 @@ export function CampaignDetailClient({ campaignId }: CampaignDetailClientProps) 
                     <td className="px-6 py-4 font-mono text-[var(--body)]">{item.phone}</td>
                     <td className="px-6 py-4 text-[var(--body)]">{item.company_name || '—'}</td>
                     <td className="px-6 py-4">
-                      <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[9px] font-black uppercase border font-montserrat ${getCallStatusBadgeClass(item.call_status)}`}>
-                        {getCallStatusIcon(item.call_status)}
-                        {item.call_status}
-                      </span>
+                      {(() => {
+                        const isDialing = campaign.status === 'running' && item.call_status.toLowerCase() === 'dialing';
+                        const effectiveStatus = (!isDialing && item.call_status.toLowerCase() === 'dialing')
+                          ? (item.call_attempts > 0 ? 'answered' : 'pending')
+                          : item.call_status;
+                        return (
+                          <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[9px] font-black uppercase border font-montserrat ${getCallStatusBadgeClass(effectiveStatus)}`}>
+                            {getCallStatusIcon(effectiveStatus)}
+                            {effectiveStatus}
+                          </span>
+                        );
+                      })()}
                     </td>
                     <td className="px-6 py-4 text-center font-semibold font-mono text-[var(--body)]">{item.call_attempts}</td>
                     <td className="px-6 py-4 space-y-1">
                       {item.call_id && (
-                        <span className="block text-[10px] text-violet-500 font-bold hover:underline cursor-pointer">
+                        <button
+                          type="button"
+                          onClick={() => handleOpenTranscript(item.call_id!, item.full_name)}
+                          className="block text-[10px] text-violet-500 hover:text-violet-400 font-bold hover:underline cursor-pointer text-left"
+                        >
                           View Call Transcript
-                        </span>
+                        </button>
                       )}
                       {item.lead_id && (
                         <Link 
@@ -685,16 +744,21 @@ export function CampaignDetailClient({ campaignId }: CampaignDetailClientProps) 
                       {!item.call_id && !item.lead_id && <span className="text-[var(--muted)]">—</span>}
                     </td>
                     <td className="px-6 py-4 text-right">
-                      {['answered', 'failed', 'busy', 'no_answer', 'dnd'].includes(item.call_status.toLowerCase()) && (
-                        <button
-                          onClick={() => handleRetryContact(item.id)}
-                          disabled={item.call_status.toLowerCase() === 'dnd'}
-                          className="px-2.5 py-1.5 rounded-md border border-[var(--border)] bg-[var(--card-bg)] hover:bg-[var(--hover-bg)] text-[10px] font-black uppercase tracking-wider transition-all text-[var(--body)] hover:text-[var(--heading)] cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-                          title={item.call_status.toLowerCase() === 'dnd' ? "DND numbers cannot be retried" : "Reset status back to pending"}
-                        >
-                          Retry Call
-                        </button>
-                      )}
+                      {(() => {
+                        const isDialing = campaign.status === 'running' && item.call_status.toLowerCase() === 'dialing' && (!item.last_attempt_at || (Date.now() - new Date(item.last_attempt_at).getTime()) < 35000);
+                        const isRetrying = retryingContactId === item.id;
+                        return (
+                          <button
+                            onClick={() => handleRetryContact(item.id)}
+                            disabled={isRetrying || item.call_status.toLowerCase() === 'dnd' || isDialing}
+                            className="px-3 py-1.5 rounded-lg border border-violet-500/40 bg-violet-500/15 hover:bg-violet-500/25 text-violet-700 dark:text-violet-300 text-[11px] font-bold uppercase tracking-wider transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5 ml-auto shadow-sm"
+                            title={item.call_status.toLowerCase() === 'dnd' ? "DND numbers cannot be retried" : "Retry/Dial this contact"}
+                          >
+                            <RefreshCw className={`w-3.5 h-3.5 ${isDialing || isRetrying ? 'animate-spin text-amber-500' : ''}`} />
+                            {isRetrying ? 'Connecting...' : (isDialing ? 'Dialing...' : 'Retry Call')}
+                          </button>
+                        );
+                      })()}
                     </td>
                   </tr>
                 ))}
@@ -729,6 +793,16 @@ export function CampaignDetailClient({ campaignId }: CampaignDetailClientProps) 
         )}
       </div>
 
+      {/* Transcript Modal */}
+      <TranscriptModal
+        isOpen={showTranscriptModal}
+        onClose={() => {
+          setShowTranscriptModal(false)
+          setSelectedTranscript(null)
+        }}
+        transcript={selectedTranscript}
+        callerName={selectedCallerName}
+      />
     </div>
   )
 }

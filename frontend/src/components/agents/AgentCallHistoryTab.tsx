@@ -80,9 +80,35 @@ export function AgentCallHistoryTab({ agent }: AgentCallHistoryTabProps) {
     }
   }
 
+function getTranscriptString(transcript: any): string {
+  if (!transcript) return ''
+  if (typeof transcript === 'string') return transcript
+  if (Array.isArray(transcript)) {
+    return transcript
+      .map((t: any) => {
+        if (typeof t === 'string') return t
+        if (t && typeof t === 'object') {
+          const role = t.role || t.speaker || ''
+          const text = t.content || t.text || ''
+          return role ? `${role}: ${text}` : text
+        }
+        return String(t)
+      })
+      .join('\n')
+  }
+  if (typeof transcript === 'object') {
+    try {
+      return JSON.stringify(transcript)
+    } catch {
+      return String(transcript)
+    }
+  }
+  return String(transcript)
+}
+
   // Filter Logic
   const filteredCalls = calls.filter((call) => {
-    const transcriptText = (call.transcript || call.transcript_text || '').toLowerCase()
+    const transcriptText = getTranscriptString(call.transcript || call.transcript_text).toLowerCase()
     const callerPhone = (call.caller_phone || '').toLowerCase()
     const outcomeText = (call.outcome || '').toLowerCase()
     const sentimentText = (call.sentiment || 'neutral').toLowerCase()
@@ -161,7 +187,7 @@ export function AgentCallHistoryTab({ agent }: AgentCallHistoryTabProps) {
       c.sentiment || 'neutral',
       c.status || '',
       c.outcome || '',
-      (c.transcript || c.transcript_text || '').replace(/"/g, '""')
+      getTranscriptString(c.transcript || c.transcript_text).replace(/"/g, '""')
     ])
 
     const csvContent = "data:text/csv;charset=utf-8," 
@@ -301,7 +327,8 @@ export function AgentCallHistoryTab({ agent }: AgentCallHistoryTabProps) {
                       ? 'bg-rose-500/10 border-rose-500/20 text-rose-500'
                       : 'bg-[var(--hover-bg)] border border-[var(--border)] text-[var(--muted)]'
 
-                  const snippet = getHighlightSnippet(call.transcript || call.transcript_text || '', searchQuery)
+                  const rawTranscriptStr = getTranscriptString(call.transcript || call.transcript_text)
+                  const snippet = getHighlightSnippet(rawTranscriptStr, searchQuery)
 
                   return (
                     <React.Fragment key={call.id}>
@@ -359,7 +386,7 @@ export function AgentCallHistoryTab({ agent }: AgentCallHistoryTabProps) {
                                   <FileText className="w-3.5 h-3.5" /> Conversation Transcript
                                 </h4>
                                 <div className="text-xs font-sans text-[var(--body)] leading-relaxed bg-[var(--card-bg)] p-4 rounded-xl border border-[var(--border)] max-h-60 overflow-y-auto whitespace-pre-wrap">
-                                  {call.transcript || call.transcript_text || 'No transcript text generated.'}
+                                  {getTranscriptString(call.transcript || call.transcript_text) || 'No transcript text generated.'}
                                 </div>
                               </div>
                               <div className="space-y-4">

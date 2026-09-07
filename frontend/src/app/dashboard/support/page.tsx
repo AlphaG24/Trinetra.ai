@@ -219,7 +219,7 @@ export default function SupportPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-[var(--border)]">
         <div className="space-y-1">
           <h1 className="text-2xl font-bold tracking-tight text-[var(--heading)] flex items-center gap-3 font-display">
-            <LifeBuoy className="w-6 h-6 text-violet-555" /> Help & Support
+            <LifeBuoy className="w-6 h-6 text-violet-500" /> Help & Support
           </h1>
           <p className="text-xs text-[var(--muted)]">
             Submit technical issues, search FAQs, or interact directly with platform helpdesk staff.
@@ -242,7 +242,7 @@ export default function SupportPage() {
           <h2 className="text-sm font-bold uppercase tracking-wider text-[var(--muted)] font-display">Active Tickets</h2>
           {isLoadingTickets ? (
             <div className="flex justify-center py-12">
-              <Loader2 className="w-8 h-8 text-violet-555 animate-spin" />
+              <Loader2 className="w-8 h-8 text-violet-500 animate-spin" />
             </div>
           ) : (
             renderTicketsGrid(
@@ -258,7 +258,7 @@ export default function SupportPage() {
           <h2 className="text-sm font-bold uppercase tracking-wider text-[var(--muted)] font-display">Recently Resolved</h2>
           {isLoadingTickets ? (
             <div className="flex justify-center py-12">
-              <Loader2 className="w-8 h-8 text-violet-555 animate-spin" />
+              <Loader2 className="w-8 h-8 text-violet-500 animate-spin" />
             </div>
           ) : (
             renderTicketsGrid(
@@ -335,7 +335,7 @@ export default function SupportPage() {
                 >
                   <span>{faq.question}</span>
                   <ChevronDown 
-                    className={`w-4 h-4 text-[var(--muted)] shrink-0 transition-transform duration-250 ${isOpen ? 'rotate-180 text-violet-555' : ''}`} 
+                    className={`w-4 h-4 text-[var(--muted)] shrink-0 transition-transform duration-250 ${isOpen ? 'rotate-180 text-violet-500' : ''}`} 
                   />
                 </button>
                 

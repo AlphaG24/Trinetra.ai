@@ -13,8 +13,10 @@ class CampaignAnalyticsService:
     async def get_campaign_stats(self, campaign_id: str) -> dict:
         """Core stats for a single campaign"""
         # Get campaign base data
-        campaign = await self.supabase.table("campaigns") \
-            .select("*").eq("id", campaign_id).single().execute()
+        campaign = await asyncio.to_thread(
+            self.supabase.table("campaigns")
+            .select("*").eq("id", campaign_id).single().execute
+        )
         
         if not campaign.data:
             return None
@@ -26,9 +28,11 @@ class CampaignAnalyticsService:
         if not call_ids:
             calls_data = []
         else:
-            calls = await self.supabase.table("voice_calls") \
-                .select("status, duration_seconds, sentiment, started_at") \
-                .in_("id", call_ids).execute()
+            calls = await asyncio.to_thread(
+                self.supabase.table("voice_calls")
+                .select("status, duration_seconds, sentiment, started_at")
+                .in_("id", call_ids).execute
+            )
             calls_data = calls.data or []
         
         # Get lead stats
@@ -36,9 +40,11 @@ class CampaignAnalyticsService:
         if not lead_ids:
             leads_data = []
         else:
-            leads = await self.supabase.table("leads") \
-                .select("stage, interest_level, created_at") \
-                .in_("id", lead_ids).execute()
+            leads = await asyncio.to_thread(
+                self.supabase.table("leads")
+                .select("stage, interest_level, created_at")
+                .in_("id", lead_ids).execute
+            )
             leads_data = leads.data or []
         
         return {
@@ -60,9 +66,11 @@ class CampaignAnalyticsService:
     
     async def get_campaigns_comparison(self, organization_id: str) -> dict:
         """Compare all campaigns for an organization"""
-        campaigns = await self.supabase.table("campaigns") \
-            .select("*").eq("organization_id", organization_id) \
-            .order("created_at", desc=True).execute()
+        campaigns = await asyncio.to_thread(
+            self.supabase.table("campaigns")
+            .select("*").eq("organization_id", organization_id)
+            .order("created_at", desc=True).execute
+        )
         
         comparison = []
         for c in campaigns.data:
@@ -87,17 +95,17 @@ class CampaignAnalyticsService:
         if not call_ids:
             return {"hourly_volume": []}
             
-        calls = await self.supabase.table("voice_calls") \
-            .select("started_at, status") \
-            .in_("id", call_ids).execute()
+        calls = await asyncio.to_thread(
+            self.supabase.table("voice_calls")
+            .select("started_at, status")
+            .in_("id", call_ids).execute
+        )
         
         hourly = {}
         for call in (calls.data or []):
             if call.get("started_at"):
-                # Normalize ISO started_at to hour string: MM-DD HH:00
                 dt_str = call["started_at"]
                 try:
-                    # '2026-08-04T12:34:56' -> '08-04 12:00'
                     date_part, time_part = dt_str.split('T')
                     hour_part = time_part.split(':')[0]
                     label = f"{date_part[-5:]} {hour_part}:00"
@@ -114,10 +122,12 @@ class CampaignAnalyticsService:
         if not call_ids:
             return {"sentiment_distribution": {"positive": 0, "neutral": 0, "negative": 0}}
             
-        calls = await self.supabase.table("voice_calls") \
-            .select("sentiment") \
-            .in_("id", call_ids) \
-            .not_.is_("sentiment", "null").execute()
+        calls = await asyncio.to_thread(
+            self.supabase.table("voice_calls")
+            .select("sentiment")
+            .in_("id", call_ids)
+            .not_.is_("sentiment", "null").execute
+        )
         
         dist = {"positive": 0, "neutral": 0, "negative": 0}
         for call in (calls.data or []):
@@ -174,13 +184,17 @@ class CampaignAnalyticsService:
         return round((campaign.get("contacts_connected", 0) / campaign["contacts_called"]) * 100, 1)
     
     async def _get_campaign_call_ids(self, campaign_id: str) -> list:
-        contacts = await self.supabase.table("campaign_contacts") \
-            .select("call_id").eq("campaign_id", campaign_id) \
-            .not_.is_("call_id", "null").execute()
+        contacts = await asyncio.to_thread(
+            self.supabase.table("campaign_contacts")
+            .select("call_id").eq("campaign_id", campaign_id)
+            .not_.is_("call_id", "null").execute
+        )
         return [c["call_id"] for c in contacts.data if c.get("call_id")]
     
     async def _get_campaign_lead_ids(self, campaign_id: str) -> list:
-        contacts = await self.supabase.table("campaign_contacts") \
-            .select("lead_id").eq("campaign_id", campaign_id) \
-            .not_.is_("lead_id", "null").execute()
+        contacts = await asyncio.to_thread(
+            self.supabase.table("campaign_contacts")
+            .select("lead_id").eq("campaign_id", campaign_id)
+            .not_.is_("lead_id", "null").execute
+        )
         return [c["lead_id"] for c in contacts.data if c.get("lead_id")]

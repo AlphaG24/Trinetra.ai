@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { 
   CalendarClock, Clock, Tag, RefreshCw, CheckCircle2, 
-  ExternalLink, Calendar, AlertTriangle, Check
+  ExternalLink, Calendar, AlertTriangle, Check, Trash2
 } from "lucide-react";
 import { CallbackDetailModal } from "../callbacks/CallbackDetailModal";
 import { toast } from "sonner";
@@ -98,6 +98,22 @@ export function AgentCallbacksTab({ agent }: { agent: any }) {
       fetchAgentCallbacks();
     } catch (err: any) {
       toast.error(err.message || "Action failed");
+    }
+  };
+
+  const handleDeleteCallback = async (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    if (!window.confirm("Are you sure you want to delete this callback?")) return;
+    try {
+      const res = await fetch(`/api/callbacks/${id}`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to delete callback");
+      toast.success("Callback deleted successfully");
+      fetchAgentCallbacks();
+    } catch (err: any) {
+      toast.error(err.message || "Delete failed");
     }
   };
 
@@ -212,24 +228,35 @@ export function AgentCallbacksTab({ agent }: { agent: any }) {
                     )}
                   </div>
 
-                  {item.status === "scheduled" && (
-                    <div className="mt-4 pt-3 border-t border-[var(--border)] flex gap-2 justify-end opacity-75 group-hover:opacity-100 transition-opacity">
-                      <button
-                        onClick={(e) => { e.stopPropagation(); handleStatusChange(item.id, "completed") }}
-                        className="p-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-500 border border-emerald-500/25 rounded-lg text-[10px] uppercase font-bold tracking-wider flex items-center gap-1 cursor-pointer transition-colors"
-                        title="Mark Complete"
-                      >
-                        <CheckCircle2 className="w-3.5 h-3.5" /> Done
-                      </button>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); setSelectedCallback(item) }}
-                        className="p-1.5 bg-blue-500/10 hover:bg-blue-500/20 text-blue-500 border border-blue-500/25 rounded-lg text-[10px] uppercase font-bold tracking-wider flex items-center gap-1 cursor-pointer transition-colors"
-                        title="Reschedule"
-                      >
-                        <RefreshCw className="w-3.5 h-3.5" /> Reschedule
-                      </button>
+                  <div className="mt-4 pt-3 border-t border-[var(--border)] flex gap-2 justify-between items-center opacity-75 group-hover:opacity-100 transition-opacity">
+                    <button
+                      onClick={(e) => handleDeleteCallback(e, item.id)}
+                      className="p-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 border border-rose-500/25 rounded-lg text-[10px] uppercase font-bold tracking-wider flex items-center gap-1 cursor-pointer transition-colors"
+                      title="Delete Callback"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                    <div className="flex gap-2">
+                      {item.status === "scheduled" && (
+                        <>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleStatusChange(item.id, "completed") }}
+                            className="p-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-500 border border-emerald-500/25 rounded-lg text-[10px] uppercase font-bold tracking-wider flex items-center gap-1 cursor-pointer transition-colors"
+                            title="Mark Complete"
+                          >
+                            <CheckCircle2 className="w-3.5 h-3.5" /> Done
+                          </button>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setSelectedCallback(item) }}
+                            className="p-1.5 bg-blue-500/10 hover:bg-blue-500/20 text-blue-500 border border-blue-500/25 rounded-lg text-[10px] uppercase font-bold tracking-wider flex items-center gap-1 cursor-pointer transition-colors"
+                            title="Reschedule"
+                          >
+                            <RefreshCw className="w-3.5 h-3.5" /> Reschedule
+                          </button>
+                        </>
+                      )}
                     </div>
-                  )}
+                  </div>
                 </div>
               );
             })}

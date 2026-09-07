@@ -231,7 +231,7 @@ Target Audience: ${targetAudience}
                   toast.error('Please enter Business Name and Industry to proceed.')
                 }
               }}
-              className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-violet-600 hover:bg-violet-555 text-white font-bold text-xs uppercase tracking-wider transition-all cursor-pointer shadow-md"
+              className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-violet-600 hover:bg-violet-700 text-white font-bold text-xs uppercase tracking-wider transition-all cursor-pointer shadow-md"
             >
               <span>Next Step</span>
               <ArrowRight className="w-4 h-4" />
@@ -287,7 +287,7 @@ Target Audience: ${targetAudience}
               <button
                 type="submit"
                 disabled={loading}
-                className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-violet-600 hover:bg-violet-555 text-white font-bold text-xs uppercase tracking-wider transition-all disabled:opacity-50 cursor-pointer shadow-md"
+                className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-violet-600 hover:bg-violet-700 text-white font-bold text-xs uppercase tracking-wider transition-all disabled:opacity-50 cursor-pointer shadow-md"
               >
                 {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5 animate-pulse" />}
                 <span>{loading ? 'Compiling Prompt...' : 'Complete & Save'}</span>

@@ -134,10 +134,19 @@ export async function GET(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // 2. Fetch agent
+    // 2. Fetch agent with assigned phone numbers
     const { data: agent, error: fetchError } = await supabase
       .from('agents')
-      .select('*')
+      .select(`
+        *,
+        agent_phone_numbers (
+          is_primary,
+          phone_numbers (
+            phone_number,
+            provider
+          )
+        )
+      `)
       .eq('id', agentId)
       .single();
 
@@ -145,7 +154,18 @@ export async function GET(
       return NextResponse.json({ error: "Agent not found" }, { status: 404 });
     }
 
-    return NextResponse.json({ success: true, data: agent });
+    const primaryAssigned = agent.agent_phone_numbers?.find((ap: any) => ap.is_primary) || agent.agent_phone_numbers?.[0];
+    const assignedPhoneNumber = primaryAssigned?.phone_numbers?.phone_number || agent.phone_number || null;
+    const assignedProvider = primaryAssigned?.phone_numbers?.provider || agent.telephony_provider || 'twilio';
+
+    return NextResponse.json({
+      success: true,
+      data: {
+        ...agent,
+        phone_number: assignedPhoneNumber,
+        telephony_provider: assignedProvider
+      }
+    });
   } catch (error: any) {
     console.error("[Agent Fetch API] Catch Error:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });

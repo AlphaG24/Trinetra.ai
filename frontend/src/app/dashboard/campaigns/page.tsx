@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useEffect, useState } from 'react'
-import { Megaphone, Plus, Play, Pause, ExternalLink, RefreshCw, Loader2, Users, BarChart3 } from 'lucide-react'
+import { Megaphone, Plus, Play, Pause, ExternalLink, RefreshCw, Loader2, Users, BarChart3, Trash2 } from 'lucide-react'
 import { useDashboardStore } from '@/store/dashboardStore'
 import UpgradePrompt from '@/src/components/shared/UpgradePrompt'
 import { NewCampaignModal } from '@/src/components/campaigns/NewCampaignModal'
@@ -21,6 +21,8 @@ interface Campaign {
   timezone: string
   agents?: {
     name: string
+    phone_number?: string | null
+    telephony_provider?: string | null
   }
 }
 
@@ -141,7 +143,29 @@ export default function CampaignsPage() {
     }
   }
 
-  if (!profile) {
+  const handleDelete = async (id: string, e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (!window.confirm('Are you sure you want to delete this campaign? All contacts and call history for this campaign will be removed.')) return
+    try {
+      setActionLoading(id)
+      const res = await fetch(`/api/campaigns/${id}`, { method: 'DELETE' })
+      if (res.ok) {
+        toast.success('Campaign successfully deleted')
+        fetchCampaigns()
+      } else {
+        const data = await res.json()
+        toast.error(data.error || 'Failed to delete campaign')
+      }
+    } catch (err) {
+      console.error(err)
+      toast.error('Failed to delete campaign')
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
+  if (loading || !profile) {
     return (
       <div className="flex h-[50vh] w-full items-center justify-center">
         <div className="w-8 h-8 border-2 border-violet-500 border-t-transparent rounded-full animate-spin" />
@@ -149,7 +173,7 @@ export default function CampaignsPage() {
     )
   }
 
-  const userPlanTier = (profile as any)?.plan_tier?.toLowerCase() || 'free'
+  const userPlanTier = (profile as any)?.plan_tier?.toLowerCase() || 'trial'
   if (userPlanTier === 'free' || userPlanTier === 'free_demo') {
     return (
       <UpgradePrompt 
@@ -183,7 +207,7 @@ export default function CampaignsPage() {
           
           <Link
             href="/dashboard/campaigns/analytics"
-            className="px-4 py-2.5 border border-violet-500/20 bg-violet-500/10 hover:bg-violet-500/25 text-violet-400 text-xs font-bold uppercase rounded-xl tracking-wider transition-all flex items-center gap-2 shadow-sm cursor-pointer"
+            className="px-4 py-2.5 border border-violet-500/30 bg-violet-500/10 hover:bg-violet-500/20 text-violet-700 dark:text-violet-300 text-xs font-bold uppercase rounded-xl tracking-wider transition-all flex items-center gap-2 shadow-sm cursor-pointer"
           >
             <BarChart3 className="w-4 h-4" />
             Compare
@@ -266,6 +290,11 @@ export default function CampaignsPage() {
                     <div>
                       <p className="text-[10px] text-[var(--muted)] uppercase font-bold tracking-wider">Agent Assigned</p>
                       <p className="font-semibold text-[var(--heading)] mt-0.5">{camp.agents?.name || 'Unknown Agent'}</p>
+                      {camp.agents?.phone_number && (
+                        <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-mono mt-0.5 font-semibold">
+                          📞 {camp.agents.phone_number}
+                        </p>
+                      )}
                     </div>
                     <div>
                       <p className="text-[10px] text-[var(--muted)] uppercase font-bold tracking-wider">Calling Hours</p>
@@ -306,9 +335,10 @@ export default function CampaignsPage() {
                     <button
                       onClick={() => handleStart(camp.id)}
                       disabled={isActionLoading}
-                      className="w-full md:w-32 px-3 py-2 bg-emerald-555 hover:bg-emerald-666 text-white text-[10px] font-black uppercase rounded-lg tracking-wider transition-all flex items-center justify-center gap-1.5 shadow-md cursor-pointer disabled:opacity-50"
+                      className="w-full md:w-32 px-3 py-2 text-white text-[10px] font-black uppercase rounded-lg tracking-wider transition-all flex items-center justify-center gap-1.5 shadow-md cursor-pointer disabled:opacity-50"
+                      style={{ backgroundColor: '#059669', color: '#ffffff' }}
                     >
-                      <Play className="w-3.5 h-3.5" />
+                      <Play className="w-3.5 h-3.5 fill-white" />
                       Start
                     </button>
                   )}
@@ -317,9 +347,10 @@ export default function CampaignsPage() {
                     <button
                       onClick={() => handlePause(camp.id)}
                       disabled={isActionLoading}
-                      className="w-full md:w-32 px-3 py-2 bg-amber-555 hover:bg-amber-666 text-white text-[10px] font-black uppercase rounded-lg tracking-wider transition-all flex items-center justify-center gap-1.5 shadow-md cursor-pointer disabled:opacity-50"
+                      className="w-full md:w-32 px-3 py-2 text-white text-[10px] font-black uppercase rounded-lg tracking-wider transition-all flex items-center justify-center gap-1.5 shadow-md cursor-pointer disabled:opacity-50"
+                      style={{ backgroundColor: '#d97706', color: '#ffffff' }}
                     >
-                      <Pause className="w-3.5 h-3.5" />
+                      <Pause className="w-3.5 h-3.5 fill-white" />
                       Pause
                     </button>
                   )}
@@ -328,9 +359,10 @@ export default function CampaignsPage() {
                     <button
                       onClick={() => handleResume(camp.id)}
                       disabled={isActionLoading}
-                      className="w-full md:w-32 px-3 py-2 bg-emerald-555 hover:bg-emerald-666 text-white text-[10px] font-black uppercase rounded-lg tracking-wider transition-all flex items-center justify-center gap-1.5 shadow-md cursor-pointer disabled:opacity-50"
+                      className="w-full md:w-32 px-3 py-2 text-white text-[10px] font-black uppercase rounded-lg tracking-wider transition-all flex items-center justify-center gap-1.5 shadow-md cursor-pointer disabled:opacity-50"
+                      style={{ backgroundColor: '#059669', color: '#ffffff' }}
                     >
-                      <Play className="w-3.5 h-3.5" />
+                      <Play className="w-3.5 h-3.5 fill-white" />
                       Resume
                     </button>
                   )}
@@ -343,6 +375,17 @@ export default function CampaignsPage() {
                     <ExternalLink className="w-3.5 h-3.5" />
                     Details
                   </Link>
+
+                  {/* Delete Campaign */}
+                  <button
+                    onClick={(e) => handleDelete(camp.id, e)}
+                    disabled={isActionLoading}
+                    className="w-full md:w-32 px-3 py-2 border border-red-500/30 bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 text-[10px] font-black uppercase rounded-lg tracking-wider transition-all flex items-center justify-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
+                    title="Delete campaign"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    Delete
+                  </button>
                 </div>
               </div>
             )

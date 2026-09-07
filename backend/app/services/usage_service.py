@@ -8,8 +8,8 @@ logger = logging.getLogger("UsageService")
 class UsageService:
     """Enforces plan limits and tracks usage across organizations"""
     
-    def __init__(self, supabase_client):
-        self.supabase = supabase_client
+    def __init__(self, supabase_client=None):
+        self.supabase = supabase_admin if supabase_client is None else supabase_client
     
     async def check_agent_minutes(self, agent_id: str) -> dict:
         """Check if an agent has exceeded its minutes limit"""

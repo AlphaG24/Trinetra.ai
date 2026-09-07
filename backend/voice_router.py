@@ -1,4 +1,12 @@
 from app.services.telephony.factory import get_provider
+import sys
+import io
+if sys.platform == 'win32':
+    try:
+        sys.stdout.reconfigure(encoding='utf-8')
+        sys.stderr.reconfigure(encoding='utf-8')
+    except Exception:
+        pass
 import uuid
 import json
 import math
@@ -18,10 +26,20 @@ try:
 except ModuleNotFoundError:
     import audioop_lts as audioop  # type: ignore  # Python 3.12+ drop-in replacement
 import base64
+import numpy as np
+import ctypes
+import time
 from livekit import rtc
 from app.workers.livekit_agent import generate_agent_token
 
+# Enforce 1ms timer resolution on Windows to eliminate 15.6ms clock quantisation
+try:
+    ctypes.windll.winmm.timeBeginPeriod(1)
+except Exception:
+    pass
 
+# Set to track rooms where an agent worker has already been dispatched to prevent duplicate agents
+_active_agent_spawns: set[str] = set()
 
 router = APIRouter(prefix="/api/voice", tags=["Voice Agent"])
 
@@ -271,13 +289,21 @@ async def generate_livekit_token(req: LiveKitTokenRequest):
         print(f"[LIVEKIT TOKEN ERROR] PyJWT generation failed: {str(e)}", flush=True)
         token = f"dev_token_{identity}_{room_name}"
 
-    # Spawn in-process agent worker only if explicitly requested (default: false, worker handles calls)
+    # Spawn in-process agent worker only if explicitly requested (standalone agent.py dev handles calls by default)
     if os.getenv("ENABLE_IN_PROCESS_AGENT", "false").lower() == "true":
-        print(f"[LIVEKIT AGENT] Spawning agent worker to join room: {room_name} with agent_id: {req.agent_id}", flush=True)
+        print(f"[LIVEKIT AGENT] In-process agent enabled; spawning worker for room: {room_name} with agent_id: {req.agent_id}", flush=True)
         try:
             async def safe_run_agent(r_name: str, a_id: str):
                 try:
                     from agent import run_agent
+                    # If a_id is empty, resolve from DB
+                    if not a_id:
+                        try:
+                            def_agent = supabase_admin.table("agents").select("id").limit(1).execute()
+                            if def_agent.data:
+                                a_id = def_agent.data[0]["id"]
+                        except Exception:
+                            pass
                     await run_agent(r_name, a_id)
                 except Exception as run_err:
                     import traceback
@@ -809,40 +835,39 @@ async def handle_twilio_voice_webhook(
 
         print(f"[Twilio Webhook] Received call: {call_sid} | From: {from_number} -> To: {to_number} | Direction: {direction} | Status: {call_status}", flush=True)
 
-        # 1. Resolve agent
+        # 1. Fast path: Extract agent_id & contact_id from query params
         agent_id = request.query_params.get("agent_id")
+        contact_id = request.query_params.get("contact_id")
+        requested_room = request.query_params.get("room_name") or form_data.get("room_name")
         agent_data = None
-        if agent_id:
-            try:
-                agent_res = supabase_admin.table("agents").select("*").eq("id", agent_id).maybe_single().execute()
-                agent_data = agent_res.data
-            except Exception:
-                agent_data = None
 
-        if not agent_data:
+        if not agent_id:
+            # Fallback: Inbound call lookup (must be non-blocking)
             try:
                 clean_to = to_number.replace("+", "").strip()
-                agent_lookup = supabase_admin.table("agents").select("*").or_(f"phone_number.eq.{to_number},phone_number.eq.+{clean_to},phone_number.eq.{clean_to}").limit(1).execute()
-                if agent_lookup.data and len(agent_lookup.data) > 0:
-                    agent_data = agent_lookup.data[0]
-                    agent_id = agent_data["id"]
-                else:
-                    # Try resolving via agent_phone_numbers / phone_numbers pool mapping
+                def _find_agent():
+                    lookup = supabase_admin.table("agents").select("*").or_(f"phone_number.eq.{to_number},phone_number.eq.+{clean_to},phone_number.eq.{clean_to}").limit(1).execute()
+                    if lookup.data and len(lookup.data) > 0:
+                        return lookup.data[0]
                     phone_res = supabase_admin.table("phone_numbers").select("id").or_(f"phone_number.eq.{to_number},phone_number.eq.+{clean_to},phone_number.eq.{clean_to}").limit(1).execute()
                     if phone_res.data and len(phone_res.data) > 0:
-                        phone_id = phone_res.data[0]["id"]
-                        mapping_res = supabase_admin.table("agent_phone_numbers").select("agent_id").eq("phone_number_id", phone_id).limit(1).execute()
-                        if mapping_res.data and len(mapping_res.data) > 0:
-                            agent_id = mapping_res.data[0]["agent_id"]
-                            agent_res = supabase_admin.table("agents").select("*").eq("id", agent_id).maybe_single().execute()
-                            agent_data = agent_res.data
+                        p_id = phone_res.data[0]["id"]
+                        m_res = supabase_admin.table("agent_phone_numbers").select("agent_id").eq("phone_number_id", p_id).limit(1).execute()
+                        if m_res.data and len(m_res.data) > 0:
+                            a_res = supabase_admin.table("agents").select("*").eq("id", m_res.data[0]["agent_id"]).maybe_single().execute()
+                            return a_res.data
+                    any_agent = supabase_admin.table("agents").select("*").limit(1).execute()
+                    return any_agent.data[0] if any_agent.data else None
+
+                agent_data = await asyncio.to_thread(_find_agent)
+                if agent_data:
+                    agent_id = agent_data.get("id")
             except Exception as e:
                 print(f"[Twilio Lookup Error] {e}", flush=True)
 
-        # Enforce Capabilities Matrix check
+        # Enforce Capabilities Matrix check for inbound calls
         if agent_data and direction == "inbound":
             agent_type = agent_data.get("agent_type", "voice")
-            # Lead Qualifier does NOT support inbound calls
             if agent_type == "lead_qualifier":
                 print(f"[Twilio Webhook] Inbound call rejected for agent {agent_id} (type: {agent_type})", flush=True)
                 rejection_twiml = """<?xml version="1.0" encoding="UTF-8"?>
@@ -852,69 +877,103 @@ async def handle_twilio_voice_webhook(
 </Response>"""
                 return Response(content=rejection_twiml.strip(), media_type="application/xml")
 
-        agent_name = agent_data.get("name", "Trinetra AI Assistant") if agent_data else "Trinetra AI Assistant"
-        user_id = agent_data.get("user_id") if agent_data else None
-        org_id = organization_id if organization_id and organization_id != "default" else (agent_data.get("organization_id") if agent_data else None)
+        # 3. Create unique room name embedding agent_id & contact_id so workers know without DB race conditions
+        if requested_room:
+            room_name = requested_room
+        elif agent_id:
+            room_name = f"twilio--{agent_id}--{contact_id or 'nocontact'}--{call_sid}"
+        else:
+            room_name = f"twilio--noagent--nocontact--{call_sid}"
 
-        # Resolve contact_id from query params
-        contact_id = request.query_params.get("contact_id")
+        # 2. Asynchronously log call record in background
+        async def _async_setup_call():
+            try:
+                u_id = None
+                o_id = organization_id if organization_id and organization_id != "default" else None
+                if agent_id:
+                    try:
+                        a_res = await asyncio.to_thread(
+                            supabase_admin.table("agents").select("user_id, organization_id").eq("id", agent_id).maybe_single().execute
+                        )
+                        if a_res.data:
+                            u_id = a_res.data.get("user_id")
+                            if not o_id:
+                                o_id = a_res.data.get("organization_id")
+                    except Exception:
+                        pass
 
-        # 2. Insert or update voice_calls table
-        try:
-            existing = supabase_admin.table("voice_calls").select("id, metadata").eq("metadata->>provider_call_id", call_sid).limit(1).execute()
-            if not existing.data:
-                call_record = {
-                    "agent_id": agent_id,
-                    "user_id": user_id,
-                    "organization_id": org_id,
-                    "caller_phone": to_number if direction == "outbound-api" else from_number,
-                    "status": "in_progress",
-                    "started_at": datetime.utcnow().isoformat(),
-                    "transcript": f"Agent: Hello! Welcome to Trinetra AI. How may I assist you today?\nCaller: {from_number}",
-                    "language_detected": "english",
-                    "metadata": {
-                        "provider_call_id": call_sid,
-                        "session_id": call_sid,
-                        "direction": direction,
-                        "from_number": from_number,
-                        "to_number": to_number,
-                        "contact_id": contact_id
+                existing = await asyncio.to_thread(
+                    supabase_admin.table("voice_calls").select("id, metadata").eq("metadata->>provider_call_id", call_sid).limit(1).execute
+                )
+                if not existing.data:
+                    call_record = {
+                        "agent_id": agent_id,
+                        "user_id": u_id,
+                        "organization_id": o_id,
+                        "caller_phone": to_number if direction == "outbound-api" else from_number,
+                        "status": "in_progress",
+                        "started_at": datetime.utcnow().isoformat(),
+                        "transcript": "",
+                        "language_detected": "english",
+                        "metadata": {
+                            "provider_call_id": call_sid,
+                            "session_id": call_sid,
+                            "room_name": room_name,
+                            "direction": direction,
+                            "from_number": from_number,
+                            "to_number": to_number,
+                            "contact_id": contact_id
+                        }
                     }
-                }
-                supabase_admin.table("voice_calls").insert(call_record).execute()
-                print(f"[Twilio Voice] Logged call record: {call_sid}", flush=True)
-            else:
-                # Update contact_id in metadata if present
-                if contact_id:
+                    await asyncio.to_thread(supabase_admin.table("voice_calls").insert(call_record).execute)
+                    print(f"[Twilio Voice] Logged call record: {call_sid} (room: {room_name})", flush=True)
+                else:
                     existing_row = existing.data[0]
                     existing_meta = existing_row.get("metadata") or {}
-                    existing_meta["contact_id"] = contact_id
-                    supabase_admin.table("voice_calls").update({
-                        "metadata": existing_meta
-                    }).eq("id", existing_row["id"]).execute()
-                    print(f"[Twilio Voice] Updated call record {existing_row['id']} metadata with contact_id: {contact_id}", flush=True)
-        except Exception as db_err:
-            print(f"[Twilio Voice DB Error] {db_err}", flush=True)
+                    if contact_id:
+                        existing_meta["contact_id"] = contact_id
+                    existing_meta["room_name"] = room_name
+                    existing_meta["provider_call_id"] = call_sid
+                    existing_meta["session_id"] = call_sid
+                    await asyncio.to_thread(
+                        supabase_admin.table("voice_calls").update({"metadata": existing_meta}).eq("id", existing_row["id"]).execute
+                    )
+                    print(f"[Twilio Voice] Updated existing call record: {call_sid} (room: {room_name})", flush=True)
+                
+                # When webhook fires (call answered by user), update campaign contact status to answered
+                if contact_id:
+                    try:
+                        await asyncio.to_thread(
+                            supabase_admin.table("campaign_contacts").update({
+                                "call_status": "answered",
+                                "last_attempt_at": datetime.utcnow().isoformat()
+                            }).eq("id", contact_id).execute
+                        )
+                        print(f"[Twilio Voice] Marked contact {contact_id} as answered", flush=True)
+                    except Exception as cc_ans_err:
+                        print(f"[Twilio Voice] Failed to mark contact answered: {cc_ans_err}", flush=True)
+            except Exception as db_err:
+                print(f"[Twilio Voice DB Error] {db_err}", flush=True)
 
-        # 3. Spawn background agent worker
-        room_name = f"twilio-{call_sid}"
-        if agent_id and os.getenv("DISABLE_IN_PROCESS_AGENT", "false").lower() != "true":
-            try:
-                from agent import run_agent
-                asyncio.create_task(run_agent(room_name, agent_id, contact_id=contact_id))
-            except Exception as spawn_err:
-                print(f"[Twilio Agent Spawn] {spawn_err}", flush=True)
+        asyncio.create_task(_async_setup_call())
 
-        # 4. Return TwiML with LiveKit SIP Dial
-        sip_domain = os.getenv("LIVEKIT_SIP_DOMAIN", "vaakriti-mphqnns0.sip.livekit.cloud")
-        inbound_trunk = os.getenv("LIVEKIT_SIP_INBOUND_TRUNK", "twilio-inbound")
-        sip_uri = f"sip:{inbound_trunk}@{sip_domain}"
+        # 4. LiveKit AgentServer handles agent connection via entrypoint()
+        print(f"[Twilio Webhook] Room: {room_name} | Agent: {agent_id}. LiveKit worker will connect agent via entrypoint.", flush=True)
+
+        # 6. Return TwiML with Twilio Media Stream WebSocket Bridge
+        webhook_base = os.getenv("TRINETRA_WEBHOOK_BASE_URL", "https://unclip-mundane-those.ngrok-free.dev").strip()
+        ws_base = webhook_base.replace("https://", "wss://").replace("http://", "ws://")
+        stream_url = f"{ws_base}/api/voice/webhooks/voice/twilio/stream/{room_name}"
+        print(f"[Twilio Webhook] Returning TwiML pointing to Media Stream: {stream_url}", flush=True)
         
         twiml_response = f"""<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-    <Dial>
-        <Sip>{sip_uri}</Sip>
-    </Dial>
+    <Connect>
+        <Stream url="{stream_url}">
+            <Parameter name="room_name" value="{room_name}" />
+        </Stream>
+    </Connect>
+    <Pause length="3600" />
 </Response>"""
 
         return Response(content=twiml_response.strip(), media_type="application/xml")
@@ -957,8 +1016,19 @@ async def handle_twilio_voice_status(
         print(f"[Twilio Status Webhook] Call: {call_sid} | Status: {call_status} | Duration: {duration}s", flush=True)
 
         if call_sid:
+            if call_status in ["in-progress", "in_progress", "answered"]:
+                final_voice_status = "in_progress"
+            elif call_status == "completed":
+                final_voice_status = "completed" if duration > 0 else "no_answer"
+            elif call_status in ["no-answer", "no_answer"]:
+                final_voice_status = "no_answer"
+            elif call_status == "busy":
+                final_voice_status = "busy"
+            else:
+                final_voice_status = "failed"
+
             update_payload = {
-                "status": "completed" if call_status in ["completed", "in-progress", "answered"] else call_status,
+                "status": final_voice_status,
                 "duration_seconds": duration,
                 "ended_at": datetime.utcnow().isoformat()
             }
@@ -967,19 +1037,401 @@ async def handle_twilio_voice_status(
 
             supabase_admin.table("voice_calls").update(update_payload).eq("metadata->>provider_call_id", call_sid).execute()
 
+            # Also update campaign_contacts immediately
+            try:
+                vc = supabase_admin.table("voice_calls").select("metadata, id").eq("metadata->>provider_call_id", call_sid).maybe_single().execute()
+                if vc and getattr(vc, "data", None) and isinstance(vc.data, dict) and vc.data.get("metadata"):
+                    cid = vc.data["metadata"].get("contact_id")
+                    camp_id = vc.data["metadata"].get("campaign_id")
+                    if cid:
+                        if call_status in ["in-progress", "in_progress", "answered"]:
+                            final_contact_status = "answered"
+                        elif call_status == "completed":
+                            final_contact_status = "answered" if duration > 0 else "no_answer"
+                        elif call_status in ["no-answer", "no_answer"]:
+                            final_contact_status = "no_answer"
+                        elif call_status == "busy":
+                            final_contact_status = "busy"
+                        else:
+                            final_contact_status = "failed"
+
+                        supabase_admin.table("campaign_contacts").update({
+                            "call_status": final_contact_status,
+                            "call_id": vc.data.get("id"),
+                            "last_attempt_at": datetime.utcnow().isoformat()
+                        }).eq("id", cid).execute()
+                        print(f"[Twilio Status Webhook] Updated campaign_contact {cid} to {final_contact_status}", flush=True)
+
+                    if camp_id:
+                        rem = supabase_admin.table("campaign_contacts").select("id").eq("campaign_id", camp_id).in_("call_status", ["pending", "dialing"]).limit(1).execute()
+                        if not rem.data:
+                            supabase_admin.table("campaigns").update({
+                                "status": "completed",
+                                "completed_at": datetime.utcnow().isoformat()
+                            }).eq("id", camp_id).execute()
+                            print(f"[Twilio Status Webhook] Campaign {camp_id} marked completed", flush=True)
+            except Exception as cc_err:
+                print(f"[Twilio Status Webhook] Failed to update campaign_contact: {cc_err}", flush=True)
+
         return {"status": "ok"}
     except Exception as e:
         print(f"[Twilio Status Error] {e}", flush=True)
         return {"status": "error", "message": str(e)}
 
 
-# --- TWILIO NATIVE SIP TRUNKING NOTICE ---
-# Note: Manual WebSocket u-law audio stream has been replaced with LiveKit native SIP Trunking.
+# --- TWILIO BI-DIRECTIONAL WEBSOCKET AUDIO BRIDGE ---
+
+def generate_caller_token(room_name: str) -> str:
+    import uuid
+    import jwt
+    api_key = (os.getenv("LIVEKIT_API_KEY") or "devkey").strip()
+    api_secret = (os.getenv("LIVEKIT_API_SECRET") or "secretsecretsecretsecretsecret12").strip()
+    now = int(datetime.utcnow().timestamp())
+    identity = f"caller_{uuid.uuid4().hex[:6]}"
+    payload = {
+        "exp": now + 86400,
+        "iss": api_key,
+        "nbf": now - 5,
+        "sub": identity,
+        "name": "Phone Caller",
+        "video": {
+            "room": room_name,
+            "roomJoin": True,
+            "canPublish": True,
+            "canSubscribe": True,
+            "canPublishData": True
+        }
+    }
+    token = jwt.encode(payload, api_secret, algorithm="HS256")
+    return token.decode("utf-8") if isinstance(token, bytes) else token
+
 @router.websocket("/webhooks/voice/twilio/stream/{room_name}")
 async def twilio_audio_stream(websocket: WebSocket, room_name: str):
     await websocket.accept()
-    print(f"[Twilio WebSocket Deprecated] Call for room: {room_name} is using native LiveKit SIP trunking.", flush=True)
-    await websocket.close()
+    print(f"[WebSocket] Caller connected to room: {room_name}", flush=True)
+
+    # 1. Connect to LiveKit room
+    room = rtc.Room()
+    token = generate_caller_token(room_name)
+    livekit_url = (os.getenv("LIVEKIT_URL") or "ws://127.0.0.1:7880").strip()
+
+    connected = False
+    for attempt in range(3):
+        try:
+            await asyncio.wait_for(room.connect(livekit_url, token), timeout=8.0)
+            print(f"[Twilio WebSocket] Connected to LiveKit room: {room_name}", flush=True)
+            connected = True
+            break
+        except asyncio.TimeoutError:
+            print(f"[Twilio WebSocket] LiveKit connection attempt {attempt + 1} timed out after 8s. Retrying...", flush=True)
+            await asyncio.sleep(0.3)
+        except Exception as conn_err:
+            print(f"[Twilio WebSocket] LiveKit connection attempt {attempt + 1} failed: {conn_err}. Retrying...", flush=True)
+            await asyncio.sleep(0.3)
+
+    if not connected:
+        print(f"[Twilio WebSocket] LiveKit connection failed after 3 attempts for room {room_name}", flush=True)
+        await websocket.close()
+        return
+
+    # 2. Setup Audio Source & Track with explicit Microphone source (48kHz standard WebRTC)
+    audio_source = rtc.AudioSource(sample_rate=48000, num_channels=1)
+    audio_track = rtc.LocalAudioTrack.create_audio_track("twilio-inbound", audio_source)
+    await room.local_participant.publish_track(
+        audio_track,
+        options=rtc.TrackPublishOptions(source=rtc.TrackSource.SOURCE_MICROPHONE)
+    )
+    print(f"[Twilio WebSocket] Inbound microphone audio track published to room: {room_name} (48kHz)", flush=True)
+
+    # 2.5 Agent presence is managed natively by the LiveKit AgentServer worker via entrypoint()
+
+    stream_sid = None
+    audio_queue = asyncio.Queue()
+    track_tasks = {}
+    is_ws_closed = False
+
+    async def read_track(track: rtc.RemoteAudioTrack):
+        print(f"[Twilio WebSocket] Started reading audio track: {track.sid}", flush=True)
+        while not is_ws_closed:
+            try:
+                # Request LiveKit WebRTC engine to deliver track at 8000Hz mono natively
+                audio_stream = rtc.AudioStream(track, sample_rate=8000, num_channels=1)
+                async for event in audio_stream:
+                    if is_ws_closed:
+                        break
+                    await audio_queue.put(event.frame)
+            except asyncio.CancelledError:
+                break
+            except Exception as read_err:
+                print(f"[Twilio WebSocket] Error in read_track ({track.sid}): {read_err}", flush=True)
+            await asyncio.sleep(0.1)
+        print(f"[Twilio WebSocket] Stopped reading audio track: {track.sid}", flush=True)
+
+    @room.on("track_subscribed")
+    def on_track_subscribed(track: rtc.RemoteAudioTrack, publication: rtc.RemoteTrackPublication, participant: rtc.RemoteParticipant):
+        print(f"[Twilio WebSocket] Track subscribed: {track.sid} from {participant.identity} (kind: {track.kind})", flush=True)
+        if track.kind == rtc.TrackKind.KIND_AUDIO:
+            if track.sid not in track_tasks or track_tasks[track.sid].done():
+                task = asyncio.create_task(read_track(track))
+                track_tasks[track.sid] = task
+
+    @room.on("track_unsubscribed")
+    def on_track_unsubscribed(track: rtc.RemoteAudioTrack, publication: rtc.RemoteTrackPublication, participant: rtc.RemoteParticipant):
+        print(f"[Twilio WebSocket] Track unsubscribed: {track.sid}", flush=True)
+        if track.sid in track_tasks:
+            track_tasks[track.sid].cancel()
+            del track_tasks[track.sid]
+
+    @room.on("participant_connected")
+    def on_participant_connected(participant: rtc.RemoteParticipant):
+        print(f"[Twilio WebSocket] Participant connected: {participant.identity}", flush=True)
+        for pub in participant.track_publications.values():
+            if pub.track and pub.track.kind == rtc.TrackKind.KIND_AUDIO:
+                if pub.track.sid not in track_tasks or track_tasks[pub.track.sid].done():
+                    track_tasks[pub.track.sid] = asyncio.create_task(read_track(pub.track))
+
+    async def safe_close_ws():
+        nonlocal is_ws_closed
+        if not is_ws_closed:
+            # Drain remaining audio in buffer (up to 1.5s) so the last sentence isn't clipped
+            for _ in range(15):
+                async with buffer_lock:
+                    remaining = len(pcm_buffer)
+                if remaining < 320:
+                    break
+                await asyncio.sleep(0.1)
+            is_ws_closed = True
+            try:
+                await websocket.close()
+            except Exception:
+                pass
+
+    @room.on("disconnected")
+    def on_room_disconnected(reason):
+        print(f"[Twilio WebSocket] LiveKit room disconnected ({reason}). Hanging up Twilio call.", flush=True)
+        asyncio.create_task(safe_close_ws())
+
+    # Handle existing remote tracks already in room
+    for p in room.remote_participants.values():
+        for pub in p.track_publications.values():
+            if pub.track and pub.track.kind == rtc.TrackKind.KIND_AUDIO:
+                if pub.track.sid not in track_tasks or track_tasks[pub.track.sid].done():
+                    task = asyncio.create_task(read_track(pub.track))
+                    track_tasks[pub.track.sid] = task
+
+    pcm_buffer = bytearray()
+    buffer_lock = asyncio.Lock()
+    buffering = True
+
+    # Interruption / data event listener from LiveKit agent
+    @room.on("data_received")
+    def on_data_received(data_packet: rtc.DataPacket):
+        nonlocal stream_sid, is_ws_closed, buffering
+        try:
+            msg_obj = json.loads(data_packet.data.decode("utf-8"))
+            ev_type = msg_obj.get("type")
+            if ev_type in ("interruption", "clear"):
+                print("[Twilio WebSocket] Caller barge-in detected. Clearing audio buffer and flushing Twilio playback queue.", flush=True)
+                buffering = True
+                async def flush_twilio():
+                    async with buffer_lock:
+                        pcm_buffer.clear()
+                    if stream_sid and not is_ws_closed:
+                        try:
+                            await websocket.send_json({
+                                "event": "clear",
+                                "streamSid": stream_sid
+                            })
+                        except Exception:
+                            pass
+                asyncio.create_task(flush_twilio())
+        except Exception:
+            pass
+
+    ratecv_state = None
+
+    async def ingest_audio():
+        nonlocal stream_sid, ratecv_state
+        ingest_count = 0
+        try:
+            while not is_ws_closed:
+                frame = await audio_queue.get()
+                raw_bytes = bytes(frame.data)
+                sr = frame.sample_rate
+                ingest_count += 1
+
+                # If sample rate matches 8kHz natively (e.g. Sarvam TTS @ 8000Hz), passthrough with 0 conversion loss
+                if sr == 8000:
+                    pcm_8k = raw_bytes
+                else:
+                    # High-fidelity band-limited rate conversion with continuous state across audio frames
+                    pcm_8k, ratecv_state = audioop.ratecv(raw_bytes, 2, 1, sr, 8000, ratecv_state)
+
+                async with buffer_lock:
+                    pcm_buffer.extend(pcm_8k)
+                    # Maintain generous buffer capacity (100 seconds = 1.6MB @ 8kHz 16-bit mono) so synthesized sentences are never truncated
+                    if len(pcm_buffer) > 1600000:
+                        del pcm_buffer[:len(pcm_buffer) - 1600000]
+
+                if ingest_count % 150 == 1:
+                    print(f"[Twilio WebSocket] Outbound audio: {len(raw_bytes)}B from LiveKit {sr}Hz -> {len(pcm_8k)}B 8kHz PCM (frames ingested: {ingest_count})", flush=True)
+        except asyncio.CancelledError:
+            pass
+        except Exception as ingest_err:
+            print(f"[Twilio WebSocket] Ingest task error: {ingest_err}", flush=True)
+
+    is_playing = False
+
+    async def send_to_twilio():
+        nonlocal stream_sid, is_ws_closed, is_playing
+        speech_frames_sent = 0
+        next_send_time = time.perf_counter()
+        empty_ticks = 0
+
+        try:
+            while not is_ws_closed:
+                if not stream_sid:
+                    await asyncio.sleep(0.010)
+                    next_send_time = time.perf_counter()
+                    is_playing = False
+                    continue
+
+                chunk = None
+                is_silence_fill = False
+
+                async with buffer_lock:
+                    buf_len = len(pcm_buffer)
+                    # Start playback as soon as 1 full 20ms frame (320 bytes @ 8kHz 16-bit linear PCM) is available
+                    if not is_playing:
+                        if buf_len >= 320:
+                            is_playing = True
+                            empty_ticks = 0
+                            next_send_time = time.perf_counter()
+
+                    if is_playing:
+                        if buf_len >= 320:
+                            chunk = bytes(pcm_buffer[:320])
+                            del pcm_buffer[:320]
+                            empty_ticks = 0
+                        elif buf_len > 0:
+                            # Flush final trailing fragment (<20ms): pad with zeros to complete 160-sample frame without clipping
+                            chunk = bytes(pcm_buffer) + b"\x00" * (320 - buf_len)
+                            pcm_buffer.clear()
+                            empty_ticks = 0
+                        else:
+                            empty_ticks += 1
+                            # If buffer is momentarily dry for up to 25 ticks (500ms TTS inter-chunk gap / jitter), bridge with silence
+                            if empty_ticks <= 25:
+                                is_silence_fill = True
+                            else:
+                                # Over 500ms of consecutive silence: speech utterance is complete
+                                is_playing = False
+                                empty_ticks = 0
+
+                if not is_playing and not chunk and not is_silence_fill:
+                    await asyncio.sleep(0.010)
+                    continue
+
+                if chunk:
+                    mulaw_data = audioop.lin2ulaw(chunk, 2)
+                elif is_silence_fill:
+                    mulaw_data = b"\xff" * 160  # 20ms of silence in mu-law
+                else:
+                    await asyncio.sleep(0.010)
+                    continue
+
+                speech_frames_sent += 1
+
+                payload = base64.b64encode(mulaw_data).decode("utf-8")
+                await websocket.send_json({
+                    "event": "media",
+                    "streamSid": stream_sid,
+                    "media": {
+                        "payload": payload
+                    }
+                })
+
+                if speech_frames_sent % 200 == 1:
+                    print(f"[Twilio WebSocket] Streaming speech frame #{speech_frames_sent} (buffer: {len(pcm_buffer)}B)", flush=True)
+
+                # Drift-compensated real-time playback pacing (20ms per frame @ 8000Hz)
+                next_send_time += 0.020
+                now = time.perf_counter()
+                delay = next_send_time - now
+                if delay > 0.002:
+                    await asyncio.sleep(delay)
+                elif now - next_send_time > 0.060:
+                    # Clock alignment to prevent frame bursting if event loop is delayed
+                    next_send_time = now
+        except asyncio.CancelledError:
+            pass
+        except Exception as send_err:
+            print(f"[Twilio WebSocket] Send task error: {send_err}", flush=True)
+
+    ingest_task = asyncio.create_task(ingest_audio())
+    send_task = asyncio.create_task(send_to_twilio())
+
+    inbound_frames = 0
+    try:
+        while True:
+            data = await websocket.receive_text()
+            msg = json.loads(data)
+            event = msg.get("event")
+
+            if event == "start":
+                start_data = msg.get("start", {})
+                stream_sid = start_data.get("streamSid") or msg.get("streamSid")
+                print(f"[Twilio WebSocket] Media stream active: {stream_sid}", flush=True)
+
+            elif event == "media":
+                media = msg.get("media", {})
+                payload_b64 = media.get("payload")
+                if payload_b64:
+                    mulaw_data = base64.b64decode(payload_b64)
+                    pcm_8k = audioop.ulaw2lin(mulaw_data, 2)
+                    inbound_frames += 1
+
+                    # High-fidelity linear interpolation: 8kHz PCM (160 samples) -> 48kHz PCM (960 samples)
+                    samples_8k = np.frombuffer(pcm_8k, dtype=np.int16)
+                    n_in = len(samples_8k)
+                    n_out = n_in * 6
+                    x_in = np.arange(n_in)
+                    x_out = np.linspace(0, n_in - 1, n_out)
+                    samples_48k = np.interp(x_out, x_in, samples_8k).astype(np.int16)
+                    pcm_48k = samples_48k.tobytes()
+
+                    frame = rtc.AudioFrame(
+                        data=pcm_48k,
+                        sample_rate=48000,
+                        num_channels=1,
+                        samples_per_channel=n_out
+                    )
+                    await audio_source.capture_frame(frame)
+
+                    if inbound_frames % 150 == 1:
+                        print(f"[Twilio WebSocket] Inbound audio: {len(mulaw_data)}B mu-law (8kHz) -> {len(pcm_48k)}B PCM (48kHz) (inbound #{inbound_frames})", flush=True)
+
+            elif event == "clear":
+                # Twilio clear event on caller interruption/barge-in
+                is_playing = False
+                async with buffer_lock:
+                    pcm_buffer.clear()
+
+            elif event == "stop":
+                print("[Twilio WebSocket] Media stream stopped by Twilio", flush=True)
+                break
+    except WebSocketDisconnect:
+        print("[Twilio WebSocket] Phone caller disconnected", flush=True)
+    except Exception as e:
+        print(f"[Twilio WebSocket] Bridge exception: {e}", flush=True)
+    finally:
+        is_ws_closed = True
+        ingest_task.cancel()
+        send_task.cancel()
+        for t in track_tasks.values():
+            t.cancel()
+        await room.disconnect()
+        print(f"[Twilio WebSocket] Connection for room {room_name} closed & cleaned up", flush=True)
 
 
 class SarvamAgentCreateRequest(BaseModel):

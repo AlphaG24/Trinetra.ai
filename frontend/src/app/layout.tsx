@@ -140,6 +140,31 @@ export default function RootLayout({
 
   return (
     <html lang="en" suppressHydrationWarning className={`${inter.variable} ${jetbrainsMono.variable} ${calSans.variable} ${playfair.variable} ${montserrat.variable} ${merriweather.variable}`} data-scroll-behavior="smooth">
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function() {
+                try {
+                  var theme = localStorage.getItem('trinetra-theme') || localStorage.getItem('theme');
+                  if (!theme && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+                    theme = 'dark';
+                  }
+                  if (theme === 'light') {
+                    document.documentElement.setAttribute('data-theme', 'light');
+                    document.documentElement.classList.remove('dark');
+                    document.documentElement.classList.add('light');
+                  } else if (theme === 'dark') {
+                    document.documentElement.setAttribute('data-theme', 'dark');
+                    document.documentElement.classList.remove('light');
+                    document.documentElement.classList.add('dark');
+                  }
+                } catch (e) {}
+              })();
+            `,
+          }}
+        />
+      </head>
       <body suppressHydrationWarning className="antialiased">
         <script
           type="application/ld+json"
