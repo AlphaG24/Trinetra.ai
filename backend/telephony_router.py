@@ -47,7 +47,8 @@ async def trigger_outbound_call(req: OutboundCallRequest):
 
         provider = get_provider("twilio")
         webhook_base = ConfigService.get("TRINETRA_WEBHOOK_BASE_URL") or os.getenv("TRINETRA_WEBHOOK_BASE_URL") or "http://localhost:8000"
-        webhook_url = f"{webhook_base}/api/voice/webhooks/voice/twilio/{req.organization_id}?agent_id={req.agent_id}"
+        unique_room = f"twilio--{req.agent_id}--nocontact--{uuid.uuid4().hex[:8]}" if req.agent_id else f"twilio--noagent--nocontact--{uuid.uuid4().hex[:8]}"
+        webhook_url = f"{webhook_base}/api/voice/webhooks/voice/twilio/{req.organization_id}?agent_id={req.agent_id}&room_name={unique_room}"
 
         # Use provided from_phone or fallback to TWILIO_PHONE_NUMBER env or default pool number
         from_phone = req.from_phone
@@ -69,8 +70,15 @@ async def trigger_outbound_call(req: OutboundCallRequest):
         if not from_phone:
             from_phone = os.getenv("TWILIO_PHONE_NUMBER") or "+12282950908"
 
-        logger.info(f"Placing manual outbound call: From {from_phone} -> To {req.to_phone} (agent: {req.agent_id})")
-        call_res = await provider.make_outbound_call(req.to_phone, from_phone, webhook_url)
+        call_res = await provider.make_outbound_call(
+            req.to_phone, 
+            from_phone, 
+            webhook_url,
+            custom_parameters={
+                "agent_id": req.agent_id,
+                "room_name": unique_room
+            }
+        )
         return {"success": True, "data": call_res}
     except Exception as e:
         logger.error(f"Failed to place outbound callback: {e}")

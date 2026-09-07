@@ -100,7 +100,14 @@ export function AgentOverviewTab({
     startCall,
     endCall,
     toggleMute,
+    clearTranscripts,
   } = useVoiceAgent()
+
+  const handleCloseCallModal = () => {
+    if (connectionState === 'active' || connectionState === 'connecting') return
+    setShowCallModal(false)
+    clearTranscripts()
+  }
 
   const secondsConnectedRef = useRef(0)
   useEffect(() => {
@@ -442,6 +449,32 @@ export function AgentOverviewTab({
     }
   }
 
+  const getTranscriptString = (transcript: any): string => {
+    if (!transcript) return ''
+    if (typeof transcript === 'string') return transcript
+    if (Array.isArray(transcript)) {
+      return transcript
+        .map((t: any) => {
+          if (typeof t === 'string') return t
+          if (t && typeof t === 'object') {
+            const role = t.role || t.speaker || ''
+            const text = t.content || t.text || ''
+            return role ? `${role}: ${text}` : text
+          }
+          return String(t)
+        })
+        .join('\n')
+    }
+    if (typeof transcript === 'object') {
+      try {
+        return JSON.stringify(transcript)
+      } catch {
+        return String(transcript)
+      }
+    }
+    return String(transcript)
+  }
+
   const formatTime = (totalSecs: number) => {
     const mins = Math.floor(totalSecs / 60)
     const secs = totalSecs % 60
@@ -588,7 +621,7 @@ export function AgentOverviewTab({
                         <div className="p-4 bg-[var(--background)]/30 border-t border-[var(--border)] space-y-2">
                           <h4 className="text-[10px] uppercase tracking-wider font-montserrat font-bold text-[var(--muted)]">Transcript:</h4>
                           <p className="text-xs font-sans text-[var(--body)] leading-relaxed bg-[var(--card-bg)] p-3 rounded-lg border border-[var(--border)] max-h-40 overflow-y-auto whitespace-pre-wrap">
-                            {log.transcript || 'No transcript generated for this call.'}
+                            {getTranscriptString(log.transcript) || 'No transcript generated for this call.'}
                           </p>
                         </div>
                       )}
@@ -663,7 +696,10 @@ export function AgentOverviewTab({
           <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-6 shadow-sm space-y-4 text-left">
             {/* Make Test Call */}
             <button 
-              onClick={() => setShowCallModal(true)}
+              onClick={() => {
+                clearTranscripts()
+                setShowCallModal(true)
+              }}
               data-tour="make-test-call"
               className="w-full flex items-center justify-between p-4 rounded-xl border border-[var(--border)] bg-[var(--background)]/40 hover:bg-[var(--hover-bg)]/20 transition-all font-montserrat font-bold text-xs uppercase tracking-wider text-[var(--heading)] cursor-pointer"
             >
@@ -727,10 +763,10 @@ export function AgentOverviewTab({
       {/* Test Call Modal */}
       {showCallModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => connectionState !== 'active' && connectionState !== 'connecting' && setShowCallModal(false)} />
+          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={handleCloseCallModal} />
           <div className="relative w-full max-w-2xl bg-[var(--card-bg)] border border-[var(--border)] rounded-3xl p-6 md:p-8 shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200 text-left z-10">
             <button
-              onClick={() => connectionState !== 'active' && connectionState !== 'connecting' && setShowCallModal(false)}
+              onClick={handleCloseCallModal}
               disabled={connectionState === 'active' || connectionState === 'connecting'}
               className="absolute top-4 right-4 p-2 text-[var(--muted)] hover:text-[var(--heading)] rounded-lg hover:bg-[var(--hover-bg)] transition-colors disabled:opacity-30 cursor-pointer"
             >
@@ -801,7 +837,10 @@ export function AgentOverviewTab({
                       <div className="relative">
                         <div className="absolute inset-0 w-16 h-16 bg-red-500/20 rounded-full animate-ping pointer-events-none scale-105" />
                         <button
-                          onClick={endCall}
+                          onClick={() => {
+                            endCall()
+                            clearTranscripts()
+                          }}
                           className="w-16 h-16 rounded-full bg-red-650 hover:bg-red-550 text-white flex items-center justify-center transition-all duration-300 shadow-md border-4 border-red-500/20 relative z-10 active:scale-[0.95] cursor-pointer"
                         >
                           <Square className="w-5 h-5 fill-current" />
@@ -920,6 +959,7 @@ export function AgentOverviewTab({
             <div className="flex gap-3">
               <button
                 onClick={() => {
+                  clearTranscripts()
                   setShowUpgradeModal(false)
                   setShowCallModal(false)
                   router.push('/dashboard/billing')
@@ -930,6 +970,7 @@ export function AgentOverviewTab({
               </button>
               <button
                 onClick={() => {
+                  clearTranscripts()
                   setShowUpgradeModal(false)
                   setShowCallModal(false)
                 }}

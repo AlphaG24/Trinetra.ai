@@ -1,5 +1,18 @@
 import sys
 import os
+import socket
+import logging
+
+# Force IPv4 socket connections to bypass broken ISP/NAT64 IPv6 routes causing 30s timeouts
+_orig_getaddrinfo = socket.getaddrinfo
+def _getaddrinfo_ipv4_first(host, port, family=0, type=0, proto=0, flags=0):
+    if family == 0:
+        family = socket.AF_INET
+    return _orig_getaddrinfo(host, port, family, type, proto, flags)
+socket.getaddrinfo = _getaddrinfo_ipv4_first
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(name)s] %(levelname)s: %(message)s")
+
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from fastapi import FastAPI
@@ -40,6 +53,28 @@ app.include_router(integration_router)
 app.include_router(usage_router)
 app.include_router(blog_ai_router)
 
+import httpx
+import asyncio
+
+async def _nat_keepalive_loop():
+    ngrok_url = "https://unclip-mundane-those.ngrok-free.dev"
+    async with httpx.AsyncClient(timeout=4.0) as client:
+        while True:
+            await asyncio.sleep(10.0)
+            try:
+                await client.get(ngrok_url, headers={"ngrok-skip-browser-warning": "true"})
+            except Exception:
+                pass
+
+@app.on_event("startup")
+async def app_startup():
+    try:
+        from agent import run_agent
+        print("[Startup] Agent runner pre-warmed successfully.", flush=True)
+    except Exception as e:
+        print(f"[Startup] Pre-warm agent warning: {e}", flush=True)
+    asyncio.create_task(_nat_keepalive_loop())
+
 @app.get("/")
 def read_root():
     return {"message": "Trinetra Voice AI Backend is Active"}
@@ -53,4 +88,3 @@ def debug_env():
         "livekit_api_key_len": len(os.environ.get("LIVEKIT_API_KEY", "")),
         "cwd": os.getcwd()
     }
-

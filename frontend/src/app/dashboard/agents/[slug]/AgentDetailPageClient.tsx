@@ -266,7 +266,7 @@ export function AgentDetailPageClient({
     loadConfig()
   }, [])
 
-  // Background polling heartbeat — silently refreshes every 8 seconds
+  // Background polling heartbeat — silently refreshes every 30 seconds to conserve Supabase Disk IO
   // Stops automatically when sessionExpired ref is set to true
   useEffect(() => {
     if (!agentId) return
@@ -274,7 +274,7 @@ export function AgentDetailPageClient({
       if (!sessionExpired.current) {
         fetchAgentData(true)
       }
-    }, 8000)
+    }, 30000)
     return () => clearInterval(intervalId)
   }, [agentId, fetchAgentData])
 

@@ -70,7 +70,24 @@ export async function GET(request: NextRequest) {
       leadsQuery.order('created_at', { ascending: false })
     ])
 
-    const calls = callsRes.data || []
+    const now = Date.now()
+    const validCalls = (callsRes.data || []).filter((c: any) => {
+      const isZeroDuration = !c.duration_seconds || c.duration_seconds === 0
+      const hasTranscript = !!(c.transcript && (typeof c.transcript === 'string' ? c.transcript.trim().length > 0 : Array.isArray(c.transcript) && c.transcript.length > 0))
+      const ageMs = now - new Date(c.created_at).getTime()
+      
+      // If still marked in_progress with 0s duration and older than 3 minutes, it never connected
+      if (c.status === 'in_progress' && isZeroDuration && ageMs > 180000) {
+        return false
+      }
+      // If failed with 0 duration and no transcript, it never connected
+      if (c.status === 'failed' && isZeroDuration && !hasTranscript) {
+        return false
+      }
+      return true
+    })
+
+    const calls = validCalls
     const leads = leadsRes.data || []
 
     // 2. Aggregate KPIs

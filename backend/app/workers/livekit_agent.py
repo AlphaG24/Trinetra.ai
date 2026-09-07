@@ -75,7 +75,7 @@ async def run_agent(room_name: str):
         instructions=system_prompt,
         stt=sarvam.STT(language="unknown", model="saaras:v3", flush_signal=True),
         llm=sarvam.LLM(model="sarvam-30b"),
-        tts=sarvam.TTS(target_language_code="hi-IN", model="bulbul:v3", speaker="shubh"),
+        tts=sarvam.TTS(target_language_code="hi-IN", model="bulbul:v3", speaker="shubh", speech_sample_rate=8000, output_audio_codec="linear16"),
     )
 
     session = AgentSession(vad=silero.VAD.load())

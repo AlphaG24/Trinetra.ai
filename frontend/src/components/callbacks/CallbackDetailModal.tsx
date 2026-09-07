@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { 
   X, Calendar, User, Phone, Tag, AlignLeft, 
-  CheckCircle2, XCircle, RefreshCw, AlertCircle, Copy, Check 
+  CheckCircle2, XCircle, RefreshCw, AlertCircle, Copy, Check, Trash2 
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -64,6 +64,31 @@ export function CallbackDetailModal({
     setCopied(true);
     toast.success("Phone number copied!");
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleDeleteCallback = async () => {
+    if (!window.confirm("Are you sure you want to delete this callback?")) return;
+    setLoading(true);
+    setErrorMsg("");
+
+    try {
+      const res = await fetch(`/api/callbacks/${callback.id}`, {
+        method: "DELETE",
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to delete callback");
+      }
+
+      toast.success("Callback deleted successfully!");
+      onUpdate();
+      onClose();
+    } catch (err: any) {
+      setErrorMsg(err.message || "An unexpected error occurred");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleStatusChange = async (newStatus: string) => {
@@ -344,7 +369,15 @@ export function CallbackDetailModal({
 
             {/* Actions Bar */}
             {!isRescheduling && (
-              <div className="p-5 border-t border-[var(--border)] bg-[var(--background)]/35 flex flex-wrap gap-2.5 justify-end">
+              <div className="p-5 border-t border-[var(--border)] bg-[var(--background)]/35 flex flex-wrap gap-2.5 items-center justify-end">
+                <button
+                  onClick={handleDeleteCallback}
+                  disabled={loading}
+                  className="px-4 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 border border-rose-500/25 rounded-xl text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 transition-colors cursor-pointer mr-auto"
+                  title="Delete Callback"
+                >
+                  <Trash2 className="w-4 h-4" /> Delete
+                </button>
                 {callback.status === "scheduled" && (
                   <>
                     <button

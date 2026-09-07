@@ -22,12 +22,20 @@ export default async function LeadsPage() {
     .eq('is_active', true)
     .order('name', { ascending: true })
 
+  // Fetch user profile to get organization
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('organization_id')
+    .eq('id', user.id)
+    .maybeSingle()
+
   // Fetch leads for the current user
   const { data: leads } = await supabase
     .from('leads')
     .select('*')
     .eq('user_id', user.id)
     .order('created_at', { ascending: false })
+
      
   return (
     <LeadsPageClient 

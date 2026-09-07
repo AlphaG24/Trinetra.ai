@@ -179,7 +179,7 @@ async def query_knowledge(req: QueryRequest):
                     "Content-Type": "application/json"
                 },
                 json={
-                    "model": "groq/compound",
+                    "model": os.getenv("GROQ_LLM_MODEL", "openai/gpt-oss-120b"),
                     "messages": [
                         {
                             "role": "system",

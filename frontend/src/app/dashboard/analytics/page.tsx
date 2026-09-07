@@ -52,11 +52,11 @@ export default function AnalyticsDashboardPage() {
 
         const { data: userAgents } = await supabase
           .from('agents')
-          .select('id, agent_name')
+          .select('id, name')
           .eq('user_id', user.id)
-          .order('agent_name', { ascending: true })
+          .order('name', { ascending: true })
 
-        setAgents(userAgents || [])
+        setAgents((userAgents || []).map((a: any) => ({ id: a.id, agent_name: a.name })))
       } catch (err) {
         console.error('Failed to load agents list:', err)
       }

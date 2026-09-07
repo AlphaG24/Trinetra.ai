@@ -220,7 +220,7 @@ export default function TicketDetailPage() {
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-emerald-555/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 rounded-xl p-4 flex items-center gap-3"
+          className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 rounded-xl p-4 flex items-center gap-3"
         >
           <CheckCircle2 className="w-5 h-5 shrink-0" />
           <span className="text-sm font-semibold font-montserrat">
@@ -333,7 +333,7 @@ export default function TicketDetailPage() {
                     ? 'border-emerald-500 scale-110 shadow-sm shadow-emerald-500/20' 
                     : 'border-[var(--border)]'
                 }`}>
-                  {isStepActive('received') && <div className="w-1.5 h-1.5 rounded-full bg-emerald-555" />}
+                  {isStepActive('received') && <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />}
                 </div>
                 <div className="space-y-1">
                   <h4 className={`text-sm font-bold font-montserrat ${
@@ -375,7 +375,7 @@ export default function TicketDetailPage() {
                     ? 'border-emerald-500 scale-110 shadow-sm shadow-emerald-500/20' 
                     : 'border-[var(--border)]'
                 }`}>
-                  {isStepActive('resolved') && <div className="w-1.5 h-1.5 rounded-full bg-emerald-555" />}
+                  {isStepActive('resolved') && <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />}
                 </div>
                 <div className="space-y-1">
                   <h4 className={`text-sm font-bold font-montserrat ${

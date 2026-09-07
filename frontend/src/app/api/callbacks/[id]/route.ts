@@ -133,11 +133,7 @@ export async function DELETE(request: Request, { params }: RouteParams) {
       return NextResponse.json({ error: "Callback not found or unauthorized" }, { status: 404 });
     }
 
-    // Only allow deleting 'cancelled' or 'completed' callbacks
-    if (callback.status === 'scheduled' || callback.status === 'in_progress') {
-      return NextResponse.json({ error: "Cannot delete an active callback. Please cancel it first." }, { status: 400 });
-    }
-
+    // Remove callback record
     const { error: deleteError } = await supabase
       .from("callbacks")
       .delete()
