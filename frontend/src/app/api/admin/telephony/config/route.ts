@@ -4,12 +4,9 @@ import { NextRequest, NextResponse } from 'next/server'
 
 const ALLOWED_KEYS = [
   'EXOTEL_API_KEY', 'EXOTEL_API_TOKEN', 'EXOTEL_ACCOUNT_SID', 'EXOTEL_SUBDOMAIN', 'EXOTEL_CALLER_ID', 'EXOTEL_APP_ID',
-  'VOICELINK_API_KEY', 'VOICELINK_API_BASE_URL',
   'TWILIO_ACCOUNT_SID', 'TWILIO_AUTH_TOKEN',
   'TRINETRA_WEBHOOK_BASE_URL',
   'exotel_mobile_did_cost_paisa', 'exotel_landline_did_cost_paisa',
-  'voicelink_mobile_did_cost_paisa', 'voicelink_landline_did_cost_paisa',
-  'voicelink_tollfree_did_cost_paisa', 'voicelink_92series_did_cost_paisa',
   'twilio_US_local_cost_paisa', 'twilio_UK_local_cost_paisa', 'twilio_IN_mobile_cost_paisa',
   'trinetra_number_markup_percent', 'show_number_prices_to_users', 'max_phone_numbers_per_org'
 ]

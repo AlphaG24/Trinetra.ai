@@ -470,7 +470,7 @@ export default function AdminPhoneNumbersPage() {
                       {num.did_type || "mobile"}
                     </td>
                     <td className="py-3.5 px-4 capitalize font-semibold text-[11px] text-[var(--muted)]">
-                      {num.provider || "voicelink"}
+                      {num.provider || "exotel"}
                     </td>
                     <td className="py-3.5 px-4 font-bold font-mono text-emerald-400">
                       ₹{((num.retail_price_paisa || 29900) / 100).toFixed(2)}/mo
@@ -676,7 +676,7 @@ export default function AdminPhoneNumbersPage() {
               <div>
                 <textarea
                   rows={8}
-                  placeholder={`+919876543210, Mumbai, mobile, voicelink, 299\n+919876543211, Delhi, mobile, voicelink, 299\n+12125550199, New York, local, twilio, 499`}
+                  placeholder={`+919876543210, Mumbai, mobile, exotel, 299\n+919876543211, Delhi, mobile, exotel, 299\n+12125550199, New York, local, twilio, 499`}
                   value={csvContent}
                   onChange={(e) => setCsvContent(e.target.value)}
                   className="w-full p-3 bg-[var(--background)] border border-[var(--border)] rounded-lg text-[var(--heading)] font-mono text-xs outline-none focus:border-violet-500"

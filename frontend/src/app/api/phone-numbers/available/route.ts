@@ -99,7 +99,7 @@ export async function GET(request: Request) {
             console.warn('[API] FastAPI available numbers fetch failed, returning mock/empty available numbers:', fetchErr?.message || fetchErr);
             
             // Return some fallback numbers in case backend is offline so the UI doesn't look completely empty or break
-            const mockNumbers = (provider === 'sarvam' || provider === 'voicelink' || provider === 'exotel') ? [
+            const mockNumbers = (provider === 'sarvam' || provider === 'exotel') ? [
                 { did_id: "mock-sv-1", phone_number: "+91 98765 43210", city: "Mumbai", area_code: "022", did_type: "mobile", provider: "sarvam" },
                 { did_id: "mock-sv-2", phone_number: "+91 98765 43211", city: "Delhi", area_code: "011", did_type: "mobile", provider: "sarvam" },
                 { did_id: "mock-sv-3", phone_number: "+91 98765 43212", city: "Bangalore", area_code: "080", did_type: "mobile", provider: "sarvam" }

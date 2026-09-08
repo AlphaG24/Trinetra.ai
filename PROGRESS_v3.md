@@ -49,7 +49,7 @@
 
 | # | Task | Details |
 |---|------|---------|
-| 3.1 | **Inbound call → agent** | Twilio webhook (or VoiceLink later) → LiveKit room → selected agent picks up. |
+| 3.1 | **Inbound call → agent** | Twilio or Exotel webhook → LiveKit room → selected agent picks up. |
 | 3.2 | **Caller recognition** | On inbound, look up `customer_contacts` by phone number. If found, greet by name and reference previous query. |
 | 3.3 | **Update customer DB** | During call, if new customer, collect name, query, email. After call, upsert into `customer_contacts`. |
 | 3.4 | **Post-call notification** | After call, send Telegram/WhatsApp (via integration executor) to the business owner with query summary, response, and action items. Also send a message to the customer confirming receipt. |

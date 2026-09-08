@@ -22,7 +22,7 @@ const getCitiesForProvider = (provider: string, country: string) => {
       { name: 'Denver', code: '303' },
     ]
   }
-  // VoiceLink / Indian cities
+  // Indian cities (Exotel / Sarvam)
   return [
     { name: 'Mumbai', code: '022' },
     { name: 'Delhi', code: '011' },
@@ -230,7 +230,7 @@ export function ProvisionNumberModal({
                   </div>
                   <div className="flex items-center gap-3 text-sm text-[var(--heading)]">
                     <Globe size={16} className="text-[var(--primary-bg)]" />
-                    <span>{autoDetectedProvider === 'sarvam' ? 'Sarvam AI (India)' : 'International Provider'}</span>
+                    <span>{autoDetectedProvider === 'exotel' ? 'Exotel (India)' : 'International Provider (Twilio)'}</span>
                   </div>
                   <div className="flex items-center gap-3 text-sm text-[var(--heading)]">
                     <CreditCard size={16} className="text-[var(--primary-bg)]" />
@@ -306,7 +306,7 @@ export function ProvisionNumberModal({
                       <div className="flex flex-col gap-1.5">
                         <label className="text-xs text-[var(--muted)]">Provider</label>
                         <div className="w-full rounded-md border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--muted)] cursor-not-allowed">
-                          Auto-selected: {autoDetectedProvider === 'sarvam' ? 'Sarvam AI' : 'Twilio'}
+                          Auto-selected: {autoDetectedProvider === 'exotel' ? 'Exotel (India)' : 'Twilio'}
                         </div>
                       </div>
 

@@ -47,7 +47,7 @@ export async function POST(request: Request) {
                         error: 'US area code must be exactly 3 digits' 
                     }, { status: 400 });
                 }
-            } else if (provider === 'sarvam' || provider === 'voicelink' || provider === 'exotel') {
+            } else if (provider === 'sarvam' || provider === 'exotel') {
                 if (!/^\d{3,4}$/.test(area_code)) {
                     return NextResponse.json({
                         success: false,

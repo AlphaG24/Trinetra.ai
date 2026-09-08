@@ -2,7 +2,7 @@ import { CheckCircle2, AlertTriangle, XCircle } from 'lucide-react'
 
 interface AgentCallingStatusProps {
   phoneNumber: string | null
-  providerType?: string | null // e.g. 'twilio', 'voicelink', 'sandbox', 'simulated', etc.
+  providerType?: string | null // e.g. 'twilio', 'exotel', 'sandbox', 'simulated', etc.
   className?: string
 }
 
