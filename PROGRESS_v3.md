@@ -38,7 +38,7 @@
 | 2.7 | **Manual 30-Day Renewal** | ✅ COMPLETED | Working via `/api/phone-numbers/[id]/renew` + Razorpay webhook extending `renewal_date` by +30 days. |
 | 2.8 | **Universal Auto-Release on Non-Renewal** | ✅ COMPLETED | `/api/cron/process-auctions` handles both bidding auctions and universal auto-release of standard expired phone numbers back to the pool. |
 | 2.9 | **Pre-Expiration Alerts & Dignity Quota Guarantee** | ✅ COMPLETED | Configurable `validity_days` in admin. Automatic 3-day and 24-hour alerts for phone numbers and voice agents via existing `notifications` table. Trinetra Dignity Quota Guarantee preserves active voice minutes even after timeline expiry. |
-| 2.10 | **Domestic Telephony Architecture** | ⏳ IN PROGRESS | Sarvam voice & speech integration active; Exotel recommended carrier for high-scale 100% TRAI/DLT Indian DIDs. |
+| 2.10 | **Domestic Telephony Architecture** | ✅ COMPLETED | Full Exotel carrier integration with dynamic DB credential management via Admin Portal (`/admin/telephony`), Indian virtual number pooling, assignment to agents, outbound calling & webhook routing. |
 | 2.11 | **Database Audit & Dead Table Cleanup** | ✅ COMPLETED | Cleaned 13 legacy MSME/scheme tables (`schemes`, `msme_app_config`, `user_matches`, etc.) and structured lifecycle columns (`validity_days`, `subscription_expires_at`, `expiry_alerts_sent`). |
 
 

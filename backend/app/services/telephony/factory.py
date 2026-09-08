@@ -5,6 +5,7 @@ from typing import Dict, Any
 from app.services.telephony.base import AbstractTelephonyProvider
 from app.services.telephony.simulated import SimulatedProvider
 from app.services.telephony.twilio import TwilioProvider
+from app.services.telephony.exotel_adapter import ExotelAdapter
 from database import supabase_admin
 
 logger = logging.getLogger("TelephonyFactory")
@@ -22,6 +23,8 @@ def get_provider(provider_name: str) -> Any:
     
     if provider_name == "simulated":
         provider = SimulatedProvider()
+    elif provider_name == "exotel":
+        provider = ExotelAdapter()
     elif provider_name == "twilio":
         provider = TwilioProvider()
     else:
@@ -32,6 +35,8 @@ def get_provider(provider_name: str) -> Any:
     return provider
 
 def get_best_provider(country_code: str = 'IN') -> str:
+    if country_code == 'IN':
+        return 'exotel'
     return 'twilio'
 
 def get_provider_for_organization(organization_id: str) -> AbstractTelephonyProvider:
@@ -40,7 +45,7 @@ def get_provider_for_organization(organization_id: str) -> AbstractTelephonyProv
         logger.info(f"Using environment override {env_override} for org {organization_id}")
         return get_provider(env_override)
         
-    return get_provider("twilio")
+    return get_provider("exotel")
 
 def clear_provider_cache():
     logger.info("Clearing telephony provider cache")

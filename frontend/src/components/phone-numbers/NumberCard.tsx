@@ -83,7 +83,7 @@ export function NumberCard({
             <span className="text-xs font-semibold text-[var(--muted)] capitalize">{phoneNumber.status}</span>
           </div>
           <div className="px-2 py-0.5 rounded-full bg-[var(--secondary)] text-[10px] font-bold uppercase tracking-wider text-[var(--muted)]">
-            {phoneNumber.provider === 'sarvam' ? 'Sarvam AI' : phoneNumber.provider === 'twilio' ? 'Twilio' : phoneNumber.provider || 'Provider'}
+            {phoneNumber.provider === 'exotel' ? 'Exotel' : phoneNumber.provider === 'sarvam' ? 'Sarvam AI' : phoneNumber.provider === 'twilio' ? 'Twilio' : phoneNumber.provider || 'Provider'}
           </div>
         </div>
 

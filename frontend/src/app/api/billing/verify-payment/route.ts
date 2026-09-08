@@ -468,7 +468,7 @@ export async function POST(request: Request) {
                   const fastApiBody = {
                     organization_id: profile.organization_id || null,
                     did_type: 'mobile',
-                    provider: profile.country === 'IN' ? 'voicelink' : 'twilio',
+                    provider: profile.country === 'IN' ? 'exotel' : 'twilio',
                     user_id: user.id,
                     area_code: profile.country === 'IN' ? '022' : '212'
                   };

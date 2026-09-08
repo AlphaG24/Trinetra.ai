@@ -22,6 +22,7 @@ class TestConnectionRequest(BaseModel):
     account_sid: Optional[str] = None
     auth_token: Optional[str] = None
     base_url: Optional[str] = None
+    subdomain: Optional[str] = None
 
 class ProvisionNumberRequest(BaseModel):
     organization_id: str
@@ -87,7 +88,7 @@ async def trigger_outbound_call(req: OutboundCallRequest):
 @router.post("/test/{provider}")
 async def test_connection(provider: str, req: TestConnectionRequest):
     provider = provider.lower()
-    if provider not in ["voicelink", "twilio", "simulated"]:
+    if provider not in ["voicelink", "twilio", "simulated", "exotel"]:
         return {"success": False, "message": f"Unsupported provider: {provider}"}
         
     start_time = datetime.now()
@@ -135,6 +136,51 @@ async def test_connection(provider: str, req: TestConnectionRequest):
                     return {
                         "success": False,
                         "message": f"Authentication failed (Status {resp.status_code})",
+                    }
+
+        elif provider == "exotel":
+            account_sid = req.account_sid
+            api_key = req.api_key
+            api_token = req.auth_token
+            subdomain = req.subdomain
+            
+            if not account_sid or not api_key or not api_token:
+                try:
+                    res = supabase_admin.table("system_config").select("config_key, config_value").in_("config_key", ["EXOTEL_ACCOUNT_SID", "EXOTEL_API_KEY", "EXOTEL_API_TOKEN", "EXOTEL_SUBDOMAIN"]).execute()
+                    configs = {row["config_key"]: row["config_value"] for row in res.data}
+                    account_sid = account_sid or configs.get("EXOTEL_ACCOUNT_SID")
+                    api_key = api_key or configs.get("EXOTEL_API_KEY")
+                    api_token = api_token or configs.get("EXOTEL_API_TOKEN")
+                    subdomain = subdomain or configs.get("EXOTEL_SUBDOMAIN") or "api.exotel.com"
+                except Exception as e:
+                    logger.error(f"Error fetching exotel config: {e}")
+                    subdomain = subdomain or "api.exotel.com"
+            else:
+                subdomain = subdomain or "api.exotel.com"
+
+            if not account_sid or not api_key or not api_token:
+                return {"success": False, "message": "Exotel credentials (ACCOUNT_SID, API_KEY, API_TOKEN) not provided and not found in system_config"}
+
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                url = f"https://{subdomain.strip().rstrip('/')}/v1/Accounts/{account_sid}.json"
+                resp = await client.get(url, auth=(api_key, api_token))
+                delta = int((datetime.now() - start_time).total_seconds() * 1000)
+
+                if resp.status_code == 200:
+                    data = resp.json().get("Account", {})
+                    return {
+                        "success": True,
+                        "message": f"Connected to Exotel successfully ({data.get('Status', 'Active')})",
+                        "details": {
+                            "response_time_ms": delta,
+                            "account_sid": account_sid,
+                            "status": data.get("Status")
+                        }
+                    }
+                else:
+                    return {
+                        "success": False,
+                        "message": f"Exotel authentication failed (Status {resp.status_code}): {resp.text}"
                     }
 
         elif provider == "twilio":

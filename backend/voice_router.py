@@ -800,6 +800,97 @@ async def handle_call_completed(body: dict, org_id: str):
         print(f"[Webhook Error] Failed to handle call.completed: {e}", flush=True)
 
 
+# --- EXOTEL INBOUND & OUTBOUND VOICE WEBHOOKS ---
+
+@router.api_route("/webhooks/voice/exotel/{organization_id}", methods=["GET", "POST"])
+@router.api_route("/webhooks/voice/exotel", methods=["GET", "POST"])
+async def handle_exotel_voice_webhook(
+    request: Request,
+    organization_id: Optional[str] = "default"
+):
+    """
+    Handle incoming & outbound Exotel voice webhooks and status callbacks.
+    Exotel sends parameters via Form or Query parameters (CallSid, From, To, Status, RecordingUrl, etc.).
+    """
+    try:
+        form_data = {}
+        content_type = request.headers.get("content-type", "")
+        if "application/x-www-form-urlencoded" in content_type or "multipart/form-data" in content_type:
+            form = await request.form()
+            form_data = dict(form)
+        else:
+            try:
+                form_data = await request.json()
+            except Exception:
+                form_data = dict(request.query_params)
+
+        call_sid = form_data.get("CallSid") or form_data.get("call_sid") or request.query_params.get("CallSid") or str(uuid.uuid4())
+        from_number = form_data.get("From") or form_data.get("from") or request.query_params.get("From") or "Unknown"
+        to_number = form_data.get("To") or form_data.get("to") or request.query_params.get("To") or "Unknown"
+        call_status = form_data.get("Status") or form_data.get("CallStatus") or request.query_params.get("Status") or "in-progress"
+        duration = int(form_data.get("DialCallDuration") or form_data.get("Legs[0][Duration]") or form_data.get("Duration") or 0)
+        recording_url = form_data.get("RecordingUrl") or form_data.get("recording_url")
+
+        agent_id = request.query_params.get("agent_id") or form_data.get("CustomField")
+        contact_id = request.query_params.get("contact_id")
+        room_name = request.query_params.get("room_name") or f"exotel--{call_sid}"
+
+        print(f"[Exotel Webhook] Call: {call_sid} | From: {from_number} -> To: {to_number} | Status: {call_status} | Org: {organization_id}", flush=True)
+
+        async def _async_record_exotel():
+            try:
+                # Upsert to voice_calls
+                supabase_admin.table("voice_calls").upsert({
+                    "organization_id": organization_id if organization_id != "default" else None,
+                    "provider_call_id": call_sid,
+                    "caller_number": from_number,
+                    "agent_number": to_number,
+                    "direction": "outbound" if agent_id or contact_id else "inbound",
+                    "status": "completed" if call_status.lower() in ["completed", "terminated"] else call_status.lower(),
+                    "duration_seconds": duration,
+                    "recording_url": recording_url,
+                    "metadata": {
+                        "provider": "exotel",
+                        "agent_id": agent_id,
+                        "contact_id": contact_id,
+                        "room_name": room_name,
+                        "raw_status": call_status
+                    }
+                }, on_conflict="provider_call_id").execute()
+
+                if contact_id and call_status.lower() in ["completed", "in-progress", "busy", "no-answer", "failed"]:
+                    stat_map = {
+                        "completed": "answered",
+                        "in-progress": "answered",
+                        "busy": "failed",
+                        "no-answer": "no-answer",
+                        "failed": "failed"
+                    }
+                    supabase_admin.table("campaign_contacts").update({
+                        "call_status": stat_map.get(call_status.lower(), "answered"),
+                        "call_duration": duration
+                    }).eq("id", contact_id).execute()
+            except Exception as e:
+                print(f"[Exotel Webhook DB Error] {e}", flush=True)
+
+        asyncio.create_task(_async_record_exotel())
+
+        # Return ExoML Response
+        exoml_response = """<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+    <Say>Thank you for connecting with Trinetra AI.</Say>
+    <Pause length="10" />
+</Response>"""
+        return Response(content=exoml_response.strip(), media_type="application/xml")
+    except Exception as e:
+        print(f"[Exotel Webhook Error] {e}", flush=True)
+        fallback = """<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+    <Say>Thank you for connecting with Trinetra AI.</Say>
+</Response>"""
+        return Response(content=fallback, media_type="application/xml")
+
+
 # --- TWILIO INBOUND & OUTBOUND VOICE WEBHOOKS ---
 
 @router.api_route("/webhooks/voice/twilio/{organization_id}", methods=["GET", "POST"])

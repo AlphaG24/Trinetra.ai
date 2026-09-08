@@ -477,7 +477,7 @@ export default function PhoneNumbersPage() {
                     phone_number: num.phone_number,
                     city: num.city || "Mumbai",
                     did_type: num.did_type || "mobile",
-                    provider: num.provider || "voicelink",
+                    provider: num.provider || "exotel",
                     status: num.is_assigned ? "assigned" : "available",
                     retail_price_paisa: num.retail_price_paisa || 29900,
                     bidding_enabled: num.bidding_enabled,
@@ -607,7 +607,7 @@ export default function PhoneNumbersPage() {
 
             <div className="p-3 bg-[var(--secondary)] rounded-xl border border-[var(--border)] text-xs mb-4 space-y-1">
               <p className="text-[var(--muted)]">Number Type: <span className="text-[var(--heading)] font-semibold uppercase">{bidModalNumber.did_type || "mobile"}</span></p>
-              <p className="text-[var(--muted)]">Provider: <span className="text-[var(--heading)] font-semibold capitalize">{bidModalNumber.provider || "voicelink"}</span></p>
+              <p className="text-[var(--muted)]">Provider: <span className="text-[var(--heading)] font-semibold capitalize">{bidModalNumber.provider || "exotel"}</span></p>
               {bidModalNumber.current_bid_paisa ? (
                 <p className="text-emerald-400 font-bold">Current Highest Bid: ₹{(bidModalNumber.current_bid_paisa / 100).toFixed(2)}</p>
               ) : bidModalNumber.minimum_bid_paisa ? (

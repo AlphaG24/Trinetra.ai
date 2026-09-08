@@ -19,7 +19,7 @@ export default function AdminPhoneNumbersPage() {
     phone_number: "",
     city: "Mumbai",
     did_type: "mobile",
-    provider: "voicelink",
+    provider: "exotel",
     monthly_cost_paisa: 10000,
     retail_price_paisa: 29900
   });
@@ -124,7 +124,7 @@ export default function AdminPhoneNumbersPage() {
 
   const handleAddSingle = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!addForm.phone_number) {
+    if (!addForm.phone_number.trim()) {
       toast.error("Phone number is required");
       return;
     }
@@ -145,7 +145,7 @@ export default function AdminPhoneNumbersPage() {
         phone_number: "",
         city: "Mumbai",
         did_type: "mobile",
-        provider: "voicelink",
+        provider: "exotel",
         monthly_cost_paisa: 10000,
         retail_price_paisa: 29900
       });
@@ -177,7 +177,7 @@ export default function AdminPhoneNumbersPage() {
         const phone = parts[0];
         const city = parts[1] || "Mumbai";
         const did_type = parts[2] || "mobile";
-        const provider = parts[3] || "voicelink";
+        const provider = parts[3] || "exotel";
         const retailPriceRupees = parts[4] ? parseFloat(parts[4]) : 299;
 
         parsedRows.push({
@@ -619,7 +619,8 @@ export default function AdminPhoneNumbersPage() {
                     onChange={(e) => setAddForm({ ...addForm, provider: e.target.value })}
                     className="w-full px-3 py-2 bg-[var(--background)] border border-[var(--border)] rounded-lg text-[var(--heading)] outline-none focus:border-violet-500"
                   >
-                    <option value="voicelink">VoiceLink (IN)</option>
+                    <option value="exotel">Exotel (India)</option>
+                    <option value="sarvam">Sarvam (India)</option>
                     <option value="twilio">Twilio (US/Global)</option>
                     <option value="simulated">Simulated</option>
                   </select>

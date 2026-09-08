@@ -54,7 +54,7 @@ export function ProvisionNumberModal({
   
   const autoDetectedCity = userCountry === "IN" ? "Mumbai" : "New York";
   const autoDetectedAreaCode = userCountry === "IN" ? "022" : "212";
-  const autoDetectedProvider = userCountry === "IN" ? "sarvam" : "twilio";
+  const autoDetectedProvider = userCountry === "IN" ? "exotel" : "twilio";
   
   const cities = getCitiesForProvider(autoDetectedProvider, userCountry);
   const [selectedCity, setSelectedCity] = useState(cities[0]?.code || "022");

@@ -22,7 +22,10 @@ active_campaign_ids = set()
 class CampaignService:
     @staticmethod
     def get_provider_for_number(phone_number: str) -> str:
-        return 'twilio'
+        cleaned = CampaignService.clean_phone(phone_number)
+        if cleaned.startswith("+91") or cleaned.startswith("91"):
+            return "exotel"
+        return "twilio"
 
     @staticmethod
     def clean_phone(phone_str: str) -> str:
@@ -558,23 +561,7 @@ class CampaignService:
         
         agent = agent_res.data or {}
         
-        # 4. Trigger Outbound call
-        from app.services.telephony.factory import get_provider
-        from app.services.config_service import ConfigService
-
-        twilio_sid = ConfigService.get("TWILIO_ACCOUNT_SID")
-        twilio_token = ConfigService.get("TWILIO_AUTH_TOKEN")
-        is_simulated = not (twilio_sid and twilio_token)
-        
-        provider = get_provider("twilio" if not is_simulated else "simulated")
-        unique_room = f"twilio--{agent_id}--{contact_id}--{uuid.uuid4().hex[:8]}" if agent_id else f"twilio--noagent--{contact_id}--{uuid.uuid4().hex[:8]}"
-        webhook_base = ConfigService.get("TRINETRA_WEBHOOK_BASE_URL") or os.getenv("TRINETRA_WEBHOOK_BASE_URL") or "http://localhost:8000"
-        webhook_url = f"{webhook_base}/api/voice/webhooks/voice/twilio/{organization_id}?agent_id={agent_id}&contact_id={contact_id}&room_name={unique_room}"
-        
-        agent_phone = agent.get("phone_number") or os.getenv("TWILIO_PHONE_NUMBER") or "+12282950908"
-        if agent_phone and not str(agent_phone).startswith("+"):
-            agent_phone = f"+{agent_phone}"
-            
+        # 4. Normalize contact phone number
         contact_phone = str(contact["phone"]).strip()
         if not contact_phone.startswith("+"):
             import re
@@ -590,6 +577,48 @@ class CampaignService:
                 contact_phone = f"+91{digits[1:]}"
             else:
                 contact_phone = f"+{digits}"
+
+        # 5. Dynamically resolve Telephony Provider (Exotel vs Twilio vs Simulated)
+        from app.services.telephony.factory import get_provider
+        from app.services.config_service import ConfigService
+
+        exo_sid = ConfigService.get("EXOTEL_ACCOUNT_SID") or os.getenv("EXOTEL_ACCOUNT_SID")
+        exo_key = ConfigService.get("EXOTEL_API_KEY") or os.getenv("EXOTEL_API_KEY")
+        exo_tok = ConfigService.get("EXOTEL_API_TOKEN") or os.getenv("EXOTEL_API_TOKEN")
+        has_exotel = bool(exo_sid and exo_key and exo_tok)
+
+        twilio_sid = ConfigService.get("TWILIO_ACCOUNT_SID") or os.getenv("TWILIO_ACCOUNT_SID")
+        twilio_token = ConfigService.get("TWILIO_AUTH_TOKEN") or os.getenv("TWILIO_AUTH_TOKEN")
+        has_twilio = bool(twilio_sid and twilio_token)
+
+        agent_provider = (agent.get("telephony_provider") or "").lower().strip()
+        if agent_provider == "exotel" and has_exotel:
+            chosen_provider = "exotel"
+        elif agent_provider == "twilio" and has_twilio:
+            chosen_provider = "twilio"
+        elif contact_phone.startswith("+91") and has_exotel:
+            chosen_provider = "exotel"
+        elif has_twilio:
+            chosen_provider = "twilio"
+        elif has_exotel:
+            chosen_provider = "exotel"
+        else:
+            chosen_provider = "simulated"
+
+        is_simulated = chosen_provider == "simulated"
+        provider = get_provider(chosen_provider)
+
+        unique_room = f"{chosen_provider}--{agent_id}--{contact_id}--{uuid.uuid4().hex[:8]}" if agent_id else f"{chosen_provider}--noagent--{contact_id}--{uuid.uuid4().hex[:8]}"
+        webhook_base = ConfigService.get("TRINETRA_WEBHOOK_BASE_URL") or os.getenv("TRINETRA_WEBHOOK_BASE_URL") or "http://localhost:8000"
+        webhook_url = f"{webhook_base}/api/voice/webhooks/voice/{chosen_provider}/{organization_id}?agent_id={agent_id}&contact_id={contact_id}&room_name={unique_room}"
+
+        if chosen_provider == "exotel":
+            agent_phone = agent.get("phone_number") or ConfigService.get("EXOTEL_CALLER_ID") or os.getenv("EXOTEL_CALLER_ID") or "+918000000000"
+        else:
+            agent_phone = agent.get("phone_number") or os.getenv("TWILIO_PHONE_NUMBER") or "+12282950908"
+
+        if agent_phone and not str(agent_phone).startswith("+"):
+            agent_phone = f"+{agent_phone}"
 
         call_sid = None
         outcome = "failed"
