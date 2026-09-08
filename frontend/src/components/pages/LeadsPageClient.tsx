@@ -2,9 +2,9 @@
 
 import React, { useState, useMemo, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { 
-  Target, Search, Phone, Mail, ChevronDown, Database, 
-  Sparkles, Download, Trash2, Eye, User, Building, Calendar, 
+import {
+  Target, Search, Phone, Mail, ChevronDown, Database,
+  Sparkles, Download, Trash2, Eye, User, Building, Calendar,
   CheckCircle2, AlertCircle, RefreshCw, X, ArrowUpRight, Flame
 } from 'lucide-react'
 import toast from 'react-hot-toast'
@@ -50,13 +50,13 @@ interface LeadsPageClientProps {
 
 export function LeadsPageClient({ initialLeads, services }: LeadsPageClientProps) {
   const router = useRouter()
-  
+
   const [selectedSlug, setSelectedSlug] = useState<string>(() => {
     const firstVoice = services.find(s => s.type?.toLowerCase() === 'voice')
     if (firstVoice) return firstVoice.slug
     return services.length > 0 ? services[0].slug : ''
   })
-  
+
   const [leads, setLeads] = useState<Lead[]>(initialLeads)
 
   // Sync state if initialLeads prop updates (e.g. after server revalidation or navigation)
@@ -72,7 +72,7 @@ export function LeadsPageClient({ initialLeads, services }: LeadsPageClientProps
 
   // Selected lead for detail modal
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
-  
+
   // Transcript Modal State
   const [showTranscriptModal, setShowTranscriptModal] = useState(false)
   const [selectedTranscript, setSelectedTranscript] = useState<string | null>(null)
@@ -94,10 +94,10 @@ export function LeadsPageClient({ initialLeads, services }: LeadsPageClientProps
       const summary = (l.call_summary || l.message || '').toLowerCase()
       const q = search.toLowerCase().trim()
 
-      const matchesSearch = !q || 
-        name.includes(q) || 
-        email.includes(q) || 
-        phone.includes(q) || 
+      const matchesSearch = !q ||
+        name.includes(q) ||
+        email.includes(q) ||
+        phone.includes(q) ||
         company.includes(q) ||
         summary.includes(q)
 
@@ -266,7 +266,7 @@ export function LeadsPageClient({ initialLeads, services }: LeadsPageClientProps
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-3 duration-300">
-      
+
       {/* Page Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-5 border-b border-[var(--border)]">
         <div className="space-y-1">
@@ -375,7 +375,7 @@ export function LeadsPageClient({ initialLeads, services }: LeadsPageClientProps
                 className="w-full pl-9 pr-4 py-2.5 bg-[var(--card-bg)] border border-[var(--border)] rounded-xl text-[var(--heading)] placeholder:text-[var(--muted)] text-xs font-medium focus:outline-none focus:ring-2 focus:ring-violet-500/30 transition-all shadow-sm"
               />
               {search && (
-                <button 
+                <button
                   onClick={() => setSearch('')}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--muted)] hover:text-[var(--heading)]"
                 >
@@ -458,7 +458,7 @@ export function LeadsPageClient({ initialLeads, services }: LeadsPageClientProps
 
                       return (
                         <tr key={lead.id} className="hover:bg-[var(--hover-bg)] transition-colors group">
-                          
+
                           {/* 1. Date */}
                           <td className="px-5 py-3.5 text-[var(--muted)] font-mono whitespace-nowrap">
                             {formatDate(lead.created_at)}
@@ -470,7 +470,7 @@ export function LeadsPageClient({ initialLeads, services }: LeadsPageClientProps
                               <span className="font-bold text-[var(--heading)] text-sm">{name}</span>
                               <div className="flex items-center gap-2 text-[11px] text-[var(--muted)] font-mono">
                                 {phone && (
-                                  <a 
+                                  <a
                                     href={`tel:${phone}`}
                                     className="hover:text-violet-500 hover:underline inline-flex items-center gap-1"
                                     title="Click to dial"
@@ -480,7 +480,7 @@ export function LeadsPageClient({ initialLeads, services }: LeadsPageClientProps
                                   </a>
                                 )}
                                 {email && (
-                                  <a 
+                                  <a
                                     href={`mailto:${email}`}
                                     className="hover:text-violet-500 hover:underline inline-flex items-center gap-1"
                                     title="Click to email"
@@ -505,13 +505,12 @@ export function LeadsPageClient({ initialLeads, services }: LeadsPageClientProps
                           <td className="px-5 py-3.5 max-w-sm">
                             <div className="space-y-1">
                               <div className="flex items-center gap-1.5 flex-wrap">
-                                <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider ${
-                                  interest === 'hot' || interest === 'high'
+                                <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider ${interest === 'hot' || interest === 'high'
                                     ? 'bg-red-500/10 text-red-500 border border-red-500/20'
                                     : interest === 'medium'
-                                    ? 'bg-amber-500/10 text-amber-500 border border-amber-500/20'
-                                    : 'bg-zinc-500/10 text-[var(--muted)] border border-[var(--border)]'
-                                }`}>
+                                      ? 'bg-amber-500/10 text-amber-500 border border-amber-500/20'
+                                      : 'bg-zinc-500/10 text-[var(--muted)] border border-[var(--border)]'
+                                  }`}>
                                   {interest === 'hot' || interest === 'high' ? '🔥' : '⚡'} {interest} intent
                                 </span>
                                 {lead.budget_range && (
@@ -531,15 +530,14 @@ export function LeadsPageClient({ initialLeads, services }: LeadsPageClientProps
                             <select
                               value={status}
                               onChange={(e) => handleStatusChange(lead.id, e.target.value)}
-                              className={`px-2 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider border transition-all cursor-pointer focus:outline-none ${
-                                status === 'qualified'
+                              className={`px-2 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider border transition-all cursor-pointer focus:outline-none ${status === 'qualified'
                                   ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30'
                                   : status === 'contacted'
-                                  ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30'
-                                  : status === 'closed'
-                                  ? 'bg-purple-500/15 text-purple-600 dark:text-purple-400 border-purple-500/30'
-                                  : 'bg-blue-500/15 text-blue-600 dark:text-blue-400 border-blue-500/30'
-                              }`}
+                                    ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30'
+                                    : status === 'closed'
+                                      ? 'bg-purple-500/15 text-purple-600 dark:text-purple-400 border-purple-500/30'
+                                      : 'bg-blue-500/15 text-blue-600 dark:text-blue-400 border-blue-500/30'
+                                }`}
                             >
                               <option value="new" className="bg-[var(--card-bg)] text-[var(--heading)]">New</option>
                               <option value="contacted" className="bg-[var(--card-bg)] text-[var(--heading)]">Contacted</option>
@@ -636,7 +634,7 @@ export function LeadsPageClient({ initialLeads, services }: LeadsPageClientProps
                   </p>
                 </div>
               </div>
-              <button 
+              <button
                 onClick={() => setSelectedLead(null)}
                 className="p-1.5 rounded-lg hover:bg-[var(--hover-bg)] text-[var(--muted)] hover:text-[var(--heading)]"
               >

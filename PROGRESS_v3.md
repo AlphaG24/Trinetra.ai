@@ -96,4 +96,4 @@
 ### **Immediate Next Actions**
 1. **Kick off Phase 3** — Inbound Support Agent & Customer DB (Inbound call handling, caller recognition, upserting customer profiles, and post-call notifications).
 2. **Execute Database Migration in Supabase SQL Editor** — Run `database/migrations/20260908_db_cleanup_and_validity_lifecycle.sql` to permanently drop the empty legacy tables and add the check indexes.
-
+
