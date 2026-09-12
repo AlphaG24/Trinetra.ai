@@ -194,3 +194,24 @@ async def retry_contact(id: str, contact_id: str):
     except Exception as e:
         logger.error(f"Error retrying contact: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/{id}/send-report")
+async def trigger_campaign_report(id: str):
+    """
+    On-demand campaign report generation and dispatch to Telegram, WhatsApp, and in-app dashboard.
+    """
+    try:
+        camp_res = await asyncio.to_thread(
+            supabase_admin.table("campaigns").select("*").eq("id", id).limit(1).execute
+        )
+        if not camp_res or not camp_res.data:
+            raise HTTPException(status_code=404, detail="Campaign not found")
+
+        res = await CampaignService.dispatch_campaign_report(id, camp_res.data[0])
+        return {"success": True, "data": res}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error dispatching report for campaign {id}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+

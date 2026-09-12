@@ -762,96 +762,205 @@ class CampaignService:
         return {"success": True, "data": result.data or []}
 
     @staticmethod
-    async def dispatch_campaign_report(campaign_id: str, campaign_data: Dict):
-        # 1. Fetch contacts outcomes
+    async def dispatch_campaign_report(campaign_id: str, campaign_data: Optional[Dict] = None) -> Dict:
+        """
+        Gathers comprehensive metrics for a completed campaign and dispatches a rich summary
+        report to Telegram, In-App notifications, and connected WhatsApp integrations.
+        """
+        # 1. Fetch campaign if not provided
+        if not campaign_data or not campaign_data.get("name"):
+            c_res = await asyncio.to_thread(
+                supabase_admin.table("campaigns").select("*").eq("id", campaign_id).limit(1).execute
+            )
+            campaign_data = c_res.data[0] if (c_res and c_res.data) else {}
+
+        camp_name = campaign_data.get("name", "Outbound Campaign")
+        org_id = campaign_data.get("organization_id")
+        agent_id = campaign_data.get("agent_id")
+
+        # 2. Fetch contacts outcomes
         contacts_res = await asyncio.to_thread(
             supabase_admin.table("campaign_contacts")
-            .select("call_status")
+            .select("call_status, call_id")
             .eq("campaign_id", campaign_id)
             .execute
         )
-        contacts = contacts_res.data or []
+        contacts = (contacts_res.data if contacts_res else None) or []
         total_contacts = len(contacts)
 
-        answered = sum(1 for c in contacts if c.get("call_status") == "answered")
-        no_answer = sum(1 for c in contacts if c.get("call_status") == "no-answer")
-        failed = sum(1 for c in contacts if c.get("call_status") == "failed")
-        dnd = sum(1 for c in contacts if c.get("call_status") == "dnd")
+        answered = sum(1 for c in contacts if (c.get("call_status") or "").lower() in ["answered", "completed"])
+        no_answer = sum(1 for c in contacts if (c.get("call_status") or "").lower() in ["no_answer", "no-answer"])
+        busy = sum(1 for c in contacts if (c.get("call_status") or "").lower() == "busy")
+        failed = sum(1 for c in contacts if (c.get("call_status") or "").lower() == "failed")
+        dnd = sum(1 for c in contacts if (c.get("call_status") or "").lower() == "dnd")
+        pending = sum(1 for c in contacts if (c.get("call_status") or "").lower() in ["pending", "dialing"])
+        calls_made = total_contacts - pending
 
-        # 2. Query scheduled callbacks
-        callbacks_res = await asyncio.to_thread(
-            supabase_admin.table("callbacks")
-            .select("id", count="exact")
-            .eq("organization_id", campaign_data.get("organization_id"))
-            .eq("agent_id", campaign_data.get("agent_id"))
-            .execute
-        )
-        callbacks_count = callbacks_res.count or 0
+        # Compute total duration from voice_calls
+        call_ids = [c.get("call_id") for c in contacts if c.get("call_id")]
+        total_duration_sec = 0
+        if call_ids:
+            try:
+                vc_res = await asyncio.to_thread(
+                    supabase_admin.table("voice_calls").select("duration_seconds").in_("id", call_ids).execute
+                )
+                if vc_res and vc_res.data:
+                    for row in vc_res.data:
+                        sec = row.get("duration_seconds") or 0
+                        total_duration_sec += int(sec)
+            except Exception:
+                pass
+        duration_mins = round(total_duration_sec / 60, 1)
 
-        # 3. Retrieve user profile
+        # 3. Query leads count
+        leads_count = campaign_data.get("leads_generated") or 0
+        if not leads_count and org_id:
+            try:
+                l_res = await asyncio.to_thread(
+                    supabase_admin.table("leads").select("id", count="exact").eq("organization_id", org_id).gte("created_at", campaign_data.get("created_at", "2000-01-01")).execute
+                )
+                leads_count = l_res.count or 0
+            except Exception:
+                pass
+
+        # 4. Query scheduled callbacks
+        callbacks_count = 0
+        if org_id and agent_id:
+            try:
+                callbacks_res = await asyncio.to_thread(
+                    supabase_admin.table("callbacks")
+                    .select("id", count="exact")
+                    .eq("organization_id", org_id)
+                    .eq("agent_id", agent_id)
+                    .execute
+                )
+                callbacks_count = callbacks_res.count or 0
+            except Exception:
+                pass
+
+        # 5. Calculate percentages
+        conn_rate = round((answered / max(1, calls_made)) * 100, 1)
+        conv_rate = round((leads_count / max(1, answered)) * 100, 1) if answered > 0 else 0.0
+
+        # 6. Retrieve user profile (owner of the campaign / organization)
         user_id = campaign_data.get("user_id")
         user_res = None
         if user_id:
             user_res = await asyncio.to_thread(
                 supabase_admin.table("profiles")
-                .select("telegram_chat_id")
+                .select("id, email, telegram_chat_id, phone, full_name, timezone")
                 .eq("id", user_id)
-                .maybe_single()
+                .limit(1)
                 .execute
             )
-        elif campaign_data.get("organization_id"):
+        elif org_id:
             user_res = await asyncio.to_thread(
                 supabase_admin.table("profiles")
-                .select("telegram_chat_id")
-                .eq("organization_id", campaign_data.get("organization_id"))
+                .select("id, email, telegram_chat_id, phone, full_name, timezone")
+                .eq("organization_id", org_id)
                 .limit(1)
-                .maybe_single()
                 .execute
             )
 
-        telegram_chat_id = None
-        if user_res and user_res.data:
-            telegram_chat_id = user_res.data.get("telegram_chat_id")
+        profile = user_res.data[0] if (user_res and user_res.data) else {}
+        owner_user_id = profile.get("id") or user_id
+        telegram_chat_id = profile.get("telegram_chat_id")
 
-        # 4. Construct report message
+        # 7. Construct rich report message
         report_text = (
-            f"📢 *Trinetra AI Campaign Report*\n\n"
-            f"*Campaign:* {campaign_data.get('name', 'Voice Campaign')}\n"
-            f"*Status:* Completed ✅\n\n"
-            f"📊 *Key Statistics:*\n"
-            f"- Total Contacts: {total_contacts}\n"
-            f"- Connected calls: {answered}\n"
-            f"- Leads Extracted: {campaign_data.get('leads_generated', 0)}\n\n"
-            f"📞 *Dispositions:*\n"
-            f"- Answered & Talked: {answered}\n"
-            f"- Callbacks Scheduled: {callbacks_count}\n"
-            f"- DND / Skipped: {dnd}\n"
-            f"- Failed / Switch-Off: {failed + no_answer}\n\n"
-            f"🚀 *Trinetra.ai* - Human-grade Outbound Telephony."
+            f"📊 *Trinetra AI Campaign Report*\n"
+            f"*Campaign:* {camp_name}\n"
+            f"*Status:* Completed ✅\n"
+            f"══════════════════════════\n"
+            f"👥 *Total Contacts:* {total_contacts}\n"
+            f"📞 *Calls Attempted:* {calls_made}\n"
+            f"✅ *Connected Calls:* {answered} ({conn_rate}%)\n"
+            f"🎯 *Leads Generated:* {leads_count}\n"
+            f"📈 *Conversion Rate:* {conv_rate}%\n"
+            f"⏱️ *Talk Time:* {duration_mins} mins\n"
+            f"📅 *Callbacks Scheduled:* {callbacks_count}\n\n"
+            f"📋 *Call Dispositions:*\n"
+            f"• Answered: {answered}\n"
+            f"• No Answer / Unreachable: {no_answer}\n"
+            f"• Busy Line: {busy}\n"
+            f"• DND Filtered: {dnd}\n"
+            f"• Failed / Carrier Rejected: {failed}\n"
+            f"══════════════════════════\n"
+            f"🚀 *Trinetra.ai* — Autonomous Enterprise Voice Intelligence"
         )
 
-        # 5. Dispatch Telegram alert
+        # 8. Dispatch In-App & Telegram notification via NotificationService
+        if owner_user_id:
+            try:
+                from app.services.notification_service import NotificationService
+                await NotificationService.dispatch(
+                    user_id=owner_user_id,
+                    event_type="weekly_report",
+                    title=f"📊 Campaign Completed: {camp_name}",
+                    message=report_text,
+                    payload={
+                        "campaign_id": campaign_id,
+                        "campaign_name": camp_name,
+                        "total_contacts": total_contacts,
+                        "answered": answered,
+                        "leads_count": leads_count,
+                        "conversion_rate": conv_rate,
+                        "duration_mins": duration_mins
+                    }
+                )
+                logger.info(f"[Campaign Report] Dispatched notification for user {owner_user_id}")
+            except Exception as notif_err:
+                logger.error(f"[Campaign Report] NotificationService dispatch error: {notif_err}")
+
+        # 9. Also send direct Telegram alert if chat ID is present
         bot_token = os.getenv("TELEGRAM_BOT_TOKEN")
         if bot_token and telegram_chat_id:
-            import httpx
-            url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
-            payload = {
-                "chat_id": telegram_chat_id,
-                "text": report_text,
-                "parse_mode": "Markdown"
-            }
             try:
-                async with httpx.AsyncClient() as client:
-                    res = await client.post(url, json=payload, timeout=10.0)
-                    if res.status_code == 200:
-                        logger.info(f"[Report Alert] Sent campaign completion report to Telegram: {telegram_chat_id}")
-                    else:
-                        logger.warning(f"[Report Alert] Telegram API rejected report message: {res.text}")
-            except Exception as e:
-                logger.error(f"[Report Alert] Failed to post Telegram notification: {e}")
-        else:
-            logger.info(f"[Report Alert] Skipping Telegram report: bot_token={bool(bot_token)}, chat_id={telegram_chat_id}")
-            logger.info(f"Report Output:\n{report_text}")
+                from app.services.notification_service import NotificationService
+                await NotificationService.send_telegram_notification(telegram_chat_id, report_text)
+                logger.info(f"[Campaign Report] Sent direct Telegram message to chat {telegram_chat_id}")
+            except Exception as tg_err:
+                logger.error(f"[Campaign Report] Direct Telegram send failed: {tg_err}")
+
+        # 10. Dispatch via WhatsApp to user's registered phone if integration is active
+        try:
+            from app.services.integration_executor import IntegrationExecutor
+            executor = IntegrationExecutor()
+            await executor.dispatch_post_call(
+                agent_id=agent_id,
+                event_type="call_completed",
+                context={
+                    "campaign_name": camp_name,
+                    "event_type": "Campaign Completed",
+                    "call_summary": f"Campaign '{camp_name}' finished. {answered}/{total_contacts} connected. {leads_count} leads generated ({conv_rate}% conversion).",
+                    "prospect_name": profile.get("full_name") or "Administrator",
+                    "prospect_phone": profile.get("phone")
+                },
+                data={
+                    "campaign_id": campaign_id,
+                    "total_contacts": total_contacts,
+                    "answered": answered,
+                    "leads_count": leads_count
+                },
+                org_id=org_id,
+                user_id=owner_user_id
+            )
+        except Exception as wa_err:
+            logger.debug(f"[Campaign Report] WhatsApp executor skipped/failed: {wa_err}")
+
+        return {
+            "success": True,
+            "campaign_id": campaign_id,
+            "campaign_name": camp_name,
+            "total_contacts": total_contacts,
+            "calls_made": calls_made,
+            "answered": answered,
+            "leads_count": leads_count,
+            "connection_rate": conn_rate,
+            "conversion_rate": conv_rate,
+            "callbacks_count": callbacks_count,
+            "duration_mins": duration_mins
+        }
 
 
 async def simulate_call_completion(

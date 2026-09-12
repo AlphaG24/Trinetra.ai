@@ -1345,6 +1345,10 @@ Only return valid JSON."""
         except Exception as e:
             logger.error(f"Failed to update voice_call with extracted sentiment: {e}")
 
+        from app.services.integration_executor import IntegrationExecutor
+        from app.services.notification_service import NotificationService
+        executor = IntegrationExecutor()
+
         # 2. Insert into leads
         lead_id = None
         if lead_data.get("is_lead"):
@@ -1400,8 +1404,8 @@ Only return valid JSON."""
                     except Exception as v_err:
                         logger.warning(f"Failed to link lead_id to voice_call: {v_err}")
 
-                # Trigger Lead Captured event
-                if executor and lead_id:
+                # Trigger Lead Captured event on connected integrations
+                if lead_id:
                     try:
                         asyncio.create_task(executor.on_lead_captured(agent_id, {
                             "lead_id": lead_id,
@@ -1420,6 +1424,59 @@ Only return valid JSON."""
                         }))
                     except Exception as e:
                         logger.error(f"Error triggering on_lead_captured: {e}")
+
+                # Task 4.3: Dispatch Real-time Qualified Lead Alert (Telegram + In-App Dashboard Notification Bell)
+                if user_id and lead_id:
+                    try:
+                        lead_int = str(lead_data.get("interest_level", "warm")).capitalize()
+                        c_disp = f"{resolved_name} ({resolved_phone})" if (resolved_name and resolved_name != "Unknown" and resolved_phone and resolved_phone != "Unknown") else (resolved_phone if resolved_phone != "Unknown" else resolved_name)
+                        lead_notif_title = f"🎯 New {lead_int} Lead: {resolved_name or 'Prospect'}"
+                        lead_notif_body = (
+                            f"• Contact: {c_disp}\n"
+                            f"• Interest Level: {lead_int}\n"
+                            f"• Budget: {lead_data.get('budget_range') or 'Not specified'}\n"
+                            f"• Timeline: {lead_data.get('timeline') or 'Immediate'}\n"
+                            f"• Summary: {lead_data.get('call_summary') or 'Captured from voice conversation'}"
+                        )
+                        asyncio.create_task(NotificationService.dispatch(
+                            user_id=user_id,
+                            event_type="new_lead",
+                            title=lead_notif_title,
+                            message=lead_notif_body,
+                            payload={
+                                "lead_id": lead_id,
+                                "agent_id": agent_id,
+                                "call_id": original_call_id,
+                                "contact_name": resolved_name,
+                                "contact_phone": resolved_phone,
+                                "interest_level": lead_data.get("interest_level", "medium"),
+                                "budget_range": lead_data.get("budget_range", ""),
+                                "timeline": lead_data.get("timeline", "")
+                            }
+                        ))
+                        logger.info(f"[extract_and_save_lead] Dispatched real-time new_lead notification for lead {lead_id}")
+                    except Exception as notif_l_err:
+                        logger.warning(f"[extract_and_save_lead] Failed to dispatch new_lead notification: {notif_l_err}")
+
+                # Task 4.2: Automated Welcome & Next-Step Message to Interested Prospect via WhatsApp/SMS
+                if resolved_phone and resolved_phone != "Unknown":
+                    try:
+                        asyncio.create_task(executor.dispatch_interested_followup(
+                            agent_id=agent_id,
+                            prospect_data={
+                                "contact_name": resolved_name,
+                                "contact_phone": resolved_phone,
+                                "organization_id": organization_id,
+                                "user_id": user_id,
+                                "call_summary": lead_data.get("call_summary", ""),
+                                "callback_scheduled": lead_data.get("callback_scheduled", False),
+                                "callback_time_iso": lead_data.get("callback_time_iso"),
+                                "interest_level": lead_data.get("interest_level", "medium")
+                            }
+                        ))
+                        logger.info(f"[extract_and_save_lead] Dispatched automated welcome message task for {resolved_phone}")
+                    except Exception as fol_err:
+                        logger.warning(f"[extract_and_save_lead] Failed to dispatch interested followup: {fol_err}")
 
             except Exception as e:
                 logger.error(f"Failed to save lead: {e}")
