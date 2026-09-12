@@ -1430,13 +1430,14 @@ Only return valid JSON."""
                     try:
                         lead_int = str(lead_data.get("interest_level", "warm")).capitalize()
                         c_disp = f"{resolved_name} ({resolved_phone})" if (resolved_name and resolved_name != "Unknown" and resolved_phone and resolved_phone != "Unknown") else (resolved_phone if resolved_phone != "Unknown" else resolved_name)
+                        company_disp = lead_data.get("company") or "Direct Prospect"
                         lead_notif_title = f"🎯 New {lead_int} Lead: {resolved_name or 'Prospect'}"
                         lead_notif_body = (
-                            f"• Contact: {c_disp}\n"
-                            f"• Interest Level: {lead_int}\n"
-                            f"• Budget: {lead_data.get('budget_range') or 'Not specified'}\n"
-                            f"• Timeline: {lead_data.get('timeline') or 'Immediate'}\n"
-                            f"• Summary: {lead_data.get('call_summary') or 'Captured from voice conversation'}"
+                            f"👤 *Contact:* {c_disp}\n"
+                            f"🏢 *Company:* {company_disp}\n"
+                            f"🔥 *Interest Level:* {lead_int}\n"
+                            f"💰 *Budget:* {lead_data.get('budget_range') or 'Flexible'} | ⏱️ *Timeline:* {lead_data.get('timeline') or 'Immediate'}\n"
+                            f"📝 *Summary:* {lead_data.get('call_summary') or 'Captured from voice conversation'}"
                         )
                         asyncio.create_task(NotificationService.dispatch(
                             user_id=user_id,

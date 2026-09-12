@@ -866,27 +866,27 @@ class CampaignService:
         owner_user_id = profile.get("id") or user_id
         telegram_chat_id = profile.get("telegram_chat_id")
 
-        # 7. Construct rich report message
+        # 7. Construct rich executive report message
         report_text = (
-            f"📊 *Trinetra AI Campaign Report*\n"
+            f"📊 *TRINETRA AI* | *Executive Campaign Briefing*\n\n"
             f"*Campaign:* {camp_name}\n"
             f"*Status:* Completed ✅\n"
-            f"══════════════════════════\n"
-            f"👥 *Total Contacts:* {total_contacts}\n"
-            f"📞 *Calls Attempted:* {calls_made}\n"
-            f"✅ *Connected Calls:* {answered} ({conn_rate}%)\n"
-            f"🎯 *Leads Generated:* {leads_count}\n"
-            f"📈 *Conversion Rate:* {conv_rate}%\n"
-            f"⏱️ *Talk Time:* {duration_mins} mins\n"
-            f"📅 *Callbacks Scheduled:* {callbacks_count}\n\n"
-            f"📋 *Call Dispositions:*\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"📈 *Performance Overview*\n"
+            f"• *Total Contacts:* {total_contacts}\n"
+            f"• *Calls Attempted:* {calls_made}\n"
+            f"• *Connected Calls:* {answered} ({conn_rate}%)\n"
+            f"• *Qualified Leads:* {leads_count} ({conv_rate}% conversion)\n"
+            f"• *Callbacks Booked:* {callbacks_count}\n"
+            f"• *Total Talk Time:* {duration_mins} mins\n\n"
+            f"📋 *Disposition Breakdown*\n"
             f"• Answered: {answered}\n"
             f"• No Answer / Unreachable: {no_answer}\n"
             f"• Busy Line: {busy}\n"
             f"• DND Filtered: {dnd}\n"
-            f"• Failed / Carrier Rejected: {failed}\n"
-            f"══════════════════════════\n"
-            f"🚀 *Trinetra.ai* — Autonomous Enterprise Voice Intelligence"
+            f"• Carrier Rejected / Failed: {failed}\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"_Automated Intelligence by Trinetra Enterprise Voice_"
         )
 
         # 8. Dispatch In-App & Telegram notification via NotificationService
@@ -926,21 +926,37 @@ class CampaignService:
         try:
             from app.services.integration_executor import IntegrationExecutor
             executor = IntegrationExecutor()
+            owner_name = profile.get("full_name") or "Administrator"
+            owner_phone = profile.get("phone")
             await executor.dispatch_post_call(
                 agent_id=agent_id,
-                event_type="call_completed",
+                event_type="campaign_completed",
                 context={
                     "campaign_name": camp_name,
-                    "event_type": "Campaign Completed",
-                    "call_summary": f"Campaign '{camp_name}' finished. {answered}/{total_contacts} connected. {leads_count} leads generated ({conv_rate}% conversion).",
-                    "prospect_name": profile.get("full_name") or "Administrator",
-                    "prospect_phone": profile.get("phone")
+                    "owner_name": owner_name,
+                    "contact_name": owner_name,
+                    "contact_phone": owner_phone,
+                    "prospect_name": owner_name,
+                    "prospect_phone": owner_phone,
+                    "total_contacts": total_contacts,
+                    "calls_attempted": calls_made,
+                    "connected_count": answered,
+                    "connection_rate": f"{conn_rate}%",
+                    "leads_count": leads_count,
+                    "conversion_rate": f"{conv_rate}%",
+                    "callbacks_count": callbacks_count,
+                    "total_duration_mins": duration_mins,
+                    "call_summary": f"Campaign '{camp_name}' finished: {answered}/{total_contacts} connected ({conn_rate}%), {leads_count} leads generated ({conv_rate}% conversion)."
                 },
                 data={
                     "campaign_id": campaign_id,
                     "total_contacts": total_contacts,
                     "answered": answered,
-                    "leads_count": leads_count
+                    "leads_count": leads_count,
+                    "connection_rate": conn_rate,
+                    "conversion_rate": conv_rate,
+                    "callbacks_count": callbacks_count,
+                    "duration_mins": duration_mins
                 },
                 org_id=org_id,
                 user_id=owner_user_id
