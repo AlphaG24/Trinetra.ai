@@ -24,7 +24,7 @@
     "jspdf": "^4.2.1",
     "livekit-client": "^2.20.2",
     "lucide-react": "^0.563.0",
-    "mammoth": "^1.11.0",
+    "mammoth": "^1.12.2",
     "next": "^16.2.10",
     "next-remove-imports": "^1.0.13",
     "openai": "^6.17.0",
