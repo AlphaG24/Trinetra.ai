@@ -938,14 +938,32 @@ async def handle_exotel_voice_webhook(
                     stat_map = {
                         "completed": "answered",
                         "in-progress": "answered",
-                        "busy": "failed",
-                        "no-answer": "no-answer",
+                        "busy": "busy",
+                        "no-answer": "no_answer",
                         "failed": "failed"
                     }
+                    updated_stat = stat_map.get(call_status.lower(), "answered")
                     supabase_admin.table("campaign_contacts").update({
-                        "call_status": stat_map.get(call_status.lower(), "answered"),
-                        "call_duration": duration
+                        "call_status": updated_stat,
+                        "last_attempt_at": datetime.utcnow().isoformat()
                     }).eq("id", contact_id).execute()
+
+                    # Check if campaign has finished all contacts
+                    try:
+                        cc_row = supabase_admin.table("campaign_contacts").select("campaign_id").eq("id", contact_id).limit(1).execute()
+                        if cc_row.data and cc_row.data[0].get("campaign_id"):
+                            ex_camp_id = cc_row.data[0]["campaign_id"]
+                            rem = supabase_admin.table("campaign_contacts").select("id").eq("campaign_id", ex_camp_id).in_("call_status", ["pending", "dialing"]).limit(1).execute()
+                            if not rem.data:
+                                supabase_admin.table("campaigns").update({
+                                    "status": "completed",
+                                    "completed_at": datetime.utcnow().isoformat()
+                                }).eq("id", ex_camp_id).execute()
+                                print(f"[Exotel Webhook] Campaign {ex_camp_id} marked completed, dispatching report...", flush=True)
+                                from app.services.campaign_service import CampaignService
+                                asyncio.create_task(CampaignService.dispatch_campaign_report(ex_camp_id))
+                    except Exception as comp_err:
+                        print(f"[Exotel Webhook] Campaign completion check error: {comp_err}", flush=True)
             except Exception as e:
                 print(f"[Exotel Webhook DB Error] {e}", flush=True)
 
@@ -1369,7 +1387,12 @@ async def handle_twilio_voice_status(
                                 "status": "completed",
                                 "completed_at": datetime.utcnow().isoformat()
                             }).eq("id", camp_id).execute()
-                            print(f"[Twilio Status Webhook] Campaign {camp_id} marked completed", flush=True)
+                            print(f"[Twilio Status Webhook] Campaign {camp_id} marked completed, dispatching report...", flush=True)
+                            try:
+                                from app.services.campaign_service import CampaignService
+                                asyncio.create_task(CampaignService.dispatch_campaign_report(camp_id))
+                            except Exception as rep_err:
+                                print(f"[Twilio Status Webhook] Failed to trigger campaign report: {rep_err}", flush=True)
             except Exception as cc_err:
                 print(f"[Twilio Status Webhook] Failed to update campaign_contact: {cc_err}", flush=True)
 

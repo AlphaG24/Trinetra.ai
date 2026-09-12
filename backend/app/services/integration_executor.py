@@ -243,6 +243,88 @@ class IntegrationExecutor:
                 
             await self._dispatch(slug, "callback_scheduled", config, callback_data)
 
+    async def dispatch_post_call(self, agent_id: str, event_type: str, context: dict, data: dict, org_id: str = None, user_id: str = None):
+        """
+        Dispatches post-call or post-campaign summaries across all active integrations (WhatsApp, Telegram, Webhook, Email).
+        """
+        logger.info(f"Triggering dispatch_post_call for agent={agent_id}, event={event_type}")
+        integrations = await self._get_agent_integrations(agent_id, org_id, user_id)
+        merged_data = {**data, **context}
+        for integration in integrations:
+            itype = integration.get("integration_types") or {}
+            slug = itype.get("slug")
+            config = integration.get("config") or {}
+            try:
+                await self._dispatch(slug, event_type, config, merged_data)
+            except Exception as d_err:
+                logger.error(f"[dispatch_post_call] Error dispatching to {slug}: {d_err}")
+
+    async def dispatch_interested_followup(self, agent_id: str, prospect_data: dict) -> bool:
+        """
+        Sends an automated welcome & next-step message to interested prospects via WhatsApp (or SMS fallback).
+        """
+        prospect_phone = prospect_data.get("contact_phone") or prospect_data.get("prospect_phone")
+        if not prospect_phone or str(prospect_phone).strip().lower() in ("unknown", "none", "", "null"):
+            logger.info("[Interested Followup] Skipped: no valid prospect phone provided.")
+            return False
+
+        org_id = prospect_data.get("organization_id")
+        user_id = prospect_data.get("user_id")
+        prospect_name = prospect_data.get("contact_name") or prospect_data.get("prospect_name") or "there"
+        business_name = prospect_data.get("business_name") or prospect_data.get("agent_name") or "Trinetra AI"
+        summary = prospect_data.get("call_summary") or ""
+        cb_time = prospect_data.get("callback_time_iso") or prospect_data.get("callback_time")
+
+        msg_lines = [
+            f"Hello {prospect_name},",
+            f"\nThank you for speaking with our team at {business_name}! 🎉"
+        ]
+        if summary:
+            clean_sum = summary if len(summary) <= 300 else summary[:297] + "..."
+            msg_lines.append(f"\n📋 *Call Summary*:\n{clean_sum}")
+        if cb_time:
+            msg_lines.append(f"\n⏰ *Next Step*: Your callback has been scheduled for *{cb_time}*.")
+        else:
+            msg_lines.append("\n🚀 *Next Step*: Our team will review your requirements and follow up with you shortly.")
+
+        msg_lines.append(f"\nFeel free to reply directly to this message if you have any questions!\n\nBest regards,\nTeam {business_name}")
+        message = "\n".join(msg_lines)
+
+        integrations = await self._get_agent_integrations(agent_id, org_id, user_id)
+
+        # 1. Attempt WhatsApp first
+        sent = False
+        for itg in integrations:
+            itype = (itg.get("integration_types") or {}).get("slug")
+            config = itg.get("config") or {}
+            if itype == "whatsapp":
+                wa_ok = await self._send_whatsapp(config, message, {"contact_phone": prospect_phone})
+                if wa_ok:
+                    sent = True
+                    break
+
+        # 2. If WhatsApp is not configured or failed, attempt SMS
+        if not sent:
+            for itg in integrations:
+                config = itg.get("config") or {}
+                if config.get("twilio_sid") or os.getenv("TWILIO_ACCOUNT_SID"):
+                    sms_ok = await self._send_sms(config, message, {"contact_phone": prospect_phone})
+                    if sms_ok:
+                        sent = True
+                        break
+
+        # 3. Global Twilio fallback if env vars are present
+        if not sent and os.getenv("TWILIO_ACCOUNT_SID") and os.getenv("TWILIO_PHONE_NUMBER"):
+            sms_ok = await self._send_sms({}, message, {"contact_phone": prospect_phone})
+            if sms_ok:
+                sent = True
+
+        if sent:
+            logger.info(f"[Interested Followup] Successfully dispatched welcome message to {prospect_phone}")
+        else:
+            logger.warning(f"[Interested Followup] No active messaging provider reached for {prospect_phone}")
+        return sent
+
     async def _dispatch(self, slug: str, event_type: str, config: dict, data: dict):
         try:
             # Merge event_type into template context
@@ -297,17 +379,17 @@ class IntegrationExecutor:
             if res.status_code != 200:
                 logger.error(f"Telegram API error: {res.text}")
 
-    async def _send_whatsapp(self, config: dict, message: str, data: dict = None):
+    async def _send_whatsapp(self, config: dict, message: str, data: dict = None) -> bool:
         to_number = (data or {}).get("contact_phone") or (data or {}).get("prospect_phone") or config.get("target_phone")
-        twilio_sid = config.get("twilio_sid")
-        auth_token = config.get("auth_token")
-        from_number = config.get("phone_number") or config.get("from_number")
+        twilio_sid = config.get("twilio_sid") or os.getenv("TWILIO_ACCOUNT_SID")
+        auth_token = config.get("auth_token") or os.getenv("TWILIO_AUTH_TOKEN")
+        from_number = config.get("phone_number") or config.get("from_number") or os.getenv("TWILIO_WHATSAPP_FROM") or os.getenv("TWILIO_PHONE_NUMBER")
 
         # 1. Twilio WhatsApp dispatch
         if twilio_sid and auth_token and from_number:
             if not to_number:
                 logger.warning("Twilio WhatsApp dispatch skipped: no destination contact phone provided.")
-                return
+                return False
             from_whatsapp = format_whatsapp_number(from_number)
             to_whatsapp = format_whatsapp_number(to_number)
 
@@ -326,11 +408,13 @@ class IntegrationExecutor:
                     )
                     if res.status_code not in (200, 201):
                         logger.error(f"Twilio WhatsApp API error: status={res.status_code} response={res.text}")
+                        return False
                     else:
                         logger.info(f"Twilio WhatsApp message sent successfully to {to_whatsapp}")
+                        return True
             except Exception as exc:
                 logger.error(f"Twilio WhatsApp request failed: {exc}")
-            return
+                return False
 
         # 2. Meta Cloud API WhatsApp dispatch
         phone_id = config.get("whatsapp_phone_id")
@@ -338,7 +422,7 @@ class IntegrationExecutor:
         if phone_id and token:
             if not to_number:
                 logger.warning("Meta WhatsApp dispatch skipped: no destination contact phone provided.")
-                return
+                return False
             clean_to = str(to_number).replace("+", "").replace(" ", "").replace("-", "")
             url = f"https://graph.facebook.com/v18.0/{phone_id}/messages"
             try:
@@ -356,13 +440,54 @@ class IntegrationExecutor:
                     )
                     if res.status_code not in (200, 201):
                         logger.error(f"Meta WhatsApp API error: status={res.status_code} response={res.text}")
+                        return False
                     else:
                         logger.info(f"Meta WhatsApp message sent successfully to {clean_to}")
+                        return True
             except Exception as exc:
                 logger.error(f"Meta WhatsApp request failed: {exc}")
-            return
+                return False
 
         logger.warning(f"WhatsApp dispatch skipped: incomplete configuration (keys={list(config.keys())})")
+        return False
+
+    async def _send_sms(self, config: dict, message: str, data: dict = None) -> bool:
+        to_number = (data or {}).get("contact_phone") or (data or {}).get("prospect_phone") or config.get("target_phone")
+        twilio_sid = config.get("twilio_sid") or os.getenv("TWILIO_ACCOUNT_SID")
+        auth_token = config.get("auth_token") or os.getenv("TWILIO_AUTH_TOKEN")
+        from_number = config.get("phone_number") or config.get("from_number") or os.getenv("TWILIO_PHONE_NUMBER")
+
+        if twilio_sid and auth_token and from_number and to_number:
+            url = f"https://api.twilio.com/2010-04-01/Accounts/{twilio_sid}/Messages.json"
+            try:
+                to_clean = str(to_number).strip().replace("whatsapp:", "")
+                from_clean = str(from_number).strip().replace("whatsapp:", "")
+                if not to_clean.startswith("+"):
+                    to_clean = "+" + to_clean
+                if not from_clean.startswith("+"):
+                    from_clean = "+" + from_clean
+
+                async with httpx.AsyncClient() as client:
+                    res = await client.post(
+                        url,
+                        auth=(twilio_sid, auth_token),
+                        data={
+                            "From": from_clean,
+                            "To": to_clean,
+                            "Body": message
+                        },
+                        timeout=10.0
+                    )
+                    if res.status_code in (200, 201):
+                        logger.info(f"Twilio SMS sent successfully to {to_clean}")
+                        return True
+                    else:
+                        logger.error(f"Twilio SMS error: status={res.status_code} response={res.text}")
+                        return False
+            except Exception as exc:
+                logger.error(f"Twilio SMS request failed: {exc}")
+                return False
+        return False
 
     async def _send_webhook(self, config: dict, event_type: str, message: str, data: dict):
         url = config.get("webhook_url")

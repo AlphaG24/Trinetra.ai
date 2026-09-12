@@ -60,23 +60,23 @@
 ### **Phase 4 — Notifications & Reports**
 > **Goal:** Instant lead/campaign reports via Telegram/WhatsApp + dashboard real-time updates.
 
-| # | Task | Details |
-|---|------|---------|
-| 4.1 | **Campaign report** | When campaign ends (or after each call), generate report with: calls made, connected, leads, interested customers, conversion rate. Send to Telegram if connected. |
-| 4.2 | **Welcome message to interested client** | If prospect expresses interest, send them a welcome/next-step message (SMS/WhatsApp) via integration. |
-| 4.3 | **Lead alert** | On new lead, send immediate Telegram/WhatsApp alert with lead details. Already partially built; verify it works with real calls. |
-| 4.4 | **Dashboard real-time** | Use Supabase Realtime to update KPIs, charts, and activity feed instantly. Verify all pages refetch on new data. |
+| # | Task | Status | Details |
+|---|------|--------|---------|
+| 4.1 | **Campaign report** | ✅ COMPLETED | Upgraded `CampaignService.dispatch_campaign_report` with connection/conversion metrics and auto-dispatch upon campaign completion (Twilio & Exotel webhooks) or on-demand via `POST /api/campaigns/{id}/send-report` to Telegram, WhatsApp, and in-app bell. |
+| 4.2 | **Welcome message to interested client** | ✅ COMPLETED | Implemented `IntegrationExecutor.dispatch_interested_followup`, automatically sending warm personalized welcome and next-step messages via WhatsApp/SMS to interested prospects when captured during voice calls. |
+| 4.3 | **Lead alert** | ✅ COMPLETED | Triggered real-time `new_lead` alerts via `NotificationService.dispatch` with prospect name, phone, company, interest level, budget, and summary directly to user's Telegram and dashboard notification bell. |
+| 4.4 | **Dashboard real-time** | ✅ COMPLETED | Connected Supabase Realtime subscriptions to `voice_calls`, `leads`, and `campaigns` tables in `dashboard/page.tsx`, automatically triggering `mutateOverview()` so KPIs, conversion charts, and recent activity reflect live changes instantly. |
 
 ---
 
 ### **Phase 5 — Developer/Marketing Account (Later)**
 > **Goal:** A second "developer" account with extra permissions to manage marketing/demo calls, forms, and numbers.
 
-| # | Task | Details |
-|---|------|---------|
-| 5.1 | **Role-based permissions** | Extend `profiles.role` to include a custom role (e.g., `marketing_admin`) with access to marketing tools, demo campaigns, and pool management. |
-| 5.2 | **Homepage "Talk to Anika" form** | Already added; connect it to the outbound pipeline. When user submits name/phone/language, instantly trigger a Twilio outbound call using the marketing number and the marketing agent. |
-| 5.3 | **Marketing dashboard** | For that account, show lead generation stats from the homepage form and demo calls. |
+| # | Task | Status | Details |
+|---|------|--------|---------|
+| 5.1 | **Role-based permissions** | 📋 PLANNED | Extend `profiles.role` to include a custom role (e.g., `marketing_admin`) with access to marketing tools, demo campaigns, and pool management. |
+| 5.2 | **Homepage "Talk to Anika" form** | 📋 PLANNED | Already added; connect it to the outbound pipeline. When user submits name/phone/language, instantly trigger a Twilio outbound call using the marketing number and the marketing agent. |
+| 5.3 | **Marketing dashboard** | 📋 PLANNED | For that account, show lead generation stats from the homepage form and demo calls. |
 
 ---
 
@@ -94,6 +94,7 @@
 ---
 
 ### **Immediate Next Actions**
-1. **Kick off Phase 3** — Inbound Support Agent & Customer DB (Inbound call handling, caller recognition, upserting customer profiles, and post-call notifications).
-2. **Execute Database Migration in Supabase SQL Editor** — Run `database/migrations/20260908_db_cleanup_and_validity_lifecycle.sql` to permanently drop the empty legacy tables and add the check indexes.
+1. **Verify Phase 4 Endpoints & Live Notifications** — Test `POST /api/campaigns/{id}/send-report` and check live updates on the dashboard.
+2. **Kick off Phase 5** — Developer/Marketing Account & Homepage "Talk to Anika" direct outbound call bridge.
+
 
