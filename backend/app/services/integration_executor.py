@@ -275,19 +275,24 @@ class IntegrationExecutor:
         summary = prospect_data.get("call_summary") or ""
         cb_time = prospect_data.get("callback_time_iso") or prospect_data.get("callback_time")
 
+        clean_sum = summary.strip() if summary else "We reviewed your requirements and aligned on our next discussion."
+        if len(clean_sum) > 350:
+            clean_sum = clean_sum[:347] + "..."
+
         msg_lines = [
             f"Hello {prospect_name},",
-            f"\nThank you for speaking with our team at {business_name}! 🎉"
+            f"\nThank you for speaking with our team today on behalf of *{business_name}*.",
+            "\n━━━━━━━━━━━━━━━━━━━━━━━━",
+            "📋 *Conversation Summary*",
+            f"{clean_sum}",
+            "━━━━━━━━━━━━━━━━━━━━━━━━"
         ]
-        if summary:
-            clean_sum = summary if len(summary) <= 300 else summary[:297] + "..."
-            msg_lines.append(f"\n📋 *Call Summary*:\n{clean_sum}")
         if cb_time:
-            msg_lines.append(f"\n⏰ *Next Step*: Your callback has been scheduled for *{cb_time}*.")
+            msg_lines.append(f"\n⏰ *Scheduled Next Step*\nYour callback has been scheduled for *{cb_time}*. Our specialist will connect with you then.")
         else:
-            msg_lines.append("\n🚀 *Next Step*: Our team will review your requirements and follow up with you shortly.")
+            msg_lines.append("\n🚀 *Scheduled Next Step*\nOur advisory team is reviewing your requirements and will reach out with the requested details shortly.")
 
-        msg_lines.append(f"\nFeel free to reply directly to this message if you have any questions!\n\nBest regards,\nTeam {business_name}")
+        msg_lines.append(f"\nIf you have any questions or need to make changes, feel free to reply directly to this message.\n\nWarm regards,\n*{business_name} Client Team*")
         message = "\n".join(msg_lines)
 
         integrations = await self._get_agent_integrations(agent_id, org_id, user_id)
@@ -335,18 +340,155 @@ class IntegrationExecutor:
                 context["contact_name"] = context.get("prospect_name", "Unknown")
             if "contact_phone" not in context:
                 context["contact_phone"] = context.get("prospect_phone", "")
+            if "owner_name" not in context:
+                context["owner_name"] = context.get("prospect_name", "Team")
             
             # Retrieve custom template or default to a standard placeholder string
             template = config.get("message_template") or ""
             if not template:
-                if slug == "telegram":
-                    template = "🔔 *Trinetra Alert*: {{event_type}}\nProspect: {{contact_name}} ({{contact_phone}})\nSummary: {{call_summary}}"
-                elif slug == "smtp-email":
-                    template = "<h3>Trinetra AI Notification</h3><p>Event: <strong>{{event_type}}</strong></p><p>Prospect: {{contact_name}} ({{contact_phone}})</p><p>Summary: {{call_summary}}</p>"
-                elif slug == "whatsapp":
-                    template = "🔔 *Trinetra AI Call Update*\n\nHello {{contact_name}},\nThank you for speaking with our AI assistant.\n\n*Call Summary*: {{call_summary}}\n\nFeel free to reply if you have any questions!"
+                if event_type == "campaign_completed":
+                    if slug == "whatsapp":
+                        template = (
+                            "📊 *TRINETRA AI* | *Executive Campaign Briefing*\n\n"
+                            "Hello {{owner_name}},\n"
+                            "Your outbound campaign *“{{campaign_name}}”* has completed.\n\n"
+                            "━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                            "📈 *Performance Overview*\n"
+                            "• *Total Contacts:* {{total_contacts}}\n"
+                            "• *Calls Attempted:* {{calls_attempted}}\n"
+                            "• *Connected:* {{connected_count}} ({{connection_rate}})\n"
+                            "• *Qualified Leads:* {{leads_count}} ({{conversion_rate}} conversion)\n"
+                            "• *Callbacks Booked:* {{callbacks_count}}\n"
+                            "• *Total Talk Time:* {{total_duration_mins}} mins\n\n"
+                            "🎯 *Next Step*:\n"
+                            "Qualified leads and recordings are ready for review in your Command Center.\n"
+                            "━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                            "_Automated Intelligence by Trinetra Enterprise Voice_"
+                        )
+                    elif slug == "telegram":
+                        template = (
+                            "📊 *TRINETRA AI* | *Executive Campaign Briefing*\n\n"
+                            "Hello {{owner_name}},\n"
+                            "Campaign *“{{campaign_name}}”* has completed.\n\n"
+                            "━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                            "📈 *Key Highlights*\n"
+                            "• *Total Contacts:* {{total_contacts}}\n"
+                            "• *Calls Attempted:* {{calls_attempted}}\n"
+                            "• *Connected:* {{connected_count}} ({{connection_rate}})\n"
+                            "• *Qualified Leads:* {{leads_count}} ({{conversion_rate}})\n"
+                            "• *Callbacks Booked:* {{callbacks_count}}\n"
+                            "• *Total Duration:* {{total_duration_mins}} mins\n"
+                            "━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                            "_Automated Intelligence by Trinetra Enterprise Voice_"
+                        )
+                    elif slug == "smtp-email":
+                        template = (
+                            "<div style='font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; color: #111; max-width: 600px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 8px; padding: 24px;'>"
+                            "<div style='font-size: 13px; font-weight: 700; letter-spacing: 0.05em; color: #4f46e5; text-transform: uppercase;'>Trinetra Enterprise Voice</div>"
+                            "<h2 style='margin-top: 6px; margin-bottom: 4px; color: #0f172a;'>Executive Campaign Briefing</h2>"
+                            "<p style='color: #64748b; font-size: 14px; margin-top: 0;'>Campaign: <strong>{{campaign_name}}</strong></p>"
+                            "<div style='height: 1px; background-color: #e2e8f0; margin: 16px 0;'></div>"
+                            "<table style='width: 100%; border-collapse: collapse; font-size: 14px; margin-bottom: 20px;'>"
+                            "<tr style='border-bottom: 1px solid #f1f5f9;'><td style='padding: 8px 0; color: #64748b;'>Total Contacts:</td><td style='text-align: right; font-weight: 600;'>{{total_contacts}}</td></tr>"
+                            "<tr style='border-bottom: 1px solid #f1f5f9;'><td style='padding: 8px 0; color: #64748b;'>Calls Attempted:</td><td style='text-align: right; font-weight: 600;'>{{calls_attempted}}</td></tr>"
+                            "<tr style='border-bottom: 1px solid #f1f5f9;'><td style='padding: 8px 0; color: #64748b;'>Connected Calls:</td><td style='text-align: right; font-weight: 600; color: #0284c7;'>{{connected_count}} ({{connection_rate}})</td></tr>"
+                            "<tr style='border-bottom: 1px solid #f1f5f9;'><td style='padding: 8px 0; color: #64748b;'>Qualified Leads:</td><td style='text-align: right; font-weight: 700; color: #16a34a;'>{{leads_count}} ({{conversion_rate}})</td></tr>"
+                            "<tr style='border-bottom: 1px solid #f1f5f9;'><td style='padding: 8px 0; color: #64748b;'>Callbacks Scheduled:</td><td style='text-align: right; font-weight: 600;'>{{callbacks_count}}</td></tr>"
+                            "<tr><td style='padding: 8px 0; color: #64748b;'>Total Talk Time:</td><td style='text-align: right; font-weight: 600;'>{{total_duration_mins}} mins</td></tr>"
+                            "</table>"
+                            "<div style='background-color: #f8fafc; border-radius: 6px; padding: 12px; font-size: 13px; color: #475569; border-left: 3px solid #4f46e5;'>"
+                            "All recorded conversations and prospect intelligence notes are synced to your Trinetra Dashboard."
+                            "</div>"
+                            "<div style='height: 1px; background-color: #e2e8f0; margin: 20px 0;'></div>"
+                            "<p style='font-size: 12px; color: #94a3b8; margin: 0;'>Automated Intelligence by Trinetra Enterprise Voice.</p>"
+                            "</div>"
+                        )
+                    else:
+                        template = "📊 Trinetra AI Campaign Briefing: {{campaign_name}} - {{connected_count}}/{{total_contacts}} connected ({{leads_count}} leads)."
+
+                elif event_type == "lead_captured":
+                    if slug == "whatsapp":
+                        template = (
+                            "🎯 *TRINETRA AI* | *Qualified Lead Alert*\n\n"
+                            "A high-intent prospect was just qualified by your AI Agent.\n\n"
+                            "━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                            "👤 *Prospect Profile*\n"
+                            "• *Name:* {{contact_name}}\n"
+                            "• *Phone:* {{contact_phone}}\n"
+                            "• *Company:* {{company_name}}\n"
+                            "• *Interest Level:* 🔥 {{interest_level}}\n\n"
+                            "💼 *Deal Intelligence*\n"
+                            "• *Budget:* {{budget_range}}\n"
+                            "• *Timeline:* {{timeline}}\n\n"
+                            "📝 *Discussion Summary*\n"
+                            "“{{call_summary}}”\n"
+                            "━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                            "⚡ _Recommended Action: Follow up within 15 minutes for peak conversion._"
+                        )
+                    elif slug == "telegram":
+                        template = (
+                            "🎯 *TRINETRA AI* | *Qualified Lead Alert*\n\n"
+                            "High-intent lead qualified by AI Agent.\n\n"
+                            "━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                            "👤 *Prospect:* {{contact_name}} ({{contact_phone}})\n"
+                            "🏢 *Company:* {{company_name}}\n"
+                            "🔥 *Interest:* {{interest_level}}\n"
+                            "💰 *Budget:* {{budget_range}} | ⏱️ *Timeline:* {{timeline}}\n\n"
+                            "📝 *Summary:* {{call_summary}}\n"
+                            "━━━━━━━━━━━━━━━━━━━━━━━━"
+                        )
+                    elif slug == "smtp-email":
+                        template = (
+                            "<div style='font-family: Arial, sans-serif; line-height: 1.6; color: #111; max-width: 600px; border: 1px solid #e5e7eb; border-radius: 8px; padding: 24px;'>"
+                            "<div style='font-size: 12px; font-weight: 700; color: #16a34a; text-transform: uppercase;'>New Qualified Lead</div>"
+                            "<h3 style='margin-top: 4px; color: #0f172a;'>{{contact_name}} ({{company_name}})</h3>"
+                            "<p><strong>Phone:</strong> {{contact_phone}}<br/><strong>Interest Level:</strong> {{interest_level}}<br/><strong>Budget:</strong> {{budget_range}}<br/><strong>Timeline:</strong> {{timeline}}</p>"
+                            "<p style='background-color: #f8fafc; padding: 12px; border-radius: 6px; font-style: italic;'>“{{call_summary}}”</p>"
+                            "</div>"
+                        )
+                    else:
+                        template = "🎯 New Lead: {{contact_name}} ({{contact_phone}}) - {{interest_level}} - {{call_summary}}"
+
+                elif event_type == "callback_scheduled":
+                    if slug == "whatsapp":
+                        template = (
+                            "🗓️ *TRINETRA AI* | *Appointment / Callback Scheduled*\n\n"
+                            "A prospect has confirmed an appointment with your team.\n\n"
+                            "━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                            "👤 *Contact:* {{contact_name}} ({{contact_phone}})\n"
+                            "⏰ *Scheduled Time:* {{scheduled_at}}\n"
+                            "📌 *Context / Notes:* {{notes}}\n"
+                            "━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                            "_Reminder is scheduled prior to call._"
+                        )
+                    elif slug == "telegram":
+                        template = "🗓️ *Appointment Scheduled*\nContact: {{contact_name}} ({{contact_phone}})\nTime: {{scheduled_at}}\nNotes: {{notes}}"
+                    elif slug == "smtp-email":
+                        template = "<h3>Appointment Scheduled</h3><p>Contact: {{contact_name}} ({{contact_phone}})</p><p>Time: {{scheduled_at}}</p><p>Notes: {{notes}}</p>"
+                    else:
+                        template = "🗓️ Appointment Scheduled: {{contact_name}} - {{scheduled_at}}"
+
                 else:
-                    template = "Trinetra AI Event Alert: {{event_type}} - {{contact_name}} ({{contact_phone}})"
+                    # Default call_completed event
+                    if slug == "whatsapp":
+                        template = (
+                            "📞 *TRINETRA AI* | *Call Briefing*\n\n"
+                            "Hello {{contact_name}},\n"
+                            "Thank you for speaking with our AI specialist today.\n\n"
+                            "━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                            "📋 *Conversation Summary*\n"
+                            "{{call_summary}}\n"
+                            "━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                            "Feel free to reply directly to this message if you have any questions.\n\n"
+                            "Warm regards,\n"
+                            "*Client Operations Team*"
+                        )
+                    elif slug == "telegram":
+                        template = "📞 *Trinetra Call Completed*\nProspect: {{contact_name}} ({{contact_phone}})\nSummary: {{call_summary}}"
+                    elif slug == "smtp-email":
+                        template = "<h3>Trinetra AI Call Update</h3><p>Prospect: {{contact_name}} ({{contact_phone}})</p><p>Summary: {{call_summary}}</p>"
+                    else:
+                        template = "Trinetra AI Call Update: {{contact_name}} - {{call_summary}}"
                     
             formatted_msg = self._replace_placeholders(template, context)
             

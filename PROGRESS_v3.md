@@ -69,14 +69,14 @@
 
 ---
 
-### **Phase 5 — Developer/Marketing Account (Later)**
+### **Phase 5 — Developer/Marketing Account (Deferred to Post-MVP)**
 > **Goal:** A second "developer" account with extra permissions to manage marketing/demo calls, forms, and numbers.
 
 | # | Task | Status | Details |
 |---|------|--------|---------|
-| 5.1 | **Role-based permissions** | 📋 PLANNED | Extend `profiles.role` to include a custom role (e.g., `marketing_admin`) with access to marketing tools, demo campaigns, and pool management. |
-| 5.2 | **Homepage "Talk to Anika" form** | 📋 PLANNED | Already added; connect it to the outbound pipeline. When user submits name/phone/language, instantly trigger a Twilio outbound call using the marketing number and the marketing agent. |
-| 5.3 | **Marketing dashboard** | 📋 PLANNED | For that account, show lead generation stats from the homepage form and demo calls. |
+| 5.1 | **Role-based permissions** | ⏸️ SKIPPED (Post-MVP) | Deferred to post-client acquisition release to keep team focused on core MVP pipeline. |
+| 5.2 | **Homepage "Talk to Anika" form** | ⏸️ SKIPPED (Post-MVP) | Deferred to post-client acquisition release. |
+| 5.3 | **Marketing dashboard** | ⏸️ SKIPPED (Post-MVP) | Deferred to post-client acquisition release. |
 
 ---
 
@@ -94,7 +94,7 @@
 ---
 
 ### **Immediate Next Actions**
-1. **Verify Phase 4 Endpoints & Live Notifications** — Test `POST /api/campaigns/{id}/send-report` and check live updates on the dashboard.
-2. **Kick off Phase 5** — Developer/Marketing Account & Homepage "Talk to Anika" direct outbound call bridge.
+1. **Kick off Phase 6** — The "Joe Girard Engine" (Occasion nurture scheduler, zero-pitch care pings, automated referral generation, and cold lead reactivation).
+2. **End-to-End Client Demo Polish** — Final validation of client-facing dashboard and live call journey for client onboarding.
 
 
