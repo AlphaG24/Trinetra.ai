@@ -2,7 +2,10 @@ import os
 import json
 import httpx
 import traceback
-import pytz
+try:
+    from zoneinfo import ZoneInfo
+except ImportError:
+    ZoneInfo = None
 from datetime import datetime
 from database import supabase_admin as supabase
 
@@ -31,11 +34,14 @@ class NotificationService:
     @staticmethod
     def is_in_quiet_hours(tz_name: str, start_str: str, end_str: str) -> bool:
         try:
-            tz = pytz.timezone(tz_name)
+            if ZoneInfo:
+                tz = ZoneInfo(tz_name)
+                local_now = datetime.now(tz)
+            else:
+                local_now = datetime.utcnow()
         except Exception:
-            tz = pytz.timezone('UTC')
+            local_now = datetime.utcnow()
             
-        local_now = datetime.now(tz)
         local_time = local_now.time()
         
         try:
@@ -61,7 +67,7 @@ class NotificationService:
             # 1. Fetch user profile, telegram chat id, and notification preferences
             user_res = supabase.table("profiles").select(
                 "email, telegram_chat_id, timezone, notification_preferences"
-            ).eq("id", user_id).maybeSingle().execute()
+            ).eq("id", user_id).maybe_single().execute()
             
             if not user_res.data:
                 print(f"[NotificationService] User profile {user_id} not found. Skipping dispatch.", flush=True)
@@ -85,13 +91,30 @@ class NotificationService:
             # 2. In-App Dashboard Notification (always instant if enabled, does not respect quiet hours/digest)
             if event_prefs.get("dashboard", True):
                 try:
-                    supabase.table("notifications").insert({
+                    type_map = {
+                        "new_lead": "success",
+                        "payment_confirmed": "success",
+                        "call_completed": "info",
+                        "callback_scheduled": "info",
+                        "usage_warning": "warning",
+                        "agent_paused": "warning",
+                        "weekly_report": "info"
+                    }
+                    db_type = type_map.get(event_type, "info")
+                    insert_data = {
                         "user_id": user_id,
                         "title": title,
                         "message": message,
-                        "type": event_type,
+                        "type": db_type,
                         "is_read": False
-                    }).execute()
+                    }
+                    if payload:
+                        insert_data["payload"] = payload
+                    try:
+                        supabase.table("notifications").insert(insert_data).execute()
+                    except Exception:
+                        insert_data.pop("payload", None)
+                        supabase.table("notifications").insert(insert_data).execute()
                     print(f"[NotificationService] In-App dashboard alert created for user {user_id}", flush=True)
                 except Exception as e:
                     print(f"[NotificationService] Failed to write in-app notification: {str(e)}", flush=True)
@@ -228,7 +251,7 @@ class NotificationService:
                 # Get user settings
                 user_res = supabase.table("profiles").select(
                     "email, telegram_chat_id, timezone, notification_preferences"
-                ).eq("id", user_id).maybeSingle().execute()
+                ).eq("id", user_id).maybe_single().execute()
                 
                 if not user_res.data:
                     continue

@@ -30,6 +30,15 @@ export function AgentBehaviorTab({ agent, unlocked, upgradeUrl }: AgentBehaviorT
   const [enhancing, setEnhancing] = useState(false)
   const [resetting, setResetting] = useState(false)
 
+  const nameMatch = (agent?.name || agent?.raw_name || '').match(/^\[([^\]]+)\]/)
+  const detectedType = nameMatch ? nameMatch[1] : (agent?.agent_type || '')
+  const isMultiAgent = 
+    detectedType === 'multi_agent' ||
+    agent?.agent_type === 'multi_agent' ||
+    (typeof agent?.name === 'string' && agent.name.toLowerCase().startsWith('[multi_agent]')) ||
+    (typeof agent?.raw_name === 'string' && agent.raw_name.toLowerCase().startsWith('[multi_agent]')) ||
+    (typeof agent?.name === 'string' && (agent.name.toLowerCase().includes('multi-agent') || agent.name.toLowerCase().includes('multi agent')))
+
   const handleEnhancePrompt = async () => {
     const userInput = window.prompt("What custom behavior or instructions would you like to add?");
     if (!userInput) return;
@@ -288,11 +297,13 @@ export function AgentBehaviorTab({ agent, unlocked, upgradeUrl }: AgentBehaviorT
             </div>
           </div>
 
-          {/* Multi-Personality Selector */}
-          <PersonalitySelector
-            agentId={agent.id}
-            initialPersonalities={agent.personalities || null}
-          />
+          {/* Multi-Personality Selector (Exclusively for Multi-Agent) */}
+          {isMultiAgent && (
+            <PersonalitySelector
+              agentId={agent.id}
+              initialPersonalities={agent.personalities || null}
+            />
+          )}
 
         </div>
 

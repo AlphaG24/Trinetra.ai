@@ -299,13 +299,19 @@ class TwilioProvider(AbstractTelephonyProvider):
                 # Pass direct Media Stream TwiML instructions!
                 # By passing twiml directly, Twilio executes from memory without any HTTP webhook roundtrip,
                 # completely eliminating HTTP 404, 503, and "An application error has occurred" failures!
+                recording_cb = f"{self.webhook_base}/api/voice/webhooks/voice/twilio/recording/default"
+                if "ngrok" in recording_cb:
+                    recording_cb += "?ngrok-skip-browser-warning=true"
                 call = self.client.calls.create(
                     to=to_number,
                     from_=from_number,
                     twiml=media_stream_twiml,
                     status_callback=status_cb,
                     status_callback_event=['answered', 'completed'],
-                    status_callback_method='POST'
+                    status_callback_method='POST',
+                    record=True,
+                    recording_status_callback=recording_cb,
+                    recording_status_callback_method='POST'
                 )
                 return {"call_sid": call.sid, "status": call.status, "room_name": room_name}
             except TwilioRestException as e:

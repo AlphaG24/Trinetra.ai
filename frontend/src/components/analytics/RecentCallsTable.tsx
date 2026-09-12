@@ -12,6 +12,7 @@ interface CallData {
   outcome: string
   is_lead: boolean
   caller_phone: string
+  caller_name?: string | null
   transcript: string | null
   recording_url: string | null
 }
@@ -146,7 +147,19 @@ export function RecentCallsTable({ calls }: RecentCallsTableProps) {
                           <span>{formatDuration(call.duration_seconds)}</span>
                         </div>
                         <div>{getSentimentBadge(call.sentiment)}</div>
-                        <div className="font-semibold capitalize text-[var(--heading)]">{call.outcome}</div>
+                        <div className="font-semibold capitalize text-[var(--heading)]">
+                          {call.outcome === 'Callback Scheduled' ? (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                              Callback Scheduled
+                            </span>
+                          ) : call.outcome === 'Lead Captured' ? (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                              Lead Captured
+                            </span>
+                          ) : (
+                            <span>{call.outcome}</span>
+                          )}
+                        </div>
                         <div className="flex items-center justify-between gap-2">
                           {call.is_lead ? (
                             <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[9px] font-extrabold uppercase border border-[var(--border)] bg-[var(--primary-bg)] text-[var(--heading)]">
@@ -165,11 +178,16 @@ export function RecentCallsTable({ calls }: RecentCallsTableProps) {
                       {isExpanded && (
                         <div className="border-t border-[var(--border)] bg-[var(--background)]/50 p-5 space-y-4">
                           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-3 border-b border-[var(--border)]">
-                            <div className="flex items-center gap-2">
+                            <div className="flex flex-wrap items-center gap-2">
                               <Sparkles className="w-4 h-4 text-[var(--muted)]" />
                               <span className="font-bold font-montserrat uppercase tracking-wider text-[10px] text-[var(--heading)]">
                                 Call Details & Transcript Preview
                               </span>
+                              {call.caller_phone && call.caller_phone !== 'Private' && (
+                                <span className="text-[10px] text-[var(--muted)] font-mono ml-2">
+                                  • Caller: <span className="text-[var(--heading)] font-semibold">{call.caller_name ? `${call.caller_name} (${call.caller_phone})` : call.caller_phone}</span>
+                                </span>
+                              )}
                             </div>
                             {call.recording_url && (
                               <div className="w-full sm:w-auto">

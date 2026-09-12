@@ -298,21 +298,21 @@ export function NotificationsTab() {
             {prefs.quiet_hours.enabled && (
               <div className="grid grid-cols-2 gap-3 pt-2">
                 <div>
-                  <label className="text-[10px] text-zinc-400 font-semibold block mb-1 font-montserrat">Start Time</label>
+                  <label className="text-[10px] text-zinc-500 dark:text-zinc-400 font-semibold block mb-1 font-montserrat">Start Time</label>
                   <input
                     type="time"
                     value={prefs.quiet_hours.start}
                     onChange={(e) => handleUpdateQuietHours('start', e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg bg-[var(--background)] border border-[var(--border)] text-xs text-white focus:outline-none focus:border-violet-500"
+                    className="w-full px-3 py-2 rounded-lg bg-[var(--background)] border border-[var(--border)] text-xs text-zinc-900 dark:text-white [color-scheme:light] dark:[color-scheme:dark] focus:outline-none focus:border-violet-500 transition-colors"
                   />
                 </div>
                 <div>
-                  <label className="text-[10px] text-zinc-400 font-semibold block mb-1 font-montserrat">End Time</label>
+                  <label className="text-[10px] text-zinc-500 dark:text-zinc-400 font-semibold block mb-1 font-montserrat">End Time</label>
                   <input
                     type="time"
                     value={prefs.quiet_hours.end}
                     onChange={(e) => handleUpdateQuietHours('end', e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg bg-[var(--background)] border border-[var(--border)] text-xs text-white focus:outline-none focus:border-violet-500"
+                    className="w-full px-3 py-2 rounded-lg bg-[var(--background)] border border-[var(--border)] text-xs text-zinc-900 dark:text-white [color-scheme:light] dark:[color-scheme:dark] focus:outline-none focus:border-violet-500 transition-colors"
                   />
                 </div>
               </div>
@@ -349,12 +349,12 @@ export function NotificationsTab() {
 
             {prefs.digest_mode.enabled && (
               <div className="pt-2">
-                <label className="text-[10px] text-zinc-400 font-semibold block mb-1 font-montserrat">Delivery Schedule</label>
+                <label className="text-[10px] text-zinc-500 dark:text-zinc-400 font-semibold block mb-1 font-montserrat">Delivery Schedule</label>
                 <input
                   type="time"
                   value={prefs.digest_mode.time}
                   onChange={(e) => handleUpdateDigest('time', e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg bg-[var(--background)] border border-[var(--border)] text-xs text-white focus:outline-none focus:border-violet-500"
+                  className="w-full px-3 py-2 rounded-lg bg-[var(--background)] border border-[var(--border)] text-xs text-zinc-900 dark:text-white [color-scheme:light] dark:[color-scheme:dark] focus:outline-none focus:border-violet-500 transition-colors"
                 />
               </div>
             )}

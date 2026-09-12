@@ -288,7 +288,7 @@ class UsageService:
         # Resolve user_id from agent
         try:
             agent_res = await asyncio.to_thread(
-                self.supabase.table("agents").select("user_id").eq("id", agent_id).maybeSingle().execute
+                self.supabase.table("agents").select("user_id").eq("id", agent_id).maybe_single().execute
             )
             user_id = agent_res.data.get("user_id") if agent_res.data else None
             

@@ -263,12 +263,13 @@ export function CustomerDatabaseClient() {
     try {
       const supabase = createClient()
       const cleanPhone = customer.phone_number.replace(/\D/g, "")
+      const last10 = cleanPhone.length > 10 ? cleanPhone.slice(-10) : cleanPhone
       
-      // Search for matches in caller_number or agent_number
+      // Search for matches in caller_phone
       const { data, error } = await supabase
         .from('voice_calls')
         .select('*')
-        .or(`caller_number.ilike.%${cleanPhone}%,agent_number.ilike.%${cleanPhone}%`)
+        .or(`caller_phone.ilike.%${cleanPhone}%,caller_phone.ilike.%${last10}%`)
         .order('started_at', { ascending: false })
 
       if (error) throw error

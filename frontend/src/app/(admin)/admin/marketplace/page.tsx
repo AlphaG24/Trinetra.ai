@@ -16,7 +16,8 @@ import {
   MessageSquare, 
   ShieldAlert,
   Loader2,
-  Video
+  Video,
+  Image as ImageIcon
 } from 'lucide-react'
 import Link from 'next/link'
 import { toast } from 'sonner'
@@ -38,6 +39,7 @@ interface PlatformService {
     price?: string
     features?: string[]
     video_url?: string
+    preview_image_url?: string
   } | null
 }
 
@@ -65,6 +67,7 @@ export default function AdminMarketplacePage() {
   const [price, setPrice] = useState('')
   const [featuresInput, setFeaturesInput] = useState('')
   const [videoUrl, setVideoUrl] = useState('')
+  const [previewImageUrl, setPreviewImageUrl] = useState('')
 
   const [saving, setSaving] = useState(false)
 
@@ -102,6 +105,7 @@ export default function AdminMarketplacePage() {
     setPrice('')
     setFeaturesInput('')
     setVideoUrl('')
+    setPreviewImageUrl('')
     setIsModalOpen(true)
   }
 
@@ -121,6 +125,7 @@ export default function AdminMarketplacePage() {
     setPrice(service.marketplace_metadata?.price || '')
     setFeaturesInput(service.marketplace_metadata?.features?.join(', ') || '')
     setVideoUrl(service.marketplace_metadata?.video_url || '')
+    setPreviewImageUrl(service.marketplace_metadata?.preview_image_url || '')
     setIsModalOpen(true)
   }
 
@@ -159,7 +164,8 @@ export default function AdminMarketplacePage() {
         tagline,
         price,
         features,
-        video_url: videoUrl
+        video_url: videoUrl,
+        preview_image_url: previewImageUrl
       }
     }
 
@@ -502,26 +508,39 @@ export default function AdminMarketplacePage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-1">
                     <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest block flex items-center gap-1">
-                      <Video className="w-3 h-3 text-zinc-400" /> Demo Video URL
+                      <Video className="w-3 h-3 text-zinc-400" /> Demo Video URL (YouTube / Loom)
                     </label>
                     <input
                       type="text"
                       value={videoUrl}
                       onChange={(e) => setVideoUrl(e.target.value)}
                       className="w-full bg-black border border-white/10 rounded-lg px-3 py-2 text-xs text-white focus:border-violet-500 outline-none"
-                      placeholder="e.g. https://www.youtube.com/embed/dQw4w9WgXcQ"
+                      placeholder="e.g. https://www.youtube.com/watch?v=xxx or embed link"
                     />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest block">Features List (Comma-separated)</label>
+                    <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest block flex items-center gap-1">
+                      <ImageIcon className="w-3 h-3 text-zinc-400" /> Setup Image / Screenshot URL
+                    </label>
                     <input
                       type="text"
-                      value={featuresInput}
-                      onChange={(e) => setFeaturesInput(e.target.value)}
+                      value={previewImageUrl}
+                      onChange={(e) => setPreviewImageUrl(e.target.value)}
                       className="w-full bg-black border border-white/10 rounded-lg px-3 py-2 text-xs text-white focus:border-violet-500 outline-none"
-                      placeholder="e.g. Live transcription, 24/7 Availability, Dedicated number"
+                      placeholder="e.g. https://example.com/agent-preview.png"
                     />
                   </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest block">Features List (Comma-separated)</label>
+                  <input
+                    type="text"
+                    value={featuresInput}
+                    onChange={(e) => setFeaturesInput(e.target.value)}
+                    className="w-full bg-black border border-white/10 rounded-lg px-3 py-2 text-xs text-white focus:border-violet-500 outline-none"
+                    placeholder="e.g. Live transcription, 24/7 Availability, Dedicated number"
+                  />
                 </div>
               </div>
 

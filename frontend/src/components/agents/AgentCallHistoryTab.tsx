@@ -245,7 +245,7 @@ function getTranscriptString(transcript: any): string {
             placeholder="Search transcripts, phones, outcomes..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full px-3 py-2 rounded-xl bg-[var(--background)] border border-[var(--border)] text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-violet-500 transition"
+            className="w-full px-3 py-2 rounded-xl bg-[var(--background)] border border-[var(--border)] text-xs text-[var(--heading)] placeholder-[var(--muted)] focus:outline-none focus:border-violet-500 transition font-sans"
           />
         </div>
 
@@ -257,12 +257,12 @@ function getTranscriptString(transcript: any): string {
           <select
             value={sentimentFilter}
             onChange={(e) => setSentimentFilter(e.target.value)}
-            className="w-full px-3 py-2 rounded-xl bg-[var(--background)] border border-[var(--border)] text-xs text-white focus:outline-none focus:border-violet-500 transition cursor-pointer"
+            className="w-full px-3 py-2 rounded-xl bg-[var(--background)] border border-[var(--border)] text-xs text-[var(--heading)] focus:outline-none focus:border-violet-500 transition cursor-pointer font-sans"
           >
-            <option value="all">All Sentiments</option>
-            <option value="positive">Positive</option>
-            <option value="neutral">Neutral</option>
-            <option value="negative">Negative</option>
+            <option value="all" className="bg-[var(--card-bg)] text-[var(--heading)]">All Sentiments</option>
+            <option value="positive" className="bg-[var(--card-bg)] text-[var(--heading)]">Positive</option>
+            <option value="neutral" className="bg-[var(--card-bg)] text-[var(--heading)]">Neutral</option>
+            <option value="negative" className="bg-[var(--card-bg)] text-[var(--heading)]">Negative</option>
           </select>
         </div>
 
@@ -275,7 +275,7 @@ function getTranscriptString(transcript: any): string {
             type="date"
             value={startDate}
             onChange={(e) => setStartDate(e.target.value)}
-            className="w-full px-3 py-2 rounded-xl bg-[var(--background)] border border-[var(--border)] text-xs text-white focus:outline-none focus:border-violet-500 transition"
+            className="w-full px-3 py-2 rounded-xl bg-[var(--background)] border border-[var(--border)] text-xs text-[var(--heading)] [color-scheme:light] dark:[color-scheme:dark] focus:outline-none focus:border-violet-500 transition font-sans"
           />
         </div>
 
@@ -288,7 +288,7 @@ function getTranscriptString(transcript: any): string {
             type="date"
             value={endDate}
             onChange={(e) => setEndDate(e.target.value)}
-            className="w-full px-3 py-2 rounded-xl bg-[var(--background)] border border-[var(--border)] text-xs text-white focus:outline-none focus:border-violet-500 transition"
+            className="w-full px-3 py-2 rounded-xl bg-[var(--background)] border border-[var(--border)] text-xs text-[var(--heading)] [color-scheme:light] dark:[color-scheme:dark] focus:outline-none focus:border-violet-500 transition font-sans"
           />
         </div>
       </div>

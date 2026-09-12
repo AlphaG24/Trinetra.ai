@@ -9,6 +9,7 @@ import {
 import { NumberCard } from "@/src/components/phone-numbers/NumberCard";
 import { ProvisionNumberModal } from "@/src/components/phone-numbers/ProvisionNumberModal";
 import { ManageNumberModal } from "@/src/components/phone-numbers/ManageNumberModal";
+import { PaymentProgressModal } from "@/src/components/phone-numbers/PaymentProgressModal";
 import { toast } from "sonner";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
@@ -54,6 +55,23 @@ export default function PhoneNumbersPage() {
   const [poolLoading, setPoolLoading] = useState(true);
   const [buyingId, setBuyingId] = useState<string | null>(null);
   const [renewingId, setRenewingId] = useState<string | null>(null);
+
+  // Pre-loaded agents for instant modal rendering
+  const [agents, setAgents] = useState<any[]>([]);
+
+  // Payment Verification & Allocation Progress State
+  const [paymentProgress, setPaymentProgress] = useState<{
+    isOpen: boolean;
+    status: "verifying" | "success" | "error";
+    title?: string;
+    phoneNumber?: string;
+    provider?: string;
+    paymentId?: string;
+    errorMsg?: string;
+  }>({
+    isOpen: false,
+    status: "verifying"
+  });
 
   // Modals state
   const [isProvisionModalOpen, setIsProvisionModalOpen] = useState(false);
@@ -166,9 +184,39 @@ export default function PhoneNumbersPage() {
     }
   };
 
+  const fetchAgents = async () => {
+    try {
+      const { createClient } = await import('@/utils/supabase/client');
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('organization_id')
+          .eq('id', user.id)
+          .single();
+
+        if (profile?.organization_id) {
+          const { data: dbAgents } = await supabase
+            .from('agents')
+            .select('id, name, status, is_demo, agent_type')
+            .eq('organization_id', profile.organization_id)
+            .neq('status', 'deleted');
+
+          if (dbAgents) {
+            setAgents(dbAgents);
+          }
+        }
+      }
+    } catch (err) {
+      console.error("Failed to pre-fetch agents in PhoneNumbersPage", err);
+    }
+  };
+
   useEffect(() => {
     fetchPurchasedNumbers();
     fetchPoolNumbers();
+    fetchAgents();
   }, []);
 
   const handleBuyPoolNumber = async (poolNum: any) => {
@@ -208,6 +256,16 @@ export default function PhoneNumbersPage() {
         },
         theme: { color: "#7c3aed" },
         handler: async function (response: any) {
+          // Open progress modal immediately so user sees live confirmation & progress
+          setPaymentProgress({
+            isOpen: true,
+            status: "verifying",
+            title: "Securing Your Phone Line",
+            phoneNumber: data.data.phone_number,
+            provider: poolNum.provider === "exotel" ? "Exotel" : poolNum.provider === "sarvam" ? "Sarvam AI" : "Twilio",
+            paymentId: response.razorpay_payment_id
+          });
+
           try {
             const verifyRes = await fetch("/api/billing/verify-payment", {
               method: "POST",
@@ -226,13 +284,28 @@ export default function PhoneNumbersPage() {
 
             const verifyData = await verifyRes.json();
             if (verifyRes.ok) {
+              setPaymentProgress(prev => ({
+                ...prev,
+                status: "success",
+                phoneNumber: data.data.phone_number
+              }));
               toast.success("Phone number purchased successfully!");
               fetchPurchasedNumbers();
               fetchPoolNumbers();
             } else {
+              setPaymentProgress(prev => ({
+                ...prev,
+                status: "error",
+                errorMsg: verifyData.error || "Payment verification failed"
+              }));
               toast.error(verifyData.error || "Payment verification failed");
             }
           } catch (err: any) {
+            setPaymentProgress(prev => ({
+              ...prev,
+              status: "error",
+              errorMsg: err.message || "Payment verification failed"
+            }));
             toast.error(err.message || "Payment verification failed");
           }
         }
@@ -277,6 +350,14 @@ export default function PhoneNumbersPage() {
         },
         theme: { color: "#7c3aed" },
         handler: async function (response: any) {
+          setPaymentProgress({
+            isOpen: true,
+            status: "verifying",
+            title: "Renewing Phone Line",
+            phoneNumber: data.data.phone_number,
+            paymentId: response.razorpay_payment_id
+          });
+
           try {
             const verifyRes = await fetch("/api/billing/verify-payment", {
               method: "POST",
@@ -295,12 +376,27 @@ export default function PhoneNumbersPage() {
 
             const verifyData = await verifyRes.json();
             if (verifyRes.ok) {
+              setPaymentProgress(prev => ({
+                ...prev,
+                status: "success",
+                phoneNumber: data.data.phone_number
+              }));
               toast.success("Phone number renewed for 30 days!");
               fetchPurchasedNumbers();
             } else {
+              setPaymentProgress(prev => ({
+                ...prev,
+                status: "error",
+                errorMsg: verifyData.error || "Payment verification failed"
+              }));
               toast.error(verifyData.error || "Payment verification failed");
             }
           } catch (err: any) {
+            setPaymentProgress(prev => ({
+              ...prev,
+              status: "error",
+              errorMsg: err.message || "Renewal verification failed"
+            }));
             toast.error(err.message || "Renewal verification failed");
           }
         }
@@ -558,7 +654,9 @@ export default function PhoneNumbersPage() {
                 <NumberCard 
                   phoneNumber={{
                     ...number,
-                    display_price: "₹299/mo"
+                    display_price: number.retail_price_paisa
+                      ? `₹${(number.retail_price_paisa / 100).toFixed(0)}/mo`
+                      : "₹299/mo"
                   }} 
                   onManage={handleManage}
                   onRenew={handleRenewNumber}
@@ -585,15 +683,30 @@ export default function PhoneNumbersPage() {
           onClose={() => setManageNumberId(null)} 
           phoneNumber={{
             ...selectedNumber,
-            display_price: "₹299/mo"
+            display_price: selectedNumber.retail_price_paisa
+              ? `₹${(selectedNumber.retail_price_paisa / 100).toFixed(0)}/mo`
+              : "₹299/mo"
           }}
+          agents={agents}
           onUpdate={fetchPurchasedNumbers}
         />
       )}
 
+      {/* Payment & Carrier Provisioning Live Progress Modal */}
+      <PaymentProgressModal
+        isOpen={paymentProgress.isOpen}
+        status={paymentProgress.status}
+        title={paymentProgress.title}
+        phoneNumber={paymentProgress.phoneNumber}
+        provider={paymentProgress.provider}
+        paymentId={paymentProgress.paymentId}
+        errorMsg={paymentProgress.errorMsg}
+        onClose={() => setPaymentProgress(prev => ({ ...prev, isOpen: false }))}
+      />
+
       {/* Place Bid Modal */}
       {bidModalNumber && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[1050] bg-black/75 backdrop-blur-md flex items-center justify-center p-4">
           <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl w-full max-w-md p-6 shadow-2xl">
             <h3 className="text-base font-bold text-[var(--heading)] mb-1 flex items-center gap-2">
               <ShoppingBag className="text-emerald-500" size={18} />

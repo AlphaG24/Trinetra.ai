@@ -17,7 +17,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from voice_router import router as voice_router, telegram_router, agents_router
+from voice_router import router as voice_router, telegram_router, agents_router, telephony_audio_stream
 from telemetry_router import router as telemetry_router
 from knowledge_router import router as knowledge_router
 from telephony_router import router as telephony_router, numbers_router
@@ -40,6 +40,12 @@ app.add_middleware(
 )
 
 app.include_router(voice_router)
+# Support root-level WebSocket routes for Exotel Voicebot applets configured with or without /api/voice prefix
+app.websocket("/webhooks/voice/exotel")(telephony_audio_stream)
+app.websocket("/webhooks/voice/exotel/{room_name}")(telephony_audio_stream)
+app.websocket("/webhooks/voice/exotel/stream")(telephony_audio_stream)
+app.websocket("/webhooks/voice/exotel/stream/{room_name}")(telephony_audio_stream)
+app.websocket("/webhooks/voice/twilio/stream/{room_name}")(telephony_audio_stream)
 app.include_router(telegram_router)
 app.include_router(telemetry_router)
 app.include_router(knowledge_router)

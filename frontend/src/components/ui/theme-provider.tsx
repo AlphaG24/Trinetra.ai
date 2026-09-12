@@ -15,17 +15,28 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined)
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const supabase = createClient()
-  const [theme, setTheme] = useState<Theme>('dark')
+  
+  // Synchronous initialization matching what SSR and <head> script placed on <html>
+  const [theme, setTheme] = useState<Theme>(() => {
+    if (typeof window !== 'undefined') {
+      const docTheme = document.documentElement.getAttribute('data-theme') as Theme
+      if (docTheme === 'light' || docTheme === 'dark') return docTheme
+      const localTheme = localStorage.getItem('trinetra-theme') as Theme
+      if (localTheme === 'light' || localTheme === 'dark') return localTheme
+    }
+    return 'dark'
+  })
   const [mounted, setMounted] = useState(false)
 
-  // Initial Load: Default to dark theme for consistent, premium UI
   useEffect(() => {
-    const localTheme = localStorage.getItem('trinetra-theme') as Theme
-    const activeTheme = localTheme === 'light' ? 'light' : 'dark'
-    setTheme(activeTheme)
+    setMounted(true)
 
+    // Sync from database only if user hasn't explicitly chosen a local preference
     async function syncThemeFromDb() {
       try {
+        const localTheme = localStorage.getItem('trinetra-theme')
+        if (localTheme) return
+
         const { data: { user } } = await supabase.auth.getUser()
         if (user) {
           const { data: profile } = await supabase
@@ -35,35 +46,43 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
             .single()
           
           if (profile?.theme && (profile.theme === 'light' || profile.theme === 'dark')) {
-            setTheme(profile.theme as Theme)
+            const dbTheme = profile.theme as Theme
+            setTheme(dbTheme)
+            localStorage.setItem('trinetra-theme', dbTheme)
+            document.cookie = `trinetra-theme=${dbTheme}; path=/; max-age=31536000; SameSite=Lax`
+            document.documentElement.setAttribute('data-theme', dbTheme)
+            document.documentElement.classList.remove('light', 'dark')
+            document.documentElement.classList.add(dbTheme)
           }
         }
       } catch (err) {
-        console.error('Failed to load theme preference:', err)
+        // Silently ignore background theme sync
       }
     }
-    // Mark mounted so client renders correct icon immediately
-    setMounted(true)
-    // Fire DB sync in background after mount
     syncThemeFromDb()
   }, [])
 
-  // Ensure theme is applied to the ROOT html element
+  // Keep DOM in sync when theme changes
   useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme)
-    document.documentElement.classList.toggle('dark', theme === 'dark')
-    document.documentElement.classList.toggle('light', theme === 'light')
+    const currentAttr = document.documentElement.getAttribute('data-theme')
+    if (currentAttr !== theme) {
+      document.documentElement.setAttribute('data-theme', theme)
+      document.documentElement.classList.remove('light', 'dark')
+      document.documentElement.classList.add(theme)
+    }
+    document.cookie = `trinetra-theme=${theme}; path=/; max-age=31536000; SameSite=Lax`
   }, [theme])
-
 
   // Synchronous toggle — DB sync fires in background, never blocks UI
   const toggleTheme = () => {
     const nextTheme = theme === 'dark' ? 'light' : 'dark'
     // 1. Update React state immediately
     setTheme(nextTheme)
-    // 2. Update localStorage immediately
+    // 2. Update localStorage & Cookie immediately
     localStorage.setItem('trinetra-theme', nextTheme)
+    document.cookie = `trinetra-theme=${nextTheme}; path=/; max-age=31536000; SameSite=Lax`
     // 3. Update DOM class immediately (no re-render wait)
+    document.documentElement.setAttribute('data-theme', nextTheme)
     document.documentElement.classList.remove('light', 'dark')
     document.documentElement.classList.add(nextTheme)
     
@@ -94,7 +113,7 @@ export function DashboardThemeWrapper({ children }: { children: React.ReactNode 
   return (
     <div 
       suppressHydrationWarning
-      className="dashboard-theme-root min-h-screen w-full bg-[var(--background)] text-[var(--body)] transition-colors duration-200"
+      className="dashboard-theme-root min-h-screen w-full bg-[var(--background)] text-[var(--body)]"
     >
       {children}
     </div>

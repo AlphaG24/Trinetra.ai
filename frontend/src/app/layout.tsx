@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { cookies } from "next/headers";
 import "./globals.css";
 import { Inter, JetBrains_Mono, Playfair_Display, Montserrat, Merriweather } from "next/font/google";
 import localFont from 'next/font/local';
@@ -99,11 +100,15 @@ export const metadata: Metadata = {
   }
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const cookieStore = await cookies();
+  const themeCookie = cookieStore.get('trinetra-theme')?.value;
+  const initialTheme = themeCookie === 'light' ? 'light' : 'dark';
+
   const jsonLd = {
     "@context": "https://schema.org",
     "@graph": [
@@ -139,25 +144,33 @@ export default function RootLayout({
   };
 
   return (
-    <html lang="en" suppressHydrationWarning className={`${inter.variable} ${jetbrainsMono.variable} ${calSans.variable} ${playfair.variable} ${montserrat.variable} ${merriweather.variable}`} data-scroll-behavior="smooth">
+    <html
+      lang="en"
+      suppressHydrationWarning
+      data-theme={initialTheme}
+      className={`${initialTheme} ${inter.variable} ${jetbrainsMono.variable} ${calSans.variable} ${playfair.variable} ${montserrat.variable} ${merriweather.variable}`}
+      data-scroll-behavior="smooth"
+    >
       <head>
         <script
           dangerouslySetInnerHTML={{
             __html: `
               (function() {
                 try {
-                  var theme = localStorage.getItem('trinetra-theme') || localStorage.getItem('theme');
-                  if (!theme && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-                    theme = 'dark';
+                  var match = document.cookie.match(/(?:^|;\\s*)trinetra-theme=([^;]*)/);
+                  var cookieTheme = match ? match[1] : null;
+                  var localTheme = localStorage.getItem('trinetra-theme') || localStorage.getItem('theme');
+                  var activeTheme = localTheme || cookieTheme || document.documentElement.getAttribute('data-theme') || 'dark';
+                  
+                  document.documentElement.setAttribute('data-theme', activeTheme);
+                  document.documentElement.classList.remove('light', 'dark');
+                  document.documentElement.classList.add(activeTheme);
+                  
+                  if (!cookieTheme || cookieTheme !== activeTheme) {
+                    document.cookie = 'trinetra-theme=' + activeTheme + '; path=/; max-age=31536000; SameSite=Lax';
                   }
-                  if (theme === 'light') {
-                    document.documentElement.setAttribute('data-theme', 'light');
-                    document.documentElement.classList.remove('dark');
-                    document.documentElement.classList.add('light');
-                  } else if (theme === 'dark') {
-                    document.documentElement.setAttribute('data-theme', 'dark');
-                    document.documentElement.classList.remove('light');
-                    document.documentElement.classList.add('dark');
+                  if (!localTheme) {
+                    localStorage.setItem('trinetra-theme', activeTheme);
                   }
                 } catch (e) {}
               })();
@@ -172,7 +185,7 @@ export default function RootLayout({
         />
         <AuthProvider>
           {children}
-          <Toaster position="bottom-right" theme="dark" />
+          <Toaster position="bottom-right" theme={initialTheme === 'light' ? 'light' : 'dark'} />
         </AuthProvider>
       </body>
     </html>

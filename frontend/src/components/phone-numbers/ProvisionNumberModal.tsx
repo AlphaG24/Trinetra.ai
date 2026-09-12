@@ -178,7 +178,7 @@ export function ProvisionNumberModal({
   return (
     <AnimatePresence>
       <div 
-        className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
+        className="fixed inset-0 z-[1050] flex items-center justify-center bg-black/75 p-4 backdrop-blur-md"
         onClick={handleClose}
         role="dialog"
         aria-modal="true"

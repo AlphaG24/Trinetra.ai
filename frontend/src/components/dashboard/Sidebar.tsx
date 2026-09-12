@@ -72,11 +72,11 @@ export function Sidebar({ isOpen, onClose }: { isOpen?: boolean; onClose?: () =>
         href={item.href}
         onClick={onClose}
         className={`flex items-center gap-3 px-4 py-2.5 rounded-[10px] text-sm font-medium transition-all duration-150 ${active
-            ? 'bg-violet-100 dark:bg-violet-950/50 text-violet-600 dark:text-violet-400 font-semibold'
-            : 'text-gray-400 hover:bg-[var(--hover-bg)] hover:text-gray-200'
+            ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-950 font-bold shadow-sm'
+            : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-white/5 hover:text-zinc-900 dark:hover:text-white'
           }`}
       >
-        <item.icon className={`w-5 h-5 shrink-0 ${active ? 'text-violet-600 dark:text-violet-400' : 'text-gray-500'}`} />
+        <item.icon className={`w-5 h-5 shrink-0 ${active ? 'text-white dark:text-zinc-950' : 'text-zinc-400 dark:text-zinc-500'}`} />
         <span className="font-playfair font-semibold text-[15px] inherit">{item.label}</span>
       </Link>
     )

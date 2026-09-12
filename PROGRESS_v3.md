@@ -47,13 +47,13 @@
 ### **Phase 3 — Inbound Support Agent & Customer DB**
 > **Goal:** Inbound calls to a user's number handled by their agent, with personalization and customer database updates.
 
-| # | Task | Details |
-|---|------|---------|
-| 3.1 | **Inbound call → agent** | Twilio or Exotel webhook → LiveKit room → selected agent picks up. |
-| 3.2 | **Caller recognition** | On inbound, look up `customer_contacts` by phone number. If found, greet by name and reference previous query. |
-| 3.3 | **Update customer DB** | During call, if new customer, collect name, query, email. After call, upsert into `customer_contacts`. |
-| 3.4 | **Post-call notification** | After call, send Telegram/WhatsApp (via integration executor) to the business owner with query summary, response, and action items. Also send a message to the customer confirming receipt. |
-| 3.5 | **Support vs Sales** | If agent has multi-personality enabled, use intent classifier to switch between sales/support based on caller. |
+| # | Task | Status | Details |
+|---|------|--------|---------|
+| 3.1 | **Inbound call → agent & Concurrency Guard** | ✅ COMPLETED | Twilio & Exotel inbound webhooks resolve assigned agent from `phone_numbers`. Includes 10-call concurrency limit per organization (auto-hangup with "All agents are busy" TwiML/ExoML & busy logging to prevent abuse). |
+| 3.2 | **Caller recognition & Greeting Memory** | ✅ COMPLETED | On inbound call, `CallerLookupService.lookup_caller` queries `customer_contacts`. Returning callers are greeted by name (*"Namaste Rahul ji!"*) and their previous calls count, last contact date, and past inquiry notes are injected into agent memory. |
+| 3.3 | **Update customer DB** | ✅ COMPLETED | Post-call pipeline (`extract_and_save_lead` + `CallerLookupService.upsert_from_call`) extracts caller details (name, email, company, summary) and upserts them into `customer_contacts`, updating `total_calls` and notes history. |
+| 3.4 | **Post-call notification & Call Recording** | ✅ COMPLETED | Immediate Telegram & Dashboard post-call notification dispatched via `NotificationService.dispatch` with caller info, duration, summary, and sentiment. Twilio & Exotel call recording enabled with dedicated callbacks storing `recording_url` in `voice_calls.recording_url`. |
+| 3.5 | **Support vs Sales Multi-Personality** | ✅ COMPLETED | Multi-personality intent switching via `IntentClassifier` and `PromptService` actively classifies caller utterances and dynamically transitions system prompt between support and consultative sales in real time. |
 
 ---
 
