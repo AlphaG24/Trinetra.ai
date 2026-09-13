@@ -16,9 +16,15 @@ socket.getaddrinfo = _getaddrinfo_ipv4_first
 # Load environment variables locally from backend directory
 load_dotenv()
 
-SUPABASE_URL = os.getenv("SUPABASE_URL") or os.getenv("NEXT_PUBLIC_SUPABASE_URL") 
-SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY") or os.getenv("NEXT_PUBLIC_SUPABASE_ANON_KEY")
-SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+SUPABASE_URL = (os.getenv("SUPABASE_URL") or os.getenv("NEXT_PUBLIC_SUPABASE_URL") or "").strip()
+SUPABASE_ANON_KEY = (os.getenv("SUPABASE_ANON_KEY") or os.getenv("NEXT_PUBLIC_SUPABASE_ANON_KEY") or "").strip()
+SUPABASE_SERVICE_ROLE_KEY = (os.getenv("SUPABASE_SERVICE_ROLE_KEY") or "").strip()
+
+# Automatic fallback: if only one key is set, use it for both
+if not SUPABASE_ANON_KEY and SUPABASE_SERVICE_ROLE_KEY:
+    SUPABASE_ANON_KEY = SUPABASE_SERVICE_ROLE_KEY
+elif not SUPABASE_SERVICE_ROLE_KEY and SUPABASE_ANON_KEY:
+    SUPABASE_SERVICE_ROLE_KEY = SUPABASE_ANON_KEY
 
 def _create_supabase_options():
     return ClientOptions(
@@ -26,13 +32,15 @@ def _create_supabase_options():
         storage_client_timeout=10
     )
 
-# Create standard client using the public Anon Key
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_ANON_KEY, options=_create_supabase_options())
-
-# Create admin client using the private Service Role Key to bypass RLS securely
-if not SUPABASE_SERVICE_ROLE_KEY:
-    logging.warning("CRITICAL: SUPABASE_SERVICE_ROLE_KEY is missing from environment variables! Falling back to standard Anon Client.")
-    supabase_admin: Client = supabase
+if not SUPABASE_URL or not SUPABASE_ANON_KEY:
+    logging.error("CRITICAL: SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY is missing from environment variables!")
+    supabase: Client = None
+    supabase_admin: Client = None
 else:
+    # Create standard client
+    supabase: Client = create_client(SUPABASE_URL, SUPABASE_ANON_KEY, options=_create_supabase_options())
+
+    # Create admin client using the private Service Role Key to bypass RLS securely
     supabase_admin: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, options=_create_supabase_options())
+
 
