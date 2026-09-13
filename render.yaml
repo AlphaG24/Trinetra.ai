@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: trinetra-backend
+    env: python
+    rootDir: backend
+    plan: starter
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /
+    autoDeploy: true
+
+  - type: web
+    name: trinetra-voice-agent
+    env: python
+    rootDir: backend
+    plan: starter
+    buildCommand: pip install -r requirements.txt
+    startCommand: python agent.py start
+    healthCheckPath: /
+    autoDeploy: true

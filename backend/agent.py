@@ -3298,5 +3298,33 @@ async def run_agent(room_name: str, agent_id: str | None = None, contact_id: str
             except Exception:
                 pass
 
+def _start_health_server():
+    """Lightweight HTTP server on $PORT for Render deployment health checks and UptimeRobot keep-alive."""
+    port_str = os.getenv("PORT")
+    if not port_str:
+        return
+    try:
+        import threading
+        from http.server import HTTPServer, BaseHTTPRequestHandler
+
+        class HealthHandler(BaseHTTPRequestHandler):
+            def do_GET(self):
+                self.send_response(200)
+                self.send_header("Content-type", "application/json")
+                self.end_headers()
+                self.wfile.write(b'{"status":"healthy","service":"trinetra-livekit-agent"}')
+
+            def log_message(self, format, *args):
+                return
+
+        port = int(port_str)
+        server = HTTPServer(("0.0.0.0", port), HealthHandler)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        print(f"[Render Health] LiveKit worker HTTP keep-alive server active on port {port}", flush=True)
+    except Exception as e:
+        print(f"[Render Health] Could not start HTTP keep-alive server: {e}", flush=True)
+
 if __name__ == "__main__":
-    cli.run_app(WorkerOptions(entrypoint_fnc=entrypoint))
+    _start_health_server()
+    cli.run_app(WorkerOptions(entrypoint_fnc=entrypoint))

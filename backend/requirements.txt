@@ -6,7 +6,17 @@ pydantic>=2.0.0
 google-genai
 python-multipart>=0.0.12
 livekit-agents[sarvam,silero]
+livekit-plugins-openai
+livekit-plugins-elevenlabs
+livekit-plugins-google
 twilio>=9.0.0
 openpyxl>=3.1.0
 groq>=0.9.0
+cryptography>=42.0.0
+httpx>=0.25.0
+pyjwt>=2.8.0
+pypdf>=3.0.0
+python-docx>=0.8.11
+pyyaml>=6.0.0
 audioop-lts>=0.2.1; python_version >= "3.13"
+
