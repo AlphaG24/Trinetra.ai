@@ -93,8 +93,22 @@
 
 ---
 
+### **Phase 7 — Production Hardening, Client Whitelabeling & Security**
+> **Goal:** Bridge the gap from MVP prototype to enterprise-ready, white-labeled client SaaS with zero trial branding, sub-second latency, and bank-grade security.
+
+| # | Task | Status | Details |
+|---|------|--------|---------|
+| 7.1 | **Client Whitelabeling (Dynamic Business Branding)** | 📋 PLANNED | Replace all fallback "Trinetra" tags in customer-facing notifications, SMS, and WhatsApp messages with dynamic `{{business_name}}` extracted from agent and profile. End customers will only see their local business name. |
+| 7.2 | **Admin Dynamic Pricing & Per-Agent Price Cards** | 📋 PLANNED | Enable Super Admin to set custom price cards/amounts per agent or custom billing quotes (instead of hardcoded ₹4,999/mo). Implement strict 30-day pre-call blocking on expired subscriptions and exhausted quotas. |
+| 7.3 | **Security Hardening (AES-256-GCM & Audit Logging)** | 📋 PLANNED | Upgrade AES-256-CBC to authenticated AES-256-GCM with authentication tags. Add permanent admin action audit logging (`admin_audit_logs`) capturing all config overrides and verify DPDP non-deletable consent logs. |
+| 7.4 | **Real Voice Cloning Integration** | 📋 PLANNED | Replace the mock `cloned-xxxx` string generator in `/api/agents/[id]/clone-voice` with direct multipart upload to ElevenLabs `/v1/voices/add` API, returning real cloned voice IDs. |
+| 7.5 | **Production Infrastructure & Domestic Telephony** | 📋 PLANNED | Transition from local ngrok to Cloud VM in India (AWS Mumbai `ap-south-1` or DigitalOcean Bangalore `blr1`) for sub-second voice latency. Connect paid Twilio / Exotel DLT numbers to eliminate carrier trial prompts, and configure LiveKit SIP trunking. |
+
+---
+
 ### **Immediate Next Actions**
 1. **Kick off Phase 6** — The "Joe Girard Engine" (Occasion nurture scheduler, zero-pitch care pings, automated referral generation, and cold lead reactivation).
-2. **End-to-End Client Demo Polish** — Final validation of client-facing dashboard and live call journey for client onboarding.
+2. **Execute Phase 7** — Production Hardening, Client Whitelabeling, Admin Custom Pricing, Real Voice Cloning, and Security.
+
 
 
