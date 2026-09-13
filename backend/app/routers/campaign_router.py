@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Query
 from typing import Optional, List, Dict
 import logging
+import asyncio
 
 from database import supabase_admin
 from app.services.campaign_service import CampaignService
@@ -57,20 +58,24 @@ async def list_campaigns(organization_id: str = Query(...)):
 @router.get("/{id}")
 async def get_campaign_detail(id: str):
     try:
-        campaign_res = supabase_admin.table("campaigns")\
-            .select("*, agents(name)")\
-            .eq("id", id)\
-            .single()\
-            .execute()
+        campaign_res = await asyncio.to_thread(
+            supabase_admin.table("campaigns")
+            .select("*, agents(name, phone_number, telephony_provider)")
+            .eq("id", id)
+            .single()
+            .execute
+        )
             
         if not campaign_res.data:
             raise HTTPException(status_code=404, detail="Campaign not found")
             
-        dnd_count_res = supabase_admin.table("campaign_contacts")\
-            .select("id", count="exact")\
-            .eq("campaign_id", id)\
-            .eq("call_status", "dnd")\
-            .execute()
+        dnd_count_res = await asyncio.to_thread(
+            supabase_admin.table("campaign_contacts")
+            .select("id", count="exact")
+            .eq("campaign_id", id)
+            .eq("call_status", "dnd")
+            .execute
+        )
         
         campaign_data = campaign_res.data
         campaign_data["contacts_dnd"] = dnd_count_res.count or 0
@@ -102,7 +107,7 @@ async def get_campaign_contacts(
         if status:
             query = query.eq("call_status", status)
             
-        res = query.range(offset, offset + limit - 1).execute()
+        res = await asyncio.to_thread(query.range(offset, offset + limit - 1).execute)
         
         return {
             "success": True,
@@ -143,15 +148,25 @@ async def resume_campaign(id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.delete("/{id}")
-async def cancel_campaign(id: str):
+async def delete_campaign(id: str):
     try:
+        from app.services.campaign_service import active_campaign_ids
+        active_campaign_ids.discard(id)
+
+        # Delete contacts associated with this campaign
+        supabase_admin.table("campaign_contacts")\
+            .delete()\
+            .eq("campaign_id", id)\
+            .execute()
+
+        # Delete the campaign
         res = supabase_admin.table("campaigns")\
-            .update({"status": "cancelled"})\
+            .delete()\
             .eq("id", id)\
             .execute()
-        return {"success": True, "data": res.data[0] if res.data else {}}
+        return {"success": True, "message": "Campaign deleted successfully"}
     except Exception as e:
-        logger.error(f"Error cancelling campaign: {e}")
+        logger.error(f"Error deleting campaign: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/{id}/contacts/{contact_id}/retry")
@@ -164,20 +179,39 @@ async def retry_contact(id: str, contact_id: str):
             .eq("campaign_id", id)\
             .execute()
             
-        # Check campaign status and re-trigger calling loop if not already running
-        campaign = supabase_admin.table("campaigns").select("status").eq("id", id).single().execute().data
-        if campaign and campaign["status"] in ("completed", "ready", "paused"):
-            # Set campaign to running and spawn the background dialer loop
-            supabase_admin.table("campaigns").update({"status": "running"}).eq("id", id).execute()
-            
-            import asyncio
-            from app.services.campaign_service import CampaignService, running_campaign_tasks
-            task = asyncio.create_task(CampaignService.run_campaign_loop(id))
-            running_campaign_tasks.add(task)
-            task.add_done_callback(running_campaign_tasks.discard)
-            logger.info(f"Retry triggered: re-started calling loop for campaign {id}")
+        # Set campaign to running and spawn the background dialer loop
+        supabase_admin.table("campaigns").update({"status": "running"}).eq("id", id).execute()
+        
+        import asyncio
+        from app.services.campaign_service import CampaignService, running_campaign_tasks, active_campaign_ids
+        active_campaign_ids.discard(id)
+        task = asyncio.create_task(CampaignService.run_campaign_loop(id, bypass_hours=True))
+        running_campaign_tasks.add(task)
+        task.add_done_callback(running_campaign_tasks.discard)
+        logger.info(f"Retry triggered: started calling loop for campaign {id} (bypassing hours for manual retry)")
             
         return {"success": True, "data": res.data[0] if res.data else {}}
     except Exception as e:
         logger.error(f"Error retrying contact: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/{id}/send-report")
+async def trigger_campaign_report(id: str):
+    """
+    On-demand campaign report generation and dispatch to Telegram, WhatsApp, and in-app dashboard.
+    """
+    try:
+        camp_res = await asyncio.to_thread(
+            supabase_admin.table("campaigns").select("*").eq("id", id).limit(1).execute
+        )
+        if not camp_res or not camp_res.data:
+            raise HTTPException(status_code=404, detail="Campaign not found")
+
+        res = await CampaignService.dispatch_campaign_report(id, camp_res.data[0])
+        return {"success": True, "data": res}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error dispatching report for campaign {id}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+

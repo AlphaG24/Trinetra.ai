@@ -66,22 +66,41 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
-    const { authenticated, profile, error } = await authenticateRequest();
-    if (!authenticated || !profile) {
+    const { authenticated, profile, error, supabase } = await authenticateRequest();
+    if (!authenticated || !profile || !supabase) {
       return NextResponse.json({ error: error || "Unauthorized" }, { status: 401 });
     }
     
     const fastApiUrl = process.env.NEXT_PUBLIC_FASTAPI_URL || 'http://127.0.0.1:8000';
-    const response = await fetch(`${fastApiUrl}/api/campaigns/${id}`, {
-      method: "DELETE"
-    });
-    
-    const data = await response.json();
-    if (!response.ok) {
-      return NextResponse.json({ error: data.detail || "Failed to delete campaign" }, { status: response.status });
+    try {
+      const response = await fetch(`${fastApiUrl}/api/campaigns/${id}`, {
+        method: "DELETE"
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        return NextResponse.json(data);
+      }
+    } catch (fetchErr) {
+      console.warn(`[DELETE /api/campaigns/${id}] FastAPI fetch failed, falling back to direct database delete:`, fetchErr);
     }
-    
-    return NextResponse.json(data);
+
+    // Direct database deletion fallback
+    // 1. Delete associated contacts first
+    await supabase.from("campaign_contacts").delete().eq("campaign_id", id);
+
+    // 2. Delete campaign
+    const { error: dbError } = await supabase
+      .from("campaigns")
+      .delete()
+      .eq("id", id)
+      .eq("organization_id", profile.organization_id);
+
+    if (dbError) {
+      return NextResponse.json({ error: dbError.message || "Failed to delete campaign" }, { status: 500 });
+    }
+
+    return NextResponse.json({ success: true, message: "Campaign deleted successfully" });
   } catch (err: any) {
     return NextResponse.json({ error: err.message || "Internal server error" }, { status: 500 });
   }

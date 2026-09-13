@@ -20,6 +20,7 @@ export interface ManageNumberModalProps {
     provider: string;
     status: string;
     provisioned_at: string;
+    retail_price_paisa?: number;
     assigned_agents: Array<{
       agent_id: string;
       agent_name: string;
@@ -27,6 +28,7 @@ export interface ManageNumberModalProps {
     }>;
     display_price?: string;
   };
+  agents?: any[];
   onUpdate: () => void;
 }
 
@@ -34,6 +36,7 @@ export function ManageNumberModal({
   isOpen, 
   onClose, 
   phoneNumber, 
+  agents: propAgents,
   onUpdate 
 }: ManageNumberModalProps) {
   const [copied, setCopied] = useState(false);
@@ -43,7 +46,13 @@ export function ManageNumberModal({
   
   const { agents: storeAgents } = useDashboardStore();
   const [localAgents, setLocalAgents] = useState<any[]>([]);
-  const agents = localAgents.length > 0 ? localAgents : (storeAgents || []);
+  const [loadingAgents, setLoadingAgents] = useState(false);
+  
+  const agents = (propAgents && propAgents.length > 0)
+    ? propAgents
+    : localAgents.length > 0
+    ? localAgents
+    : (storeAgents || []);
 
   const [selectedAgentId, setSelectedAgentId] = useState("");
   const [isPrimary, setIsPrimary] = useState(false);
@@ -54,6 +63,10 @@ export function ManageNumberModal({
     .filter(a => !assignedAgentIds.includes(a.id))
     .filter(a => a.status !== 'deleted');
 
+  const formattedPrice = (phoneNumber as any).retail_price_paisa 
+    ? `₹${((phoneNumber as any).retail_price_paisa / 100).toFixed(0)}/mo` 
+    : (phoneNumber.display_price || "₹299/mo");
+
   // Close with Escape key
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -63,11 +76,12 @@ export function ManageNumberModal({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isOpen, onClose]);
 
-  // Dynamically load agents if not present in Zustand store
+  // Dynamically load agents if not present in props or Zustand store
   useEffect(() => {
-    if (isOpen && (!storeAgents || storeAgents.length === 0)) {
+    if (isOpen && agents.length === 0) {
       const fetchLocalAgents = async () => {
         try {
+          setLoadingAgents(true);
           const { createClient } = await import('@/utils/supabase/client');
           const supabase = createClient();
           const { data: { user } } = await supabase.auth.getUser();
@@ -92,11 +106,13 @@ export function ManageNumberModal({
           }
         } catch (err) {
           console.error("Error fetching local agents in ManageNumberModal:", err);
+        } finally {
+          setLoadingAgents(false);
         }
       };
       fetchLocalAgents();
     }
-  }, [isOpen, storeAgents]);
+  }, [isOpen, agents.length]);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(phoneNumber.phone_number);
@@ -182,7 +198,7 @@ export function ManageNumberModal({
   return (
     <AnimatePresence>
       <div 
-        className="fixed inset-0 z-50 flex items-start sm:items-center justify-center bg-black/50 p-4 backdrop-blur-sm overflow-y-auto"
+        className="fixed inset-0 z-[1050] flex items-center justify-center bg-black/75 p-4 backdrop-blur-md overflow-y-auto"
         onClick={onClose}
         role="dialog"
         aria-modal="true"
@@ -194,12 +210,12 @@ export function ManageNumberModal({
           exit={{ opacity: 0, scale: 0.95 }}
           transition={{ duration: 0.2 }}
           onClick={(e) => e.stopPropagation()}
-          className="relative w-full max-w-lg rounded-2xl bg-[var(--card-bg)] border border-[var(--border)] p-5 md:p-6 shadow-2xl my-8 sm:my-auto max-h-none sm:max-h-[85vh] overflow-y-auto custom-scrollbar"
+          className="relative w-full max-w-lg rounded-2xl bg-[var(--card-bg)] border border-[var(--border)] p-5 md:p-6 shadow-2xl my-auto max-h-[88vh] overflow-y-auto custom-scrollbar"
         >
           {/* Close Button */}
           <button
             onClick={onClose}
-            className="absolute right-4 top-4 text-[var(--muted)] hover:text-[var(--heading)] transition-colors"
+            className="absolute right-4 top-4 text-[var(--muted)] hover:text-[var(--heading)] transition-colors p-1 cursor-pointer"
             aria-label="Close"
           >
             <X size={20} />
@@ -215,7 +231,7 @@ export function ManageNumberModal({
                 type="button"
                 onClick={handleCopy}
                 aria-label="Copy phone number"
-                className="text-[var(--muted)] hover:text-[var(--heading)] transition-colors p-1"
+                className="text-[var(--muted)] hover:text-[var(--heading)] transition-colors p-1 cursor-pointer"
               >
                 {copied ? <Check size={20} className="text-green-500 scale-in" /> : <Copy size={20} />}
               </button>
@@ -242,7 +258,7 @@ export function ManageNumberModal({
             </div>
             <div className="flex flex-col gap-1">
               <span className="text-xs text-[var(--muted)] flex items-center gap-1.5"><CreditCard size={12}/> Pricing</span>
-              <span className="text-sm text-[var(--heading)]">{phoneNumber.display_price || "Billed monthly"}</span>
+              <span className="text-sm font-semibold text-[var(--heading)]">{formattedPrice}</span>
             </div>
             <div className="flex flex-col gap-1 col-span-2">
               <span className="text-xs text-[var(--muted)]">Provisioned At</span>
@@ -270,7 +286,7 @@ export function ManageNumberModal({
                     </div>
                     <button
                       onClick={() => handleUnassign(agent.agent_id)}
-                      className="text-xs font-medium text-red-500 hover:text-red-400 transition-colors"
+                      className="text-xs font-medium text-red-500 hover:text-red-400 transition-colors cursor-pointer"
                     >
                       Unassign
                     </button>
@@ -280,12 +296,17 @@ export function ManageNumberModal({
             ) : (
               <div className="rounded-lg border border-dashed border-[var(--border)] p-6 text-center">
                 <p className="text-sm text-[var(--muted)]">No agents assigned to this number.</p>
-                <p className="text-xs text-[var(--muted)] mt-1">Manage assignments from the agent settings page.</p>
+                <p className="text-xs text-[var(--muted)] mt-1">Select an agent below to assign calls.</p>
               </div>
             )}
 
             {/* Quick Assign Form */}
-            {unassignedAgents.length > 0 && (
+            {loadingAgents && agents.length === 0 ? (
+              <div className="mt-4 p-4 rounded-xl border border-[var(--border)] bg-[var(--secondary)]/40 animate-pulse space-y-2">
+                <div className="h-3 w-28 bg-[var(--border)] rounded" />
+                <div className="h-9 w-full bg-[var(--background)] rounded-lg" />
+              </div>
+            ) : unassignedAgents.length > 0 ? (
               <div className="mt-4 p-4 rounded-xl border border-[var(--border)] bg-[var(--secondary)] flex flex-col gap-3">
                 <span className="text-xs font-bold text-[var(--muted)] uppercase tracking-wider">Assign to Agent</span>
                 <select
@@ -321,12 +342,16 @@ export function ManageNumberModal({
                   type="button"
                   onClick={handleAssign}
                   disabled={!selectedAgentId || isAssigning}
-                  className="w-full bg-[var(--primary-bg)] hover:opacity-90 active:scale-[0.98] text-[var(--heading)] font-bold text-xs uppercase tracking-widest py-3 rounded-lg transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:opacity-40 disabled:active:scale-100 mt-2 font-montserrat shadow-md hover:shadow-lg"
+                  className="w-full bg-[var(--primary-bg)] hover:opacity-90 active:scale-[0.98] text-[var(--heading)] font-bold text-xs uppercase tracking-widest py-3 rounded-lg transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:opacity-40 disabled:active:scale-100 mt-2 font-montserrat shadow-md hover:shadow-lg cursor-pointer"
                 >
                   {isAssigning ? "Assigning..." : "Assign Agent"}
                 </button>
               </div>
-            )}
+            ) : agents.length > 0 ? (
+              <div className="mt-4 p-3 rounded-xl border border-[var(--border)] bg-[var(--secondary)]/30 text-center">
+                <p className="text-xs text-[var(--muted)]">All available agents are already assigned to this number.</p>
+              </div>
+            ) : null}
           </div>
 
           {/* Danger Zone */}

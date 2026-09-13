@@ -17,8 +17,16 @@ logger = logging.getLogger("CampaignService")
 
 # Global set to hold reference to background running tasks to prevent garbage collection
 running_campaign_tasks = set()
+active_campaign_ids = set()
 
 class CampaignService:
+    @staticmethod
+    def get_provider_for_number(phone_number: str) -> str:
+        cleaned = CampaignService.clean_phone(phone_number)
+        if cleaned.startswith("+91") or cleaned.startswith("91"):
+            return "exotel"
+        return "twilio"
+
     @staticmethod
     def clean_phone(phone_str: str) -> str:
         if not phone_str:
@@ -312,11 +320,69 @@ class CampaignService:
             .eq("id", campaign_id)
             .execute
         )
+        # Transition any contacts left in 'dialing' state to 'answered'
+        try:
+            await asyncio.to_thread(
+                supabase_admin.table("campaign_contacts")
+                .update({"call_status": "answered"})
+                .eq("campaign_id", campaign_id)
+                .eq("call_status", "dialing")
+                .execute
+            )
+        except Exception as e:
+            logger.warning(f"Error resetting dialing contacts on pause: {e}")
         return res.data[0] if res.data else {}
 
     @staticmethod
     async def resume_campaign(campaign_id: str) -> Dict:
         logger.info(f"Resuming campaign: {campaign_id}")
+        
+        # 1. Check if there are any pending contacts
+        pending_check = await asyncio.to_thread(
+            supabase_admin.table("campaign_contacts")
+            .select("id")
+            .eq("campaign_id", campaign_id)
+            .eq("call_status", "pending")
+            .limit(1)
+            .execute
+        )
+        if not pending_check.data:
+            # Check if there are unreached / failed / no_answer / cancelled contacts to retry
+            unreached = await asyncio.to_thread(
+                supabase_admin.table("campaign_contacts")
+                .select("id")
+                .eq("campaign_id", campaign_id)
+                .in_("call_status", ["no_answer", "failed", "dialing", "cancelled"])
+                .execute
+            )
+            if unreached.data:
+                await asyncio.to_thread(
+                    supabase_admin.table("campaign_contacts")
+                    .update({"call_status": "pending"})
+                    .eq("campaign_id", campaign_id)
+                    .in_("call_status", ["no_answer", "failed", "dialing", "cancelled"])
+                    .execute
+                )
+                logger.info(f"Reset {len(unreached.data)} unreached contacts to pending for campaign {campaign_id}")
+            else:
+                # All contacts were marked answered; reset all non-DND contacts to pending for a complete rerun
+                all_contacts = await asyncio.to_thread(
+                    supabase_admin.table("campaign_contacts")
+                    .select("id")
+                    .eq("campaign_id", campaign_id)
+                    .neq("call_status", "dnd")
+                    .execute
+                )
+                if all_contacts.data:
+                    await asyncio.to_thread(
+                        supabase_admin.table("campaign_contacts")
+                        .update({"call_status": "pending"})
+                        .eq("campaign_id", campaign_id)
+                        .neq("call_status", "dnd")
+                        .execute
+                    )
+                    logger.info(f"Reset {len(all_contacts.data)} contacts to pending for full campaign rerun {campaign_id}")
+
         res = await asyncio.to_thread(
             supabase_admin.table("campaigns")
             .update({"status": "running"})
@@ -324,66 +390,121 @@ class CampaignService:
             .execute
         )
         
-        # Spawn background dialer loop
-        task = asyncio.create_task(CampaignService.run_campaign_loop(campaign_id))
+        # Clear any stale active_campaign_ids lock
+        active_campaign_ids.discard(campaign_id)
+
+        # Spawn background dialer loop with bypass_hours=True for immediate execution
+        task = asyncio.create_task(CampaignService.run_campaign_loop(campaign_id, bypass_hours=True))
         running_campaign_tasks.add(task)
         task.add_done_callback(running_campaign_tasks.discard)
         
         return res.data[0] if res.data else {}
 
     @staticmethod
-    async def run_campaign_loop(campaign_id: str):
+    async def run_campaign_loop(campaign_id: str, bypass_hours: bool = False):
+        if campaign_id in active_campaign_ids:
+            logger.info(f"Campaign runner already active for {campaign_id}. Skipping duplicate spawn.")
+            return
+        active_campaign_ids.add(campaign_id)
         logger.info(f"Background dialing runner initialized for campaign {campaign_id}")
-        while True:
-            # 1. Fetch current status
-            campaign_res = await asyncio.to_thread(
-                supabase_admin.table("campaigns").select("*").eq("id", campaign_id).single().execute
-            )
-            
-            if not campaign_res.data:
-                logger.error(f"Campaign {campaign_id} not found. Terminating runner.")
-                break
-                
-            campaign = campaign_res.data
-            status = campaign.get("status")
-            
-            if status != "running":
-                logger.info(f"Campaign {campaign_id} status changed to {status}. Stopping background runner.")
-                break
-                
-            # 2. Check calling hours
-            start_hours = campaign.get("calling_hours_start") or "10:00"
-            end_hours = campaign.get("calling_hours_end") or "18:00"
-            timezone_str = campaign.get("timezone") or "Asia/Kolkata"
-            
-            within_hours, log_msg = CampaignService.is_within_calling_hours(start_hours, end_hours, timezone_str)
-            if not within_hours:
-                logger.info(f"Campaign {campaign_id} is outside calling hours. {log_msg} Sleeping 60s...")
-                await asyncio.sleep(60.0) # Check again in a minute
-                continue
-                
-            # 3. Process next contact
-            has_more = await CampaignService.process_next_contact(campaign_id, campaign)
-            if not has_more:
-                logger.info(f"Campaign {campaign_id} completed: No more pending contacts.")
-                await asyncio.to_thread(
-                    supabase_admin.table("campaigns")
-                    .update({
-                        "status": "completed",
-                        "completed_at": datetime.now(timezone.utc).isoformat()
-                    })
-                    .eq("id", campaign_id)
-                    .execute
-                )
-                # Dispatch consolidated campaign report notification
+        is_first_iteration = True
+        try:
+            while True:
                 try:
-                    await CampaignService.dispatch_campaign_report(campaign_id, campaign)
-                except Exception as report_err:
-                    logger.error(f"Failed to dispatch campaign report: {report_err}")
-                break
-                
-            # Simulate a calling cooldown/processing interval
-            await asyncio.sleep(3.0)
+                    # 1. Fetch current status
+                    campaign_res = await asyncio.to_thread(
+                        supabase_admin.table("campaigns").select("*").eq("id", campaign_id).single().execute
+                    )
+                    
+                    if not campaign_res.data:
+                        logger.error(f"Campaign {campaign_id} not found. Terminating runner.")
+                        break
+                        
+                    campaign = campaign_res.data
+                    status = campaign.get("status")
+                    
+                    if status != "running":
+                        logger.info(f"Campaign {campaign_id} status changed to {status}. Stopping background runner.")
+                        break
+                        
+                    # 2. Check calling hours (bypass on first iteration if explicitly requested via manual retry)
+                    if not (bypass_hours and is_first_iteration):
+                        start_hours = campaign.get("calling_hours_start") or "10:00"
+                        end_hours = campaign.get("calling_hours_end") or "18:00"
+                        timezone_str = campaign.get("timezone") or "Asia/Kolkata"
+                        
+                        within_hours, log_msg = CampaignService.is_within_calling_hours(start_hours, end_hours, timezone_str)
+                        if not within_hours:
+                            logger.info(f"Campaign {campaign_id} is outside calling hours. {log_msg} Sleeping 60s...")
+                            await asyncio.sleep(60.0) # Check again in a minute
+                            continue
+                    
+                    is_first_iteration = False
+                        
+                    # 3. Process next contact
+                    try:
+                        has_more = await CampaignService.process_next_contact(campaign_id, campaign)
+                    except Exception as step_err:
+                        logger.error(f"[Campaign Loop Error] Error processing next contact: {step_err}")
+                        await asyncio.sleep(3)
+                        continue
+
+                    if not has_more:
+                        # Check if there are any lingering contacts in "dialing"
+                        dialing_contacts = await asyncio.to_thread(
+                            supabase_admin.table("campaign_contacts")
+                            .select("id, last_attempt_at")
+                            .eq("campaign_id", campaign_id)
+                            .eq("call_status", "dialing")
+                            .execute
+                        )
+                        if dialing_contacts.data:
+                            now = datetime.now(timezone.utc)
+                            all_resolved = True
+                            for dc in dialing_contacts.data:
+                                last_att = dc.get("last_attempt_at")
+                                if last_att:
+                                    try:
+                                        dt = datetime.fromisoformat(last_att.replace("Z", "+00:00"))
+                                        if (now - dt).total_seconds() > 45:
+                                            await asyncio.to_thread(
+                                                supabase_admin.table("campaign_contacts")
+                                                .update({"call_status": "no_answer"})
+                                                .eq("id", dc["id"])
+                                                .execute
+                                            )
+                                        else:
+                                            all_resolved = False
+                                    except Exception:
+                                        pass
+                            if not all_resolved:
+                                await asyncio.sleep(4.0)
+                                continue
+
+                        logger.info(f"Campaign {campaign_id} completed: All contacts finished.")
+                        await asyncio.to_thread(
+                            supabase_admin.table("campaigns")
+                            .update({
+                                "status": "completed",
+                                "completed_at": datetime.now(timezone.utc).isoformat()
+                            })
+                            .eq("id", campaign_id)
+                            .execute
+                        )
+                        # Dispatch consolidated campaign report notification
+                        try:
+                            await CampaignService.dispatch_campaign_report(campaign_id, campaign)
+                        except Exception as report_err:
+                            logger.error(f"Failed to dispatch campaign report: {report_err}")
+                        break
+                        
+                    # Simulate a calling cooldown/processing interval
+                    await asyncio.sleep(3.0)
+                except Exception as loop_iter_err:
+                    logger.error(f"[Campaign Loop Error] Unexpected error in iteration: {loop_iter_err}")
+                    await asyncio.sleep(3.0)
+        finally:
+            active_campaign_ids.discard(campaign_id)
 
     @staticmethod
     async def process_next_contact(campaign_id: str, campaign_data: Dict) -> bool:
@@ -440,22 +561,7 @@ class CampaignService:
         
         agent = agent_res.data or {}
         
-        # 4. Trigger Outbound call
-        from app.services.telephony.factory import get_provider
-        from app.services.config_service import ConfigService
-
-        twilio_sid = ConfigService.get("TWILIO_ACCOUNT_SID")
-        twilio_token = ConfigService.get("TWILIO_AUTH_TOKEN")
-        is_simulated = not (twilio_sid and twilio_token)
-        
-        provider = get_provider("twilio" if not is_simulated else "simulated")
-        webhook_base = ConfigService.get("TRINETRA_WEBHOOK_BASE_URL") or os.getenv("TRINETRA_WEBHOOK_BASE_URL") or "http://localhost:8000"
-        webhook_url = f"{webhook_base}/api/voice/webhooks/voice/twilio/{organization_id}?agent_id={agent_id}&contact_id={contact_id}"
-        
-        agent_phone = agent.get("phone_number") or os.getenv("TWILIO_PHONE_NUMBER") or "+12282950908"
-        if agent_phone and not str(agent_phone).startswith("+"):
-            agent_phone = f"+{agent_phone}"
-            
+        # 4. Normalize contact phone number
         contact_phone = str(contact["phone"]).strip()
         if not contact_phone.startswith("+"):
             import re
@@ -472,15 +578,59 @@ class CampaignService:
             else:
                 contact_phone = f"+{digits}"
 
+        # 5. Dynamically resolve Telephony Provider (Exotel vs Twilio vs Simulated)
+        from app.services.telephony.factory import get_provider
+        from app.services.config_service import ConfigService
+
+        exo_sid = ConfigService.get("EXOTEL_ACCOUNT_SID") or os.getenv("EXOTEL_ACCOUNT_SID")
+        exo_key = ConfigService.get("EXOTEL_API_KEY") or os.getenv("EXOTEL_API_KEY")
+        exo_tok = ConfigService.get("EXOTEL_API_TOKEN") or os.getenv("EXOTEL_API_TOKEN")
+        has_exotel = bool(exo_sid and exo_key and exo_tok)
+
+        twilio_sid = ConfigService.get("TWILIO_ACCOUNT_SID") or os.getenv("TWILIO_ACCOUNT_SID")
+        twilio_token = ConfigService.get("TWILIO_AUTH_TOKEN") or os.getenv("TWILIO_AUTH_TOKEN")
+        has_twilio = bool(twilio_sid and twilio_token)
+
+        agent_provider = (agent.get("telephony_provider") or "").lower().strip()
+        if agent_provider == "exotel" and has_exotel:
+            chosen_provider = "exotel"
+        elif agent_provider == "twilio" and has_twilio:
+            chosen_provider = "twilio"
+        elif contact_phone.startswith("+91") and has_exotel:
+            chosen_provider = "exotel"
+        elif has_twilio:
+            chosen_provider = "twilio"
+        elif has_exotel:
+            chosen_provider = "exotel"
+        else:
+            chosen_provider = "simulated"
+
+        is_simulated = chosen_provider == "simulated"
+        provider = get_provider(chosen_provider)
+
+        unique_room = f"{chosen_provider}--{agent_id}--{contact_id}--{uuid.uuid4().hex[:8]}" if agent_id else f"{chosen_provider}--noagent--{contact_id}--{uuid.uuid4().hex[:8]}"
+        webhook_base = ConfigService.get("TRINETRA_WEBHOOK_BASE_URL") or os.getenv("TRINETRA_WEBHOOK_BASE_URL") or "http://localhost:8000"
+        webhook_url = f"{webhook_base}/api/voice/webhooks/voice/{chosen_provider}/{organization_id}?agent_id={agent_id}&contact_id={contact_id}&room_name={unique_room}"
+
+        if chosen_provider == "exotel":
+            agent_phone = agent.get("phone_number") or ConfigService.get("EXOTEL_CALLER_ID") or os.getenv("EXOTEL_CALLER_ID") or "+918000000000"
+        else:
+            agent_phone = agent.get("phone_number") or os.getenv("TWILIO_PHONE_NUMBER") or "+12282950908"
+
+        if agent_phone and not str(agent_phone).startswith("+"):
+            agent_phone = f"+{agent_phone}"
+
         call_sid = None
         outcome = "failed"
         duration = 0
 
-        contact_name = contact.get("full_name") or ""
-        company_name = contact.get("company_name") or ""
+        contact_name = contact.get("full_name") or contact.get("name") or ""
+        company_name = contact.get("company_name") or contact.get("company") or ""
         notes = contact.get("notes") or ""
+        agent_name = agent.get("name") or "Agent"
+        business_name = campaign_data.get("name") or "Trinetra AI"
 
-        # Place the outbound call via Twilio or Simulated
+        # Place the outbound call via Twilio or Simulated fallback
         try:
             if not is_simulated:
                 call_res = await provider.make_outbound_call(
@@ -490,19 +640,23 @@ class CampaignService:
                     custom_parameters={
                         "contact_name": contact_name,
                         "company_name": company_name,
-                        "notes": notes
+                        "notes": notes,
+                        "agent_id": agent_id,
+                        "contact_id": contact_id,
+                        "room_name": unique_room
                     }
                 )
                 call_sid = call_res.get("call_sid")
+                room_name = call_res.get("room_name") or unique_room
                 outcome = "connected"
-                logger.info(f"[Campaign Outbound] Twilio call placed successfully: SID={call_sid} to {contact_phone}")
+                logger.info(f"[Campaign Outbound] Twilio call placed successfully: SID={call_sid} to {contact_phone}, room={room_name}. External LiveKit worker will connect agent {agent_id}.")
             else:
                 call_sid = f"sim-{uuid.uuid4()}"
+                room_name = f"sim-{uuid.uuid4().hex[:8]}"
                 outcome = "connected"
                 logger.info(f"[Campaign Outbound] Simulated call placed: SID={call_sid} to {contact_phone}")
                 
                 # Spawn background task to simulate call completion
-                agent_name = agent.get("name") or "Agent"
                 asyncio.create_task(
                     simulate_call_completion(
                         call_sid=call_sid,
@@ -522,11 +676,12 @@ class CampaignService:
             logger.error(f"[Campaign Outbound] Call FAILED to {contact_phone}: {dial_err}")
             outcome = "failed"
             call_sid = None
+            room_name = None
 
         call_id = None
         lead_id = None
         
-        # 5. If call connected, log the outbound call record
+        # 5. If call placed, log the outbound call record
         #    The actual transcript and sentiment will be populated by the voice webhook
         #    once the AI agent conversation completes.
         if outcome == "connected":
@@ -538,11 +693,15 @@ class CampaignService:
                     "caller_phone": contact["phone"],
                     "status": "in_progress",
                     "duration_seconds": 0,
+                    "transcript": "",
                     "metadata": {
                         "from_number": agent_phone,
                         "to_number": contact["phone"],
                         "provider_call_id": call_sid,
-                        "session_id": call_sid
+                        "session_id": call_sid,
+                        "room_name": room_name,
+                        "contact_id": contact_id,
+                        "campaign_id": campaign_id
                     }
                 }
                 call_res = await asyncio.to_thread(
@@ -554,14 +713,18 @@ class CampaignService:
             except Exception as call_log_err:
                 logger.error(f"Failed to log outbound call record: {call_log_err}")
                     
-        # 6. Finalize contact status
-        final_call_status = "answered" if outcome == "connected" else outcome
+        # 6. Update contact status:
+        # If simulated, simulate_call_completion handles final status.
+        # If real telephony (Twilio), status is "dialing" until callee answers or status callback arrives.
+        # If failed to place, status is "failed".
+        final_call_status = "dialing" if outcome == "connected" else "failed"
         await asyncio.to_thread(
             supabase_admin.table("campaign_contacts")
             .update({
                 "call_status": final_call_status,
                 "call_id": call_id,
-                "lead_id": lead_id
+                "lead_id": lead_id,
+                "last_attempt_at": datetime.now(timezone.utc).isoformat()
             })
             .eq("id", contact_id)
             .execute
@@ -572,7 +735,9 @@ class CampaignService:
             "contacts_called": campaign_data["contacts_called"] + 1,
         }
         if outcome == "connected":
-            campaign_update["contacts_connected"] = campaign_data["contacts_connected"] + 1
+            # Real connections will update contacts_connected when answered in webhook/status callback
+            if is_simulated:
+                campaign_update["contacts_connected"] = campaign_data["contacts_connected"] + 1
             if lead_id:
                 campaign_update["leads_generated"] = campaign_data["leads_generated"] + 1
                 
@@ -589,7 +754,7 @@ class CampaignService:
     async def list_campaigns(organization_id: str):
         result = await asyncio.to_thread(
             supabase_admin.table("campaigns")
-            .select("*, agents(name)")
+            .select("*, agents(name, phone_number, telephony_provider)")
             .eq("organization_id", organization_id)
             .order("created_at", desc=True)
             .execute
@@ -597,84 +762,221 @@ class CampaignService:
         return {"success": True, "data": result.data or []}
 
     @staticmethod
-    async def dispatch_campaign_report(campaign_id: str, campaign_data: Dict):
-        # 1. Fetch contacts outcomes
+    async def dispatch_campaign_report(campaign_id: str, campaign_data: Optional[Dict] = None) -> Dict:
+        """
+        Gathers comprehensive metrics for a completed campaign and dispatches a rich summary
+        report to Telegram, In-App notifications, and connected WhatsApp integrations.
+        """
+        # 1. Fetch campaign if not provided
+        if not campaign_data or not campaign_data.get("name"):
+            c_res = await asyncio.to_thread(
+                supabase_admin.table("campaigns").select("*").eq("id", campaign_id).limit(1).execute
+            )
+            campaign_data = c_res.data[0] if (c_res and c_res.data) else {}
+
+        camp_name = campaign_data.get("name", "Outbound Campaign")
+        org_id = campaign_data.get("organization_id")
+        agent_id = campaign_data.get("agent_id")
+
+        # 2. Fetch contacts outcomes
         contacts_res = await asyncio.to_thread(
             supabase_admin.table("campaign_contacts")
-            .select("call_status")
+            .select("call_status, call_id")
             .eq("campaign_id", campaign_id)
             .execute
         )
-        contacts = contacts_res.data or []
+        contacts = (contacts_res.data if contacts_res else None) or []
         total_contacts = len(contacts)
 
-        answered = sum(1 for c in contacts if c.get("call_status") == "answered")
-        no_answer = sum(1 for c in contacts if c.get("call_status") == "no-answer")
-        failed = sum(1 for c in contacts if c.get("call_status") == "failed")
-        dnd = sum(1 for c in contacts if c.get("call_status") == "dnd")
+        answered = sum(1 for c in contacts if (c.get("call_status") or "").lower() in ["answered", "completed"])
+        no_answer = sum(1 for c in contacts if (c.get("call_status") or "").lower() in ["no_answer", "no-answer"])
+        busy = sum(1 for c in contacts if (c.get("call_status") or "").lower() == "busy")
+        failed = sum(1 for c in contacts if (c.get("call_status") or "").lower() == "failed")
+        dnd = sum(1 for c in contacts if (c.get("call_status") or "").lower() == "dnd")
+        pending = sum(1 for c in contacts if (c.get("call_status") or "").lower() in ["pending", "dialing"])
+        calls_made = total_contacts - pending
 
-        # 2. Query scheduled callbacks
-        callbacks_res = await asyncio.to_thread(
-            supabase_admin.table("callbacks")
-            .select("id", count="exact")
-            .eq("organization_id", campaign_data.get("organization_id"))
-            .eq("agent_id", campaign_data.get("agent_id"))
-            .execute
-        )
-        callbacks_count = callbacks_res.count or 0
+        # Compute total duration from voice_calls
+        call_ids = [c.get("call_id") for c in contacts if c.get("call_id")]
+        total_duration_sec = 0
+        if call_ids:
+            try:
+                vc_res = await asyncio.to_thread(
+                    supabase_admin.table("voice_calls").select("duration_seconds").in_("id", call_ids).execute
+                )
+                if vc_res and vc_res.data:
+                    for row in vc_res.data:
+                        sec = row.get("duration_seconds") or 0
+                        total_duration_sec += int(sec)
+            except Exception:
+                pass
+        duration_mins = round(total_duration_sec / 60, 1)
 
-        # 3. Retrieve user profile
-        user_res = await asyncio.to_thread(
-            supabase_admin.table("profiles")
-            .select("telegram_chat_id")
-            .eq("id", campaign_data.get("user_id") or "")
-            .maybe_single()
-            .execute
-        )
+        # 3. Query leads count
+        leads_count = campaign_data.get("leads_generated") or 0
+        if not leads_count and org_id:
+            try:
+                l_res = await asyncio.to_thread(
+                    supabase_admin.table("leads").select("id", count="exact").eq("organization_id", org_id).gte("created_at", campaign_data.get("created_at", "2000-01-01")).execute
+                )
+                leads_count = l_res.count or 0
+            except Exception:
+                pass
 
-        telegram_chat_id = None
-        if user_res.data:
-            telegram_chat_id = user_res.data.get("telegram_chat_id")
+        # 4. Query scheduled callbacks
+        callbacks_count = 0
+        if org_id and agent_id:
+            try:
+                callbacks_res = await asyncio.to_thread(
+                    supabase_admin.table("callbacks")
+                    .select("id", count="exact")
+                    .eq("organization_id", org_id)
+                    .eq("agent_id", agent_id)
+                    .execute
+                )
+                callbacks_count = callbacks_res.count or 0
+            except Exception:
+                pass
 
-        # 4. Construct report message
+        # 5. Calculate percentages
+        conn_rate = round((answered / max(1, calls_made)) * 100, 1)
+        conv_rate = round((leads_count / max(1, answered)) * 100, 1) if answered > 0 else 0.0
+
+        # 6. Retrieve user profile (owner of the campaign / organization)
+        user_id = campaign_data.get("user_id")
+        user_res = None
+        if user_id:
+            user_res = await asyncio.to_thread(
+                supabase_admin.table("profiles")
+                .select("id, email, telegram_chat_id, phone, full_name, timezone")
+                .eq("id", user_id)
+                .limit(1)
+                .execute
+            )
+        elif org_id:
+            user_res = await asyncio.to_thread(
+                supabase_admin.table("profiles")
+                .select("id, email, telegram_chat_id, phone, full_name, timezone")
+                .eq("organization_id", org_id)
+                .limit(1)
+                .execute
+            )
+
+        profile = user_res.data[0] if (user_res and user_res.data) else {}
+        owner_user_id = profile.get("id") or user_id
+        telegram_chat_id = profile.get("telegram_chat_id")
+
+        # 7. Construct rich executive report message
         report_text = (
-            f"📢 *Trinetra AI Campaign Report*\n\n"
-            f"*Campaign:* {campaign_data.get('name', 'Voice Campaign')}\n"
-            f"*Status:* Completed ✅\n\n"
-            f"📊 *Key Statistics:*\n"
-            f"- Total Contacts: {total_contacts}\n"
-            f"- Connected calls: {answered}\n"
-            f"- Leads Extracted: {campaign_data.get('leads_generated', 0)}\n\n"
-            f"📞 *Dispositions:*\n"
-            f"- Answered & Talked: {answered}\n"
-            f"- Callbacks Scheduled: {callbacks_count}\n"
-            f"- DND / Skipped: {dnd}\n"
-            f"- Failed / Switch-Off: {failed + no_answer}\n\n"
-            f"🚀 *Trinetra.ai* - Human-grade Outbound Telephony."
+            f"📊 *TRINETRA AI* | *Executive Campaign Briefing*\n\n"
+            f"*Campaign:* {camp_name}\n"
+            f"*Status:* Completed ✅\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"📈 *Performance Overview*\n"
+            f"• *Total Contacts:* {total_contacts}\n"
+            f"• *Calls Attempted:* {calls_made}\n"
+            f"• *Connected Calls:* {answered} ({conn_rate}%)\n"
+            f"• *Qualified Leads:* {leads_count} ({conv_rate}% conversion)\n"
+            f"• *Callbacks Booked:* {callbacks_count}\n"
+            f"• *Total Talk Time:* {duration_mins} mins\n\n"
+            f"📋 *Disposition Breakdown*\n"
+            f"• Answered: {answered}\n"
+            f"• No Answer / Unreachable: {no_answer}\n"
+            f"• Busy Line: {busy}\n"
+            f"• DND Filtered: {dnd}\n"
+            f"• Carrier Rejected / Failed: {failed}\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"_Automated Intelligence by Trinetra Enterprise Voice_"
         )
 
-        # 5. Dispatch Telegram alert
+        # 8. Dispatch In-App & Telegram notification via NotificationService
+        if owner_user_id:
+            try:
+                from app.services.notification_service import NotificationService
+                await NotificationService.dispatch(
+                    user_id=owner_user_id,
+                    event_type="weekly_report",
+                    title=f"📊 Campaign Completed: {camp_name}",
+                    message=report_text,
+                    payload={
+                        "campaign_id": campaign_id,
+                        "campaign_name": camp_name,
+                        "total_contacts": total_contacts,
+                        "answered": answered,
+                        "leads_count": leads_count,
+                        "conversion_rate": conv_rate,
+                        "duration_mins": duration_mins
+                    }
+                )
+                logger.info(f"[Campaign Report] Dispatched notification for user {owner_user_id}")
+            except Exception as notif_err:
+                logger.error(f"[Campaign Report] NotificationService dispatch error: {notif_err}")
+
+        # 9. Also send direct Telegram alert if chat ID is present
         bot_token = os.getenv("TELEGRAM_BOT_TOKEN")
         if bot_token and telegram_chat_id:
-            import httpx
-            url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
-            payload = {
-                "chat_id": telegram_chat_id,
-                "text": report_text,
-                "parse_mode": "Markdown"
-            }
             try:
-                async with httpx.AsyncClient() as client:
-                    res = await client.post(url, json=payload, timeout=10.0)
-                    if res.status_code == 200:
-                        logger.info(f"[Report Alert] Sent campaign completion report to Telegram: {telegram_chat_id}")
-                    else:
-                        logger.warning(f"[Report Alert] Telegram API rejected report message: {res.text}")
-            except Exception as e:
-                logger.error(f"[Report Alert] Failed to post Telegram notification: {e}")
-        else:
-            logger.info(f"[Report Alert] Skipping Telegram report: bot_token={bool(bot_token)}, chat_id={telegram_chat_id}")
-            logger.info(f"Report Output:\n{report_text}")
+                from app.services.notification_service import NotificationService
+                await NotificationService.send_telegram_notification(telegram_chat_id, report_text)
+                logger.info(f"[Campaign Report] Sent direct Telegram message to chat {telegram_chat_id}")
+            except Exception as tg_err:
+                logger.error(f"[Campaign Report] Direct Telegram send failed: {tg_err}")
+
+        # 10. Dispatch via WhatsApp to user's registered phone if integration is active
+        try:
+            from app.services.integration_executor import IntegrationExecutor
+            executor = IntegrationExecutor()
+            owner_name = profile.get("full_name") or "Administrator"
+            owner_phone = profile.get("phone")
+            await executor.dispatch_post_call(
+                agent_id=agent_id,
+                event_type="campaign_completed",
+                context={
+                    "campaign_name": camp_name,
+                    "owner_name": owner_name,
+                    "contact_name": owner_name,
+                    "contact_phone": owner_phone,
+                    "prospect_name": owner_name,
+                    "prospect_phone": owner_phone,
+                    "total_contacts": total_contacts,
+                    "calls_attempted": calls_made,
+                    "connected_count": answered,
+                    "connection_rate": f"{conn_rate}%",
+                    "leads_count": leads_count,
+                    "conversion_rate": f"{conv_rate}%",
+                    "callbacks_count": callbacks_count,
+                    "total_duration_mins": duration_mins,
+                    "call_summary": f"Campaign '{camp_name}' finished: {answered}/{total_contacts} connected ({conn_rate}%), {leads_count} leads generated ({conv_rate}% conversion)."
+                },
+                data={
+                    "campaign_id": campaign_id,
+                    "total_contacts": total_contacts,
+                    "answered": answered,
+                    "leads_count": leads_count,
+                    "connection_rate": conn_rate,
+                    "conversion_rate": conv_rate,
+                    "callbacks_count": callbacks_count,
+                    "duration_mins": duration_mins
+                },
+                org_id=org_id,
+                user_id=owner_user_id
+            )
+        except Exception as wa_err:
+            logger.debug(f"[Campaign Report] WhatsApp executor skipped/failed: {wa_err}")
+
+        return {
+            "success": True,
+            "campaign_id": campaign_id,
+            "campaign_name": camp_name,
+            "total_contacts": total_contacts,
+            "calls_made": calls_made,
+            "answered": answered,
+            "leads_count": leads_count,
+            "connection_rate": conn_rate,
+            "conversion_rate": conv_rate,
+            "callbacks_count": callbacks_count,
+            "duration_mins": duration_mins
+        }
 
 
 async def simulate_call_completion(

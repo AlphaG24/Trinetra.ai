@@ -40,6 +40,7 @@ export default async function NotificationsPage() {
     title: n.title,
     message: n.message,
     type: n.type,
+    payload: n.payload || null,
     created_at: n.created_at,
     is_read: !!n.is_read,
     action_url: n.action_url || null,

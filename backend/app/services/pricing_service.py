@@ -71,7 +71,7 @@ class PricingService:
         provider = provider.lower()
         did_type = did_type.lower()
         
-        if provider == "voicelink":
+        if provider == "exotel":
             key = f"{provider}_{did_type}_did_cost_paisa"
         elif provider == "twilio":
             key = f"twilio_{country_code.upper()}_{did_type}_cost_paisa"
@@ -144,8 +144,7 @@ class PricingService:
     async def get_price_display_map(self) -> Dict[str, str]:
         # Predefined combinations we might care about
         combos = [
-            ("voicelink", "mobile"), ("voicelink", "landline"), 
-            ("voicelink", "tollfree"), ("voicelink", "92series"),
+            ("exotel", "mobile"), ("exotel", "landline"),
             ("twilio", "local"), ("twilio", "mobile")
         ]
         
@@ -222,12 +221,10 @@ class PricingService:
     async def validate_pricing_configured(self, provider: str) -> Dict:
         provider = provider.lower()
         required_keys = []
-        if provider == "voicelink":
+        if provider == "exotel":
             required_keys = [
-                "voicelink_mobile_did_cost_paisa",
-                "voicelink_landline_did_cost_paisa",
-                "voicelink_tollfree_did_cost_paisa",
-                "voicelink_92series_did_cost_paisa"
+                "exotel_mobile_did_cost_paisa",
+                "exotel_landline_did_cost_paisa"
             ]
         elif provider == "twilio":
             # Just check if at least one twilio cost is configured
@@ -294,9 +291,9 @@ class PricingService:
         ]
         
         # Pre-fetch known provider keys
-        types = ["mobile", "landline", "tollfree", "92series"]
+        types = ["mobile", "landline"]
         for t in types:
-            keys.append(f"voicelink_{t}_did_cost_paisa")
+            keys.append(f"exotel_{t}_did_cost_paisa")
             
         keys.extend([
             "twilio_US_local_cost_paisa",

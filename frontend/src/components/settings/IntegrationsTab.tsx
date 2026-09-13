@@ -12,9 +12,12 @@ export function IntegrationsTab() {
   // Form states
   const [telegram, setTelegram] = useState({ token: '', chatId: '', connected: false })
   const [whatsapp, setWhatsapp] = useState({ sid: '', token: '', from: '', connected: false })
+  const [testWhatsappPhone, setTestWhatsappPhone] = useState('')
+  const [testingWhatsapp, setTestingWhatsapp] = useState(false)
   const [email, setEmail] = useState({ smtpHost: '', smtpPort: '587', smtpUsername: '', smtpPassword: '', smtpFrom: '', connected: false })
   const [webhook, setWebhook] = useState({ url: '', secret: '', connected: false })
   const [calendar, setCalendar] = useState({ apiKey: '', eventTypeId: '', connected: false })
+  const [testingCalendar, setTestingCalendar] = useState(false)
 
   const fetchConfig = async () => {
     try {
@@ -136,6 +139,74 @@ export function IntegrationsTab() {
       toast.error('Save failed: ' + err.message)
     } finally {
       setLoadingSection(null)
+    }
+  }
+
+  const handleTestWhatsapp = async () => {
+    if (!whatsapp.sid || !whatsapp.token || !whatsapp.from) {
+      toast.error('Please enter Twilio SID, Auth Token, and From number first')
+      return
+    }
+    const target = testWhatsappPhone.trim() || prompt('Enter recipient phone number to test (e.g. +919876543210):')
+    if (!target) return
+
+    try {
+      setTestingWhatsapp(true)
+      const res = await fetch('/api/integrations/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          slug: 'whatsapp',
+          config: {
+            twilio_sid: whatsapp.sid,
+            auth_token: whatsapp.token,
+            from_number: whatsapp.from,
+            target_phone: target
+          }
+        })
+      })
+      const data = await res.json()
+      if (data.success) {
+        toast.success(data.message || 'Test WhatsApp message sent!')
+      } else {
+        toast.error(data.error || 'Test failed. Please check your Twilio credentials.')
+      }
+    } catch (err: any) {
+      toast.error('Test failed: ' + err.message)
+    } finally {
+      setTestingWhatsapp(false)
+    }
+  }
+
+  const handleTestCalendar = async () => {
+    if (!calendar.apiKey) {
+      toast.error('Please enter your Cal.com API key first')
+      return
+    }
+
+    try {
+      setTestingCalendar(true)
+      const res = await fetch('/api/integrations/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          slug: 'calendar',
+          config: {
+            cal_api_key: calendar.apiKey,
+            event_type_id: calendar.eventTypeId
+          }
+        })
+      })
+      const data = await res.json()
+      if (data.success) {
+        toast.success(data.message || 'Cal.com verified successfully!')
+      } else {
+        toast.error(data.error || 'Cal.com verification failed.')
+      }
+    } catch (err: any) {
+      toast.error('Test failed: ' + err.message)
+    } finally {
+      setTestingCalendar(false)
     }
   }
 
@@ -342,6 +413,33 @@ export function IntegrationsTab() {
               className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-white/10 text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-650 text-xs font-semibold font-mono rounded-xl p-3 focus:outline-none focus:ring-1 focus:ring-violet-500"
             />
           </div>
+          <div className="md:col-span-3 pt-2 pb-1 border-t border-zinc-100 dark:border-white/5">
+            <label className="block text-[10px] font-bold font-montserrat text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mb-2">
+              Send Test Message To Number
+            </label>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <input
+                type="text"
+                value={testWhatsappPhone}
+                onChange={e => setTestWhatsappPhone(e.target.value)}
+                placeholder="+919876543210"
+                className="flex-1 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-white/10 text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-650 text-xs font-semibold font-mono rounded-xl p-3 focus:outline-none focus:ring-1 focus:ring-violet-500"
+              />
+              <button
+                type="button"
+                onClick={handleTestWhatsapp}
+                disabled={testingWhatsapp || !whatsapp.sid || !whatsapp.token}
+                className="flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold text-xs uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap"
+              >
+                {testingWhatsapp ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <MessageSquare className="w-3.5 h-3.5" />}
+                <span>{testingWhatsapp ? 'Sending Test...' : 'Send Test WhatsApp'}</span>
+              </button>
+            </div>
+            <p className="text-[10px] text-zinc-500 dark:text-zinc-400 mt-1.5">
+              ℹ️ Note: If using a Twilio Sandbox number, ensure the recipient phone has sent your sandbox keyword to your Twilio number first.
+            </p>
+          </div>
+
           <div className="md:col-span-3 pt-2 flex justify-end gap-3">
             {whatsapp.connected && (
               <button
@@ -545,6 +643,15 @@ export function IntegrationsTab() {
                 Disconnect
               </button>
             )}
+            <button
+              type="button"
+              onClick={handleTestCalendar}
+              disabled={testingCalendar || !calendar.apiKey}
+              className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-zinc-200 dark:border-white/10 hover:border-violet-500/40 text-zinc-800 dark:text-zinc-200 font-bold text-xs uppercase tracking-wider transition-all cursor-pointer disabled:opacity-50"
+            >
+              {testingCalendar ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Calendar className="w-3.5 h-3.5 text-violet-500" />}
+              <span>{testingCalendar ? 'Testing...' : 'Test Connection'}</span>
+            </button>
             <button
               onClick={() => handleSave('calendar')}
               disabled={loadingSection !== null}

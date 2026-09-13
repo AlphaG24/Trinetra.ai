@@ -16,16 +16,19 @@ CREATE TABLE IF NOT EXISTS public.developer_requests (
 ALTER TABLE public.developer_requests ENABLE ROW LEVEL SECURITY;
 
 -- 1. Developers can view their own requests
+DROP POLICY IF EXISTS "Developers view own requests" ON public.developer_requests;
 CREATE POLICY "Developers view own requests" ON public.developer_requests
     FOR SELECT TO authenticated
     USING (developer_id = auth.uid());
 
 -- 2. Developers can submit new requests
+DROP POLICY IF EXISTS "Developers submit requests" ON public.developer_requests;
 CREATE POLICY "Developers submit requests" ON public.developer_requests
     FOR INSERT TO authenticated
     WITH CHECK (developer_id = auth.uid());
 
 -- 3. Admins/Super Admins can view all requests
+DROP POLICY IF EXISTS "Admins view all requests" ON public.developer_requests;
 CREATE POLICY "Admins view all requests" ON public.developer_requests
     FOR SELECT TO authenticated
     USING (EXISTS (
@@ -34,6 +37,7 @@ CREATE POLICY "Admins view all requests" ON public.developer_requests
     ));
 
 -- 4. Admins/Super Admins can resolve requests
+DROP POLICY IF EXISTS "Admins resolve requests" ON public.developer_requests;
 CREATE POLICY "Admins resolve requests" ON public.developer_requests
     FOR UPDATE TO authenticated
     USING (EXISTS (

@@ -7,7 +7,7 @@ import { toast } from 'sonner'
 
 interface LogObject {
   duration_seconds?: number
-  transcript?: string | null
+  transcript?: any
   recording_url?: string | null
   caller_name?: string
 }
@@ -18,7 +18,7 @@ interface TranscriptModalProps {
   log?: LogObject | null
   
   // Backward compatibility fallbacks
-  transcript?: string | null
+  transcript?: any
   recordingUrl?: string | null
   callerName?: string
 }
@@ -28,7 +28,7 @@ export function TranscriptModal({
   onClose, 
   log,
   transcript, 
-  recordingUrl,
+  recordingUrl, 
   callerName = 'Customer'
 }: TranscriptModalProps) {
   const [copied, setCopied] = useState(false)
@@ -47,11 +47,62 @@ export function TranscriptModal({
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
   }
 
-  // Parses raw transcripts (e.g. "USER: text \n AI: text") into message bubbles
+  // Parses raw transcripts (strings, arrays, JSON objects) into message bubbles
   // Handles multi-line messages, non-colon formats, and standard speaker prefixes
-  const parseTranscript = (raw: string | null | undefined) => {
+  const parseTranscript = (raw: any): Array<{ id: number; speaker: 'AI' | 'USER'; text: string }> => {
     if (!raw) return []
-    const lines = raw
+
+    // If raw is an array already (e.g. [{ role: 'assistant', content: '...' }])
+    if (Array.isArray(raw)) {
+      return raw.map((item, idx): { id: number; speaker: 'AI' | 'USER'; text: string } => {
+        if (typeof item === 'string') {
+          const colonMatch = item.match(/^(USER|AI|CALLER|ASSISTANT|SYSTEM|AGENT|CUSTOMER):\s*(.*)$/i)
+          if (colonMatch) {
+            const rawSpeaker = colonMatch[1].toUpperCase()
+            const speaker: 'AI' | 'USER' = (rawSpeaker === 'USER' || rawSpeaker === 'CALLER' || rawSpeaker === 'CUSTOMER') ? 'USER' : 'AI'
+            return { id: idx, speaker, text: colonMatch[2].trim() }
+          }
+          return { id: idx, speaker: 'AI', text: item }
+        }
+        if (typeof item === 'object' && item !== null) {
+          const rawSpeaker = String(item.speaker || item.role || item.sender || '').toUpperCase()
+          const speaker: 'AI' | 'USER' = (rawSpeaker === 'USER' || rawSpeaker === 'CALLER' || rawSpeaker === 'CUSTOMER') ? 'USER' : 'AI'
+          const text = String(item.text || item.content || item.message || item.transcript || item.utterance || '')
+          return { id: idx, speaker, text }
+        }
+        return { id: idx, speaker: 'AI', text: String(item) }
+      }).filter(msg => msg.text.trim().length > 0)
+    }
+
+    // If raw is an object (not null, not array)
+    if (typeof raw === 'object' && raw !== null) {
+      if (Array.isArray(raw.messages)) return parseTranscript(raw.messages)
+      if (Array.isArray(raw.turns)) return parseTranscript(raw.turns)
+      if (raw.transcript) return parseTranscript(raw.transcript)
+      if (raw.text) return parseTranscript(raw.text)
+      if (raw.content) return parseTranscript(raw.content)
+      // Fallback: stringify object
+      return parseTranscript(JSON.stringify(raw, null, 2))
+    }
+
+    // Ensure raw is a string
+    const rawString = typeof raw === 'string' ? raw : String(raw)
+    const trimmed = rawString.trim()
+    if (!trimmed) return []
+
+    // Try parsing as JSON string if it looks like JSON array or object
+    if (trimmed.startsWith('[') || trimmed.startsWith('{')) {
+      try {
+        const parsed = JSON.parse(trimmed)
+        if (Array.isArray(parsed) || (typeof parsed === 'object' && parsed !== null)) {
+          return parseTranscript(parsed)
+        }
+      } catch {
+        // Not JSON, continue to line-by-line parsing
+      }
+    }
+
+    const lines = rawString
       .split('\n')
       .map(line => line.trim())
       .filter(line => line.length > 0)
@@ -60,13 +111,13 @@ export function TranscriptModal({
     let currentMessage: { id: number; speaker: 'AI' | 'USER'; text: string } | null = null
 
     lines.forEach((line, idx) => {
-      // Matches standard patterns like "USER: message", "AI: message", "CALLER: message"
-      const colonMatch = line.match(/^(USER|AI|CALLER|ASSISTANT|SYSTEM):\s*(.*)$/i)
+      // Matches standard patterns like "USER: message", "AI: message", "CALLER: message", "AGENT: message"
+      const colonMatch = line.match(/^(USER|AI|CALLER|ASSISTANT|SYSTEM|AGENT|CUSTOMER):\s*(.*)$/i)
       
       if (colonMatch) {
         const rawSpeaker = colonMatch[1].toUpperCase()
         const text = colonMatch[2].trim()
-        const speaker: 'AI' | 'USER' = (rawSpeaker === 'USER' || rawSpeaker === 'CALLER') ? 'USER' : 'AI'
+        const speaker: 'AI' | 'USER' = (rawSpeaker === 'USER' || rawSpeaker === 'CALLER' || rawSpeaker === 'CUSTOMER') ? 'USER' : 'AI'
         
         currentMessage = {
           id: idx,
@@ -76,11 +127,11 @@ export function TranscriptModal({
         parsedMessages.push(currentMessage)
       } else {
         // Fallback for space separation e.g. "USER message"
-        const spaceMatch = line.match(/^(USER|AI|CALLER|ASSISTANT)\s+(.*)$/i)
+        const spaceMatch = line.match(/^(USER|AI|CALLER|ASSISTANT|AGENT|CUSTOMER)\s+(.*)$/i)
         if (spaceMatch) {
           const rawSpeaker = spaceMatch[1].toUpperCase()
           const text = spaceMatch[2].trim()
-          const speaker: 'AI' | 'USER' = (rawSpeaker === 'USER' || rawSpeaker === 'CALLER') ? 'USER' : 'AI'
+          const speaker: 'AI' | 'USER' = (rawSpeaker === 'USER' || rawSpeaker === 'CALLER' || rawSpeaker === 'CUSTOMER') ? 'USER' : 'AI'
           
           currentMessage = {
             id: idx,
@@ -111,7 +162,10 @@ export function TranscriptModal({
 
   const handleCopyTranscript = () => {
     if (!resolvedTranscript) return
-    navigator.clipboard.writeText(resolvedTranscript)
+    const textToCopy = typeof resolvedTranscript === 'string'
+      ? resolvedTranscript
+      : (typeof resolvedTranscript === 'object' ? JSON.stringify(resolvedTranscript, null, 2) : String(resolvedTranscript))
+    navigator.clipboard.writeText(textToCopy)
     setCopied(true)
     toast.success('Transcript copied to clipboard')
     setTimeout(() => setCopied(false), 2000)
@@ -122,13 +176,13 @@ export function TranscriptModal({
       {isOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 md:p-10 overflow-hidden">
           
-          {/* iOS-Style Premium Glass Backdrop with heavy blur */}
+          {/* Backdrop */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="fixed inset-0 bg-black/75 backdrop-blur-md"
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm"
           />
 
           {/* Modal Container */}
@@ -136,26 +190,26 @@ export function TranscriptModal({
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            transition={{ type: 'spring', duration: 0.5, bounce: 0.2 }}
-            className="relative w-full max-w-2xl bg-zinc-950/90 border border-zinc-800/80 rounded-3xl overflow-hidden shadow-[0_0_50px_-12px_rgba(99,102,241,0.2)] flex flex-col max-h-[85vh] backdrop-blur-xl z-10"
+            transition={{ type: 'spring', duration: 0.4, bounce: 0.2 }}
+            className="relative w-full max-w-2xl bg-[var(--card-bg)] text-[var(--body)] border border-[var(--border)] rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[85vh] z-10 font-sans"
           >
             
             {/* Header */}
-            <div className="flex items-center justify-between px-6 py-5 border-b border-zinc-800/80 bg-zinc-900/20">
+            <div className="flex items-center justify-between px-6 py-5 border-b border-[var(--border)] bg-[var(--background)]/60">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
+                <div className="w-10 h-10 rounded-2xl bg-violet-500/10 border border-violet-500/20 flex items-center justify-center text-violet-600 dark:text-violet-400 shrink-0">
                   <MessageSquare className="w-5 h-5 animate-pulse" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-semibold text-zinc-100 tracking-tight flex items-center gap-2">
+                  <h3 className="text-base font-bold text-[var(--heading)] tracking-tight flex items-center gap-2 font-display">
                     {resolvedCallerName}
                   </h3>
                   <div className="flex items-center gap-2 mt-0.5">
-                    <span className="text-[11px] text-zinc-400 font-medium tracking-wide uppercase">Call Transcript</span>
+                    <span className="text-[10px] text-[var(--muted)] font-bold tracking-wider uppercase font-montserrat">Call Transcript</span>
                     {durationLabel && (
                       <>
-                        <span className="text-zinc-700 font-bold">•</span>
-                        <div className="flex items-center gap-1 text-[11px] text-indigo-400 font-mono font-medium">
+                        <span className="text-[var(--muted)] font-bold">•</span>
+                        <div className="flex items-center gap-1 text-[11px] text-violet-600 dark:text-violet-400 font-mono font-medium">
                           <Clock className="w-3.5 h-3.5" />
                           {durationLabel}
                         </div>
@@ -169,16 +223,17 @@ export function TranscriptModal({
                 {resolvedTranscript && (
                   <button 
                     onClick={handleCopyTranscript}
-                    className="p-2 hover:bg-zinc-900 text-zinc-400 hover:text-zinc-200 rounded-xl transition-all border border-transparent hover:border-zinc-800/60"
+                    className="p-2 hover:bg-[var(--hover-bg)] text-[var(--muted)] hover:text-[var(--heading)] rounded-xl transition-all border border-[var(--border)] cursor-pointer"
                     title="Copy Transcript"
                   >
-                    {copied ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
+                    {copied ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
                   </button>
                 )}
                 
                 <button 
                   onClick={onClose}
-                  className="p-2 hover:bg-zinc-900 text-zinc-400 hover:text-zinc-200 rounded-xl transition-all border border-transparent hover:border-zinc-800/60"
+                  className="p-2 hover:bg-[var(--hover-bg)] text-[var(--muted)] hover:text-[var(--heading)] rounded-xl transition-all border border-[var(--border)] cursor-pointer"
+                  title="Close"
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -187,32 +242,32 @@ export function TranscriptModal({
 
             {/* Sticky Audio Player */}
             {resolvedRecordingUrl && (
-              <div className="px-6 py-4 bg-zinc-900/30 border-b border-zinc-800/60 flex items-center gap-4">
-                <div className="p-2 rounded-xl bg-indigo-600/10 text-indigo-400 border border-indigo-500/20 shrink-0">
+              <div className="px-6 py-4 bg-[var(--background)]/80 border-b border-[var(--border)] flex items-center gap-4">
+                <div className="p-2 rounded-xl bg-violet-600/10 text-violet-600 dark:text-violet-400 border border-violet-500/20 shrink-0">
                   <Headphones className="w-4 h-4 animate-bounce" style={{ animationDuration: '3s' }} />
                 </div>
                 <div className="flex-1 flex items-center gap-3">
                   <audio 
                     src={resolvedRecordingUrl} 
                     controls 
-                    className="w-full h-9 rounded-lg accent-indigo-500 filter invert"
+                    className="w-full h-9 rounded-lg accent-violet-600"
                   />
                   <a 
                     href={resolvedRecordingUrl} 
                     download
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="p-2 bg-zinc-900/60 hover:bg-zinc-900 text-zinc-400 hover:text-zinc-200 border border-zinc-800 rounded-xl transition-all shrink-0"
+                    className="p-2 bg-[var(--card-bg)] hover:bg-[var(--hover-bg)] text-[var(--muted)] hover:text-[var(--heading)] border border-[var(--border)] rounded-xl transition-all shrink-0"
                     title="Download Recording"
                   >
-                    <Download className="w-4.5 h-4.5" />
+                    <Download className="w-4 h-4" />
                   </a>
                 </div>
               </div>
             )}
 
             {/* Chat Messages Area */}
-            <div className="flex-1 overflow-y-auto p-6 space-y-6 min-h-0 bg-black/10 scrollbar-thin scrollbar-thumb-zinc-800 scrollbar-track-transparent">
+            <div className="flex-1 overflow-y-auto p-6 space-y-6 min-h-0 bg-[var(--background)]/30 scrollbar-thin scrollbar-thumb-[var(--border)] scrollbar-track-transparent">
               {messages.length > 0 ? (
                 messages.map((msg, index) => {
                   const isAI = msg.speaker === 'AI'
@@ -226,22 +281,22 @@ export function TranscriptModal({
                     >
                       {/* Left side Avatar for AI */}
                       {isAI && (
-                        <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-600 flex items-center justify-center text-white shrink-0 shadow-md">
+                        <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-violet-600 to-indigo-600 flex items-center justify-center text-white shrink-0 shadow-md">
                           <Bot className="w-4.5 h-4.5" />
                         </div>
                       )}
 
                       {/* Message Bubble Container */}
                       <div className="flex flex-col max-w-[75%]">
-                        <span className={`text-[10px] font-semibold text-zinc-500 mb-1 px-1 tracking-wider uppercase ${isAI ? 'text-left' : 'text-right'}`}>
+                        <span className={`text-[10px] font-bold text-[var(--muted)] mb-1 px-1 tracking-wider uppercase font-montserrat ${isAI ? 'text-left' : 'text-right'}`}>
                           {isAI ? 'Trinetra AI' : 'User'}
                         </span>
                         
                         <div
                           className={`px-4 py-2.5 text-sm leading-relaxed whitespace-pre-wrap ${
                             isAI
-                              ? 'bg-zinc-900 text-zinc-100 border border-zinc-800/80 rounded-2xl rounded-tl-none shadow-sm'
-                              : 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white rounded-2xl rounded-tr-none shadow-lg shadow-indigo-500/10'
+                              ? 'bg-[var(--card-bg)] text-[var(--heading)] border border-[var(--border)] rounded-2xl rounded-tl-none shadow-sm'
+                              : 'bg-violet-600 text-white rounded-2xl rounded-tr-none shadow-md'
                           }`}
                         >
                           {msg.text}
@@ -250,7 +305,7 @@ export function TranscriptModal({
 
                       {/* Right side Avatar for User */}
                       {!isAI && (
-                        <div className="w-8 h-8 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center text-zinc-400 shrink-0 shadow-sm">
+                        <div className="w-8 h-8 rounded-full bg-[var(--primary-bg)] border border-[var(--border)] flex items-center justify-center text-[var(--body)] shrink-0 shadow-sm">
                           <User className="w-4 h-4" />
                         </div>
                       )}
@@ -259,9 +314,9 @@ export function TranscriptModal({
                 })
               ) : (
                 <div className="flex flex-col items-center justify-center h-52 text-center py-10">
-                  <Sparkles className="w-8 h-8 text-zinc-700 mb-3 animate-pulse" />
-                  <p className="text-sm font-semibold text-zinc-400">No Transcript Available</p>
-                  <p className="text-xs text-zinc-500 mt-1 max-w-xs leading-relaxed">
+                  <Sparkles className="w-8 h-8 text-[var(--muted)] mb-3 animate-pulse" />
+                  <p className="text-sm font-bold text-[var(--heading)] font-display">No Transcript Available</p>
+                  <p className="text-xs text-[var(--muted)] mt-1 max-w-xs leading-relaxed">
                     This call does not have transcript logs or they are currently compiling.
                   </p>
                 </div>
@@ -269,10 +324,10 @@ export function TranscriptModal({
             </div>
 
             {/* Footer */}
-            <div className="px-6 py-4 border-t border-zinc-800/80 bg-zinc-900/20 flex justify-end">
+            <div className="px-6 py-4 border-t border-[var(--border)] bg-[var(--background)]/60 flex justify-end">
               <button
                 onClick={onClose}
-                className="px-5 py-2.5 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white text-xs font-semibold rounded-xl transition-all border border-zinc-800 hover:border-zinc-700/80 shadow-md cursor-pointer"
+                className="px-5 py-2.5 bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold uppercase tracking-wider rounded-xl transition-all shadow-md cursor-pointer"
               >
                 Close Logs
               </button>

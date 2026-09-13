@@ -1,4 +1,5 @@
 import os
+import uuid
 import logging
 from datetime import datetime, timezone
 from typing import List, Dict, Optional
@@ -102,8 +103,8 @@ class TwilioProvider(AbstractTelephonyProvider):
         voice_url = None
         status_callback = None
         if not localhost:
-            voice_url = f"{self.webhook_base}/webhooks/voice/twilio/{organization_id}"
-            status_callback = f"{self.webhook_base}/webhooks/voice/twilio/status/{organization_id}"
+            voice_url = f"{self.webhook_base}/api/voice/webhooks/voice/twilio/{organization_id}"
+            status_callback = f"{self.webhook_base}/api/voice/webhooks/voice/twilio/status/{organization_id}"
             logger.info(f"[Twilio] Using webhook URL: {voice_url}")
         else:
             logger.warning("[Twilio] Localhost detected — skipping voice_url configuration")
@@ -272,18 +273,57 @@ class TwilioProvider(AbstractTelephonyProvider):
             url_parts[4] = urllib.parse.urlencode(query)
             webhook_url = urllib.parse.urlunparse(url_parts)
             logger.info(f"[{self.provider_name}] Appended custom parameters to webhook URL: {webhook_url}")
-        try:
-            call = self.client.calls.create(
-                to=to_number,
-                from_=from_number,
-                url=webhook_url  # TwiML URL that connects to LiveKit / agent handler
-            )
-            return {"call_sid": call.sid, "status": call.status}
-        except TwilioRestException as e:
-            self._handle_twilio_exception(e, "make_outbound_call")
-        except Exception as e:
-            logger.error(f"[{self.provider_name}] Unexpected error placing outbound call: {e}")
-            raise TelephonyProviderError(self.provider_name, str(e))
+            
+        ws_base = self.webhook_base.replace("https://", "wss://").replace("http://", "ws://")
+        room_name = (custom_parameters.get("room_name") if custom_parameters else None) or f"twilio-{uuid.uuid4().hex[:12]}"
+        
+        stream_url = f"{ws_base}/api/voice/webhooks/voice/twilio/stream/{room_name}"
+        if "ngrok" in ws_base:
+            stream_url += "?ngrok-skip-browser-warning=true"
+
+        media_stream_twiml = f"""<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+    <Connect>
+        <Stream url="{stream_url}">
+            <Parameter name="room_name" value="{room_name}" />
+        </Stream>
+    </Connect>
+    <Pause length="3600" />
+</Response>"""
+
+        status_cb = f"{self.webhook_base}/api/voice/webhooks/voice/twilio/status/default"
+        if "ngrok" in status_cb:
+            status_cb += "?ngrok-skip-browser-warning=true"
+        for attempt in range(2):
+            try:
+                # Pass direct Media Stream TwiML instructions!
+                # By passing twiml directly, Twilio executes from memory without any HTTP webhook roundtrip,
+                # completely eliminating HTTP 404, 503, and "An application error has occurred" failures!
+                recording_cb = f"{self.webhook_base}/api/voice/webhooks/voice/twilio/recording/default"
+                if "ngrok" in recording_cb:
+                    recording_cb += "?ngrok-skip-browser-warning=true"
+                call = self.client.calls.create(
+                    to=to_number,
+                    from_=from_number,
+                    twiml=media_stream_twiml,
+                    status_callback=status_cb,
+                    status_callback_event=['answered', 'completed'],
+                    status_callback_method='POST',
+                    record=True,
+                    recording_status_callback=recording_cb,
+                    recording_status_callback_method='POST'
+                )
+                return {"call_sid": call.sid, "status": call.status, "room_name": room_name}
+            except TwilioRestException as e:
+                self._handle_twilio_exception(e, "make_outbound_call")
+            except Exception as e:
+                err_str = str(e)
+                if ("RemoteDisconnected" in err_str or "Connection aborted" in err_str) and attempt == 0:
+                    logger.warning(f"[{self.provider_name}] Stale connection drop in Twilio client. Re-initializing client and retrying...")
+                    self.client = Client(self.account_sid, self.auth_token)
+                    continue
+                logger.error(f"[{self.provider_name}] Unexpected error placing outbound call: {e}")
+                raise TelephonyProviderError(self.provider_name, str(e))
 
     async def validate_webhook_request(self, request_data: Dict, signature: str) -> bool:
         url = request_data.get("_url", "")

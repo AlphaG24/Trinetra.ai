@@ -2,6 +2,7 @@ import re
 import csv
 import io
 import logging
+import asyncio
 from datetime import datetime
 from database import supabase_admin
 
@@ -123,3 +124,91 @@ class CallerLookupService:
         }
         
         return self.supabase.table("customer_contacts").upsert(payload, on_conflict="organization_id,phone_number").execute()
+
+    async def upsert_from_call(
+        self,
+        organization_id: str,
+        phone_number: str,
+        caller_name: str | None = None,
+        email: str | None = None,
+        company: str | None = None,
+        call_summary: str | None = None,
+        direction: str = "inbound",
+        tags: list | None = None
+    ) -> dict | None:
+        """
+        Upsert customer contact after a call.
+        If contact exists, increment total_calls, append call summary to notes, and fill missing info.
+        If new, create a new contact row.
+        """
+        cleaned = self._clean_phone(phone_number)
+        if not cleaned or not organization_id:
+            return None
+
+        try:
+            existing = await asyncio.to_thread(
+                self.supabase.table("customer_contacts")
+                .select("*")
+                .eq("organization_id", organization_id)
+                .eq("phone_number", cleaned)
+                .maybe_single()
+                .execute
+            )
+
+            now_iso = datetime.utcnow().isoformat()
+            date_str = datetime.utcnow().strftime("%Y-%m-%d %H:%M")
+            summary_entry = f"[{date_str} - {direction.upper()}]: {call_summary}" if call_summary else ""
+
+            if existing and existing.data:
+                cust = existing.data
+                existing_notes = cust.get("notes") or ""
+                new_notes = f"{existing_notes}\n{summary_entry}".strip() if summary_entry else existing_notes
+                
+                update_fields = {
+                    "last_contact_at": now_iso,
+                    "total_calls": (cust.get("total_calls") or 0) + 1,
+                    "updated_at": now_iso,
+                    "notes": new_notes
+                }
+                if caller_name and caller_name.strip() and caller_name.lower() not in ("unknown", "prospect", "caller", "inbound caller", ""):
+                    if not cust.get("full_name") or cust.get("full_name").lower() in ("unknown", "prospect", "caller", "inbound caller", ""):
+                        update_fields["full_name"] = caller_name.strip()
+                if email and email.strip() and not cust.get("email"):
+                    update_fields["email"] = email.strip()
+                if company and company.strip() and not cust.get("company"):
+                    update_fields["company"] = company.strip()
+                if tags:
+                    existing_tags = cust.get("tags") or []
+                    merged_tags = list(set(existing_tags + tags))
+                    update_fields["tags"] = merged_tags
+
+                res = await asyncio.to_thread(
+                    self.supabase.table("customer_contacts").update(update_fields).eq("id", cust["id"]).execute
+                )
+                logger.info(f"[CallerLookupService] Updated existing contact {cust['id']} for phone {cleaned}")
+                return res.data[0] if res.data else cust
+            else:
+                clean_contact_name = caller_name.strip() if (caller_name and caller_name.strip() and caller_name.lower() not in ("unknown", "prospect", "caller")) else "Inbound Caller"
+                new_payload = {
+                    "organization_id": organization_id,
+                    "phone_number": cleaned,
+                    "full_name": clean_contact_name,
+                    "email": email.strip() if email else None,
+                    "company": company.strip() if company else None,
+                    "notes": summary_entry,
+                    "total_calls": 1,
+                    "last_contact_at": now_iso,
+                    "import_source": f"{direction}_call",
+                    "tags": tags or [direction],
+                    "created_at": now_iso,
+                    "updated_at": now_iso
+                }
+                res = await asyncio.to_thread(
+                    self.supabase.table("customer_contacts").insert(new_payload).execute
+                )
+                logger.info(f"[CallerLookupService] Inserted new customer contact for phone {cleaned}")
+                return res.data[0] if res.data else new_payload
+        except Exception as e:
+            logger.error(f"[CallerLookupService] Error in upsert_from_call: {e}")
+            return None
+

@@ -8,7 +8,7 @@ import fs from 'fs'
 import path from 'path'
 
 interface CartItem {
-  type: 'subscription' | 'phone_number' | 'bundle'
+  type: 'subscription' | 'phone_number' | 'bundle' | 'number_pool' | 'number_renewal'
   key: string
   quantity: number
 }
@@ -193,6 +193,145 @@ export async function POST(request: Request) {
           discount: itemDiscount,
           amount: finalPrice
         })
+      } else if (item.type === 'number_pool') {
+        // Pool Number Purchase Processing
+        const { data: poolNumber } = await adminClient
+          .from('phone_numbers')
+          .select('*')
+          .eq('id', item.key)
+          .single()
+
+        if (poolNumber) {
+          const validityDays = poolNumber.validity_days || 30
+          const renewalDateIso = new Date(Date.now() + validityDays * 86400000).toISOString()
+
+          // 1. Mark pool number as assigned in phone_numbers
+          await adminClient
+            .from('phone_numbers')
+            .update({
+              status: 'active',
+              is_assigned: true,
+              organization_id: profile.organization_id,
+              assigned_org_id: profile.organization_id,
+              validity_days: validityDays,
+              renewal_date: renewalDateIso,
+              expiry_alerts_sent: [],
+              metadata: {
+                payment_id: razorpay_payment_id
+              },
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', poolNumber.id)
+
+          // 2. Check if this is the organization's FIRST assigned number; if so, auto-assign to most recently created agent
+          const { count: assignedCount } = await adminClient
+            .from('phone_numbers')
+            .select('id', { count: 'exact', head: true })
+            .eq('organization_id', profile.organization_id)
+            .eq('is_assigned', true)
+
+          if (assignedCount === null || assignedCount === undefined || assignedCount <= 1) {
+            const { data: recentAgent } = await adminClient
+              .from('agents')
+              .select('id, name')
+              .eq('organization_id', profile.organization_id)
+              .order('created_at', { ascending: false })
+              .limit(1)
+              .maybeSingle()
+
+            if (recentAgent) {
+              await adminClient
+                .from('phone_numbers')
+                .update({ assigned_agent_id: recentAgent.id })
+                .eq('id', poolNumber.id)
+
+              await adminClient
+                .from('agent_phone_numbers')
+                .upsert({
+                  agent_id: recentAgent.id,
+                  phone_number_id: poolNumber.id,
+                  is_primary: true
+                })
+
+              await adminClient
+                .from('agents')
+                .update({
+                  phone_number: poolNumber.phone_number,
+                  telephony_provider: poolNumber.provider || 'sarvam'
+                })
+                .eq('id', recentAgent.id)
+
+              console.log(`[First Number Auto-Assignment] Assigned ${poolNumber.phone_number} to recent agent ${recentAgent.name} (${recentAgent.id})`)
+            }
+          }
+
+          // 3. Activity log
+          await adminClient.from('activity_log').insert({
+            user_id: user.id,
+            organization_id: profile.organization_id,
+            activity_type: 'number_provisioned',
+            title: 'Phone Number Purchased from Pool',
+            description: `Purchased number ${poolNumber.phone_number} (${poolNumber.city || 'Local'})`
+          })
+
+          const itemRate = poolNumber.retail_price_paisa || 29900
+          const itemTotal = itemRate * item.quantity
+          totalPaidPaisa += itemTotal
+
+          invoiceLines.push({
+            item: `Virtual Phone Number Purchase (${poolNumber.phone_number})`,
+            quantity: item.quantity,
+            rate: itemRate,
+            discount: 0,
+            amount: itemTotal
+          })
+        }
+      } else if (item.type === 'number_renewal') {
+        // Phone Number Renewal Processing
+        const { data: phoneRow } = await adminClient
+          .from('phone_numbers')
+          .select('*')
+          .eq('id', item.key)
+          .single()
+
+        if (phoneRow) {
+          const validityDays = phoneRow.validity_days || 30
+          const currentRenewal = phoneRow.renewal_date ? new Date(phoneRow.renewal_date).getTime() : Date.now()
+          const baseTime = currentRenewal > Date.now() ? currentRenewal : Date.now()
+          const newRenewalDateIso = new Date(baseTime + validityDays * 86400000).toISOString()
+
+          // Extend renewal date on phone_numbers
+          await adminClient
+            .from('phone_numbers')
+            .update({
+              renewal_date: newRenewalDateIso,
+              status: 'active',
+              expiry_alerts_sent: [],
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', phoneRow.id)
+
+          // Activity log
+          await adminClient.from('activity_log').insert({
+            user_id: user.id,
+            organization_id: profile.organization_id,
+            activity_type: 'number_renewed',
+            title: 'Phone Number Renewed',
+            description: `Extended subscription for ${phoneRow.phone_number} by ${validityDays} days`
+          })
+
+          const itemRate = phoneRow.retail_price_paisa || 29900
+          const itemTotal = itemRate * item.quantity
+          totalPaidPaisa += itemTotal
+
+          invoiceLines.push({
+            item: `Virtual Phone Number 30-Day Renewal (${phoneRow.phone_number})`,
+            quantity: item.quantity,
+            rate: itemRate,
+            discount: 0,
+            amount: itemTotal
+          })
+        }
       } else if (item.type === 'bundle') {
         const bundle = bundleMap[item.key]
         if (bundle) {
@@ -280,6 +419,9 @@ export async function POST(request: Request) {
                   ? `Hello, main ${cleanName} bol rahi hoon ${companyName} support team se. Kaise help kar sakti hoon?`
                   : `Hello, main ${cleanName} bol raha hoon ${companyName} se. Kaise hain aap?`
 
+                const bundleValidityDays = bundle.validity_days || 30;
+                const subscriptionExpiresAt = new Date(Date.now() + bundleValidityDays * 86400000).toISOString();
+
                 const agentPayload = {
                   user_id: user.id,
                   organization_id: profile.organization_id || null,
@@ -291,6 +433,9 @@ export async function POST(request: Request) {
                   system_prompt: systemPrompt,
                   greeting_message: greetingMessage,
                   fallback_message: 'Mujhe yeh samajh nahi aaya, kripya dubara bataiye.',
+                  validity_days: bundleValidityDays,
+                  subscription_expires_at: subscriptionExpiresAt,
+                  expiry_alerts_sent: [],
                   config: {
                     plan_tier: prod.tier || (dbAgentType === 'multi_agent' ? 'professional' : 'starter'),
                     minutes_limit: 1000
@@ -323,7 +468,7 @@ export async function POST(request: Request) {
                   const fastApiBody = {
                     organization_id: profile.organization_id || null,
                     did_type: 'mobile',
-                    provider: profile.country === 'IN' ? 'voicelink' : 'twilio',
+                    provider: profile.country === 'IN' ? 'exotel' : 'twilio',
                     user_id: user.id,
                     area_code: profile.country === 'IN' ? '022' : '212'
                   };

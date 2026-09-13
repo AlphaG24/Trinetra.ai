@@ -22,6 +22,7 @@ class TestConnectionRequest(BaseModel):
     account_sid: Optional[str] = None
     auth_token: Optional[str] = None
     base_url: Optional[str] = None
+    subdomain: Optional[str] = None
 
 class ProvisionNumberRequest(BaseModel):
     organization_id: str
@@ -47,7 +48,8 @@ async def trigger_outbound_call(req: OutboundCallRequest):
 
         provider = get_provider("twilio")
         webhook_base = ConfigService.get("TRINETRA_WEBHOOK_BASE_URL") or os.getenv("TRINETRA_WEBHOOK_BASE_URL") or "http://localhost:8000"
-        webhook_url = f"{webhook_base}/api/voice/webhooks/voice/twilio/{req.organization_id}?agent_id={req.agent_id}"
+        unique_room = f"twilio--{req.agent_id}--nocontact--{uuid.uuid4().hex[:8]}" if req.agent_id else f"twilio--noagent--nocontact--{uuid.uuid4().hex[:8]}"
+        webhook_url = f"{webhook_base}/api/voice/webhooks/voice/twilio/{req.organization_id}?agent_id={req.agent_id}&room_name={unique_room}"
 
         # Use provided from_phone or fallback to TWILIO_PHONE_NUMBER env or default pool number
         from_phone = req.from_phone
@@ -69,8 +71,15 @@ async def trigger_outbound_call(req: OutboundCallRequest):
         if not from_phone:
             from_phone = os.getenv("TWILIO_PHONE_NUMBER") or "+12282950908"
 
-        logger.info(f"Placing manual outbound call: From {from_phone} -> To {req.to_phone} (agent: {req.agent_id})")
-        call_res = await provider.make_outbound_call(req.to_phone, from_phone, webhook_url)
+        call_res = await provider.make_outbound_call(
+            req.to_phone, 
+            from_phone, 
+            webhook_url,
+            custom_parameters={
+                "agent_id": req.agent_id,
+                "room_name": unique_room
+            }
+        )
         return {"success": True, "data": call_res}
     except Exception as e:
         logger.error(f"Failed to place outbound callback: {e}")
@@ -79,7 +88,7 @@ async def trigger_outbound_call(req: OutboundCallRequest):
 @router.post("/test/{provider}")
 async def test_connection(provider: str, req: TestConnectionRequest):
     provider = provider.lower()
-    if provider not in ["voicelink", "twilio", "simulated"]:
+    if provider not in ["twilio", "simulated", "exotel"]:
         return {"success": False, "message": f"Unsupported provider: {provider}"}
         
     start_time = datetime.now()
@@ -92,41 +101,50 @@ async def test_connection(provider: str, req: TestConnectionRequest):
                 "message": "Connected to Simulated Provider", 
                 "details": {"response_time_ms": 5}
             }
-            
-        elif provider == "voicelink":
+
+        elif provider == "exotel":
+            account_sid = req.account_sid
             api_key = req.api_key
-            base_url = req.base_url
+            api_token = req.auth_token
+            subdomain = req.subdomain
             
-            if not api_key or not base_url:
-                # Fetch from config
+            if not account_sid or not api_key or not api_token:
                 try:
-                    res = supabase_admin.table("system_config").select("config_key, config_value").in_("config_key", ["VOICELINK_API_KEY", "VOICELINK_API_BASE_URL"]).execute()
+                    res = supabase_admin.table("system_config").select("config_key, config_value").in_("config_key", ["EXOTEL_ACCOUNT_SID", "EXOTEL_API_KEY", "EXOTEL_API_TOKEN", "EXOTEL_SUBDOMAIN"]).execute()
                     configs = {row["config_key"]: row["config_value"] for row in res.data}
-                    api_key = api_key or configs.get("VOICELINK_API_KEY")
-                    base_url = base_url or configs.get("VOICELINK_API_BASE_URL")
+                    account_sid = account_sid or configs.get("EXOTEL_ACCOUNT_SID")
+                    api_key = api_key or configs.get("EXOTEL_API_KEY")
+                    api_token = api_token or configs.get("EXOTEL_API_TOKEN")
+                    subdomain = subdomain or configs.get("EXOTEL_SUBDOMAIN") or "api.exotel.com"
                 except Exception as e:
-                    logger.error(f"Error fetching voicelink config: {e}")
-                    
-            if not api_key or not base_url:
-                return {"success": False, "message": "VoiceLink credentials not provided and not found in system_config"}
-                
-            base_url = base_url.rstrip("/")
-            
-            # Simple auth test against voicelink profile endpoint
+                    logger.error(f"Error fetching exotel config: {e}")
+                    subdomain = subdomain or "api.exotel.com"
+            else:
+                subdomain = subdomain or "api.exotel.com"
+
+            if not account_sid or not api_key or not api_token:
+                return {"success": False, "message": "Exotel credentials (ACCOUNT_SID, API_KEY, API_TOKEN) not provided and not found in system_config"}
+
             async with httpx.AsyncClient(timeout=10.0) as client:
-                resp = await client.get(f"{base_url}/reseller/profile", headers={"Authorization": f"Bearer {api_key}"})
-                
+                url = f"https://{subdomain.strip().rstrip('/')}/v1/Accounts/{account_sid}.json"
+                resp = await client.get(url, auth=(api_key, api_token))
+                delta = int((datetime.now() - start_time).total_seconds() * 1000)
+
                 if resp.status_code == 200:
-                    delta = int((datetime.now() - start_time).total_seconds() * 1000)
+                    data = resp.json().get("Account", {})
                     return {
                         "success": True,
-                        "message": "Connected to VoiceLink successfully",
-                        "details": {"response_time_ms": delta}
+                        "message": f"Connected to Exotel successfully ({data.get('Status', 'Active')})",
+                        "details": {
+                            "response_time_ms": delta,
+                            "account_sid": account_sid,
+                            "status": data.get("Status")
+                        }
                     }
                 else:
                     return {
                         "success": False,
-                        "message": f"Authentication failed (Status {resp.status_code})",
+                        "message": f"Exotel authentication failed (Status {resp.status_code}): {resp.text}"
                     }
 
         elif provider == "twilio":
@@ -239,8 +257,8 @@ async def get_available_numbers(city: str, did_type: str, provider: Optional[str
             prov = get_provider(provider)
             numbers = await prov.get_available_numbers(city, did_enum)
         else:
-            # Fallback to voicelink for now if not specified
-            prov = get_provider("voicelink")
+            # Fallback to exotel if not specified
+            prov = get_provider("exotel")
             numbers = await prov.get_available_numbers(city, did_enum)
             
         return {
@@ -337,10 +355,10 @@ async def get_pricing_display():
         # Get pricing for all configured providers and DID types
         pricing = {}
         
-        # VoiceLink pricing
-        for did_type in ["mobile", "landline", "tollfree", "92series"]:
-            display = await ps.format_price_for_display("voicelink", did_type)
-            pricing[f"voicelink_{did_type}"] = display
+        # Exotel pricing
+        for did_type in ["mobile", "landline"]:
+            display = await ps.format_price_for_display("exotel", did_type)
+            pricing[f"exotel_{did_type}"] = display
         
         # Twilio pricing
         for country in ["US", "UK", "IN"]:

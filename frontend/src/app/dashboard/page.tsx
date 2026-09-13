@@ -83,11 +83,13 @@ export default function DashboardPage() {
 
     const supabase = createClient()
     let activeChannel: any = null
+    let dataChannel: any = null
 
-    const subscribeToProfile = async () => {
+    const subscribeToRealtime = async () => {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
 
+      // Profile updates
       activeChannel = supabase
         .channel(`dashboard_profile_realtime_${Math.random().toString(36).substring(7)}`)
         .on(
@@ -105,16 +107,60 @@ export default function DashboardPage() {
           }
         )
         .subscribe()
+
+      // Realtime KPI, Calls, Leads & Campaigns sync (Task 4.4)
+      dataChannel = supabase
+        .channel(`dashboard_data_realtime_${Math.random().toString(36).substring(7)}`)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'voice_calls',
+            filter: `user_id=eq.${user.id}`,
+          },
+          () => {
+            mutateOverview()
+          }
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'leads',
+            filter: `user_id=eq.${user.id}`,
+          },
+          () => {
+            mutateOverview()
+          }
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'campaigns',
+            filter: `user_id=eq.${user.id}`,
+          },
+          () => {
+            mutateOverview()
+          }
+        )
+        .subscribe()
     }
 
-    subscribeToProfile()
+    subscribeToRealtime()
 
     return () => {
       if (activeChannel) {
         supabase.removeChannel(activeChannel)
       }
+      if (dataChannel) {
+        supabase.removeChannel(dataChannel)
+      }
     }
-  }, [])
+  }, [mutateOverview])
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto p-4 md:p-6">

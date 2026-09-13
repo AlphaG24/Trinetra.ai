@@ -43,50 +43,8 @@ const cleanAgentName = (name: string) => {
 export default function CallbacksDashboardPage() {
   const { agents, profile, setProfile } = useDashboardStore();
 
-  useEffect(() => {
-    if (!profile) {
-      const loadProfile = async () => {
-        try {
-          const { createClient } = await import('@/utils/supabase/client');
-          const supabase = createClient();
-          const { data: { user } } = await supabase.auth.getUser();
-          if (user) {
-            const { data: dbProfile } = await supabase
-              .from('profiles')
-              .select('*')
-              .eq('id', user.id)
-              .single();
-            if (dbProfile) {
-              setProfile(dbProfile);
-            }
-          }
-        } catch (err) {
-          console.error("Error loading profile in CallbacksDashboardPage:", err);
-        }
-      };
-      loadProfile();
-    }
-  }, [profile, setProfile]);
+  // === ALL HOOKS MUST BE ABOVE ANY EARLY RETURNS (Rules of Hooks) ===
 
-  if (!profile) {
-    return (
-      <div className="flex h-[50vh] w-full items-center justify-center">
-        <div className="w-8 h-8 border-2 border-violet-500 border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
-  }
-
-  const userPlanTier = (profile as any)?.plan_tier?.toLowerCase() || 'free';
-  if (userPlanTier === 'free' || userPlanTier === 'free_demo') {
-    return (
-      <UpgradePrompt 
-        title="Callbacks Scheduling"
-        message="Callback scheduling is available on paid plans. Upgrade to the ₹99 Trial or a paid plan to schedule and track callbacks."
-        upgradeLink="/dashboard/billing"
-      />
-    );
-  }
-  
   // Modals
   const [isScheduleOpen, setIsScheduleOpen] = useState(false);
   const [selectedCallback, setSelectedCallback] = useState<Callback | null>(null);
@@ -113,6 +71,31 @@ export default function CallbacksDashboardPage() {
   
   // Dropdown menu state per row
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!profile) {
+      const loadProfile = async () => {
+        try {
+          const { createClient } = await import('@/utils/supabase/client');
+          const supabase = createClient();
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user) {
+            const { data: dbProfile } = await supabase
+              .from('profiles')
+              .select('*')
+              .eq('id', user.id)
+              .single();
+            if (dbProfile) {
+              setProfile(dbProfile);
+            }
+          }
+        } catch (err) {
+          console.error("Error loading profile in CallbacksDashboardPage:", err);
+        }
+      };
+      loadProfile();
+    }
+  }, [profile, setProfile]);
 
   const fetchStats = async () => {
     try {
@@ -151,6 +134,27 @@ export default function CallbacksDashboardPage() {
     fetchStats();
     fetchCallbacks();
   }, [statusFilter, agentFilter, priorityFilter, dateFilter]);
+
+  // === EARLY RETURNS (after all hooks) ===
+
+  if (!profile) {
+    return (
+      <div className="flex h-[50vh] w-full items-center justify-center">
+        <div className="w-8 h-8 border-2 border-violet-500 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  const userPlanTier = (profile as any)?.plan_tier?.toLowerCase() || 'free';
+  if (userPlanTier === 'free' || userPlanTier === 'free_demo') {
+    return (
+      <UpgradePrompt 
+        title="Callbacks Scheduling"
+        message="Callback scheduling is available on paid plans. Upgrade to the ₹99 Trial or a paid plan to schedule and track callbacks."
+        upgradeLink="/dashboard/billing"
+      />
+    );
+  }
 
   const handleCopyPhone = (e: React.MouseEvent, id: string, phone: string) => {
     e.stopPropagation();

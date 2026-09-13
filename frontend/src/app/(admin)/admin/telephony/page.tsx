@@ -11,15 +11,16 @@ import toast from 'react-hot-toast'
 type Tab = 'setup' | 'pricing' | 'inventory'
 
 type Configs = {
-  VOICELINK_API_KEY: string
-  VOICELINK_API_BASE_URL: string
+  EXOTEL_API_KEY: string
+  EXOTEL_API_TOKEN: string
+  EXOTEL_ACCOUNT_SID: string
+  EXOTEL_SUBDOMAIN: string
+  EXOTEL_CALLER_ID: string
   TWILIO_ACCOUNT_SID: string
   TWILIO_AUTH_TOKEN: string
   TRINETRA_WEBHOOK_BASE_URL: string
-  voicelink_mobile_did_cost_paisa: string
-  voicelink_landline_did_cost_paisa: string
-  voicelink_tollfree_did_cost_paisa: string
-  voicelink_92series_did_cost_paisa: string
+  exotel_mobile_did_cost_paisa: string
+  exotel_landline_did_cost_paisa: string
   twilio_US_local_cost_paisa: string
   twilio_UK_local_cost_paisa: string
   twilio_IN_mobile_cost_paisa: string
@@ -34,15 +35,16 @@ export default function AdminTelephonyPage() {
   const [saving, setSaving] = useState(false)
   const [isDirty, setIsDirty] = useState(false)
   const [configs, setConfigs] = useState<Configs>({
-    VOICELINK_API_KEY: '',
-    VOICELINK_API_BASE_URL: '',
+    EXOTEL_API_KEY: '',
+    EXOTEL_API_TOKEN: '',
+    EXOTEL_ACCOUNT_SID: '',
+    EXOTEL_SUBDOMAIN: 'api.exotel.com',
+    EXOTEL_CALLER_ID: '',
     TWILIO_ACCOUNT_SID: '',
     TWILIO_AUTH_TOKEN: '',
     TRINETRA_WEBHOOK_BASE_URL: '',
-    voicelink_mobile_did_cost_paisa: '0',
-    voicelink_landline_did_cost_paisa: '0',
-    voicelink_tollfree_did_cost_paisa: '0',
-    voicelink_92series_did_cost_paisa: '0',
+    exotel_mobile_did_cost_paisa: '15000',
+    exotel_landline_did_cost_paisa: '10000',
     twilio_US_local_cost_paisa: '0',
     twilio_UK_local_cost_paisa: '0',
     twilio_IN_mobile_cost_paisa: '0',
@@ -196,9 +198,11 @@ export default function AdminTelephonyPage() {
       
       // If dirty, send the modified keys to test them without saving first
       if (isDirty) {
-        if (provider === 'voicelink') {
-          payload.api_key = configs.VOICELINK_API_KEY
-          payload.base_url = configs.VOICELINK_API_BASE_URL
+        if (provider === 'exotel') {
+          payload.account_sid = configs.EXOTEL_ACCOUNT_SID
+          payload.api_key = configs.EXOTEL_API_KEY
+          payload.auth_token = configs.EXOTEL_API_TOKEN
+          payload.subdomain = configs.EXOTEL_SUBDOMAIN
         } else if (provider === 'twilio') {
           payload.account_sid = configs.TWILIO_ACCOUNT_SID
           payload.auth_token = configs.TWILIO_AUTH_TOKEN
@@ -257,12 +261,12 @@ export default function AdminTelephonyPage() {
         
         <div className="flex items-center gap-4 mt-6">
           <div className="flex items-center gap-2 bg-[var(--card-bg)] border border-[var(--border)] px-3 py-1.5 rounded-lg text-xs">
-            <span className={`w-2 h-2 rounded-full ${configs.VOICELINK_API_KEY && !configs.VOICELINK_API_KEY.startsWith('•') || configs.VOICELINK_API_KEY.startsWith('•') ? 'bg-emerald-500' : 'bg-red-500'}`}></span>
-            <span className="text-[var(--heading)] font-semibold">VoiceLink</span>
+            <span className={`w-2 h-2 rounded-full ${configs.EXOTEL_ACCOUNT_SID && configs.EXOTEL_API_KEY ? 'bg-emerald-500' : 'bg-red-500'}`}></span>
+            <span className="text-[var(--heading)] font-semibold">Exotel (India)</span>
           </div>
           <div className="flex items-center gap-2 bg-[var(--card-bg)] border border-[var(--border)] px-3 py-1.5 rounded-lg text-xs">
             <span className={`w-2 h-2 rounded-full ${configs.TWILIO_ACCOUNT_SID && !configs.TWILIO_ACCOUNT_SID.startsWith('•') || configs.TWILIO_ACCOUNT_SID.startsWith('•') ? 'bg-emerald-500' : 'bg-red-500'}`}></span>
-            <span className="text-[var(--heading)] font-semibold">Twilio</span>
+            <span className="text-[var(--heading)] font-semibold">Twilio (US/Global)</span>
           </div>
           <div className="flex items-center gap-2 bg-[var(--card-bg)] border border-[var(--border)] px-3 py-1.5 rounded-lg text-xs">
             <span className="w-2 h-2 rounded-full bg-amber-500"></span>
@@ -296,61 +300,106 @@ export default function AdminTelephonyPage() {
       {/* TAB 1: SETUP */}
       {activeTab === 'setup' && (
         <div className="space-y-6">
-          {/* VoiceLink */}
-          <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-xl p-6 space-y-5">
-            <div className="flex items-center gap-3 border-b border-[var(--border)] pb-3">
-              <h2 className="text-lg font-bold text-[var(--heading)] font-[family-name:var(--font-montserrat)]">VoiceLink</h2>
-              <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 text-xs font-semibold border border-emerald-500/20">Indian Numbers</span>
+          {/* Exotel */}
+          <div className="bg-[var(--card-bg)] border border-emerald-500/30 rounded-xl p-6 space-y-5 shadow-lg">
+            <div className="flex items-center justify-between border-b border-[var(--border)] pb-3 flex-wrap gap-2">
+              <div className="flex items-center gap-3">
+                <h2 className="text-lg font-bold text-[var(--heading)] font-[family-name:var(--font-montserrat)]">Exotel</h2>
+                <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-xs font-bold border border-emerald-500/30">Primary Indian Carrier (DLT/TRAI Compliant)</span>
+              </div>
+              <span className="text-xs text-[var(--muted)]">Direct DB & System Config Integration</span>
             </div>
             
-            <div className="grid grid-cols-1 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-[var(--muted)] uppercase tracking-wider">Account SID</label>
+                <input 
+                  type="text"
+                  placeholder="e.g. your_account_sid"
+                  value={configs.EXOTEL_ACCOUNT_SID}
+                  onChange={(e) => handleChange('EXOTEL_ACCOUNT_SID', e.target.value)}
+                  className="w-full bg-[var(--background)] border border-[var(--border)] rounded-lg px-3 py-2.5 text-sm text-[var(--heading)] focus:border-[var(--primary-bg)] outline-none transition-colors"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-[var(--muted)] uppercase tracking-wider">API Subdomain / Host</label>
+                <input 
+                  type="text"
+                  placeholder="api.exotel.com"
+                  value={configs.EXOTEL_SUBDOMAIN}
+                  onChange={(e) => handleChange('EXOTEL_SUBDOMAIN', e.target.value)}
+                  className="w-full bg-[var(--background)] border border-[var(--border)] rounded-lg px-3 py-2.5 text-sm text-[var(--heading)] focus:border-[var(--primary-bg)] outline-none transition-colors"
+                />
+              </div>
+
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-[var(--muted)] uppercase tracking-wider">API Key</label>
                 <div className="relative">
                   <input 
-                    type={showKey['vl_key'] ? 'text' : 'password'}
-                    value={configs.VOICELINK_API_KEY}
-                    onChange={(e) => handleChange('VOICELINK_API_KEY', e.target.value)}
+                    type={showKey['exo_key'] ? 'text' : 'password'}
+                    placeholder="Enter Exotel API Key"
+                    value={configs.EXOTEL_API_KEY}
+                    onChange={(e) => handleChange('EXOTEL_API_KEY', e.target.value)}
                     className="w-full bg-[var(--background)] border border-[var(--border)] rounded-lg pl-3 pr-10 py-2.5 text-sm text-[var(--heading)] focus:border-[var(--primary-bg)] outline-none transition-colors"
                   />
-                  <button type="button" onClick={() => setShowKey(p => ({...p, vl_key: !p.vl_key}))} className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--muted)] hover:text-[var(--heading)]">
-                    {showKey['vl_key'] ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  <button type="button" onClick={() => setShowKey(p => ({...p, exo_key: !p.exo_key}))} className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--muted)] hover:text-[var(--heading)]">
+                    {showKey['exo_key'] ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
               </div>
+
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-[var(--muted)] uppercase tracking-wider">API Base URL</label>
+                <label className="text-xs font-bold text-[var(--muted)] uppercase tracking-wider">API Token</label>
+                <div className="relative">
+                  <input 
+                    type={showKey['exo_token'] ? 'text' : 'password'}
+                    placeholder="Enter Exotel API Token"
+                    value={configs.EXOTEL_API_TOKEN}
+                    onChange={(e) => handleChange('EXOTEL_API_TOKEN', e.target.value)}
+                    className="w-full bg-[var(--background)] border border-[var(--border)] rounded-lg pl-3 pr-10 py-2.5 text-sm text-[var(--heading)] focus:border-[var(--primary-bg)] outline-none transition-colors"
+                  />
+                  <button type="button" onClick={() => setShowKey(p => ({...p, exo_token: !p.exo_token}))} className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--muted)] hover:text-[var(--heading)]">
+                    {showKey['exo_token'] ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+
+              <div className="space-y-1.5 md:col-span-2">
+                <label className="text-xs font-bold text-[var(--muted)] uppercase tracking-wider">Verified Indian Virtual Number / Caller ID</label>
                 <input 
-                  type="url"
-                  placeholder="https://api.voicelink.in/v1"
-                  value={configs.VOICELINK_API_BASE_URL}
-                  onChange={(e) => handleChange('VOICELINK_API_BASE_URL', e.target.value)}
+                  type="text"
+                  placeholder="e.g. 080xxxxxxxx or +9180xxxxxxxx"
+                  value={configs.EXOTEL_CALLER_ID}
+                  onChange={(e) => handleChange('EXOTEL_CALLER_ID', e.target.value)}
                   className="w-full bg-[var(--background)] border border-[var(--border)] rounded-lg px-3 py-2.5 text-sm text-[var(--heading)] focus:border-[var(--primary-bg)] outline-none transition-colors"
                 />
+                <p className="text-xs text-[var(--muted)]">Your purchased/verified Indian line on Exotel. Used as the CLI for outbound campaigns and calls.</p>
               </div>
             </div>
             
             <div className="flex items-center gap-3 pt-2">
               <button
                 type="button"
-                onClick={() => handleTestConnection('voicelink')}
-                disabled={testStatus['voicelink'] === 'testing'}
+                onClick={() => handleTestConnection('exotel')}
+                disabled={testStatus['exotel'] === 'testing'}
                 className="px-4 py-2 rounded-lg text-xs font-bold bg-[var(--secondary)] border border-[var(--border)] hover:bg-[var(--border)] text-[var(--heading)] transition-all flex items-center gap-2"
               >
-                {testStatus['voicelink'] === 'testing' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Activity className="w-3.5 h-3.5" />}
-                {testStatus['voicelink'] === 'success' ? 'Connected ✅' : testStatus['voicelink'] === 'error' ? 'Failed ❌' : 'Test Connection'}
+                {testStatus['exotel'] === 'testing' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Activity className="w-3.5 h-3.5" />}
+                {testStatus['exotel'] === 'success' ? 'Connected ✅' : testStatus['exotel'] === 'error' ? 'Failed ❌' : 'Test Exotel Connection'}
               </button>
               <button
                 type="button"
                 onClick={handleSave}
                 disabled={saving}
-                className="px-5 py-2 rounded-lg text-xs font-bold bg-[var(--primary-bg)] hover:brightness-110 text-[var(--heading)] transition-all flex items-center gap-2"
+                className="px-5 py-2 rounded-lg text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white transition-all flex items-center gap-2"
               >
                 {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
-                Save VoiceLink
+                Save Exotel Credentials
               </button>
             </div>
           </div>
+
 
           {/* Twilio */}
           <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-xl p-6 space-y-5">
@@ -479,11 +528,11 @@ export default function AdminTelephonyPage() {
                 )}
 
                 <div className="mt-4 p-4 bg-[var(--background)] border border-[var(--border)] rounded-lg">
-                  <p className="text-xs font-semibold text-[var(--muted)] mb-2">Example: VoiceLink Mobile DID</p>
+                  <p className="text-xs font-semibold text-[var(--muted)] mb-2">Example: Exotel Mobile DID</p>
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-[var(--muted)]">Cost: ₹{displayRupees(configs.voicelink_mobile_did_cost_paisa).toFixed(2)}</span>
+                    <span className="text-[var(--muted)]">Cost: ₹{displayRupees(configs.exotel_mobile_did_cost_paisa).toFixed(2)}</span>
                     <span className="text-[var(--primary-bg)] font-bold">+{configs.trinetra_number_markup_percent}%</span>
-                    <span className="text-[var(--heading)] font-bold">Retail: ₹{calcRetail(configs.voicelink_mobile_did_cost_paisa)}/mo</span>
+                    <span className="text-[var(--heading)] font-bold">Retail: ₹{calcRetail(configs.exotel_mobile_did_cost_paisa)}/mo</span>
                   </div>
                 </div>
               </div>
@@ -505,7 +554,7 @@ export default function AdminTelephonyPage() {
                   </button>
                 </div>
                 <div className="p-3 bg-[var(--background)] border border-[var(--border)] rounded-lg text-sm text-center">
-                  Users currently see: <span className="font-bold text-[var(--heading)]">{configs.show_number_prices_to_users === 'true' ? `₹${calcRetail(configs.voicelink_mobile_did_cost_paisa)}/month` : 'Billed monthly'}</span>
+                  Users currently see: <span className="font-bold text-[var(--heading)]">{configs.show_number_prices_to_users === 'true' ? `₹${calcRetail(configs.exotel_mobile_did_cost_paisa)}/month` : 'Billed monthly'}</span>
                 </div>
               </div>
 
@@ -527,11 +576,14 @@ export default function AdminTelephonyPage() {
 
             {/* Provider Pricing Tables */}
             <div className="space-y-6">
-              {/* VoiceLink Table */}
-              <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-xl overflow-hidden">
-                <div className="p-4 border-b border-[var(--border)]">
-                  <h2 className="font-bold text-[var(--heading)]">VoiceLink DID Costs</h2>
-                  <p className="text-xs text-[var(--muted)]">Cost Price to Trinetra</p>
+              {/* Exotel Table */}
+              <div className="bg-[var(--card-bg)] border border-emerald-500/30 rounded-xl overflow-hidden shadow-sm">
+                <div className="p-4 border-b border-[var(--border)] bg-emerald-500/5 flex items-center justify-between">
+                  <div>
+                    <h2 className="font-bold text-[var(--heading)]">Exotel Indian DID Costs</h2>
+                    <p className="text-xs text-[var(--muted)]">Cost Price to Trinetra (₹/mo)</p>
+                  </div>
+                  <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 text-xs font-bold border border-emerald-500/30">Primary IN</span>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm text-left">
@@ -544,10 +596,8 @@ export default function AdminTelephonyPage() {
                     </thead>
                     <tbody className="divide-y divide-[var(--border)]">
                       {[
-                        { type: 'Mobile', key: 'voicelink_mobile_did_cost_paisa' },
-                        { type: 'Landline', key: 'voicelink_landline_did_cost_paisa' },
-                        { type: 'Toll-Free', key: 'voicelink_tollfree_did_cost_paisa' },
-                        { type: '92 Series', key: 'voicelink_92series_did_cost_paisa' }
+                        { type: 'Mobile / Virtual CLI', key: 'exotel_mobile_did_cost_paisa' },
+                        { type: 'Landline DID (080 / 011 / 022)', key: 'exotel_landline_did_cost_paisa' }
                       ].map((row, i) => (
                         <tr key={i} className="hover:bg-[var(--background)]/50 transition-colors text-[var(--heading)]">
                           <td className="px-4 py-3 font-medium">{row.type}</td>
@@ -561,7 +611,7 @@ export default function AdminTelephonyPage() {
                               className="w-24 bg-[var(--background)] border border-[var(--border)] rounded px-2 py-1 text-sm outline-none focus:border-[var(--primary-bg)]"
                             />
                           </td>
-                          <td className="px-4 py-2 bg-[var(--secondary)]/30 font-semibold text-[var(--muted)]">
+                          <td className="px-4 py-2 bg-[var(--secondary)]/30 font-semibold text-emerald-400">
                             ₹{calcRetail(configs[row.key as keyof Configs])}
                           </td>
                         </tr>
@@ -570,6 +620,8 @@ export default function AdminTelephonyPage() {
                   </table>
                 </div>
               </div>
+
+
 
               {/* Twilio Table */}
               <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-xl overflow-hidden">

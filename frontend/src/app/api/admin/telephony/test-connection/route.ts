@@ -25,22 +25,22 @@ export async function POST(request: Request) {
     const body = await request.json()
     const { provider } = body
 
-    if (!provider || !['voicelink', 'twilio', 'simulated'].includes(provider)) {
+    if (!provider || !['twilio', 'simulated', 'exotel'].includes(provider)) {
       return NextResponse.json({ success: false, error: 'Invalid provider' }, { status: 400 })
     }
 
     let apiKey = body.api_key
     let accountSid = body.account_sid
-    let authToken = body.auth_token
-    let baseUrl = body.base_url
+    let authToken = body.auth_token || body.api_token
+    let subdomain = body.subdomain
 
     if (provider !== 'simulated') {
-      const isVoiceLinkMissing = provider === 'voicelink' && (!apiKey || !baseUrl || apiKey.startsWith('•'))
       const isTwilioMissing = provider === 'twilio' && (!accountSid || !authToken || accountSid.startsWith('•') || authToken.startsWith('•'))
+      const isExotelMissing = provider === 'exotel' && (!accountSid || !apiKey || !authToken || accountSid.startsWith('•') || apiKey.startsWith('•') || authToken.startsWith('•'))
 
-      if (isVoiceLinkMissing || isTwilioMissing) {
-        const keysToFetch = provider === 'voicelink' 
-          ? ['VOICELINK_API_KEY', 'VOICELINK_API_BASE_URL'] 
+      if (isTwilioMissing || isExotelMissing) {
+        const keysToFetch = provider === 'exotel'
+          ? ['EXOTEL_ACCOUNT_SID', 'EXOTEL_API_KEY', 'EXOTEL_API_TOKEN', 'EXOTEL_SUBDOMAIN']
           : ['TWILIO_ACCOUNT_SID', 'TWILIO_AUTH_TOKEN'];
           
         const { data: configs } = await supabase
@@ -51,11 +51,13 @@ export async function POST(request: Request) {
         const configMap: Record<string, string> = {}
         configs?.forEach(item => configMap[item.config_key] = item.config_value)
 
-        if (provider === 'voicelink') {
-          apiKey = apiKey && !apiKey.startsWith('•') ? apiKey : configMap['VOICELINK_API_KEY']
-          baseUrl = baseUrl || configMap['VOICELINK_API_BASE_URL']
-          if (!apiKey || !baseUrl) {
-            return NextResponse.json({ success: false, error: "Provider not configured. Please save API credentials first." })
+        if (provider === 'exotel') {
+          accountSid = accountSid && !accountSid.startsWith('•') ? accountSid : configMap['EXOTEL_ACCOUNT_SID']
+          apiKey = apiKey && !apiKey.startsWith('•') ? apiKey : configMap['EXOTEL_API_KEY']
+          authToken = authToken && !authToken.startsWith('•') ? authToken : configMap['EXOTEL_API_TOKEN']
+          subdomain = subdomain || configMap['EXOTEL_SUBDOMAIN'] || 'api.exotel.com'
+          if (!accountSid || !apiKey || !authToken) {
+            return NextResponse.json({ success: false, error: "Exotel credentials not configured. Please save Account SID, API Key, and API Token first." })
           }
         } else if (provider === 'twilio') {
           accountSid = accountSid && !accountSid.startsWith('•') ? accountSid : configMap['TWILIO_ACCOUNT_SID']
@@ -82,7 +84,7 @@ export async function POST(request: Request) {
           api_key: apiKey,
           account_sid: accountSid,
           auth_token: authToken,
-          base_url: baseUrl
+          subdomain: subdomain
         }),
         signal: controller.signal
       })

@@ -28,6 +28,21 @@ function decrypt(text: string) {
   }
 }
 
+function encryptJson(obj: any) {
+  if (!obj) return ''
+  return encrypt(JSON.stringify(obj))
+}
+
+function decryptJson(val: string | null) {
+  if (!val) return null
+  const decrypted = decrypt(val)
+  try {
+    return decrypted ? JSON.parse(decrypted) : null
+  } catch {
+    return null
+  }
+}
+
 export async function GET(req: Request) {
   try {
     const supabase = await createClient()
@@ -109,25 +124,30 @@ export async function GET(req: Request) {
       })
     }
 
-    // Decrypt credentials helper
-    const decryptJson = (val: string | null) => {
-      if (!val) return null
-      const decrypted = decrypt(val)
-      try {
-        return decrypted ? JSON.parse(decrypted) : null
-      } catch {
-        return null
+    const whatsappConfig = decryptJson(data.whatsapp_access_token)
+    const auxConfig = decryptJson(data.whatsapp_phone_number_id)
+    const emailConfig = (auxConfig && auxConfig.smtp_host) ? auxConfig : (auxConfig?.email || null)
+
+    let calendarConfig = auxConfig?.calendar || null
+    if (!calendarConfig) {
+      const legacyCal = decryptJson(data.telegram_bot_token)
+      if (legacyCal && legacyCal.cal_api_key) {
+        calendarConfig = legacyCal
       }
     }
 
-    const whatsappConfig = decryptJson(data.whatsapp_access_token)
-    const emailConfig = decryptJson(data.whatsapp_phone_number_id)
-    const calendarConfig = decryptJson(data.telegram_bot_token)
+    let telegramToken = ''
+    if (data.telegram_bot_token) {
+      const decrypted = decrypt(data.telegram_bot_token)
+      if (!decrypted.includes('"cal_api_key"')) {
+        telegramToken = decrypted
+      }
+    }
 
     return NextResponse.json({
       telegram: {
         connected: !!data.telegram_chat_id,
-        bot_token: data.telegram_bot_token ? decrypt(data.telegram_bot_token) : '',
+        bot_token: telegramToken,
         chat_id: data.telegram_chat_id || ''
       },
       whatsapp: {
@@ -176,9 +196,6 @@ export async function POST(req: Request) {
     if (!type || !config) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
-
-    // Encrypt helper
-    const encryptJson = (obj: any) => encrypt(JSON.stringify(obj))
 
     // Fetch user's profile to get organization_id for RLS
     const { data: profile } = await supabase
@@ -233,7 +250,7 @@ export async function POST(req: Request) {
     // Query if there's an existing global integrations row
     const { data: existingRow, error: findError } = await supabase
       .from('integrations')
-      .select('id')
+      .select('*')
       .eq('organization_id', orgId)
       .is('agent_id', null)
       .maybeSingle()
@@ -259,22 +276,45 @@ export async function POST(req: Request) {
         auth_token: config.auth_token,
         phone_number: config.phone_number
       }) : null
-    } else if (type === 'email') {
-      updateData.whatsapp_phone_number_id = config.smtp_host ? encryptJson({
-        smtp_host: config.smtp_host,
-        smtp_port: config.smtp_port,
-        smtp_username: config.smtp_username,
-        smtp_password: config.smtp_password,
-        smtp_from: config.smtp_from
-      }) : null
     } else if (type === 'crm') {
       updateData.crm_webhook_url = config.webhook_url || null
       updateData.crm_sync_enabled = !!config.webhook_url
-    } else if (type === 'calendar') {
-      updateData.telegram_bot_token = config.cal_api_key ? encryptJson({
-        cal_api_key: config.cal_api_key,
-        event_type_id: config.event_type_id
-      }) : null
+    } else if (type === 'email' || type === 'calendar') {
+      // Decode existing aux config stored in whatsapp_phone_number_id
+      const existingAux = decryptJson(existingRow?.whatsapp_phone_number_id)
+      const auxObj: any = (existingAux && existingAux.smtp_host) ? { email: existingAux } : (existingAux || {})
+
+      if (type === 'email') {
+        if (config.smtp_host) {
+          auxObj.email = {
+            smtp_host: config.smtp_host,
+            smtp_port: config.smtp_port,
+            smtp_username: config.smtp_username,
+            smtp_password: config.smtp_password,
+            smtp_from: config.smtp_from
+          }
+        } else {
+          delete auxObj.email
+        }
+      } else if (type === 'calendar') {
+        if (config.cal_api_key) {
+          auxObj.calendar = {
+            cal_api_key: config.cal_api_key,
+            event_type_id: config.event_type_id
+          }
+        } else {
+          delete auxObj.calendar
+        }
+        // If legacy telegram_bot_token had calendar json, clear it so telegram isn't blocked
+        if (existingRow?.telegram_bot_token) {
+          const decToken = decrypt(existingRow.telegram_bot_token)
+          if (decToken.includes('"cal_api_key"')) {
+            updateData.telegram_bot_token = null
+          }
+        }
+      }
+
+      updateData.whatsapp_phone_number_id = Object.keys(auxObj).length > 0 ? encryptJson(auxObj) : null
     }
 
     let saveResult;

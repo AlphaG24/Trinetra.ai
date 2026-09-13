@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
     // Query voice calls
     let callsQuery = supabase
       .from('voice_calls')
-      .select('id, created_at, duration_seconds, sentiment, status, caller_phone, agent_id, transcript, recording_url')
+      .select('id, created_at, duration_seconds, sentiment, status, outcome, caller_phone, caller_name, agent_id, transcript, recording_url')
       .gte('created_at', dateLimitStr)
 
     callsQuery = callsQuery.or(`organization_id.eq.${orgId || user.id},user_id.eq.${user.id}`)
@@ -70,7 +70,24 @@ export async function GET(request: NextRequest) {
       leadsQuery.order('created_at', { ascending: false })
     ])
 
-    const calls = callsRes.data || []
+    const now = Date.now()
+    const validCalls = (callsRes.data || []).filter((c: any) => {
+      const isZeroDuration = !c.duration_seconds || c.duration_seconds === 0
+      const hasTranscript = !!(c.transcript && (typeof c.transcript === 'string' ? c.transcript.trim().length > 0 : Array.isArray(c.transcript) && c.transcript.length > 0))
+      const ageMs = now - new Date(c.created_at).getTime()
+      
+      // If still marked in_progress with 0s duration and older than 3 minutes, it never connected
+      if (c.status === 'in_progress' && isZeroDuration && ageMs > 180000) {
+        return false
+      }
+      // If failed with 0 duration and no transcript, it never connected
+      if (c.status === 'failed' && isZeroDuration && !hasTranscript) {
+        return false
+      }
+      return true
+    })
+
+    const calls = validCalls
     const leads = leadsRes.data || []
 
     // 2. Aggregate KPIs
@@ -147,15 +164,16 @@ export async function GET(request: NextRequest) {
     }))
 
     // 7. Recent Calls list
-    const recentCalls = calls.slice(0, 50).map((c) => ({
+    const recentCalls = calls.slice(0, 50).map((c: any) => ({
       id: c.id,
       created_at: c.created_at,
       agent_name: c.agent_id ? (agentMap[c.agent_id] || 'Unknown Agent') : 'Direct Dial',
       duration_seconds: c.duration_seconds || 0,
       sentiment: c.sentiment || 'Neutral',
-      outcome: c.status || 'Completed',
-      is_lead: leads.some(l => l.agent_id === c.agent_id && new Date(l.created_at).getTime() > new Date(c.created_at).getTime() - 3600000),
+      outcome: c.outcome || (c.status === 'completed' ? 'Completed' : c.status || 'Completed'),
+      is_lead: c.outcome === 'Lead Captured' || c.outcome === 'Callback Scheduled' || leads.some((l: any) => l.call_id === c.id || (l.agent_id === c.agent_id && Math.abs(new Date(l.created_at).getTime() - new Date(c.created_at).getTime()) < 3600000)),
       caller_phone: c.caller_phone || 'Private',
+      caller_name: c.caller_name || null,
       transcript: c.transcript || null,
       recording_url: c.recording_url || null,
     }))

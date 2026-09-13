@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { name, description, products, individual_price_paisa, bundle_price_paisa, discount_percent, is_active } = body
+    const { name, description, products, individual_price_paisa, bundle_price_paisa, discount_percent, is_active, validity_days } = body
 
     if (!name || !products || individual_price_paisa === undefined || bundle_price_paisa === undefined) {
       return NextResponse.json({ error: 'Missing required parameters' }, { status: 400 })
@@ -81,6 +81,7 @@ export async function POST(request: NextRequest) {
         individual_price_paisa,
         bundle_price_paisa,
         discount_percent: discount_percent || 0,
+        validity_days: validity_days !== undefined ? parseInt(validity_days, 10) : 30,
         is_active: is_active !== undefined ? is_active : true
       })
       .select()
@@ -108,7 +109,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { id, name, description, products, individual_price_paisa, bundle_price_paisa, discount_percent, is_active } = body
+    const { id, name, description, products, individual_price_paisa, bundle_price_paisa, discount_percent, is_active, validity_days } = body
 
     if (!id) {
       return NextResponse.json({ error: 'Bundle ID is required' }, { status: 400 })
@@ -121,6 +122,7 @@ export async function PATCH(request: NextRequest) {
     if (individual_price_paisa !== undefined) updates.individual_price_paisa = individual_price_paisa
     if (bundle_price_paisa !== undefined) updates.bundle_price_paisa = bundle_price_paisa
     if (discount_percent !== undefined) updates.discount_percent = discount_percent
+    if (validity_days !== undefined) updates.validity_days = parseInt(validity_days, 10)
     if (is_active !== undefined) updates.is_active = is_active
 
     const adminClient = getAdminClient()

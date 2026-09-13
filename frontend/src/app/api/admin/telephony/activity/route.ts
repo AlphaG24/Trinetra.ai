@@ -34,7 +34,7 @@ export async function GET(request: Request) {
       .from('phone_numbers')
       .select(`
         *,
-        organizations(name)
+        organizations:organizations!phone_numbers_assigned_org_id_fkey(name)
       `, { count: 'exact' })
       .order('created_at', { ascending: false })
 

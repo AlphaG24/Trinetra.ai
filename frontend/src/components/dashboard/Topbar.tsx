@@ -4,12 +4,10 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/utils/supabase/client'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Sun, Moon, Menu, Bell, LogOut, User } from 'lucide-react'
-import { useTheme } from '@/src/components/ui/theme-provider'
+import { Menu, Bell, LogOut, User, CheckCheck } from 'lucide-react'
 import { ThemeToggle } from '@/src/components/ui/theme-toggle'
 
 export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
-  const { theme, toggleTheme, mounted } = useTheme()
   const [profile, setProfile] = useState<{ full_name?: string; avatar_url?: string } | null>(null)
   const [user, setUser] = useState<{ email?: string; user_metadata?: { full_name?: string } } | null>(null)
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
@@ -17,6 +15,52 @@ export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
   const [unreadCount, setUnreadCount] = useState(0)
   const [showNotifDropdown, setShowNotifDropdown] = useState(false)
   const router = useRouter()
+
+  const formatTimeAgo = (ts: string) => {
+    const diff = Date.now() - new Date(ts).getTime()
+    const m = Math.floor(diff / 60000)
+    if (m < 1) return 'Just now'
+    if (m < 60) return `${m}m ago`
+    const h = Math.floor(m / 60)
+    if (h < 24) return `${h}h ago`
+    const d = Math.floor(h / 24)
+    if (d === 1) return 'Yesterday'
+    if (d < 7) return `${d}d ago`
+    return new Date(ts).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
+  }
+
+  const markDropdownOneRead = async (id: string, e?: React.MouseEvent) => {
+    e?.stopPropagation()
+    try {
+      const res = await fetch('/api/notifications/read-all', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id })
+      })
+      if (res.ok) {
+        setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n))
+        setUnreadCount(prev => Math.max(0, prev - 1))
+      }
+    } catch (err) {
+      console.error('Failed to mark notification read:', err)
+    }
+  }
+
+  const markDropdownAllRead = async (e?: React.MouseEvent) => {
+    e?.stopPropagation()
+    try {
+      const res = await fetch('/api/notifications/read-all', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' }
+      })
+      if (res.ok) {
+        setNotifications(prev => prev.map(n => ({ ...n, is_read: true })))
+        setUnreadCount(0)
+      }
+    } catch (err) {
+      console.error('Failed to mark all read:', err)
+    }
+  }
 
   useEffect(() => {
     const supabase = createClient()
@@ -35,16 +79,24 @@ export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
           setProfile(data)
 
           const fetchNotifs = async () => {
+            const { count } = await supabase
+              .from('notifications')
+              .select('*', { count: 'exact', head: true })
+              .eq('user_id', currentUser.id)
+              .eq('is_read', false)
+            setUnreadCount(count || 0)
+
             const { data: notifs } = await supabase
               .from('notifications')
               .select('*')
               .eq('user_id', currentUser.id)
               .order('created_at', { ascending: false })
-              .limit(5)
+              .limit(10)
             
             if (notifs) {
-              setNotifications(notifs)
-              setUnreadCount(notifs.filter((n: any) => !n.is_read).length)
+              const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000
+              const recentList = notifs.filter((n: any) => !n.is_read || new Date(n.created_at).getTime() >= sevenDaysAgo).slice(0, 5)
+              setNotifications(recentList)
             }
           }
 
@@ -93,20 +145,20 @@ export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
   const avatarUrl = profile?.avatar_url
 
   return (
-    <header className="fixed top-0 right-0 left-0 h-16 bg-[var(--card-bg)] border-b border-[var(--border)] z-30 transition-colors duration-200">
+    <header className="fixed top-0 right-0 left-0 h-16 bg-[var(--card-bg)] border-b border-[var(--border)] z-[999]">
       <div className="flex items-center justify-between h-full px-6">
         {/* Left side: Logo + Mobile Menu */}
         <div className="flex items-center gap-3">
           {onMenuClick && (
             <button
               onClick={onMenuClick}
-              className="lg:hidden text-[var(--muted)] hover:text-[var(--heading)] transition-colors mr-1"
+              className="lg:hidden p-2 rounded-lg text-[var(--muted)] hover:bg-[var(--hover-bg)] hover:text-[var(--heading)] transition-colors"
               aria-label="Open menu"
             >
-              <Menu className="w-6 h-6" />
+              <Menu className="w-5 h-5" />
             </button>
           )}
-          <Link href="/dashboard" className="flex items-center ml-1">
+          <Link href="/dashboard" className="flex items-center gap-2">
             <img
               src="/trident.png"
               alt="Trinetra"
@@ -132,26 +184,59 @@ export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
             
             {showNotifDropdown && (
               <>
-                <div className="fixed inset-0 z-40 bg-transparent" onClick={() => setShowNotifDropdown(false)} />
-                <div className="absolute right-0 mt-2 w-80 bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl shadow-xl overflow-hidden z-50 py-1">
+                <div className="fixed inset-0 z-[9998] bg-transparent" onClick={() => setShowNotifDropdown(false)} />
+                <div className="absolute right-0 mt-2 w-80 bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl shadow-xl overflow-hidden z-[9999] py-1">
                   <div className="px-4 py-2.5 border-b border-[var(--border)] flex items-center justify-between">
-                    <span className="font-playfair font-bold text-sm text-gray-300">Recent Notifications</span>
-                    {unreadCount > 0 && <span className="text-[10px] font-bold bg-rose-500/15 text-rose-500 px-1.5 py-0.5 rounded-full">{unreadCount} new</span>}
+                    <div className="flex items-center gap-2">
+                      <span className="font-playfair font-bold text-sm text-[var(--heading)]">Recent Notifications</span>
+                      {unreadCount > 0 && <span className="text-[10px] font-bold bg-rose-500/15 text-rose-500 px-1.5 py-0.5 rounded-full">{unreadCount} new</span>}
+                    </div>
+                    {unreadCount > 0 && (
+                      <button
+                        onClick={markDropdownAllRead}
+                        className="text-[11px] font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white flex items-center gap-1 transition-colors cursor-pointer"
+                        title="Mark all as read"
+                      >
+                        <CheckCheck className="w-3.5 h-3.5" /> Mark all read
+                      </button>
+                    )}
                   </div>
                   
-                  <div className="max-h-64 overflow-y-auto divide-y divide-[var(--border)]">
+                  <div className="max-h-72 overflow-y-auto divide-y divide-[var(--border)]">
                     {notifications.length === 0 ? (
                       <div className="px-4 py-8 text-center text-xs text-[var(--muted)] font-merriweather">
-                        No notifications yet.
+                        All caught up! No recent notifications.
                       </div>
                     ) : (
                       notifications.map((n) => (
-                        <div key={n.id} className={`px-4 py-3 hover:bg-[var(--hover-bg)] transition-colors text-left ${!n.is_read ? 'bg-violet-500/5 dark:bg-violet-500/10' : ''}`}>
-                          <p className="text-xs font-semibold text-[var(--heading)] font-playfair">{n.title}</p>
+                        <div
+                          key={n.id}
+                          onClick={() => {
+                            if (!n.is_read) markDropdownOneRead(n.id)
+                            if (n.action_url) router.push(n.action_url)
+                          }}
+                          className={`px-4 py-3 hover:bg-[var(--hover-bg)] transition-colors text-left cursor-pointer group relative ${!n.is_read ? 'bg-zinc-500/5 dark:bg-white/5' : ''}`}
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <p className="text-xs font-semibold text-[var(--heading)] font-playfair">{n.title}</p>
+                            {!n.is_read && (
+                              <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0 mt-1" />
+                            )}
+                          </div>
                           <p className="text-[10px] text-[var(--body)] mt-0.5 font-merriweather line-clamp-2">{n.message || n.body}</p>
-                          <span className="text-[9px] text-[var(--muted)] font-merriweather mt-1 block">
-                            {new Date(n.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
-                          </span>
+                          <div className="flex items-center justify-between mt-1.5">
+                            <span className="text-[9px] text-[var(--muted)] font-merriweather">
+                              {formatTimeAgo(n.created_at)}
+                            </span>
+                            {!n.is_read && (
+                              <button
+                                onClick={(e) => markDropdownOneRead(n.id, e)}
+                                className="opacity-0 group-hover:opacity-100 text-[10px] text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white font-sans transition-opacity"
+                              >
+                                Mark read
+                              </button>
+                            )}
+                          </div>
                         </div>
                       ))
                     )}
@@ -163,7 +248,7 @@ export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
                         setShowNotifDropdown(false)
                         router.push('/dashboard/notifications')
                       }}
-                      className="w-full text-center py-2 text-xs font-bold bg-violet-600 hover:bg-violet-700 text-white rounded-xl transition-all cursor-pointer"
+                      className="btn-luxury-animated w-full text-center py-2 text-xs font-bold text-white rounded-xl transition-all cursor-pointer"
                     >
                       View all notifications
                     </button>
@@ -182,7 +267,7 @@ export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
               onClick={() => setIsDropdownOpen(!isDropdownOpen)}
               className="flex items-center gap-2.5 p-1.5 hover:bg-[var(--hover-bg)] rounded-xl transition-colors"
             >
-              <div className="w-8 h-8 rounded-full overflow-hidden bg-violet-600/10 text-violet-600 dark:text-violet-400 border border-[var(--border)] flex items-center justify-center font-bold text-sm shrink-0">
+              <div className="w-8 h-8 rounded-full overflow-hidden bg-zinc-100 dark:bg-white/10 text-zinc-800 dark:text-white border border-[var(--border)] flex items-center justify-center font-bold text-sm shrink-0">
                 {avatarUrl ? (
                   <img src={avatarUrl} alt={displayName} className="w-full h-full object-cover" />
                 ) : (
@@ -197,10 +282,10 @@ export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
             {isDropdownOpen && (
               <>
                 <div
-                  className="fixed inset-0 z-40 bg-transparent"
+                  className="fixed inset-0 z-[9998] bg-transparent"
                   onClick={() => setIsDropdownOpen(false)}
                 />
-                <div className="absolute right-0 mt-2 w-48 bg-[var(--card-bg)] border border-[var(--border)] rounded-xl shadow-xl overflow-hidden py-1 z-50">
+                <div className="absolute right-0 mt-2 w-48 bg-[var(--card-bg)] border border-[var(--border)] rounded-xl shadow-xl overflow-hidden py-1 z-[9999]">
                   <Link
                     href="/dashboard/profile"
                     onClick={() => setIsDropdownOpen(false)}

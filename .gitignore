@@ -82,3 +82,5 @@ frontend/test_pdf.js
 
 # Supabase local configuration & state
 supabase/.temp/
+*.tsbuildinfo
+
