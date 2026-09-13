@@ -1255,7 +1255,7 @@ async def handle_twilio_voice_webhook(
                         from app.services.telephony.twilio import TwilioProvider
                         tw_svc = TwilioProvider()
                         if getattr(tw_svc, "client", None):
-                            wh_base = os.getenv("TRINETRA_WEBHOOK_BASE_URL", "https://unclip-mundane-those.ngrok-free.dev").strip()
+                            wh_base = (os.getenv("TRINETRA_WEBHOOK_BASE_URL") or os.getenv("RENDER_EXTERNAL_URL") or "https://trinetra-ai-1-6f2n.onrender.com").strip()
                             rec_cb = f"{wh_base}/api/voice/webhooks/voice/twilio/recording/{target_org or 'default'}"
                             if "ngrok" in rec_cb:
                                 rec_cb += "?ngrok-skip-browser-warning=true"
@@ -1277,10 +1277,11 @@ async def handle_twilio_voice_webhook(
         print(f"[Twilio Webhook] Room: {room_name} | Agent: {agent_id}. LiveKit worker will connect agent via entrypoint.", flush=True)
 
         # 6. Return TwiML with Twilio Media Stream WebSocket Bridge
-        webhook_base = os.getenv("TRINETRA_WEBHOOK_BASE_URL", "https://unclip-mundane-those.ngrok-free.dev").strip()
+        webhook_base = (os.getenv("TRINETRA_WEBHOOK_BASE_URL") or os.getenv("RENDER_EXTERNAL_URL") or "https://trinetra-ai-1-6f2n.onrender.com").strip()
         ws_base = webhook_base.replace("https://", "wss://").replace("http://", "ws://")
         stream_url = f"{ws_base}/api/voice/webhooks/voice/twilio/stream/{room_name}"
         print(f"[Twilio Webhook] Returning TwiML pointing to Media Stream: {stream_url}", flush=True)
+
         
         twiml_response = f"""<?xml version="1.0" encoding="UTF-8"?>
 <Response>

@@ -59,19 +59,6 @@ app.include_router(integration_router)
 app.include_router(usage_router)
 app.include_router(blog_ai_router)
 
-import httpx
-import asyncio
-
-async def _nat_keepalive_loop():
-    ngrok_url = "https://unclip-mundane-those.ngrok-free.dev"
-    async with httpx.AsyncClient(timeout=4.0) as client:
-        while True:
-            await asyncio.sleep(10.0)
-            try:
-                await client.get(ngrok_url, headers={"ngrok-skip-browser-warning": "true"})
-            except Exception:
-                pass
-
 @app.on_event("startup")
 async def app_startup():
     try:
@@ -79,11 +66,11 @@ async def app_startup():
         print("[Startup] Agent runner pre-warmed successfully.", flush=True)
     except Exception as e:
         print(f"[Startup] Pre-warm agent warning: {e}", flush=True)
-    asyncio.create_task(_nat_keepalive_loop())
 
-@app.get("/")
+@app.api_route("/", methods=["GET", "HEAD"])
 def read_root():
     return {"message": "Trinetra Voice AI Backend is Active"}
+
 
 @app.get("/api/debug-env")
 def debug_env():
