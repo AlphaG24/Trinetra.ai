@@ -23,7 +23,7 @@ function Move-MonorepoItem {
     )
     if (Test-Path $Source) {
         # Check if file is tracked by Git
-        $gitCheck = git ls-files --error-unmatch $Source 2>$null
+        $null = git ls-files --error-unmatch $Source 2>$null
         if ($LASTEXITCODE -eq 0) {
             # Tracked by git, use git mv
             git mv $Source $Destination

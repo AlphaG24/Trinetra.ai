@@ -56,11 +56,9 @@ def _start_health_server():
     except Exception as e:
         print(f"[Render Health] Could not start HTTP keep-alive server: {e}", flush=True)
 
-# Launch keep-alive server immediately at process startup if PORT is assigned by Render
-_start_health_server()
-
 
 logger = logging.getLogger("voice-agent")
+
 logger.setLevel(logging.INFO)
 
 # Load Silero VAD once at startup to eliminate disk-loading latency
@@ -1600,7 +1598,7 @@ Only return valid JSON."""
                             "user_id": user_id,
                             "organization_id": organization_id,
                             "prospect_name": lead_data.get("callback_name") or lead_data.get("contact_name") or "Unknown",
-                            "prospect_phone": phone,
+                            "prospect_phone": cb_phone,
                             "scheduled_at": callback_time,
                             "notes": lead_data.get("callback_reason") or "Callback requested by prospect during call."
                         }))
@@ -2240,8 +2238,8 @@ async def entrypoint(ctx: JobContext):
     agent_instance.bot_name = bot_name
     agent_instance.business_name = business_name_val if 'business_name_val' in dir() else (agent_data.get('business_name', '') if agent_data else '')
     agent_instance.gender = gender_tag
-    agent_instance.prospect_name = c_name if ('campaign_contact' in locals() and campaign_contact and 'is_name_valid' in locals() and is_name_valid) else ('cust_name' in locals() and cust_name or "")
-    agent_instance.campaign_goal = notes_summary if ('campaign_contact' in locals() and campaign_contact and 'notes_summary' in locals()) else ""
+    agent_instance.prospect_name = c_name if ('campaign_contact' in locals() and campaign_contact and locals().get('is_name_valid')) else (locals().get('cust_name') or "")
+    agent_instance.campaign_goal = locals().get('notes_summary') if ('campaign_contact' in locals() and campaign_contact) else ""
     agent_instance.ending_message = agent_data.get("ending_message", "") if agent_data else ""
     agent_instance.fallback_message = agent_data.get("fallback_message", "") if agent_data else ""
 
@@ -3005,8 +3003,8 @@ async def run_agent(room_name: str, agent_id: str | None = None, contact_id: str
         agent_instance.bot_name = bot_name
         agent_instance.business_name = business_name_val if 'business_name_val' in dir() else (agent_data.get('business_name', '') if agent_data else '')
         agent_instance.gender = gender_tag
-        agent_instance.prospect_name = c_name if ('campaign_contact' in locals() and campaign_contact and 'is_name_valid' in locals() and is_name_valid) else ('cust_name' in locals() and cust_name or "")
-        agent_instance.campaign_goal = notes_summary if ('campaign_contact' in locals() and campaign_contact and 'notes_summary' in locals()) else ""
+        agent_instance.prospect_name = c_name if ('campaign_contact' in locals() and campaign_contact and locals().get('is_name_valid')) else (locals().get('cust_name') or "")
+        agent_instance.campaign_goal = locals().get('notes_summary') if ('campaign_contact' in locals() and campaign_contact) else ""
         agent_instance.ending_message = agent_data.get("ending_message", "") if agent_data else ""
         agent_instance.fallback_message = agent_data.get("fallback_message", "") if agent_data else ""
 
@@ -3335,5 +3333,10 @@ async def run_agent(room_name: str, agent_id: str | None = None, contact_id: str
                 pass
 
 if __name__ == "__main__":
-    cli.run_app(WorkerOptions(entrypoint_fnc=entrypoint))
+    _start_health_server()
+    cli.run_app(WorkerOptions(
+        entrypoint_fnc=entrypoint,
+        num_idle_processes=0,
+    ))
+
 
