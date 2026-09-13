@@ -2630,8 +2630,8 @@ _running_agent_rooms: set[str] = set()
 async def run_agent(room_name: str, agent_id: str | None = None, contact_id: str | None = None, agent_data: dict | None = None, contact_data: dict | None = None):
     if not room_name:
         return
-    if os.getenv("ENABLE_IN_PROCESS_AGENT", "false").lower() != "true":
-        logger.info(f"[run_agent] In-process agent disabled (ENABLE_IN_PROCESS_AGENT!=true). External LiveKit worker entrypoint will manage room '{room_name}'.")
+    if os.getenv("DISABLE_IN_PROCESS_AGENT", "false").lower() == "true":
+        logger.info(f"[run_agent] In-process agent disabled (DISABLE_IN_PROCESS_AGENT=true). External LiveKit worker entrypoint will manage room '{room_name}'.")
         return
     if room_name in _running_agent_rooms:
         logger.warning(f"[AGENT RUN GUARD] Room '{room_name}' already has an active agent task. Aborting duplicate run_agent call.")

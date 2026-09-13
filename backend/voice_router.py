@@ -1626,7 +1626,22 @@ async def telephony_audio_stream(websocket: WebSocket, room_name: Optional[str] 
     )
     print(f"[Twilio WebSocket] Inbound microphone audio track published to room: {room_name} (48kHz)", flush=True)
 
-    # 2.5 Agent presence is managed natively by the LiveKit AgentServer worker via entrypoint()
+    # 2.5 Agent presence: Ensure agent joins room to converse with caller
+    agent_to_run = "dd4da4c1-9deb-4047-8927-5e12402e6b1f"  # Default India Sales Agent
+    if room_name and "--" in room_name:
+        parts = room_name.split("--")
+        if len(parts) >= 2 and parts[1] not in ("noagent", "None", "", "unknown", "call"):
+            agent_to_run = parts[1]
+
+    async def _dispatch_agent():
+        try:
+            from agent import run_agent
+            await asyncio.sleep(0.3)
+            await run_agent(room_name, agent_id=agent_to_run)
+        except Exception as ag_err:
+            print(f"[Telephony WebSocket] Agent spawn warning: {ag_err}", flush=True)
+
+    asyncio.create_task(_dispatch_agent())
 
     stream_sid = None
     audio_queue = asyncio.Queue()
