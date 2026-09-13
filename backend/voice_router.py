@@ -1643,7 +1643,6 @@ async def telephony_audio_stream(websocket: WebSocket, room_name: Optional[str] 
 
     asyncio.create_task(_dispatch_agent())
 
-    stream_sid = None
     audio_queue = asyncio.Queue()
     track_tasks = {}
     is_ws_closed = False
@@ -1796,10 +1795,13 @@ async def telephony_audio_stream(websocket: WebSocket, room_name: Optional[str] 
         try:
             while not is_ws_closed:
                 if not stream_sid:
-                    await asyncio.sleep(0.010)
-                    next_send_time = time.perf_counter()
-                    is_playing = False
-                    continue
+                    if is_exotel:
+                        stream_sid = call_sid or "exotel-stream"
+                    else:
+                        await asyncio.sleep(0.010)
+                        next_send_time = time.perf_counter()
+                        is_playing = False
+                        continue
 
                 chunk = None
                 is_silence_fill = False
