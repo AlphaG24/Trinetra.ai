@@ -1795,13 +1795,10 @@ async def telephony_audio_stream(websocket: WebSocket, room_name: Optional[str] 
         try:
             while not is_ws_closed:
                 if not stream_sid:
-                    if is_exotel:
-                        stream_sid = call_sid or "exotel-stream"
-                    else:
-                        await asyncio.sleep(0.010)
-                        next_send_time = time.perf_counter()
-                        is_playing = False
-                        continue
+                    await asyncio.sleep(0.010)
+                    next_send_time = time.perf_counter()
+                    is_playing = False
+                    continue
 
                 chunk = None
                 is_silence_fill = False
@@ -1831,9 +1828,9 @@ async def telephony_audio_stream(websocket: WebSocket, room_name: Optional[str] 
                                 is_playing = False
                                 empty_ticks = 0
 
-                # On Exotel, keep continuous 40ms silence frames flowing even when agent is listening
-                # so the carrier's media gateway never disconnects due to audio inactivity/timeout
-                if is_exotel and not chunk and not is_silence_fill:
+                # On Exotel, once the agent has started speaking, keep continuous 40ms silence frames
+                # flowing during listening pauses so the carrier media gateway never drops the line
+                if is_exotel and speech_frames_sent > 0 and not chunk and not is_silence_fill:
                     is_silence_fill = True
 
                 if not is_playing and not chunk and not is_silence_fill:

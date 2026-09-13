@@ -61,10 +61,17 @@ logger = logging.getLogger("voice-agent")
 
 logger.setLevel(logging.INFO)
 
-# Load Silero VAD once at startup to eliminate disk-loading latency
-logger.info("Pre-loading Silero VAD model...")
-vad_model = silero.VAD.load()
-logger.info("Silero VAD model preloaded successfully!")
+_vad_model = None
+
+def get_vad_model():
+    """Lazy-load Silero VAD model on first use to conserve startup memory on 512MB tiers."""
+    global _vad_model
+    if _vad_model is None:
+        logger.info("Loading Silero VAD model on-demand...")
+        _vad_model = silero.VAD.load()
+        logger.info("Silero VAD model loaded successfully!")
+    return _vad_model
+
 
 
 def load_system_prompt() -> str:
@@ -863,7 +870,7 @@ class VikramAgent(Agent):
             stt=stt_plugin,
             llm=llm_plugin,
             tts=wrapped_tts,
-            vad=vad_model,
+            vad=get_vad_model(),
             min_endpointing_delay=0.3,
             max_endpointing_delay=1.0,
             min_consecutive_speech_delay=0.8,
@@ -2254,13 +2261,13 @@ async def entrypoint(ctx: JobContext):
             
         asyncio.create_task(play_paused_and_disconnect())
         
-        session = AgentSession(vad=vad_model)
+        session = AgentSession(vad=get_vad_model())
         await session.start(agent=agent_instance, room=ctx.room)
         return
 
     # Configure fast local VAD turn detection to eliminate cloud EOT model timeout latency
     session = AgentSession(
-        vad=vad_model,
+        vad=get_vad_model(),
         turn_detection="vad",
         min_endpointing_delay=0.2,
         max_endpointing_delay=0.6,
@@ -3009,7 +3016,7 @@ async def run_agent(room_name: str, agent_id: str | None = None, contact_id: str
         agent_instance.fallback_message = agent_data.get("fallback_message", "") if agent_data else ""
 
         session = AgentSession(
-            vad=vad_model,
+            vad=get_vad_model(),
             turn_detection="vad",
             min_endpointing_delay=0.2,
             max_endpointing_delay=0.6,
