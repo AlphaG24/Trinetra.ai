@@ -19,18 +19,21 @@ from dotenv import load_dotenv
 from livekit.agents import AutoSubscribe, JobContext, WorkerOptions, JobExecutorType, cli, tts, llm
 from livekit.agents.voice import Agent, AgentSession
 from livekit.agents.voice.agent import ModelSettings
-from livekit.plugins import sarvam, silero, openai, elevenlabs, google
 from database import supabase_admin
 
 load_dotenv()
 
-# Warm-import openai resources eagerly during startup to eliminate cold import event loop freezes
+# Warm-import standard OpenAI SDK resources using importlib so it never shadows livekit.plugins.openai
 try:
-    import openai.resources
-    import openai.resources.chat
-    import openai.resources.beta
+    import importlib
+    importlib.import_module("openai.resources")
+    importlib.import_module("openai.resources.chat")
+    importlib.import_module("openai.resources.beta")
 except Exception:
     pass
+
+# Import livekit plugins ensuring `openai` refers to livekit.plugins.openai (with .LLM and .STT)
+from livekit.plugins import sarvam, silero, openai, elevenlabs, google
 
 def _start_health_server():
     """Lightweight HTTP server on $PORT for Render health checks and UptimeRobot keep-alive."""
