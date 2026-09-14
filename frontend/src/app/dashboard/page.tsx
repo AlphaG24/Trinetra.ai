@@ -58,15 +58,15 @@ export default function DashboardPage() {
 
       const { data: userProfile } = await supabase
         .from('profiles')
-        .select('full_name, onboarding_complete, demo_minutes_used, demo_minutes_limit, paid_minutes_used, paid_minutes_limit, tour_completed')
+        .select('*')
         .eq('id', user.id)
         .single()
 
       if (userProfile) {
         const fullProfile = {
           ...userProfile,
-          plan_tier: 'free_demo',
-          trial_ends_at: null
+          plan_tier: userProfile.plan_tier || 'free',
+          trial_ends_at: userProfile.trial_ends_at || null
         }
         setProfile(fullProfile)
         setStoreProfile(fullProfile as any)

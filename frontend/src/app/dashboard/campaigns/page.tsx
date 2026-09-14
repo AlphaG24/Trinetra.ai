@@ -30,7 +30,7 @@ export default function CampaignsPage() {
   const { profile, setProfile } = useDashboardStore()
 
   useEffect(() => {
-    if (!profile) {
+    if (!profile || profile.plan_tier === undefined) {
       const loadProfile = async () => {
         try {
           const { createClient } = await import('@/utils/supabase/client');
@@ -62,8 +62,12 @@ export default function CampaignsPage() {
   useEffect(() => {
     if (profile) {
       const userPlanTier = (profile as any)?.plan_tier?.toLowerCase() || 'free'
-      if (userPlanTier !== 'free' && userPlanTier !== 'free_demo') {
+      const hasPaidPlan = userPlanTier !== 'free' && userPlanTier !== 'free_demo'
+      const hasPaidMinutes = ((profile as any)?.paid_minutes_limit || 0) > 0
+      if (hasPaidPlan || hasPaidMinutes) {
         fetchCampaigns()
+      } else {
+        setLoading(false)
       }
     }
   }, [profile])
@@ -173,8 +177,12 @@ export default function CampaignsPage() {
     )
   }
 
-  const userPlanTier = (profile as any)?.plan_tier?.toLowerCase() || 'trial'
-  if (userPlanTier === 'free' || userPlanTier === 'free_demo') {
+  const userPlanTier = (profile as any)?.plan_tier?.toLowerCase() || 'free'
+  const hasPaidPlan = userPlanTier !== 'free' && userPlanTier !== 'free_demo'
+  const hasPaidMinutes = ((profile as any)?.paid_minutes_limit || 0) > 0
+  const isUnlocked = hasPaidPlan || hasPaidMinutes
+
+  if (!isUnlocked) {
     return (
       <UpgradePrompt 
         title="Outbound Campaigns"

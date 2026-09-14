@@ -8,6 +8,13 @@ export interface UserProfile {
   onboarding_complete?: boolean
   purchased_agent_id?: string | null
   tour_completed?: boolean
+  plan_tier?: string
+  trial_ends_at?: string | null
+  trial_started_at?: string | null
+  demo_minutes_used?: number
+  demo_minutes_limit?: number
+  paid_minutes_used?: number
+  paid_minutes_limit?: number
 }
 
 export interface Agent {

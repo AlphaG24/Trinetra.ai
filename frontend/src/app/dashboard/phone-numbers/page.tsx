@@ -20,7 +20,7 @@ export default function PhoneNumbersPage() {
   const { profile, setProfile } = useDashboardStore();
 
   useEffect(() => {
-    if (!profile) {
+    if (!profile || profile.plan_tier === undefined) {
       const loadProfile = async () => {
         try {
           const { createClient } = await import('@/utils/supabase/client');
@@ -428,7 +428,11 @@ export default function PhoneNumbersPage() {
   }
 
   const userPlanTier = (profile as any)?.plan_tier?.toLowerCase() || 'free';
-  if (userPlanTier === 'free' || userPlanTier === 'free_demo') {
+  const hasPaidPlan = userPlanTier !== 'free' && userPlanTier !== 'free_demo';
+  const hasPaidMinutes = ((profile as any)?.paid_minutes_limit || 0) > 0;
+  const isUnlocked = hasPaidPlan || hasPaidMinutes;
+
+  if (!isUnlocked) {
     return (
       <UpgradePrompt 
         title="Phone Numbers"
