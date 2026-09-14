@@ -1637,6 +1637,19 @@ async def telephony_audio_stream(websocket: WebSocket, room_name: Optional[str] 
 
     async def _dispatch_agent():
         try:
+            # If external LiveKit worker is active (default), wait briefly to verify worker claimed room
+            if os.getenv("ENABLE_IN_PROCESS_AGENT", "false").lower() != "true":
+                for _ in range(15):
+                    remotes = getattr(room, 'remote_participants', {}) if room else {}
+                    for p in remotes.values():
+                        p_id = getattr(p, 'identity', '') or ''
+                        if p_id.startswith("agent_") or "vikram" in p_id.lower():
+                            print(f"[Telephony WebSocket] External LiveKit worker '{p_id}' active in room {room_name}. Skipping in-process agent.", flush=True)
+                            return
+                    await asyncio.sleep(0.1)
+                print(f"[Telephony WebSocket] External worker mode active; skipping in-process agent spawn for room: {room_name}", flush=True)
+                return
+
             from agent import run_agent
             await asyncio.sleep(0.3)
             await run_agent(room_name, agent_id=agent_to_run)

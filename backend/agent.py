@@ -16,7 +16,7 @@ import logging
 import asyncio
 import jwt
 from dotenv import load_dotenv
-from livekit.agents import JobContext, WorkerOptions, cli, AgentServer, tts, llm
+from livekit.agents import AutoSubscribe, JobContext, WorkerOptions, cli, tts, llm
 from livekit.agents.voice import Agent, AgentSession
 from livekit.agents.voice.agent import ModelSettings
 from livekit.plugins import sarvam, silero, openai, elevenlabs, google
@@ -57,8 +57,11 @@ def _start_health_server():
         print(f"[Render Health] Could not start HTTP keep-alive server: {e}", flush=True)
 
 
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
 logger = logging.getLogger("voice-agent")
-
 logger.setLevel(logging.INFO)
 
 _vad_model = None
@@ -747,7 +750,9 @@ class VikramAgent(Agent):
 
             # hi-IN provides fluent bilingual pronunciation for both Hindi and English words
             target_lang = "hi-IN" if language in ['hinglish', 'hi-IN', 'english'] else "en-IN"
-            sarvam_sample_rate = int(os.getenv("SARVAM_SAMPLE_RATE", "8000"))
+            sarvam_sample_rate = int(os.getenv("SARVAM_SAMPLE_RATE", "24000"))
+            if sarvam_sample_rate < 16000:
+                sarvam_sample_rate = 24000
             tts_plugin = sarvam.TTS(
                 target_language_code=target_lang,
                 model=model_name,
@@ -1016,26 +1021,20 @@ class VikramAgent(Agent):
             room = getattr(self.session, 'room', None)
         
         room_name = getattr(room, 'name', '') if room else ''
-        if any(p in room_name for p in ("twilio-", "sip-", "exotel")):
-            logger.info(f"[VikramAgent] Telephony room '{room_name}': waiting for caller to connect...")
-            for _ in range(50): # wait up to 5.0s with high-frequency 100ms check
-                remotes = getattr(room, 'remote_participants', {}) if room else {}
-                if remotes:
-                    has_caller = any(
-                        "caller" in getattr(p, 'identity', '').lower() or 
-                        "twilio" in getattr(p, 'identity', '').lower() or
-                        "exotel" in getattr(p, 'identity', '').lower() or
-                        "phone" in getattr(p, 'identity', '').lower()
-                        for p in remotes.values()
-                    )
-                    if has_caller:
-                        logger.info(f"[VikramAgent] Caller connected to room! Waiting 300ms for audio tracks to settle...")
-                        await asyncio.sleep(0.3)
-                        break
-                await asyncio.sleep(0.1)
-            await asyncio.sleep(0.2)
-        else:
+        logger.info(f"[VikramAgent] on_enter for room '{room_name}'. Waiting for remote participant to connect...")
+        for _ in range(40): # wait up to 4.0s for remote human/caller to connect
+            remotes = getattr(room, 'remote_participants', {}) if room else {}
+            if remotes:
+                has_participant = any(
+                    not (getattr(p, 'identity', '').startswith("agent_") or "vikram" in getattr(p, 'identity', '').lower())
+                    for p in remotes.values()
+                )
+                if has_participant:
+                    logger.info(f"[VikramAgent] Remote participant connected in room '{room_name}'! Waiting 300ms for audio tracks to settle...")
+                    await asyncio.sleep(0.3)
+                    break
             await asyncio.sleep(0.1)
+        await asyncio.sleep(0.2)
 
         greeting = getattr(self, 'greeting_message', None)
         if not greeting:
@@ -1767,9 +1766,6 @@ Only return valid JSON."""
             except Exception as e:
                 logger.error(f"Error triggering on_call_completed: {e}")
 
-server = AgentServer(num_idle_processes=1)
-
-
 _active_livekit_rooms = set()
 
 def _cleanup_livekit_rooms():
@@ -1789,15 +1785,17 @@ try:
 except Exception:
     pass
 
-@server.rtc_session()
 async def entrypoint(ctx: JobContext):
-    logger.info(f"User connected: {ctx.room.name}")
+    logger.info(f"Connecting to room: {ctx.room.name}")
+    await ctx.connect(auto_subscribe=AutoSubscribe.AUDIO_ONLY)
+    logger.info(f"Connected to room: {ctx.room.name}")
     
     # Guard: Check if an agent participant is already connected to this room
+    local_id = getattr(ctx.room.local_participant, 'identity', '') or ''
     if ctx.room and hasattr(ctx.room, 'remote_participants'):
         for p in ctx.room.remote_participants.values():
             p_identity = getattr(p, 'identity', '') or ''
-            if p_identity.startswith("agent_") or p_identity.startswith("Vikram") or "agent" in p_identity.lower():
+            if p_identity != local_id and (p_identity.startswith("agent_") or p_identity.startswith("Vikram") or "agent" in p_identity.lower()):
                 logger.warning(f"[DUPLICATE WORKER GUARD] Room '{ctx.room.name}' already has connected agent participant '{p_identity}'. Skipping duplicate worker join.")
                 return
 
@@ -2238,6 +2236,8 @@ async def entrypoint(ctx: JobContext):
         llm_model=agent_data.get('llm_model') if agent_data else None,
         temperature=agent_data.get('temperature') if agent_data else None,
     )
+
+    agent_instance.room = ctx.room
 
     if greeting_message:
         agent_instance.greeting_message = greeting_message
