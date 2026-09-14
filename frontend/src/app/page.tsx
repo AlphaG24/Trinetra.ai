@@ -1,3 +1,4 @@
+import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/utils/supabase/server'
 import { Layout } from "@/components/layout/Layout";
@@ -17,19 +18,24 @@ export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 export default async function Home() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const cookieStore = await cookies()
+  const hasAuthCookie = cookieStore.getAll().some(c => c.name.startsWith('sb-') && c.name.includes('-auth-token'))
 
-  if (user) {
-    // Fetch role for proper routing
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single()
-    const role = (profile?.role || 'client').toLowerCase()
-    const isAdmin = role === 'admin' || role === 'super_admin'
-    redirect(isAdmin ? '/admin' : '/dashboard')
+  if (hasAuthCookie) {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+
+    if (user) {
+      // Fetch role for proper routing
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single()
+      const role = (profile?.role || 'client').toLowerCase()
+      const isAdmin = role === 'admin' || role === 'super_admin'
+      redirect(isAdmin ? '/admin' : '/dashboard')
+    }
   }
 
   return (

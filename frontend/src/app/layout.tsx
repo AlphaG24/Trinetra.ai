@@ -18,9 +18,9 @@ const jetbrainsMono = JetBrains_Mono({
   display: "swap",
 });
 
-const playfair = Playfair_Display({ subsets: ['latin'], weight: ['700', '400'], variable: '--font-playfair' })
-const montserrat = Montserrat({ subsets: ['latin'], weight: ['400', '500'], variable: '--font-montserrat' })
-const merriweather = Merriweather({ subsets: ['latin'], weight: ['300', '400'], variable: '--font-merriweather' })
+const playfair = Playfair_Display({ subsets: ['latin'], weight: ['700', '400'], variable: '--font-playfair', display: 'swap' })
+const montserrat = Montserrat({ subsets: ['latin'], weight: ['400', '500'], variable: '--font-montserrat', display: 'swap' })
+const merriweather = Merriweather({ subsets: ['latin'], weight: ['300', '400'], variable: '--font-merriweather', display: 'swap' })
 
 const calSans = localFont({
   src: [

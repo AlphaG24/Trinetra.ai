@@ -161,7 +161,7 @@ h6 {
 .dashboard-theme-root [class*="font-display"],
 .dashboard-theme-root [class*="font-playfair"] {
   font-family: var(--font-playfair), "Playfair Display", Georgia, serif !important;
-  color: var(--heading) !important;
+  color: var(--heading);
 }
 
 .dashboard-theme-root [class*="font-montserrat"] {

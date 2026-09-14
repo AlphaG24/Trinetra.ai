@@ -36,6 +36,12 @@ export function Sidebar({ isOpen, onClose }: { isOpen?: boolean; onClose?: () =>
 
   useEffect(() => {
     setMounted(true)
+    const cachedRole = typeof window !== 'undefined' ? sessionStorage.getItem('trinetra_user_role') : null
+    if (cachedRole) {
+      setRole(cachedRole)
+      return
+    }
+
     const fetchUserRole = async () => {
       try {
         const { createClient } = await import('@/lib/client')
@@ -47,8 +53,9 @@ export function Sidebar({ isOpen, onClose }: { isOpen?: boolean; onClose?: () =>
             .select('role')
             .eq('id', user.id)
             .maybeSingle()
-          if (profile) {
+          if (profile?.role) {
             setRole(profile.role)
+            sessionStorage.setItem('trinetra_user_role', profile.role)
           }
         }
       } catch (err) {
@@ -71,13 +78,15 @@ export function Sidebar({ isOpen, onClose }: { isOpen?: boolean; onClose?: () =>
         key={item.href}
         href={item.href}
         onClick={onClose}
-        className={`flex items-center gap-3 px-4 py-2.5 rounded-[10px] text-sm font-medium transition-all duration-150 ${active
+        className={`group flex items-center gap-3 px-4 py-2.5 rounded-[10px] text-sm font-medium transition-all duration-150 ${active
             ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-950 font-bold shadow-sm'
             : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-white/5 hover:text-zinc-900 dark:hover:text-white'
           }`}
       >
-        <item.icon className={`w-5 h-5 shrink-0 ${active ? 'text-white dark:text-zinc-950' : 'text-zinc-400 dark:text-zinc-500'}`} />
-        <span className="font-playfair font-semibold text-[15px] inherit">{item.label}</span>
+        <item.icon className={`w-5 h-5 shrink-0 ${active ? 'text-white dark:text-zinc-950' : 'text-zinc-400 dark:text-zinc-500 group-hover:text-zinc-900 dark:group-hover:text-white'}`} />
+        <span className={`font-playfair font-semibold text-[15px] transition-colors ${active ? '!text-white dark:!text-zinc-950' : 'text-zinc-600 dark:text-zinc-400 group-hover:text-zinc-900 dark:group-hover:text-white'}`}>
+          {item.label}
+        </span>
       </Link>
     )
   }

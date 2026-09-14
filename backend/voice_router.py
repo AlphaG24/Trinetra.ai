@@ -311,9 +311,11 @@ async def generate_livekit_token(req: LiveKitTokenRequest):
         "nbf": now - 5,
         "sub": identity,
         "name": participant_name,
+        "metadata": req.agent_id or "",
         "video": {
             "room": room_name,
             "roomJoin": True,
+            "roomCreate": True,
             "canPublish": True,
             "canSubscribe": True,
             "canPublishData": True

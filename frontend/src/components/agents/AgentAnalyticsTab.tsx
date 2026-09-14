@@ -82,8 +82,8 @@ export function AgentAnalyticsTab({ agent, unlocked, upgradeUrl }: AgentAnalytic
             Call Volume {loading && <Loader2 className="w-4 h-4 animate-spin" />}
           </h3>
           
-          <div className="h-64 w-full">
-            <ResponsiveContainer width="100%" height="100%">
+          <div className="h-64 w-full min-w-0">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
               <AreaChart data={analyticsData?.callVolume?.map((v: any) => {
                 const d = new Date(v.date)
                 const isWeek = dateRange === '7d'
@@ -128,8 +128,8 @@ export function AgentAnalyticsTab({ agent, unlocked, upgradeUrl }: AgentAnalytic
 
             return (
               <>
-                <div className="h-48 w-full flex items-center justify-center relative">
-                  <ResponsiveContainer width="100%" height="100%">
+                <div className="h-48 w-full min-w-0 flex items-center justify-center relative">
+                  <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                     <PieChart>
                       <Pie
                         data={sentimentData}
@@ -177,8 +177,8 @@ export function AgentAnalyticsTab({ agent, unlocked, upgradeUrl }: AgentAnalytic
             Conversion Funnel {loading && <Loader2 className="w-4 h-4 animate-spin" />}
           </h3>
           
-          <div className="h-60 w-full">
-            <ResponsiveContainer width="100%" height="100%">
+          <div className="h-60 w-full min-w-0">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
               <BarChart data={analyticsData?.leadFunnel?.map((f: any) => ({ stage: f.stage, value: f.count })) || []} layout="vertical" margin={{ top: 10, right: 20, left: 10, bottom: 5 }}>
                 <XAxis type="number" stroke="var(--muted)" fontSize={10} tickLine={false} axisLine={false} />
                 <YAxis dataKey="stage" type="category" stroke="var(--muted)" fontSize={10} tickLine={false} axisLine={false} width={100} />
