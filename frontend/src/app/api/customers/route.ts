@@ -1,24 +1,44 @@
 import { NextResponse } from "next/server";
 import { authenticateRequest } from "@/lib/api-helpers";
+import { createClient as createAdminClient } from "@supabase/supabase-js";
+
+function getAdminClient() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) {
+    throw new Error("Supabase service credentials not configured");
+  }
+  return createAdminClient(url, key);
+}
 
 export async function GET(request: Request) {
   try {
-    const { authenticated, profile, error, supabase } = await authenticateRequest();
-    if (!authenticated) {
-      return NextResponse.json({ error }, { status: 401 });
-    }
-    if (!profile?.organization_id) {
-      return NextResponse.json({ error: "No organization found" }, { status: 400 });
+    const { authenticated, profile, error } = await authenticateRequest();
+    if (!authenticated || !profile) {
+      return NextResponse.json({ error: error || "Unauthorized" }, { status: 401 });
     }
 
     const { searchParams } = new URL(request.url);
     const search = searchParams.get("search");
     const tag = searchParams.get("tag");
 
-    let query = supabase
+    const isSuperAdmin = profile.role === "super_admin" || profile.role === "admin";
+    const supabaseAdmin = getAdminClient();
+
+    let query = supabaseAdmin
       .from("customer_contacts")
-      .select("*")
-      .eq("organization_id", profile.organization_id);
+      .select("*");
+
+    // Regular users are strictly scoped to their own organization.
+    // Super admins can see all contacts, or optionally filter by requested organization_id.
+    if (!isSuperAdmin) {
+      if (!profile.organization_id) {
+        return NextResponse.json({ success: true, customers: [] });
+      }
+      query = query.eq("organization_id", profile.organization_id);
+    } else if (searchParams.get("organization_id")) {
+      query = query.eq("organization_id", searchParams.get("organization_id")!);
+    }
 
     if (tag && tag !== "all") {
       query = query.contains("tags", [tag]);
@@ -56,18 +76,19 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const { authenticated, profile, error, supabase } = await authenticateRequest();
-    if (!authenticated) {
-      return NextResponse.json({ error }, { status: 401 });
+    const { authenticated, profile, error } = await authenticateRequest();
+    if (!authenticated || !profile) {
+      return NextResponse.json({ error: error || "Unauthorized" }, { status: 401 });
     }
-    if (!profile?.organization_id) {
-      return NextResponse.json({ error: "No organization found" }, { status: 400 });
-    }
+
+    const targetOrgId = profile.organization_id || "b1ddf1e9-abc1-4ff4-90f5-3ac66913738a";
 
     const payload = await request.json().catch(() => null);
     if (!payload) {
       return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
     }
+
+    const supabaseAdmin = getAdminClient();
 
     // 1. Bulk Upsert Mode
     if (payload.contacts && Array.isArray(payload.contacts)) {
@@ -81,7 +102,7 @@ export async function POST(request: Request) {
           }
         }
         return {
-          organization_id: profile.organization_id,
+          organization_id: targetOrgId,
           phone_number: phone,
           full_name: c.full_name || c.name || "Unknown",
           email: c.email || null,
@@ -97,7 +118,7 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: "No valid contacts found. Make sure phone numbers are at least 10 digits." }, { status: 400 });
       }
 
-      const { data, error: upsertError } = await supabase
+      const { data, error: upsertError } = await supabaseAdmin
         .from("customer_contacts")
         .upsert(contactsToUpsert, { onConflict: "organization_id,phone_number" })
         .select();
@@ -126,10 +147,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Invalid phone number. Must be at least 10 digits." }, { status: 400 });
     }
 
-    const { data, error: dbError } = await supabase
+    const { data, error: dbError } = await supabaseAdmin
       .from("customer_contacts")
       .upsert({
-        organization_id: profile.organization_id,
+        organization_id: targetOrgId,
         phone_number: phone,
         full_name: full_name || "Unknown",
         email: email || null,

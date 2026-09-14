@@ -150,7 +150,14 @@ export function CustomerDatabaseClient() {
 
       if (!res.ok) {
         const errorText = await res.text()
-        throw new Error(errorText)
+        let errorMessage = "Failed to save contact"
+        try {
+          const parsed = JSON.parse(errorText)
+          if (parsed.error) errorMessage = parsed.error
+        } catch {
+          if (errorText) errorMessage = errorText
+        }
+        throw new Error(errorMessage)
       }
 
       toast.success(editingCustomer ? "Contact updated successfully" : "Contact added successfully")
@@ -643,8 +650,8 @@ export function CustomerDatabaseClient() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setIsCrudModalOpen(false)} />
           
-          <div className="relative bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl w-full max-w-md p-6 md:p-8 shadow-2xl space-y-6 text-left animate-in zoom-in-95 duration-200">
-            <div className="flex items-center justify-between border-b border-[var(--border)] pb-4">
+          <div className="relative bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto p-6 md:p-8 shadow-2xl space-y-6 text-left animate-in zoom-in-95 duration-200">
+            <div className="sticky top-0 bg-[var(--card-bg)]/95 backdrop-blur-sm z-10 flex items-center justify-between border-b border-[var(--border)] pb-4 -mt-2 pt-2">
               <h3 className="text-lg font-bold font-display text-[var(--heading)]">
                 {editingCustomer ? "Edit Customer Details" : "Add New Customer"}
               </h3>
@@ -751,8 +758,8 @@ export function CustomerDatabaseClient() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setIsCsvModalOpen(false)} />
           
-          <div className="relative bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl w-full max-w-md p-6 md:p-8 shadow-2xl space-y-6 text-left animate-in zoom-in-95 duration-200">
-            <div className="flex items-center justify-between border-b border-[var(--border)] pb-4">
+          <div className="relative bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto p-6 md:p-8 shadow-2xl space-y-6 text-left animate-in zoom-in-95 duration-200">
+            <div className="sticky top-0 bg-[var(--card-bg)]/95 backdrop-blur-sm z-10 flex items-center justify-between border-b border-[var(--border)] pb-4 -mt-2 pt-2">
               <h3 className="text-lg font-bold font-display text-[var(--heading)]">
                 Bulk Import Contacts
               </h3>

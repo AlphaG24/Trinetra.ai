@@ -1,5 +1,15 @@
 import { NextResponse } from "next/server";
 import { authenticateRequest } from "@/lib/api-helpers";
+import { createClient as createAdminClient } from "@supabase/supabase-js";
+
+function getAdminClient() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) {
+    throw new Error("Supabase service credentials not configured");
+  }
+  return createAdminClient(url, key);
+}
 
 export async function PATCH(
   request: Request,
@@ -7,12 +17,9 @@ export async function PATCH(
 ) {
   try {
     const { id } = await params;
-    const { authenticated, profile, error, supabase } = await authenticateRequest();
-    if (!authenticated) {
-      return NextResponse.json({ error }, { status: 401 });
-    }
-    if (!profile?.organization_id) {
-      return NextResponse.json({ error: "No organization found" }, { status: 400 });
+    const { authenticated, profile, error } = await authenticateRequest();
+    if (!authenticated || !profile) {
+      return NextResponse.json({ error: error || "Unauthorized" }, { status: 401 });
     }
 
     const payload = await request.json().catch(() => null);
@@ -20,7 +27,7 @@ export async function PATCH(
       return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
     }
 
-    const { full_name, email, company, tags, notes } = payload;
+    const { full_name, email, company, tags, notes, phone_number } = payload;
 
     const updates: Record<string, any> = {
       updated_at: new Date().toISOString()
@@ -28,14 +35,35 @@ export async function PATCH(
     if (full_name !== undefined) updates.full_name = full_name;
     if (email !== undefined) updates.email = email;
     if (company !== undefined) updates.company = company;
-    if (tags !== undefined) updates.tags = tags;
+    if (tags !== undefined) updates.tags = Array.isArray(tags) ? tags : [];
     if (notes !== undefined) updates.notes = notes;
+    if (phone_number !== undefined) {
+      let cleanPhone = String(phone_number).replace(/\D/g, "");
+      if (cleanPhone.length > 10) {
+        if (cleanPhone.startsWith("91") && cleanPhone.length === 12) {
+          cleanPhone = cleanPhone.slice(2);
+        } else if (cleanPhone.startsWith("0") && cleanPhone.length === 11) {
+          cleanPhone = cleanPhone.slice(1);
+        }
+      }
+      if (cleanPhone.length >= 10) {
+        updates.phone_number = cleanPhone;
+      }
+    }
 
-    const { data: customer, error: dbError } = await supabase
+    const isSuperAdmin = profile.role === "super_admin" || profile.role === "admin";
+    const supabaseAdmin = getAdminClient();
+
+    let query = supabaseAdmin
       .from("customer_contacts")
       .update(updates)
-      .eq("id", id)
-      .eq("organization_id", profile.organization_id)
+      .eq("id", id);
+
+    if (!isSuperAdmin && profile.organization_id) {
+      query = query.eq("organization_id", profile.organization_id);
+    }
+
+    const { data: customer, error: dbError } = await query
       .select()
       .single();
 
@@ -58,19 +86,24 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
-    const { authenticated, profile, error, supabase } = await authenticateRequest();
-    if (!authenticated) {
-      return NextResponse.json({ error }, { status: 401 });
-    }
-    if (!profile?.organization_id) {
-      return NextResponse.json({ error: "No organization found" }, { status: 400 });
+    const { authenticated, profile, error } = await authenticateRequest();
+    if (!authenticated || !profile) {
+      return NextResponse.json({ error: error || "Unauthorized" }, { status: 401 });
     }
 
-    const { error: dbError } = await supabase
+    const isSuperAdmin = profile.role === "super_admin" || profile.role === "admin";
+    const supabaseAdmin = getAdminClient();
+
+    let query = supabaseAdmin
       .from("customer_contacts")
       .delete()
-      .eq("id", id)
-      .eq("organization_id", profile.organization_id);
+      .eq("id", id);
+
+    if (!isSuperAdmin && profile.organization_id) {
+      query = query.eq("organization_id", profile.organization_id);
+    }
+
+    const { error: dbError } = await query;
 
     if (dbError) {
       console.error('[API] Database Error deleting customer:', dbError);
