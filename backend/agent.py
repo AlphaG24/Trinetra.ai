@@ -914,48 +914,41 @@ class VikramAgent(Agent):
 
                 t_lower = (norm_txt or raw_txt).lower().strip()
 
+                flow_instruction = None
+
                 # 1. Zero Re-Introduction Guard: If caller says "hello", "sun rahe ho", "are you there" mid-call
                 liveness_words = ["hello", "helo", "hello?", "are you there", "sun rahe ho", "sun rhe ho", "sunai de raha", "awaaz aa rahi", "hello hello", "sun rahe"]
                 # Only treat as liveness check if utterance is short (<= 3 words), so full sentences like "Hello, main kal baat karunga" are not hijacked!
                 is_liveness_check = any((t_lower == lw or t_lower.startswith(lw)) and len(t_lower.split()) <= 3 for lw in liveness_words)
 
                 if is_liveness_check and turn_count >= 2:
-                    turn_ctx.add_message(
-                        role="system",
-                        content=[
-                            f"[CRITICAL FLOW NOTE: The caller is checking if you are still on the line ('{norm_txt}'). "
-                            f"STRICTLY DO NOT RE-INTRODUCE YOURSELF! DO NOT say 'Main {agent_name} {v_bol}' or repeat your greeting! "
-                            f"Simply confirm you are listening and ask how to proceed: e.g. 'Ji sir, main bilkul {v_sun}, boliye na?' or 'Haan ji sir, main yahin hoon.']"
-                        ]
+                    flow_instruction = (
+                        f"[CRITICAL FLOW NOTE: The caller is checking if you are still on the line ('{norm_txt}'). "
+                        f"STRICTLY DO NOT RE-INTRODUCE YOURSELF! DO NOT say 'Main {agent_name} {v_bol}' or repeat your greeting! "
+                        f"Simply confirm you are listening and ask how to proceed: e.g. 'Ji sir, main bilkul {v_sun}, boliye na?' or 'Haan ji sir, main yahin hoon.']"
                     )
 
                 # 2. Outside / In-Transit Objection Handling (Saad 15-second walking hook)
                 outside_words = ["bahar hoon", "bahar hu", "market mein", "market me", "outside", "on the road", "driving", "drive kar raha", "drive kar rha", "chalte chalte", "raste mein", "raste me"]
                 is_outside = any(ow in t_lower for ow in outside_words)
 
-                if is_outside:
-                    turn_ctx.add_message(
-                        role="system",
-                        content=[
-                            f"[CRITICAL OBJECTION HANDLING: The caller mentioned they are outside / in transit ('{norm_txt}'). "
-                            f"DO NOT immediately ask for callback timing! Use the Saad 15-second walking hook: "
-                            f"Warmly acknowledge, say you won't take long, and ask for literally 15 seconds while they walk: "
-                            f"'Arre bilkul sir, main {v_samajh} aap bahar hain. Bas 15 second dijiye chalte-chalte—ek zaruri baat share kar doon, agar relevant na lage toh aap turant mana kar dena. Chalega sir?']"
-                        ]
+                if is_outside and not flow_instruction:
+                    flow_instruction = (
+                        f"[CRITICAL OBJECTION HANDLING: The caller mentioned they are outside / in transit ('{norm_txt}'). "
+                        f"DO NOT immediately ask for callback timing! Use the Saad 15-second walking hook: "
+                        f"Warmly acknowledge, say you won't take long, and ask for literally 15 seconds while they walk: "
+                        f"'Arre bilkul sir, main {v_samajh} aap bahar hain. Bas 15 second dijiye chalte-chalte—ek zaruri baat share kar doon, agar relevant na lage toh aap turant mana kar dena. Chalega sir?']"
                     )
 
                 # 3. Refusal / "No I don't want it" Objection Handling (Saad Wall Breaker)
                 rejection_words = ["nahi chahiye", "nhi chahiye", "don't want", "dont want", "not interested", "nahi lena", "nhi lena", "koi zaroorat nahi", "koi jarurat nahi", "nahi chahiye mujhe"]
                 is_rejection = any(rw in t_lower for rw in rejection_words)
 
-                if is_rejection:
-                    turn_ctx.add_message(
-                        role="system",
-                        content=[
-                            f"[CRITICAL OBJECTION HANDLING: The caller expressed hesitation ('{norm_txt}'). "
-                            f"DO NOT go silent, freeze, or say goodbye immediately! Use Saad's Wall Breaker: "
-                            f"'Sach kahun sir, mujhe abhi yeh bhi nahi pata ki aapko iski zaroorat hai ya nahi! Maine toh bataya bhi nahi hum exactly kya karte hain. Mujhe bas 15 second dijiye—agar 1% bhi aapke kaam ka na lage, toh main dubara kabhi {v_call}. Deal sir?']"
-                        ]
+                if is_rejection and not flow_instruction:
+                    flow_instruction = (
+                        f"[CRITICAL OBJECTION HANDLING: The caller expressed hesitation ('{norm_txt}'). "
+                        f"DO NOT go silent, freeze, or say goodbye immediately! Use Saad's Wall Breaker: "
+                        f"'Sach kahun sir, mujhe abhi yeh bhi nahi pata ki aapko iski zaroorat hai ya nahi! Maine toh bataya bhi nahi hum exactly kya karte hain. Mujhe bas 15 second dijiye—agar 1% bhi aapke kaam ka na lage, toh main dubara kabhi {v_call}. Deal sir?']"
                     )
 
                 # 3.5 Callback / Reschedule Request Handling
@@ -967,23 +960,22 @@ class VikramAgent(Agent):
                 ]
                 is_callback_request = any(cb in t_lower for cb in callback_triggers)
 
-                if is_callback_request:
+                if is_callback_request and not flow_instruction:
                     v_connect = "connect kar lungi" if is_female else "connect kar lunga"
                     v_samajh_short = "sakti" if is_female else "sakta"
                     has_specific_time = any(kw in t_lower for kw in ["baje", "kal", "shaam", "dopahar", "subah", "tomorrow", "pm", "am", "2 baje", "11 baje", "5 baje"])
                     if has_specific_time:
-                        flow_note = (
+                        flow_instruction = (
                             f"[CRITICAL FLOW NOTE: The caller requested a callback at a specific time ('{norm_txt}'). "
                             f"Do NOT ask for another timing! Confidently confirm that exact time requested: "
                             f"'Bilkul sir, main kal us time pe aapse {v_connect}. Aapka bohot shukriya, have a great day ahead!']"
                         )
                     else:
-                        flow_note = (
+                        flow_instruction = (
                             f"[CRITICAL FLOW NOTE: The caller requested a callback at a later time ('{norm_txt}'). "
                             f"STRICTLY DO NOT HANG UP! Warmly agree and offer 2 specific time options to confirm: "
                             f"'Bilkul sir, main samajh {v_samajh_short} hoon. Main aapko convenient time pe {v_connect}—aaj shaam 5 baje theek rahega ya kal subah 11 baje?']"
                         )
-                    turn_ctx.add_message(role="system", content=[flow_note])
 
                 # 4. Affirmative permission in early turns
                 affirmative_starters = [
@@ -993,18 +985,20 @@ class VikramAgent(Agent):
                 ]
                 is_affirmative = any(aff in t_lower for aff in affirmative_starters)
 
-                if is_affirmative and turn_count <= 4 and not is_outside and not is_rejection:
+                if is_affirmative and turn_count <= 4 and not is_outside and not is_rejection and not flow_instruction:
                     campaign_goal = getattr(self, 'campaign_goal', '') or 'Discuss our products, services, and pricing'
                     c_name = getattr(self, 'prospect_name', '')
                     name_prompt = f" to {c_name}" if c_name else ""
-                    turn_ctx.add_message(
-                        role="system",
-                        content=[
-                            f"[CRITICAL FLOW NOTE: The prospect just gave permission to speak ('{norm_txt}'). "
-                            f"IMMEDIATELY introduce the reason you called{name_prompt}: '{campaign_goal}'. "
-                            f"Keep your response to 1-2 conversational sentences and ask an engaging discovery question. DO NOT say goodbye, DO NOT say '{getattr(self, 'ending_message', '')}'!]"
-                        ]
+                    flow_instruction = (
+                        f"[CRITICAL FLOW NOTE: The prospect just gave permission to speak ('{norm_txt}'). "
+                        f"IMMEDIATELY introduce the reason you called{name_prompt}: '{campaign_goal}'. "
+                        f"Keep your response to 1-2 conversational sentences and ask an engaging discovery question. DO NOT say goodbye, DO NOT say '{getattr(self, 'ending_message', '')}'!]"
                     )
+
+                # Attach flow instruction to the user turn so that the last message role remains 'user' (required by Groq/OpenAI APIs)
+                if flow_instruction:
+                    current_turn = norm_txt or raw_txt
+                    new_message.content = [f"{current_turn}\n\n{flow_instruction}"]
         except Exception as e:
             logger.warning(f"[VikramAgent] on_user_turn_completed exception: {e}")
 
