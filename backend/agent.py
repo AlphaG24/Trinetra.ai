@@ -16,7 +16,7 @@ import logging
 import asyncio
 import jwt
 from dotenv import load_dotenv
-from livekit.agents import AutoSubscribe, JobContext, WorkerOptions, cli, tts, llm
+from livekit.agents import AutoSubscribe, JobContext, WorkerOptions, JobExecutorType, cli, tts, llm
 from livekit.agents.voice import Agent, AgentSession
 from livekit.agents.voice.agent import ModelSettings
 from livekit.plugins import sarvam, silero, openai, elevenlabs, google
@@ -1793,9 +1793,16 @@ async def entrypoint(ctx: JobContext):
     # Guard: Check if an agent participant is already connected to this room
     local_id = getattr(ctx.room.local_participant, 'identity', '') or ''
     if ctx.room and hasattr(ctx.room, 'remote_participants'):
+        from livekit import rtc
         for p in ctx.room.remote_participants.values():
             p_identity = getattr(p, 'identity', '') or ''
-            if p_identity != local_id and (p_identity.startswith("agent_") or p_identity.startswith("Vikram") or "agent" in p_identity.lower()):
+            p_kind = getattr(p, 'kind', None)
+            is_agent = (
+                p_kind == getattr(rtc.ParticipantKind, 'PARTICIPANT_KIND_AGENT', 1) or
+                p_identity.startswith("agent-") or
+                p_identity.startswith("agent_worker_")
+            )
+            if p_identity != local_id and is_agent:
                 logger.warning(f"[DUPLICATE WORKER GUARD] Room '{ctx.room.name}' already has connected agent participant '{p_identity}'. Skipping duplicate worker join.")
                 return
 
@@ -3343,6 +3350,8 @@ if __name__ == "__main__":
     _start_health_server()
     cli.run_app(WorkerOptions(
         entrypoint_fnc=entrypoint,
+        job_executor_type=JobExecutorType.THREAD,
+        load_threshold=float('inf'),
         num_idle_processes=0,
     ))
 
