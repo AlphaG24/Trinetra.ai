@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/server'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
+import { cached, invalidateCache } from '@/lib/redis'
 
 const isMissingColumnError = (err: any) => {
   if (!err) return false
@@ -25,50 +26,56 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    let queryResult = await supabase
-      .from('profiles')
-      .select('id, full_name, company_name, business_type, country, state, telegram_chat_id, onboarding_complete, theme, avatar_url, business_description, consented, two_factor_enabled, tour_completed, notification_preferences')
-      .eq('id', user.id)
-      .maybeSingle()
+    // Cache profile for 120 seconds — called on every page load
+    const clientProfile = await cached(
+      `profile:${user.id}`,
+      async () => {
+        let queryResult = await supabase
+          .from('profiles')
+          .select('id, full_name, company_name, business_type, country, state, telegram_chat_id, onboarding_complete, theme, avatar_url, business_description, consented, two_factor_enabled, tour_completed, notification_preferences')
+          .eq('id', user.id)
+          .maybeSingle()
 
-    let profile: any = queryResult.data
-    let error = queryResult.error
+        let profile: any = queryResult.data
+        let error = queryResult.error
 
-    // Fallback: If DB schema doesn't have some optional columns yet,
-    // fetch the clean columns and return defaults.
-    if (isMissingColumnError(error)) {
-      console.warn('[/api/profiles GET] Some columns are missing in DB. Falling back to clean subset.')
-      const fallbackResult = await supabase
-        .from('profiles')
-        .select('id, full_name, company_name, business_type, country, state, telegram_chat_id, onboarding_complete, theme, avatar_url, consented')
-        .eq('id', user.id)
-        .maybeSingle()
+        // Fallback: If DB schema doesn't have some optional columns yet,
+        // fetch the clean columns and return defaults.
+        if (isMissingColumnError(error)) {
+          console.warn('[/api/profiles GET] Some columns are missing in DB. Falling back to clean subset.')
+          const fallbackResult = await supabase
+            .from('profiles')
+            .select('id, full_name, company_name, business_type, country, state, telegram_chat_id, onboarding_complete, theme, avatar_url, consented')
+            .eq('id', user.id)
+            .maybeSingle()
 
-      profile = fallbackResult.data
-      error = fallbackResult.error
-      if (profile) {
-        profile.business_description = ''
-        profile.two_factor_enabled = false
-        profile.tour_completed = false
-        profile.notification_preferences = null
-      }
-    }
+          profile = fallbackResult.data
+          error = fallbackResult.error
+          if (profile) {
+            profile.business_description = ''
+            profile.two_factor_enabled = false
+            profile.tour_completed = false
+            profile.notification_preferences = null
+          }
+        }
 
-    if (error) {
-      console.error('[/api/profiles GET] Error fetching profile:', error)
-      return NextResponse.json({ error: 'Failed to fetch profile' }, { status: 500 })
-    }
+        if (error || !profile) {
+          return null
+        }
 
-    if (!profile) {
+        // Map database state column to client region field
+        return {
+          ...profile,
+          region: profile.state,
+          theme: profile.theme || 'dark',
+          theme_preference: profile.theme || 'dark'
+        }
+      },
+      120
+    )
+
+    if (!clientProfile) {
       return NextResponse.json({ error: 'Profile not found' }, { status: 404 })
-    }
-
-    // Map database state column to client region field
-    const clientProfile = {
-      ...profile,
-      region: profile.state,
-      theme: profile.theme || 'dark',
-      theme_preference: profile.theme || 'dark'
     }
 
     return NextResponse.json({ profile: clientProfile })
@@ -206,6 +213,9 @@ export async function PATCH(request: NextRequest) {
       console.error('[/api/profiles PATCH] Supabase error:', error)
       return NextResponse.json({ error: error ? error.message : 'Profile write returned null data' }, { status: 400 })
     }
+
+    // Invalidate cached profile and auth-profile on update
+    await invalidateCache(`profile:${user.id}`, `auth-profile:${user.id}`)
 
     const clientProfile = {
       ...profile,

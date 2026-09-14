@@ -1,4 +1,5 @@
 import { createClient } from "@/utils/supabase/server"
+import { cached, invalidateCache } from "./redis"
 
 export async function authenticateRequest(): Promise<
   | { authenticated: true; user: any; profile: any; error: null; supabase: any }
@@ -9,7 +10,17 @@ export async function authenticateRequest(): Promise<
   if (error || !user) {
     return { authenticated: false, user: null, profile: null, error: "Authentication required", supabase }
   }
-  const { data: profile } = await supabase.from('profiles').select('id, role, organization_id, plan_tier, country, additional_agents, additional_phone_numbers').eq('id', user.id).single()
+
+  // Cache profile lookup in Redis (120s TTL) — this is called on every protected route
+  const profile = await cached(
+    `auth-profile:${user.id}`,
+    async () => {
+      const { data } = await supabase.from('profiles').select('id, role, organization_id, plan_tier, country, additional_agents, additional_phone_numbers').eq('id', user.id).single()
+      return data
+    },
+    120
+  )
+
   if (!profile) {
     return { authenticated: false, user: null, profile: null, error: "Profile not found", supabase }
   }
@@ -51,6 +62,8 @@ export async function authenticateRequest(): Promise<
           console.error('[API Helpers] Failed to update organization_id in profiles:', updateErr)
         } else {
           profile.organization_id = orgId
+          // Invalidate cached profile since org_id changed
+          await invalidateCache(`auth-profile:${user.id}`)
         }
       }
     } catch (err) {

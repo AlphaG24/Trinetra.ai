@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { authenticateRequest } from "@/lib/api-helpers";
 import { createClient as createAdminClient } from "@supabase/supabase-js";
+import { invalidateCache } from "@/lib/redis";
 
 function getAdminClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
@@ -72,6 +73,10 @@ export async function PATCH(
       return NextResponse.json({ error: dbError.message }, { status: 500 });
     }
 
+    // Invalidate customer list cache after update
+    const orgId = profile.organization_id || '';
+    await invalidateCache(`customers:${orgId}:*`);
+
     return NextResponse.json({ success: true, customer });
 
   } catch (err) {
@@ -109,6 +114,10 @@ export async function DELETE(
       console.error('[API] Database Error deleting customer:', dbError);
       return NextResponse.json({ error: dbError.message }, { status: 500 });
     }
+
+    // Invalidate customer list cache after delete
+    const orgId = profile.organization_id || '';
+    await invalidateCache(`customers:${orgId}:*`);
 
     return NextResponse.json({ success: true });
 

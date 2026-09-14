@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { authenticateRequest } from "@/lib/api-helpers";
 import { createClient as createAdminClient } from "@supabase/supabase-js";
+import { cached, invalidateCache } from "@/lib/redis";
 
 function getAdminClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
@@ -23,36 +24,50 @@ export async function GET(request: Request) {
     const tag = searchParams.get("tag");
 
     const isSuperAdmin = profile.role === "super_admin" || profile.role === "admin";
-    const supabaseAdmin = getAdminClient();
+    const orgId = profile.organization_id;
 
-    let query = supabaseAdmin
-      .from("customer_contacts")
-      .select("*");
+    // Only cache when there's no text search (search is done client-side on cached data)
+    const cacheKey = `customers:${orgId || 'all'}:${tag || 'all'}`;
+    
+    const customers = await cached(
+      cacheKey,
+      async () => {
+        const supabaseAdmin = getAdminClient();
 
-    // Regular users are strictly scoped to their own organization.
-    // Super admins can see all contacts, or optionally filter by requested organization_id.
-    if (!isSuperAdmin) {
-      if (!profile.organization_id) {
-        return NextResponse.json({ success: true, customers: [] });
-      }
-      query = query.eq("organization_id", profile.organization_id);
-    } else if (searchParams.get("organization_id")) {
-      query = query.eq("organization_id", searchParams.get("organization_id")!);
-    }
+        let query = supabaseAdmin
+          .from("customer_contacts")
+          .select("*");
 
-    if (tag && tag !== "all") {
-      query = query.contains("tags", [tag]);
-    }
+        // Regular users are strictly scoped to their own organization.
+        // Super admins can see all contacts, or optionally filter by requested organization_id.
+        if (!isSuperAdmin) {
+          if (!orgId) {
+            return [];
+          }
+          query = query.eq("organization_id", orgId);
+        } else if (searchParams.get("organization_id")) {
+          query = query.eq("organization_id", searchParams.get("organization_id")!);
+        }
 
-    const { data: customers, error: dbError } = await query
-      .order("created_at", { ascending: false });
+        if (tag && tag !== "all") {
+          query = query.contains("tags", [tag]);
+        }
 
-    if (dbError) {
-      console.error('[API] Database Error fetching customers:', dbError);
-      return NextResponse.json({ error: "Database error" }, { status: 500 });
-    }
+        const { data, error: dbError } = await query
+          .order("created_at", { ascending: false });
 
-    let filtered = customers || [];
+        if (dbError) {
+          console.error('[API] Database Error fetching customers:', dbError);
+          throw new Error("Database error");
+        }
+
+        return data || [];
+      },
+      60 // 60 second TTL
+    );
+
+    // Client-side text search on cached results
+    let filtered = customers;
     if (search) {
       const s = search.toLowerCase();
       filtered = filtered.filter((c: any) => 
@@ -128,6 +143,9 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: upsertError.message }, { status: 500 });
       }
 
+      // Invalidate customer cache after bulk insert
+      await invalidateCache(`customers:${targetOrgId}:*`);
+
       return NextResponse.json({ success: true, count: data?.length || 0 });
     }
 
@@ -167,6 +185,9 @@ export async function POST(request: Request) {
       console.error('[API] Database Error inserting customer:', dbError);
       return NextResponse.json({ error: dbError.message }, { status: 500 });
     }
+
+    // Invalidate customer cache after single insert
+    await invalidateCache(`customers:${targetOrgId}:*`);
 
     return NextResponse.json({ success: true, customer: data });
 
