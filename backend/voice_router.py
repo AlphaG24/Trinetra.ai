@@ -1800,6 +1800,7 @@ async def telephony_audio_stream(websocket: WebSocket, room_name: Optional[str] 
     frame_size = 640 if is_exotel else 320
     pacing_interval = 0.040 if is_exotel else 0.020
     max_silence_ticks = 15 if is_exotel else 25
+    min_prebuffer_bytes = frame_size * 3  # 120ms jitter buffer on Exotel (1920B), 60ms on Twilio (960B)
 
     async def send_to_twilio():
         nonlocal stream_sid, is_ws_closed, is_playing
@@ -1821,7 +1822,7 @@ async def telephony_audio_stream(websocket: WebSocket, room_name: Optional[str] 
                 async with buffer_lock:
                     buf_len = len(pcm_buffer)
                     if not is_playing:
-                        if buf_len >= frame_size:
+                        if buf_len >= min_prebuffer_bytes:
                             is_playing = True
                             empty_ticks = 0
                             next_send_time = time.perf_counter()
@@ -1831,15 +1832,16 @@ async def telephony_audio_stream(websocket: WebSocket, room_name: Optional[str] 
                             chunk = bytes(pcm_buffer[:frame_size])
                             del pcm_buffer[:frame_size]
                             empty_ticks = 0
-                        elif buf_len > 0:
-                            chunk = bytes(pcm_buffer) + b"\x00" * (frame_size - buf_len)
-                            pcm_buffer.clear()
-                            empty_ticks = 0
                         else:
                             empty_ticks += 1
                             if empty_ticks <= max_silence_ticks:
+                                # Preserve partial bytes in pcm_buffer while filling temporary jitter gap with silence
                                 is_silence_fill = True
                             else:
+                                # Speech turn completed; flush any remaining partial bytes with padding
+                                if buf_len > 0:
+                                    chunk = bytes(pcm_buffer) + b"\x00" * (frame_size - buf_len)
+                                    pcm_buffer.clear()
                                 is_playing = False
                                 empty_ticks = 0
 
@@ -1977,11 +1979,18 @@ async def telephony_audio_stream(websocket: WebSocket, room_name: Optional[str] 
                     if inbound_frames % 150 == 1:
                         print(f"[Telephony WebSocket] Inbound audio: {len(raw_data)}B -> {len(pcm_48k)}B PCM (48kHz) (inbound #{inbound_frames})", flush=True)
 
-            elif event in ("clear", "mark"):
-                # Caller interruption/barge-in
+            elif event == "clear":
+                # Caller interruption/barge-in from carrier
                 is_playing = False
                 async with buffer_lock:
                     pcm_buffer.clear()
+
+            elif event == "mark":
+                # Carrier playback acknowledgment - do NOT clear audio buffer!
+                mark_info = msg.get("mark", {})
+                mark_name = mark_info.get("name", "") if isinstance(mark_info, dict) else ""
+                if mark_name:
+                    print(f"[Telephony WebSocket] Carrier mark reached: {mark_name}", flush=True)
 
             elif event == "dtmf":
                 dtmf_data = msg.get("dtmf", {})

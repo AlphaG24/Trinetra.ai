@@ -24,6 +24,14 @@ from database import supabase_admin
 
 load_dotenv()
 
+# Warm-import openai resources eagerly during startup to eliminate cold import event loop freezes
+try:
+    import openai.resources
+    import openai.resources.chat
+    import openai.resources.beta
+except Exception:
+    pass
+
 def _start_health_server():
     """Lightweight HTTP server on $PORT for Render health checks and UptimeRobot keep-alive."""
     port_str = os.getenv("PORT")
@@ -278,13 +286,21 @@ class ExpressiveTTSStream(tts.SynthesizeStream):
     def push_text(self, text: str) -> None:
         import re
         self._buffer += text
-        sentences = re.split(r'(?<=[.!?\n])\s+', self._buffer)
+        # Low-latency streaming: split on sentence terminators (. ! ? । \n)
+        sentences = re.split(r'(?<=[.!?।\n])\s+', self._buffer)
         if len(sentences) > 1:
             for sentence in sentences[:-1]:
                 if sentence.strip():
                     cleaned = fix_gender_verbs(clean_ssml(sentence), self._gender)
                     self._underlying.push_text(cleaned)
             self._buffer = sentences[-1]
+        elif len(self._buffer) >= 40 and re.search(r'[,;]\s+', self._buffer):
+            # Clause-level streaming chunking so TTS synthesizes clauses without waiting for full sentence
+            parts = re.split(r'(?<=[,;])\s+', self._buffer, maxsplit=1)
+            if len(parts) > 1 and parts[0].strip():
+                cleaned = fix_gender_verbs(clean_ssml(parts[0]), self._gender)
+                self._underlying.push_text(cleaned)
+                self._buffer = parts[1]
 
     def flush(self) -> None:
         if self._buffer.strip():
@@ -876,9 +892,9 @@ class VikramAgent(Agent):
             llm=llm_plugin,
             tts=wrapped_tts,
             vad=get_vad_model(),
-            min_endpointing_delay=0.3,
-            max_endpointing_delay=1.0,
-            min_consecutive_speech_delay=0.8,
+            min_endpointing_delay=0.1,
+            max_endpointing_delay=0.35,
+            min_consecutive_speech_delay=0.3,
             use_tts_aligned_transcript=True,
         )
 
@@ -1016,7 +1032,7 @@ class VikramAgent(Agent):
         
         room_name = getattr(room, 'name', '') if room else ''
         logger.info(f"[VikramAgent] on_enter for room '{room_name}'. Waiting for remote participant to connect...")
-        for _ in range(40): # wait up to 4.0s for remote human/caller to connect
+        for _ in range(30): # check every 50ms up to 1.5s for remote human/caller
             remotes = getattr(room, 'remote_participants', {}) if room else {}
             if remotes:
                 has_participant = any(
@@ -1024,11 +1040,11 @@ class VikramAgent(Agent):
                     for p in remotes.values()
                 )
                 if has_participant:
-                    logger.info(f"[VikramAgent] Remote participant connected in room '{room_name}'! Waiting 300ms for audio tracks to settle...")
-                    await asyncio.sleep(0.3)
+                    logger.info(f"[VikramAgent] Remote participant connected in room '{room_name}'!")
                     break
-            await asyncio.sleep(0.1)
-        await asyncio.sleep(0.2)
+            await asyncio.sleep(0.05)
+        # Brief 100ms settle time for audio tracks to subscribe instead of 500ms
+        await asyncio.sleep(0.1)
 
         greeting = getattr(self, 'greeting_message', None)
         if not greeting:
@@ -2266,13 +2282,13 @@ async def entrypoint(ctx: JobContext):
         await session.start(agent=agent_instance, room=ctx.room)
         return
 
-    # Configure fast local VAD turn detection to eliminate cloud EOT model timeout latency
+    # Configure fast local VAD turn detection and preemptive generation for low turnaround latency
     session = AgentSession(
         vad=get_vad_model(),
         turn_detection="vad",
-        min_endpointing_delay=0.2,
-        max_endpointing_delay=0.6,
-        preemptive_generation=False,
+        min_endpointing_delay=0.1,
+        max_endpointing_delay=0.35,
+        preemptive_generation=True,
         min_interruption_duration=0.5,
         min_interruption_words=2,
         resume_false_interruption=True,
@@ -3019,9 +3035,9 @@ async def run_agent(room_name: str, agent_id: str | None = None, contact_id: str
         session = AgentSession(
             vad=get_vad_model(),
             turn_detection="vad",
-            min_endpointing_delay=0.2,
-            max_endpointing_delay=0.6,
-            preemptive_generation=False,
+            min_endpointing_delay=0.1,
+            max_endpointing_delay=0.35,
+            preemptive_generation=True,
             min_interruption_duration=0.5,
             min_interruption_words=2,
             resume_false_interruption=True,
