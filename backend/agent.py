@@ -772,16 +772,26 @@ class VikramAgent(Agent):
             sarvam_sample_rate = int(os.getenv("SARVAM_SAMPLE_RATE", "24000"))
             if sarvam_sample_rate < 16000:
                 sarvam_sample_rate = 24000
-            tts_plugin = sarvam.TTS(
-                target_language_code=target_lang,
-                model=model_name,
-                speaker=sarvam_speaker,
-                pace=sarvam_pace,
-                pitch=sarvam_pitch,
-                speech_sample_rate=sarvam_sample_rate,
-                output_audio_codec="linear16",
-                min_buffer_size=25,
-            )
+            try:
+                tts_plugin = sarvam.TTS(
+                    target_language_code=target_lang,
+                    model=model_name,
+                    speaker=sarvam_speaker,
+                    pace=sarvam_pace,
+                    pitch=sarvam_pitch,
+                    speech_sample_rate=sarvam_sample_rate,
+                    output_audio_codec="linear16",
+                    min_buffer_size=30,
+                )
+            except Exception as sarvam_err:
+                logger.warning(f"[VikramAgent] Sarvam TTS custom init error ({sarvam_err}), falling back to safe defaults")
+                tts_plugin = sarvam.TTS(
+                    target_language_code=target_lang,
+                    model=model_name,
+                    speaker=sarvam_speaker,
+                    speech_sample_rate=sarvam_sample_rate,
+                    output_audio_codec="linear16",
+                )
         else:
             tts_plugin = elevenlabs.TTS(voice_id=voice_id)
 
