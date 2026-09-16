@@ -331,9 +331,10 @@ async def generate_livekit_token(req: LiveKitTokenRequest):
         print(f"[LIVEKIT TOKEN ERROR] PyJWT generation failed: {str(e)}", flush=True)
         token = f"dev_token_{identity}_{room_name}"
 
-    # Spawn in-process agent worker only if explicitly requested (standalone agent.py dev handles calls by default)
-    if os.getenv("ENABLE_IN_PROCESS_AGENT", "false").lower() == "true":
-        print(f"[LIVEKIT AGENT] In-process agent enabled; spawning worker for room: {room_name} with agent_id: {req.agent_id}", flush=True)
+    # Spawn in-process agent worker (or fallback) to guarantee agent presence in web call
+    in_process_enabled = os.getenv("ENABLE_IN_PROCESS_AGENT", "true").lower() in ("true", "1", "yes")
+    if in_process_enabled:
+        print(f"[LIVEKIT AGENT] Guaranteed agent execution: spawning worker for room: {room_name} with agent_id: {req.agent_id}", flush=True)
         try:
             async def safe_run_agent(r_name: str, a_id: str):
                 try:
@@ -356,7 +357,26 @@ async def generate_livekit_token(req: LiveKitTokenRequest):
         except Exception as spawn_err:
             print(f"[LIVEKIT AGENT SPAWN ERROR] Failed to spawn agent task: {spawn_err}", flush=True)
     else:
-        print(f"[LIVEKIT AGENT] External LiveKit worker active; skipping in-process agent spawn to prevent duplicate voices", flush=True)
+        # Also attempt LiveKit Cloud agent dispatch for standalone worker
+        try:
+            from livekit import api
+            from livekit.protocol import agent_dispatch
+            lk_url = os.getenv("LIVEKIT_URL")
+            lk_key = os.getenv("LIVEKIT_API_KEY")
+            lk_sec = os.getenv("LIVEKIT_API_SECRET")
+            if lk_url and lk_key and lk_sec:
+                async def dispatch_cloud():
+                    try:
+                        lk = api.LiveKitAPI(lk_url, lk_key, lk_sec)
+                        await lk.agent_dispatch.create_dispatch(
+                            agent_dispatch.CreateAgentDispatchRequest(agent_name="", room=room_name, metadata=req.agent_id or "")
+                        )
+                        await lk.aclose()
+                    except Exception as d_err:
+                        print(f"[LIVEKIT DISPATCH WARNING] {d_err}", flush=True)
+                asyncio.create_task(dispatch_cloud())
+        except Exception as e:
+            print(f"[LIVEKIT DISPATCH ERROR] {e}", flush=True)
 
     return {
         "status": "success",
@@ -1637,21 +1657,19 @@ async def telephony_audio_stream(websocket: WebSocket, room_name: Optional[str] 
 
     async def _dispatch_agent():
         try:
-            # If external LiveKit worker is active (default), wait briefly to verify worker claimed room
-            if os.getenv("ENABLE_IN_PROCESS_AGENT", "false").lower() != "true":
-                for _ in range(15):
-                    remotes = getattr(room, 'remote_participants', {}) if room else {}
-                    for p in remotes.values():
-                        p_id = getattr(p, 'identity', '') or ''
-                        if p_id.startswith("agent_") or "vikram" in p_id.lower():
-                            print(f"[Telephony WebSocket] External LiveKit worker '{p_id}' active in room {room_name}. Skipping in-process agent.", flush=True)
-                            return
-                    await asyncio.sleep(0.1)
-                print(f"[Telephony WebSocket] External worker mode active; skipping in-process agent spawn for room: {room_name}", flush=True)
-                return
+            # 1. Check if external worker joins within 1.0s
+            for _ in range(10):
+                remotes = getattr(room, 'remote_participants', {}) if room else {}
+                for p in remotes.values():
+                    p_id = getattr(p, 'identity', '') or ''
+                    if p_id.startswith("agent_") or "vikram" in p_id.lower() or p_id.startswith("agent-"):
+                        print(f"[Telephony WebSocket] External LiveKit worker '{p_id}' active in room {room_name}. Skipping in-process agent.", flush=True)
+                        return
+                await asyncio.sleep(0.1)
 
+            # 2. If no external worker has claimed the room, ALWAYS fall back to in-process agent so the caller is never left in silence
+            print(f"[Telephony WebSocket] No external worker detected in room {room_name}; launching guaranteed in-process agent for: {agent_to_run}", flush=True)
             from agent import run_agent
-            await asyncio.sleep(0.3)
             await run_agent(room_name, agent_id=agent_to_run)
         except Exception as ag_err:
             print(f"[Telephony WebSocket] Agent spawn warning: {ag_err}", flush=True)

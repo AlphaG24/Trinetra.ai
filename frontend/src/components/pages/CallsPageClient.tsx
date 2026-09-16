@@ -33,7 +33,7 @@ export function CallsPageClient({ agents }: { agents: any[] }) {
     const fetchCalls = async () => {
       setIsLoading(true)
       let query = supabase
-        .from('calls')
+        .from('voice_calls')
         .select('*', { count: 'exact' })
         .order('created_at', { ascending: false })
         .range((page - 1) * perPage, page * perPage - 1)
@@ -221,7 +221,7 @@ export function CallsPageClient({ agents }: { agents: any[] }) {
       <TranscriptModal
         isOpen={selectedCall !== null}
         onClose={() => setSelectedCall(null)}
-        transcript={selectedCall?.transcript || null}
+        transcript={selectedCall?.transcript_text || selectedCall?.transcript || null}
         recordingUrl={selectedCall?.recording_url || null}
         callerName={selectedCall?.caller_name || 'Customer'}
       />

@@ -88,19 +88,14 @@ export function CampaignDetailClient({ campaignId }: CampaignDetailClientProps) 
       const supabase = createClient()
       const { data } = await supabase
         .from('voice_calls')
-        .select('transcript')
-        .eq('id', callId)
+        .select('transcript_text, transcript')
+        .or(`id.eq.${callId},metadata->>provider_call_id.eq.${callId},metadata->>session_id.eq.${callId}`)
         .maybeSingle()
 
-      if (data?.transcript) {
-        setSelectedTranscript(data.transcript)
+      if (data?.transcript_text || data?.transcript) {
+        setSelectedTranscript(data.transcript_text || data.transcript)
       } else {
-        const { data: callData } = await supabase
-          .from('calls')
-          .select('transcript')
-          .eq('session_id', callId)
-          .maybeSingle()
-        setSelectedTranscript(callData?.transcript || 'No transcript registered for this call yet.')
+        setSelectedTranscript('No transcript registered for this call yet.')
       }
     } catch (err) {
       console.error('Error loading transcript:', err)

@@ -40,7 +40,7 @@ export function CallsTable({ agents }: CallsTableProps) {
 
       try {
         const { data } = await supabase
-          .from('calls')
+          .from('voice_calls')
           .select('*')
           .eq('user_id', user.id)
           .order('created_at', { ascending: false })

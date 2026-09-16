@@ -6,15 +6,22 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Menu, Bell, LogOut, User, CheckCheck } from 'lucide-react'
 import { ThemeToggle } from '@/src/components/ui/theme-toggle'
+import { useAuth, UserProfile } from '@/src/components/providers/AuthProvider'
 
 export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
-  const [profile, setProfile] = useState<{ full_name?: string; avatar_url?: string } | null>(null)
+  const { user: authUser, profile: authProfile, signOut: authSignOut } = useAuth()
+  const [profile, setProfile] = useState<UserProfile | null>(null)
   const [user, setUser] = useState<{ email?: string; user_metadata?: { full_name?: string } } | null>(null)
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
   const [notifications, setNotifications] = useState<any[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
   const [showNotifDropdown, setShowNotifDropdown] = useState(false)
   const router = useRouter()
+
+  useEffect(() => {
+    if (authProfile) setProfile(authProfile)
+    if (authUser) setUser(authUser)
+  }, [authProfile, authUser])
 
   const formatTimeAgo = (ts: string) => {
     const diff = Date.now() - new Date(ts).getTime()
@@ -68,15 +75,19 @@ export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
 
     async function loadUserAndSubscribe() {
       try {
-        const { data: { user: currentUser } } = await supabase.auth.getUser()
+        const currentUser = authUser || (await supabase.auth.getUser()).data?.user
         if (currentUser) {
-          setUser(currentUser)
-          const { data } = await supabase
-            .from('profiles')
-            .select('full_name, avatar_url')
-            .eq('id', currentUser.id)
-            .single()
-          setProfile(data)
+          if (!user) setUser(currentUser)
+          if (authProfile) {
+            setProfile(authProfile)
+          } else if (!profile) {
+            const { data } = await supabase
+              .from('profiles')
+              .select('full_name, avatar_url')
+              .eq('id', currentUser.id)
+              .maybeSingle()
+            if (data) setProfile(data as unknown as UserProfile)
+          }
 
           const fetchNotifs = async () => {
             const { count } = await supabase

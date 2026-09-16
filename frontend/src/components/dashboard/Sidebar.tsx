@@ -8,6 +8,8 @@ import {
   BarChart3, CreditCard, Settings, HelpCircle, Pencil, X
 } from 'lucide-react'
 
+import { useAuth } from '@/src/components/providers/AuthProvider'
+
 /**
  * Navigation items matching the reference image exactly:
  * Upper section: Overview, Agents, Customers, Phone Numbers, Campaigns, Analytics, Billing
@@ -32,38 +34,13 @@ const bottomNavItems = [
 export function Sidebar({ isOpen, onClose }: { isOpen?: boolean; onClose?: () => void }) {
   const pathname = usePathname() || ''
   const [mounted, setMounted] = useState(false)
-  const [role, setRole] = useState<string | null>(null)
+  const { role: authRole } = useAuth()
 
   useEffect(() => {
     setMounted(true)
-    const cachedRole = typeof window !== 'undefined' ? sessionStorage.getItem('trinetra_user_role') : null
-    if (cachedRole) {
-      setRole(cachedRole)
-      return
-    }
-
-    const fetchUserRole = async () => {
-      try {
-        const { createClient } = await import('@/lib/client')
-        const supabase = createClient()
-        const { data: { user } } = await supabase.auth.getUser()
-        if (user) {
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('role')
-            .eq('id', user.id)
-            .maybeSingle()
-          if (profile?.role) {
-            setRole(profile.role)
-            sessionStorage.setItem('trinetra_user_role', profile.role)
-          }
-        }
-      } catch (err) {
-        console.warn('Failed to fetch sidebar role:', err)
-      }
-    }
-    fetchUserRole()
   }, [])
+
+  const role = authRole || (typeof window !== 'undefined' ? sessionStorage.getItem('trinetra_user_role') : null)
 
   const isActive = (href: string) => {
     if (!mounted) return false

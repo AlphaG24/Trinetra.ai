@@ -780,7 +780,7 @@ class VikramAgent(Agent):
                 pitch=sarvam_pitch,
                 speech_sample_rate=sarvam_sample_rate,
                 output_audio_codec="linear16",
-                min_buffer_size=30,
+                min_buffer_size=25,
             )
         else:
             tts_plugin = elevenlabs.TTS(voice_id=voice_id)
@@ -820,22 +820,22 @@ class VikramAgent(Agent):
         llm_timeout = httpx.Timeout(connect=2.5, read=4.0, write=2.5, pool=2.5)
 
         if use_groq:
-            # Default to groq/compound-mini which provides a massive 70,000 ITPM rate limit (vs 8,000 for qwen)
-            if chosen_model and chosen_model.strip() and chosen_model not in ("qwen/qwen3.8-27b", "qwen/qwen3.6-27b"):
+            # Default to openai/gpt-oss-20b for ultra-fast ~250ms TTFT streaming voice response
+            if chosen_model and chosen_model.strip() and chosen_model not in ("groq/compound-mini", "groq/compound"):
                 groq_model = chosen_model.strip()
             else:
-                groq_model = "groq/compound-mini"
+                groq_model = "openai/gpt-oss-20b"
 
             llm_plugin = openai.LLM(
                 model=groq_model,
                 base_url="https://api.groq.com/openai/v1",
                 api_key=groq_api_key,
                 temperature=chosen_temp if temperature is not None else 0.6,
-                max_completion_tokens=250,
+                max_completion_tokens=150,
                 timeout=llm_timeout,
                 max_retries=1,
             )
-            logger.info(f"[VikramAgent] Using Groq LLM ({groq_model}, 70k token limit) for zero-latency voice response")
+            logger.info(f"[VikramAgent] Using Groq LLM ({groq_model}) for zero-latency voice response")
         elif gemini_api_key:
             gemini_model = chosen_model if "gemini" in chosen_model.lower() else "gemini-2.5-flash"
             llm_plugin = openai.LLM(
@@ -1377,24 +1377,7 @@ Only return valid JSON."""
             await asyncio.to_thread(
                 supabase_admin.table("voice_calls").update(update_data).eq("id", original_call_id).execute
             )
-
-            # Sync to 'calls' table for Calls History and Analytics pages
-            try:
-                calls_record = {
-                    "user_id": user_id,
-                    "agent_id": agent_id,
-                    "session_id": call_sid or (existing_call.get("metadata", {}).get("provider_call_id") if existing_call else None) or str(original_call_id or ""),
-                    "caller_phone": resolved_phone,
-                    "duration_seconds": duration_seconds,
-                    "transcript": transcript,
-                    "sentiment": lead_data.get("sentiment", "neutral"),
-                    "outcome": computed_outcome,
-                    "status": "completed"
-                }
-                await asyncio.to_thread(supabase_admin.table("calls").insert(calls_record).execute)
-                logger.info(f"[extract_and_save_lead] Successfully synced call to 'calls' table for analytics (phone: {resolved_phone})")
-            except Exception as calls_err:
-                logger.warning(f"Failed to sync to calls table: {calls_err}")
+            logger.info(f"[extract_and_save_lead] Updated voice_calls with sentiment and outcome (call_id: {original_call_id})")
         except Exception as e:
             logger.error(f"Failed to update voice_call with extracted sentiment: {e}")
 
@@ -1816,7 +1799,11 @@ async def entrypoint(ctx: JobContext):
                 p_identity.startswith("agent_worker_")
             )
             if p_identity != local_id and is_agent:
-                logger.warning(f"[DUPLICATE WORKER GUARD] Room '{ctx.room.name}' already has connected agent participant '{p_identity}'. Skipping duplicate worker join.")
+                logger.warning(f"[DUPLICATE WORKER GUARD] Room '{ctx.room.name}' already has connected agent participant '{p_identity}'. Disconnecting duplicate worker join.")
+                try:
+                    await ctx.room.disconnect()
+                except Exception:
+                    pass
                 return
 
     if ctx.room:
@@ -2290,7 +2277,7 @@ async def entrypoint(ctx: JobContext):
         vad=get_vad_model(),
         turn_detection="vad",
         min_endpointing_delay=0.1,
-        max_endpointing_delay=0.35,
+        max_endpointing_delay=0.25,
         preemptive_generation=True,
         min_interruption_duration=0.5,
         min_interruption_words=2,
@@ -3039,7 +3026,7 @@ async def run_agent(room_name: str, agent_id: str | None = None, contact_id: str
             vad=get_vad_model(),
             turn_detection="vad",
             min_endpointing_delay=0.1,
-            max_endpointing_delay=0.35,
+            max_endpointing_delay=0.25,
             preemptive_generation=True,
             min_interruption_duration=0.5,
             min_interruption_words=2,

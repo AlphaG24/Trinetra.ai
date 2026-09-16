@@ -13,6 +13,7 @@ import useSWR from 'swr'
 import { ProductTour } from '@/src/components/onboarding/ProductTour'
 import { AgentComparisonWidget } from '@/src/components/agents/AgentComparisonWidget'
 import { useDashboardStore } from '@/src/store/dashboardStore'
+import { useAuth } from '@/src/components/providers/AuthProvider'
 const fetcher = (url: string) => fetch(url).then(res => res.json())
 
 interface UserProfile {
@@ -29,9 +30,25 @@ interface UserProfile {
 
 export default function DashboardPage() {
   const router = useRouter()
+  const { user: authUser, profile: authProfile, isLoading: authLoading } = useAuth()
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [profileLoading, setProfileLoading] = useState(true)
   const { runProductTour, setRunProductTour, setProfile: setStoreProfile } = useDashboardStore()
+
+  useEffect(() => {
+    if (authProfile) {
+      const fullProfile = {
+        ...authProfile,
+        plan_tier: authProfile.plan_tier || 'free',
+        trial_ends_at: authProfile.trial_ends_at || null
+      }
+      setProfile(fullProfile as any)
+      setStoreProfile(fullProfile as any)
+      setProfileLoading(false)
+    } else if (!authLoading) {
+      setProfileLoading(false)
+    }
+  }, [authProfile, authLoading, setStoreProfile])
 
   useEffect(() => {
     if (profile && profile.tour_completed === false) {
@@ -47,12 +64,12 @@ export default function DashboardPage() {
   })
 
   const init = async () => {
-    setProfileLoading(true)
+    if (authProfile) return
     try {
       const supabase = createClient()
       const { data: { user }, error } = await supabase.auth.getUser()
       if (error || !user) {
-        router.push('/login')
+        if (!authLoading && !authUser) router.push('/login')
         return
       }
 
@@ -60,7 +77,7 @@ export default function DashboardPage() {
         .from('profiles')
         .select('*')
         .eq('id', user.id)
-        .single()
+        .maybeSingle()
 
       if (userProfile) {
         const fullProfile = {
@@ -68,7 +85,7 @@ export default function DashboardPage() {
           plan_tier: userProfile.plan_tier || 'free',
           trial_ends_at: userProfile.trial_ends_at || null
         }
-        setProfile(fullProfile)
+        setProfile(fullProfile as any)
         setStoreProfile(fullProfile as any)
       }
     } catch (err) {
@@ -79,7 +96,9 @@ export default function DashboardPage() {
   }
 
   useEffect(() => {
-    init()
+    if (!authProfile && !authLoading) {
+      init()
+    }
 
     const supabase = createClient()
     let activeChannel: any = null
