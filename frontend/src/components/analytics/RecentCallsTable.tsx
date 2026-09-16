@@ -2,6 +2,8 @@
 
 import { useState } from 'react'
 import { Download, ChevronDown, ChevronUp, PhoneCall, Calendar, Clock, Sparkles } from 'lucide-react'
+import { cleanAgentName } from '@/src/utils/formatAgentName'
+import { CallAudioPlayer } from '@/src/components/shared/CallAudioPlayer'
 
 interface CallData {
   id: string
@@ -141,7 +143,7 @@ export function RecentCallsTable({ calls }: RecentCallsTableProps) {
                           <Calendar className="w-3.5 h-3.5 text-[var(--muted)] shrink-0" />
                           <span className="truncate">{new Date(call.created_at).toLocaleString()}</span>
                         </div>
-                        <div className="font-semibold text-[var(--heading)]">{call.agent_name}</div>
+                        <div className="font-semibold text-[var(--heading)]">{cleanAgentName(call.agent_name)}</div>
                         <div className="flex items-center gap-1.5">
                           <Clock className="w-3.5 h-3.5 text-[var(--muted)] shrink-0" />
                           <span>{formatDuration(call.duration_seconds)}</span>
@@ -189,16 +191,15 @@ export function RecentCallsTable({ calls }: RecentCallsTableProps) {
                                 </span>
                               )}
                             </div>
-                            {call.recording_url && (
-                              <div className="w-full sm:w-auto">
-                                <audio
-                                  src={call.recording_url}
-                                  controls
-                                  className="h-8 max-w-full sm:w-60 focus:outline-none"
-                                />
-                              </div>
-                            )}
                           </div>
+
+                          {/* Universal Audio Player for Every Call */}
+                          <CallAudioPlayer
+                            recordingUrl={call.recording_url}
+                            transcript={call.transcript}
+                            durationSeconds={call.duration_seconds}
+                            callerName={call.caller_name || 'Customer'}
+                          />
 
                           <div className="max-h-60 overflow-y-auto bg-[var(--card-bg)] border border-[var(--border)] rounded-xl p-4 font-mono text-[11px] leading-relaxed text-[var(--body)] text-left whitespace-pre-line custom-scrollbar">
                             {call.transcript ? (

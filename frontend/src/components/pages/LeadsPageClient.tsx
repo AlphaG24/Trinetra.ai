@@ -10,9 +10,11 @@ import {
 import toast from 'react-hot-toast'
 import { createClient } from '@/utils/supabase/client'
 import { TranscriptModal } from '../modals/TranscriptModal'
+import { cleanAgentName } from '@/src/utils/formatAgentName'
 
 export interface Lead {
   id: string
+  agent_id?: string | null
   full_name?: string | null
   contact_name?: string | null
   email?: string | null
@@ -32,6 +34,13 @@ export interface Lead {
   created_at: string
 }
 
+export interface UserAgent {
+  id: string
+  name: string
+  agent_type?: string
+  status?: string
+}
+
 export interface PlatformService {
   id: string
   name: string
@@ -45,17 +54,14 @@ export interface PlatformService {
 
 interface LeadsPageClientProps {
   initialLeads: Lead[]
-  services: PlatformService[]
+  agents?: UserAgent[]
+  services?: PlatformService[]
 }
 
-export function LeadsPageClient({ initialLeads, services }: LeadsPageClientProps) {
+export function LeadsPageClient({ initialLeads, agents = [], services = [] }: LeadsPageClientProps) {
   const router = useRouter()
 
-  const [selectedSlug, setSelectedSlug] = useState<string>(() => {
-    const firstVoice = services.find(s => s.type?.toLowerCase() === 'voice')
-    if (firstVoice) return firstVoice.slug
-    return services.length > 0 ? services[0].slug : ''
-  })
+  const [selectedAgentId, setSelectedAgentId] = useState<string>('all')
 
   const [leads, setLeads] = useState<Lead[]>(initialLeads)
 
@@ -78,15 +84,26 @@ export function LeadsPageClient({ initialLeads, services }: LeadsPageClientProps
   const [selectedTranscript, setSelectedTranscript] = useState<string | null>(null)
   const [transcriptCallerName, setTranscriptCallerName] = useState<string>('Prospect')
 
-  const selectedService = useMemo(() => {
-    return services.find(s => s.slug === selectedSlug) || null
-  }, [selectedSlug, services])
+  const displayAgents = useMemo(() => {
+    if (agents && agents.length > 0) return agents
+    return (services || []).map(s => ({
+      id: s.id,
+      name: s.name,
+      agent_type: s.type,
+      status: s.is_active ? 'active' : 'inactive'
+    }))
+  }, [agents, services])
 
-  const isVoiceAgent = !selectedService || selectedService.type?.toLowerCase() === 'voice'
+  const isVoiceAgent = true
 
   // Filter leads
   const filtered = useMemo(() => {
     return leads.filter(l => {
+      // 1. Filter by selected agent
+      if (selectedAgentId !== 'all' && l.agent_id && l.agent_id !== selectedAgentId) {
+        return false
+      }
+
       const name = (l.full_name || l.contact_name || '').toLowerCase()
       const email = (l.email || l.contact_email || '').toLowerCase()
       const phone = (l.phone || l.contact_phone || '').toLowerCase()
@@ -109,20 +126,23 @@ export function LeadsPageClient({ initialLeads, services }: LeadsPageClientProps
 
       return matchesSearch && matchesStatus && matchesInterest
     })
-  }, [leads, search, statusFilter, interestFilter])
+  }, [leads, selectedAgentId, search, statusFilter, interestFilter])
 
   // KPIs
   const stats = useMemo(() => {
-    const total = leads.length
-    const qualified = leads.filter(l => {
+    const baseLeads = selectedAgentId === 'all'
+      ? leads
+      : leads.filter(l => l.agent_id === selectedAgentId)
+    const total = baseLeads.length
+    const qualified = baseLeads.filter(l => {
       const s = (l.status || l.stage || '').toLowerCase()
       const i = (l.interest_level || '').toLowerCase()
       return s === 'qualified' || i === 'high' || i === 'hot'
     }).length
-    const contacted = leads.filter(l => (l.status || l.stage || '').toLowerCase() === 'contacted').length
+    const contacted = baseLeads.filter(l => (l.status || l.stage || '').toLowerCase() === 'contacted').length
     const conversionRate = total > 0 ? Math.round((qualified / total) * 100) : 0
     return { total, qualified, contacted, conversionRate }
-  }, [leads])
+  }, [leads, selectedAgentId])
 
   // Refresh leads from DB
   const handleRefresh = async () => {
@@ -282,18 +302,24 @@ export function LeadsPageClient({ initialLeads, services }: LeadsPageClientProps
 
         {/* Top Actions */}
         <div className="flex items-center gap-2.5 flex-wrap">
-          {services.length > 0 && (
-            <div className="relative min-w-[200px]">
+          {displayAgents.length > 0 && (
+            <div className="relative min-w-[220px]">
               <select
-                value={selectedSlug}
-                onChange={(e) => setSelectedSlug(e.target.value)}
+                value={selectedAgentId}
+                onChange={(e) => setSelectedAgentId(e.target.value)}
                 className="w-full bg-[var(--card-bg)] border border-[var(--border)] rounded-xl pl-3.5 pr-8 py-2 text-xs font-semibold text-[var(--heading)] focus:outline-none focus:ring-2 focus:ring-violet-500/30 transition-all appearance-none cursor-pointer shadow-sm"
               >
-                {services.map((service) => (
-                  <option key={service.id} value={service.slug} className="bg-[var(--card-bg)] text-[var(--heading)]">
-                    {service.name}
-                  </option>
-                ))}
+                <option value="all" className="bg-[var(--card-bg)] text-[var(--heading)]">
+                  All Agents ({leads.length})
+                </option>
+                {displayAgents.map((agent) => {
+                  const count = leads.filter(l => l.agent_id === agent.id).length
+                  return (
+                    <option key={agent.id} value={agent.id} className="bg-[var(--card-bg)] text-[var(--heading)]">
+                      {cleanAgentName(agent.name)} {count > 0 ? `(${count})` : ''}
+                    </option>
+                  )
+                })}
               </select>
               <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--muted)] pointer-events-none" />
             </div>

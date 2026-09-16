@@ -232,14 +232,17 @@ export async function POST(request: Request) {
             if (prodAgent) existingAgent = prodAgent;
         }
 
-        // (2) By name prefix [slug] — reliable even when product_id is null.
-        //     Name is stored as "[lead_qualifier] Lead Qualifier - Demo"
+        // (2) By name prefix [slug] or clean name
         if (!existingAgent && requestedAgentType !== 'voice') {
+            const cleanTarget = (name || platformService?.name || '').replace(/^\[[^\]]+\]\s*/, '').trim();
+            const orFilter = cleanTarget 
+                ? `name.ilike.[${requestedAgentType}]%,name.ilike.%${cleanTarget}%` 
+                : `name.ilike.[${requestedAgentType}]%`;
             const { data: namedAgent } = await supabaseAdmin
                 .from('agents')
                 .select('id, name, agent_type, product_id, system_prompt, greeting_message, voice_id')
                 .eq('user_id', user.id)
-                .ilike('name', `[${requestedAgentType}]%`)
+                .or(orFilter)
                 .limit(1)
                 .maybeSingle();
             if (namedAgent) existingAgent = namedAgent;
@@ -436,14 +439,9 @@ export async function POST(request: Request) {
 
         const blueprint = blueprints[role] || blueprints["Custom"] || BLUEPRINTS["Custom"];
 
-        // Encode the tool slug in the agent name so we can reliably find this agent
-        // later via a name-prefix query (no DB schema change needed).
-        // Format: "[lead_qualifier] Lead Qualifier - Demo"
-        // `name` is sent by the client as e.g. "Lead Qualifier - Demo"
+        // Use clean agent name without bracketed slug prefix
         const rawAgentName = name || (platformService?.name || "Neural Unit");
-        const agentName = requestedAgentType !== 'voice'
-            ? `[${requestedAgentType}] ${rawAgentName}`
-            : rawAgentName;
+        const agentName = rawAgentName.replace(/^\[[^\]]+\]\s*/, '').trim();
 
         const userName = user.user_metadata?.full_name || user.email?.split('@')[0] || "Trinetra User";
         const companyDisplayName = company_name || profile?.company_name || userName;

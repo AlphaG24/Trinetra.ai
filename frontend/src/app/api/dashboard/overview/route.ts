@@ -145,7 +145,11 @@ export async function GET() {
 
       const tools = agents.map((agent: any) => ({
         id: agent.id,
-        name: agent.name,
+        name: (agent.name || 'Agent')
+          .replace(/^\[[^\]]+\]\s*/, '')
+          .replace(/\s*-\s*Demo\s*$/i, '')
+          .replace(/\s*-\s*Trial\s*$/i, '')
+          .trim() || 'Agent',
         agent_type: agent.agent_type || 'voice',
         status: agent.status || 'draft',
         calls_today: callsTodayMap[agent.id] || 0,

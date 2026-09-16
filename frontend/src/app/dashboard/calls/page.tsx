@@ -2,6 +2,8 @@ import { createClient } from '@/lib/server'
 import { redirect } from 'next/navigation'
 import { CallsPageClient } from '@/src/components/pages/CallsPageClient'
 
+import { cleanAgentName } from '@/src/utils/formatAgentName'
+
 export const metadata = {
   title: 'Voice Calls — Trinetra AI',
   description: 'Full history of all voice calls handled by your AI agents.',
@@ -23,5 +25,10 @@ export default async function CallsPage() {
     redirect('/dashboard')
   }
 
-  return <CallsPageClient agents={agents} />
+  const cleanedAgents = (agents || []).map((a: any) => ({
+    ...a,
+    name: cleanAgentName(a.name)
+  }))
+
+  return <CallsPageClient agents={cleanedAgents} />
 }

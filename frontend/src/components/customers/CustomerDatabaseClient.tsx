@@ -8,6 +8,7 @@ import {
   CheckCircle2, AlertCircle, FileSpreadsheet, Play, Pause, Clock
 } from 'lucide-react'
 import { toast } from 'sonner'
+import { CallAudioPlayer } from '@/src/components/shared/CallAudioPlayer'
 
 interface CustomerContact {
   id: string
@@ -31,6 +32,7 @@ interface CallLog {
   sentiment: string | null
   recording_url: string | null
   direction: string
+  transcript?: string | null
 }
 
 export function CustomerDatabaseClient() {
@@ -622,19 +624,15 @@ export function CustomerDatabaseClient() {
                             )}
                           </div>
 
-                          {call.recording_url && (
-                            <button
-                              onClick={() => handlePlayAudio(call.id, call.recording_url!)}
-                              className="w-full flex items-center justify-center gap-2 py-2 rounded-lg bg-[var(--primary-bg)] hover:bg-[var(--hover-bg)] border border-[var(--border)] text-xs font-montserrat font-bold uppercase tracking-wider transition-all cursor-pointer"
-                            >
-                              {playingCallId === call.id ? (
-                                <><Pause className="w-3.5 h-3.5" /> Pause Call Recording</>
-                              ) : (
-                                <><Play className="w-3.5 h-3.5" /> Listen Call Recording</>
-                              )}
-                            </button>
-                          )}
-                        </div>
+                            <div className="mt-3">
+                              <CallAudioPlayer
+                                recordingUrl={call.recording_url}
+                                transcript={call.transcript}
+                                durationSeconds={call.duration_seconds}
+                                callerName={selectedCustomerForHistory?.full_name || 'Customer'}
+                              />
+                            </div>
+                          </div>
                       ))}
                     </div>
                   )}

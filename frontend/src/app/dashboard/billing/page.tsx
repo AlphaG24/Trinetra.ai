@@ -8,9 +8,9 @@ import { createClient } from '@/utils/supabase/client'
 import { 
   CreditCard, 
   Check, 
+  CheckCircle2,
   HelpCircle, 
   MessageSquare, 
-  ShieldAlert, 
   Zap, 
   Volume2, 
   PhoneCall, 
@@ -22,7 +22,8 @@ import {
   Minus,
   Gift,
   Trash2,
-  Bot
+  Bot,
+  AlertCircle
 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -389,7 +390,7 @@ function BillingContent() {
   if (error || !userLimits) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[400px] border border-red-500/20 bg-red-950/10 rounded-2xl p-8 text-center max-w-lg mx-auto my-12">
-        <ShieldAlert className="w-12 h-12 text-red-500 mb-4 animate-bounce" />
+        <AlertCircle className="w-12 h-12 text-red-500 mb-4 animate-bounce" />
         <h3 className="text-white font-bold text-lg">Billing Gateway Error</h3>
         <p className="text-sm text-zinc-400 mt-2 leading-relaxed">{error || 'Could not fetch your billing details. Please try again.'}</p>
         <button 
@@ -482,27 +483,6 @@ function BillingContent() {
             </div>
           </div>
 
-          {/* Add phone numbers & Custom Assets */}
-          <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-6 shadow-sm">
-            <h3 className="font-bold text-sm text-[var(--heading)] font-display flex items-center gap-2">
-              <PhoneCall className="w-4 h-4 text-violet-500" />
-              Additional Virtual Phone Numbers
-            </h3>
-            <p className="text-xs text-[var(--muted)] mt-1">Need extra direct lines? Add more provisioning slots for your voice agents.</p>
-            
-            <div className="mt-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-4 bg-[var(--background)] border border-[var(--border)] rounded-xl">
-              <div>
-                <span className="text-xs font-bold text-[var(--heading)]">Local Dedicated Line</span>
-                <span className="text-xs text-[var(--muted)] block mt-0.5">₹{phonePriceRaw}/month per number</span>
-              </div>
-              <button
-                onClick={() => addToCart('phone_number', 'phone_number', 'Extra Virtual Phone Number', phonePriceRaw)}
-                className="px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white font-bold text-xs uppercase rounded-xl transition-all cursor-pointer shadow-sm"
-              >
-                Add Number Slot
-              </button>
-            </div>
-          </div>
 
           {/* Special Bundles Pack */}
           {availableBundles.length > 0 && (
@@ -687,16 +667,14 @@ function BillingContent() {
 
       {/* Payment History Section */}
       <div className="mt-12 bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-6 relative overflow-hidden shadow-sm">
-        <h2 className="text-lg font-bold font-display text-[var(--heading)] mb-4">Payment History</h2>
-        
-        <div className="mb-6 bg-amber-500/10 border border-amber-500/20 rounded-xl p-4 flex items-start gap-3">
-          <ShieldAlert className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
           <div>
-            <h4 className="text-sm font-bold text-amber-500">Transaction History Retention Notice</h4>
-            <p className="text-xs text-amber-500/80 mt-1">
-              ⚠️ Invoices older than 3 months will be automatically cleared to keep system performance high.<br/>
-              Please download your invoices for permanent tax records.
-            </p>
+            <h2 className="text-lg font-bold font-display text-[var(--heading)]">Payment & Invoice History</h2>
+            <p className="text-xs text-[var(--muted)] mt-0.5">Permanent record of all completed subscriptions, add-ons, and tax invoices.</p>
+          </div>
+          <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 text-xs font-semibold self-start sm:self-auto">
+            <CheckCircle2 className="w-3.5 h-3.5" />
+            <span>Permanent Records Protected</span>
           </div>
         </div>
 
@@ -757,9 +735,9 @@ function BillingContent() {
           </div>
         )}
         <div className="mt-4 pt-4 border-t border-[var(--border)] flex items-center justify-between flex-wrap gap-2">
-          <p className="text-[10px] text-[var(--muted)] flex items-center gap-1.5">
-            <ShieldAlert className="w-3.5 h-3.5 text-amber-500/80" />
-            {showAllInvoices ? `Showing all ${invoices.length} invoices. Retained for 3 months.` : "Showing last 3 invoices. Retained for 3 months."}
+          <p className="text-xs text-[var(--muted)] flex items-center gap-1.5">
+            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+            <span>All official GST tax invoices are permanently stored and downloadable anytime.</span>
           </p>
           {invoices.length > 3 && (
             <button

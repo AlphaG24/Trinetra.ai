@@ -7,7 +7,6 @@ import {
   Search, RefreshCw, SlidersHorizontal, XCircle, Info, PhoneCall, ShoppingBag
 } from "lucide-react";
 import { NumberCard } from "@/src/components/phone-numbers/NumberCard";
-import { ProvisionNumberModal } from "@/src/components/phone-numbers/ProvisionNumberModal";
 import { ManageNumberModal } from "@/src/components/phone-numbers/ManageNumberModal";
 import { PaymentProgressModal } from "@/src/components/phone-numbers/PaymentProgressModal";
 import { toast } from "sonner";
@@ -15,9 +14,13 @@ import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
 import { useDashboardStore } from "@/store/dashboardStore";
 import UpgradePrompt from "@/src/components/shared/UpgradePrompt";
+import { useAuth } from "@/src/components/providers/AuthProvider";
+import { PageHeaderSkeleton, CardGridSkeleton, TableSkeleton } from "@/src/components/ui/skeleton";
 
 export default function PhoneNumbersPage() {
-  const { profile, setProfile } = useDashboardStore();
+  const { profile: authProfile, isLoading: authLoading } = useAuth();
+  const { profile: storeProfile, setProfile } = useDashboardStore();
+  const profile = authProfile || storeProfile;
 
   useEffect(() => {
     if (!profile || profile.plan_tier === undefined) {
@@ -74,7 +77,6 @@ export default function PhoneNumbersPage() {
   });
 
   // Modals state
-  const [isProvisionModalOpen, setIsProvisionModalOpen] = useState(false);
   const [manageNumberId, setManageNumberId] = useState<string | null>(null);
 
   // Pool Bidding State
@@ -421,8 +423,10 @@ export default function PhoneNumbersPage() {
 
   if (!profile) {
     return (
-      <div className="flex h-[50vh] w-full items-center justify-center">
-        <div className="w-8 h-8 border-2 border-violet-500 border-t-transparent rounded-full animate-spin" />
+      <div className="flex-1 w-full p-4 md:p-6 lg:p-8 max-w-7xl mx-auto flex flex-col gap-8">
+        <PageHeaderSkeleton />
+        <CardGridSkeleton count={3} />
+        <TableSkeleton rows={4} />
       </div>
     );
   }
@@ -468,17 +472,6 @@ export default function PhoneNumbersPage() {
           <div className="bg-[var(--secondary)] border border-[var(--border)] rounded-xl px-4 py-2 text-xs font-bold text-[var(--heading)] flex items-center gap-1.5 font-mono">
             Active Lines: {numbers.length} / {maxLimit}
           </div>
-          <button
-            onClick={() => setIsProvisionModalOpen(true)}
-            disabled={isAtLimit}
-            className={`px-5 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider transition-all ${
-              isAtLimit 
-                ? "bg-[var(--secondary)] text-[var(--muted)] cursor-not-allowed border border-[var(--border)]"
-                : "bg-violet-600 hover:bg-violet-700 text-white shadow-lg shadow-violet-600/15"
-            }`}
-          >
-            + Express Setup
-          </button>
         </div>
       </div>
 
@@ -672,14 +665,6 @@ export default function PhoneNumbersPage() {
       </div>
 
       {/* Modals */}
-      <ProvisionNumberModal 
-        isOpen={isProvisionModalOpen} 
-        onClose={() => setIsProvisionModalOpen(false)} 
-        onSuccess={() => {
-          fetchPurchasedNumbers();
-        }}
-        userCountry={(profile as any)?.country || "IN"}
-      />
 
       {selectedNumber && (
         <ManageNumberModal 

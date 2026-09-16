@@ -316,8 +316,6 @@ export function AgentOverviewTab({
         sentiment = 'negative'
       }
 
-      const mockRecordingUrl = 'https://trinetra-voice-recordings.s3.amazonaws.com/sandbox_recording.mp3'
-
       // 1. Insert into voice_calls (global telemetry & billing usage)
       const voiceCallRecord: Record<string, any> = {
         user_id: user.id,
@@ -326,7 +324,7 @@ export function AgentOverviewTab({
         caller_name: 'Browser Sandbox',
         status: 'completed',
         duration_seconds: secs,
-        recording_url: mockRecordingUrl,
+        recording_url: null,
         transcript: fullTranscript || 'No speech detected.',
         sentiment: sentiment,
         is_test_call: true,

@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { Agent, hasAgentType } from '@/lib/utils/agentDetection'
 import { Play, FileText, MoreVertical, Phone } from 'lucide-react'
 import { createClient } from '@/lib/client'
+import { cleanAgentName } from '@/src/utils/formatAgentName'
 
 interface CallsTableProps {
   agents: Agent[]
@@ -141,7 +142,7 @@ export function CallsTable({ agents }: CallsTableProps) {
                   </td>
                   <td className="py-4 px-6">
                     <div className="flex items-center gap-2">
-                      <span className="text-white">{call.agent_name || 'Agent'}</span>
+                      <span className="text-white">{cleanAgentName(call.agent_name)}</span>
                       <span className="px-1.5 py-0.5 rounded text-[10px] font-medium uppercase tracking-wider bg-white/5 text-white/60">
                         {call.agent_type || 'voice'}
                       </span>

@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react'
-import { PhoneIncoming, Download, FileText, ChevronDown, ChevronUp, Loader2, RefreshCw, Search, Calendar, Heart } from 'lucide-react'
+import { PhoneIncoming, Download, FileText, ChevronDown, ChevronUp, Loader2, RefreshCw, Search, Calendar, Heart, Play } from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
 import { toast } from 'sonner'
+import { CallAudioPlayer } from '@/src/components/shared/CallAudioPlayer'
 
 interface CallLog {
   id: string
@@ -356,6 +357,13 @@ function getTranscriptString(transcript: any): string {
                         </td>
                         <td className="p-4 text-right">
                           <div className="flex items-center justify-end gap-2" onClick={e => e.stopPropagation()}>
+                            <button
+                              onClick={() => setExpandedCallId(isExpanded ? null : call.id)}
+                              className="p-1.5 text-violet-500 hover:text-violet-400 border border-transparent hover:border-[var(--border)] rounded-lg transition-colors cursor-pointer"
+                              title="Listen to Call Audio"
+                            >
+                              <Play className="w-3.5 h-3.5 fill-violet-500/20" />
+                            </button>
                             {call.recording_url && (
                               <a
                                 href={call.recording_url}
@@ -371,6 +379,7 @@ function getTranscriptString(transcript: any): string {
                             <button
                               onClick={() => setExpandedCallId(isExpanded ? null : call.id)}
                               className="p-1.5 text-zinc-400 hover:text-[var(--heading)] border border-transparent hover:border-[var(--border)] rounded-lg transition-colors cursor-pointer"
+                              title={isExpanded ? 'Collapse Details' : 'Expand Details'}
                             >
                               {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
                             </button>
@@ -379,7 +388,15 @@ function getTranscriptString(transcript: any): string {
                       </tr>
                       {isExpanded && (
                         <tr className="bg-[var(--background)]/20">
-                          <td colSpan={6} className="p-6 border-b border-[var(--border)]">
+                          <td colSpan={6} className="p-6 border-b border-[var(--border)] space-y-4">
+                            {/* Universal Audio Player for Call */}
+                            <CallAudioPlayer
+                              recordingUrl={call.recording_url}
+                              transcript={call.transcript || call.transcript_text}
+                              durationSeconds={call.duration_seconds}
+                              callerName={call.caller_phone || 'Caller'}
+                            />
+
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                               <div className="space-y-2">
                                 <h4 className="text-[10px] uppercase tracking-wider font-montserrat font-bold text-[var(--muted)] flex items-center gap-1">

@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { X, Headphones, MessageSquare, Bot, User, Clock, Sparkles, Copy, Check, Download } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { toast } from 'sonner'
+import { CallAudioPlayer } from '@/src/components/shared/CallAudioPlayer'
 
 interface LogObject {
   duration_seconds?: number
@@ -21,6 +22,7 @@ interface TranscriptModalProps {
   transcript?: any
   recordingUrl?: string | null
   callerName?: string
+  autoPlay?: boolean
 }
 
 export function TranscriptModal({ 
@@ -29,7 +31,8 @@ export function TranscriptModal({
   log,
   transcript, 
   recordingUrl, 
-  callerName = 'Customer'
+  callerName = 'Customer',
+  autoPlay = false
 }: TranscriptModalProps) {
   const [copied, setCopied] = useState(false)
 
@@ -240,31 +243,16 @@ export function TranscriptModal({
               </div>
             </div>
 
-            {/* Sticky Audio Player */}
-            {resolvedRecordingUrl && (
-              <div className="px-6 py-4 bg-[var(--background)]/80 border-b border-[var(--border)] flex items-center gap-4">
-                <div className="p-2 rounded-xl bg-violet-600/10 text-violet-600 dark:text-violet-400 border border-violet-500/20 shrink-0">
-                  <Headphones className="w-4 h-4 animate-bounce" style={{ animationDuration: '3s' }} />
-                </div>
-                <div className="flex-1 flex items-center gap-3">
-                  <audio 
-                    src={resolvedRecordingUrl} 
-                    controls 
-                    className="w-full h-9 rounded-lg accent-violet-600"
-                  />
-                  <a 
-                    href={resolvedRecordingUrl} 
-                    download
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="p-2 bg-[var(--card-bg)] hover:bg-[var(--hover-bg)] text-[var(--muted)] hover:text-[var(--heading)] border border-[var(--border)] rounded-xl transition-all shrink-0"
-                    title="Download Recording"
-                  >
-                    <Download className="w-4 h-4" />
-                  </a>
-                </div>
-              </div>
-            )}
+            {/* Audio Player for Every Call */}
+            <div className="px-6 py-3 bg-[var(--background)]/80 border-b border-[var(--border)]">
+              <CallAudioPlayer
+                recordingUrl={resolvedRecordingUrl}
+                transcript={resolvedTranscript}
+                durationSeconds={resolvedDuration}
+                autoPlay={autoPlay}
+                callerName={resolvedCallerName}
+              />
+            </div>
 
             {/* Chat Messages Area */}
             <div className="flex-1 overflow-y-auto p-6 space-y-6 min-h-0 bg-[var(--background)]/30 scrollbar-thin scrollbar-thumb-[var(--border)] scrollbar-track-transparent">

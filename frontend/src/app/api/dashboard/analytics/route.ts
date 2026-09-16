@@ -60,7 +60,11 @@ export async function GET(request: NextRequest) {
       .select('id, name')
 
     const agentMap: Record<string, string> = (agents || []).reduce((acc: any, cur: any) => {
-      acc[cur.id] = cur.name
+      acc[cur.id] = (cur.name || 'Agent')
+        .replace(/^\[[^\]]+\]\s*/, '')
+        .replace(/\s*-\s*Demo\s*$/i, '')
+        .replace(/\s*-\s*Trial\s*$/i, '')
+        .trim() || 'Agent'
       return acc
     }, {})
 

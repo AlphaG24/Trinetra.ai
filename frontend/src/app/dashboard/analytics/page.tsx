@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { AlertTriangle, RefreshCw, BarChart3, Bot } from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
+import { cleanAgentName } from '@/src/utils/formatAgentName'
 
 // Components
 import { DateRangeFilter } from '@/src/components/analytics/DateRangeFilter'
@@ -56,7 +57,7 @@ export default function AnalyticsDashboardPage() {
           .eq('user_id', user.id)
           .order('name', { ascending: true })
 
-        setAgents((userAgents || []).map((a: any) => ({ id: a.id, agent_name: a.name })))
+        setAgents((userAgents || []).map((a: any) => ({ id: a.id, agent_name: cleanAgentName(a.name) })))
       } catch (err) {
         console.error('Failed to load agents list:', err)
       }
@@ -151,6 +152,8 @@ export default function AnalyticsDashboardPage() {
               <div key={i} className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl h-80 animate-pulse" />
             ))}
           </div>
+          {/* Table Loader */}
+          <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl h-64 animate-pulse" />
         </div>
       )}
 

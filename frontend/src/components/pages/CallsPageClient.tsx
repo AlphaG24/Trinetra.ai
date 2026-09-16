@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/client'
 import { Phone, Search, Filter, Play, FileText, Download, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react'
 import { TranscriptModal } from '../modals/TranscriptModal'
+import { TableSkeleton } from '@/src/components/ui/skeleton'
 
 const sentimentColors: Record<string, string> = {
   positive: 'text-green-500 bg-green-500/10 border-green-500/30',
@@ -25,6 +26,7 @@ export function CallsPageClient({ agents }: { agents: any[] }) {
   const [page, setPage] = useState(1)
   const [total, setTotal] = useState(0)
   const [selectedCall, setSelectedCall] = useState<any | null>(null)
+  const [autoPlayAudio, setAutoPlayAudio] = useState(false)
   const perPage = 25
 
   const supabase = createClient()
@@ -34,7 +36,7 @@ export function CallsPageClient({ agents }: { agents: any[] }) {
       setIsLoading(true)
       let query = supabase
         .from('voice_calls')
-        .select('*', { count: 'exact' })
+        .select('id, created_at, duration_seconds, sentiment, outcome, caller_name, caller_phone, recording_url, agent_id', { count: 'exact' })
         .order('created_at', { ascending: false })
         .range((page - 1) * perPage, page * perPage - 1)
 
@@ -52,6 +54,25 @@ export function CallsPageClient({ agents }: { agents: any[] }) {
     }
     fetchCalls()
   }, [page, sentimentFilter, search])
+
+  const handleOpenCall = async (call: any, autoPlay: boolean = false) => {
+    setAutoPlayAudio(autoPlay)
+    setSelectedCall(call)
+    if (!call.transcript_text && !call.transcript) {
+      try {
+        const { data } = await supabase
+          .from('voice_calls')
+          .select('transcript_text, transcript')
+          .eq('id', call.id)
+          .single()
+        if (data) {
+          setSelectedCall((prev: any) => (prev ? { ...prev, ...data } : prev))
+        }
+      } catch (err) {
+        console.error('Failed to load full transcript:', err)
+      }
+    }
+  }
 
   const totalPages = Math.ceil(total / perPage)
 
@@ -92,18 +113,16 @@ export function CallsPageClient({ agents }: { agents: any[] }) {
       </div>
 
       {/* Table */}
-      <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl overflow-hidden">
-        {isLoading ? (
-          <div className="flex items-center justify-center h-48 text-violet-500">
-            <Loader2 className="w-8 h-8 animate-spin" />
-          </div>
-        ) : calls.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-48 text-center px-4">
-            <Phone className="w-10 h-10 text-[var(--muted)] mb-3 opacity-40" />
-            <p className="text-[var(--heading)] font-medium opacity-80">No calls found</p>
-            <p className="text-[var(--muted)] text-sm mt-1">Try adjusting your filters or wait for calls to come in.</p>
-          </div>
-        ) : (
+      {isLoading ? (
+        <TableSkeleton rows={8} />
+      ) : calls.length === 0 ? (
+        <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl overflow-hidden flex flex-col items-center justify-center h-48 text-center px-4">
+          <Phone className="w-10 h-10 text-[var(--muted)] mb-3 opacity-40" />
+          <p className="text-[var(--heading)] font-medium opacity-80">No calls found</p>
+          <p className="text-[var(--muted)] text-sm mt-1">Try adjusting your filters or wait for calls to come in.</p>
+        </div>
+      ) : (
+        <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl overflow-hidden">
           <div className="overflow-x-auto custom-scrollbar">
             <table className="w-full text-sm text-left">
               <thead className="text-xs text-[var(--muted)] uppercase bg-[var(--background)]/50 border-b border-[var(--border)]">
@@ -138,26 +157,16 @@ export function CallsPageClient({ agents }: { agents: any[] }) {
                       <td className="px-6 py-4">
                         <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                           <button 
-                            onClick={() => setSelectedCall(call)}
-                            className={`p-1.5 rounded transition-colors ${
-                              call.recording_url 
-                                ? 'text-[var(--muted)] hover:text-[var(--heading)] hover:bg-[var(--hover-bg)]' 
-                                : 'text-[var(--muted)] opacity-30 cursor-not-allowed'
-                            }`}
-                            title="Play Recording"
-                            disabled={!call.recording_url}
+                            onClick={() => handleOpenCall(call, true)}
+                            className="p-1.5 rounded transition-colors text-violet-500 hover:text-violet-400 hover:bg-violet-500/10 cursor-pointer"
+                            title="Listen to Call Audio"
                           >
-                            <Play className="w-4 h-4" />
+                            <Play className="w-4 h-4 fill-violet-500/20" />
                           </button>
                           <button 
-                            onClick={() => setSelectedCall(call)}
-                            className={`p-1.5 rounded transition-colors ${
-                              call.transcript 
-                                ? 'text-[var(--muted)] hover:text-[var(--heading)] hover:bg-[var(--hover-bg)]' 
-                                : 'text-[var(--muted)] opacity-30 cursor-not-allowed'
-                            }`}
+                            onClick={() => handleOpenCall(call, false)}
+                            className="p-1.5 rounded transition-colors text-[var(--muted)] hover:text-[var(--heading)] hover:bg-[var(--hover-bg)] cursor-pointer"
                             title="View Transcript"
-                            disabled={!call.transcript}
                           >
                             <FileText className="w-4 h-4" />
                           </button>
@@ -189,8 +198,8 @@ export function CallsPageClient({ agents }: { agents: any[] }) {
               </tbody>
             </table>
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Pagination */}
       {totalPages > 1 && (
@@ -217,13 +226,18 @@ export function CallsPageClient({ agents }: { agents: any[] }) {
         </div>
       )}
 
-      {/* Transcript Modal */}
+      {/* Transcript Modal with Universal Audio */}
       <TranscriptModal
         isOpen={selectedCall !== null}
-        onClose={() => setSelectedCall(null)}
+        onClose={() => {
+          setSelectedCall(null)
+          setAutoPlayAudio(false)
+        }}
+        log={selectedCall}
         transcript={selectedCall?.transcript_text || selectedCall?.transcript || null}
         recordingUrl={selectedCall?.recording_url || null}
         callerName={selectedCall?.caller_name || 'Customer'}
+        autoPlay={autoPlayAudio}
       />
     </div>
   )

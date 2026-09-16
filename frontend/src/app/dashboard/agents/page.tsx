@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/utils/supabase/client'
 import { Bot, Plus, ChevronRight, Trash2 } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { cleanAgentName } from '@/src/utils/formatAgentName'
+import { PageHeaderSkeleton, CardGridSkeleton } from '@/src/components/ui/skeleton'
 
 interface UserAgent {
   id: string
@@ -51,10 +53,7 @@ export default function AgentsDashboardPage() {
 
       const mappedAgents = (agentsData || []).map((agent: any) => {
         const rawName = agent.name || ''
-        const displayName = rawName
-          .replace(/^\[[^\]]+\]\s*/, '')           // remove [slug] prefix
-          .replace(/\s*-\s*Demo\s*$/i, ' (Demo)')  // prettify " - Demo" suffix
-          .replace(/\s*-\s*Trial\s*$/i, ' (Trial)') // prettify " - Trial" suffix
+        const displayName = cleanAgentName(rawName)
         return {
           ...agent,
           agent_name: displayName,
@@ -99,9 +98,9 @@ export default function AgentsDashboardPage() {
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[400px] text-zinc-400 gap-2">
-        <span className="w-6 h-6 rounded-full border-2 border-zinc-200 dark:border-zinc-800 border-t-violet-400 animate-spin" />
-        <p className="text-xs">Loading agents console...</p>
+      <div className="space-y-6 animate-pulse">
+        <PageHeaderSkeleton />
+        <CardGridSkeleton count={4} />
       </div>
     )
   }

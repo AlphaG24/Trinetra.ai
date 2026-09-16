@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { 
   Bot, ArrowLeft, Copy, Check, LayoutDashboard, Mic, BookOpen, Brain, 
-  PhoneIncoming, Users, BarChart3, Plug, Lock, AlertCircle, RefreshCw, Clock, Phone,
+  PhoneIncoming, Users, BarChart3, Lock, AlertCircle, RefreshCw, Clock, Phone,
   CalendarClock, Settings2
 } from 'lucide-react'
 import { createClient } from '@/lib/client'
@@ -23,7 +23,6 @@ import { AgentBehaviorTab } from '@/src/components/agents/AgentBehaviorTab'
 import { AgentCallHistoryTab } from '@/src/components/agents/AgentCallHistoryTab'
 import { AgentLeadsTab } from '@/src/components/agents/AgentLeadsTab'
 import { AgentAnalyticsTab } from '@/src/components/agents/AgentAnalyticsTab'
-import { AgentIntegrationsTab } from '@/src/components/agents/AgentIntegrationsTab'
 import { AgentSettingsTab } from '../../../../components/agents/AgentSettingsTab'
 import { AgentSetupGuide } from '@/src/components/agents/AgentSetupGuide'
 import { AgentCallingStatus } from '@/src/components/agents/AgentCallingStatus'
@@ -459,7 +458,6 @@ export function AgentDetailPageClient({
     { id: 'calls', label: 'Calls', icon: PhoneIncoming },
     { id: 'leads', label: 'Leads', icon: Users },
     { id: 'analytics', label: 'Analytics', icon: BarChart3 },
-    { id: 'integrations', label: 'Integrations', icon: Plug },
     { id: 'settings', label: 'Settings', icon: Settings2 }
   ]
 
@@ -774,14 +772,6 @@ export function AgentDetailPageClient({
               <AgentAnalyticsTab 
                 agent={agent}
                 unlocked={isFeatureUnlocked('analytics')}
-                upgradeUrl={upgradeUrl}
-              />
-            )}
-
-            {activeTab === 'integrations' && (
-              <AgentIntegrationsTab 
-                agent={agent}
-                unlocked={isFeatureUnlocked('integrations')}
                 upgradeUrl={upgradeUrl}
               />
             )}

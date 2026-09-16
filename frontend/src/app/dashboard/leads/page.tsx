@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/server'
 import { redirect } from 'next/navigation'
 import { LeadsPageClient } from '@/src/components/pages/LeadsPageClient'
+import { cleanAgentName } from '@/src/utils/formatAgentName'
 
 export const dynamic = 'force-dynamic'
 
@@ -15,19 +16,20 @@ export default async function LeadsPage() {
 
   if (!user) redirect('/login')
 
-  // Fetch active platform services
-  const { data: services } = await supabase
-    .from('platform_services')
-    .select('*')
-    .eq('is_active', true)
+  // Fetch user's actual agents
+  const { data: dbAgents } = await supabase
+    .from('agents')
+    .select('id, name, agent_type, status')
+    .eq('user_id', user.id)
+    .neq('status', 'deleted')
     .order('name', { ascending: true })
 
-  // Fetch user profile to get organization
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('organization_id')
-    .eq('id', user.id)
-    .maybeSingle()
+  const agents = (dbAgents || []).map((a: any) => ({
+    id: a.id,
+    name: cleanAgentName(a.name),
+    agent_type: a.agent_type,
+    status: a.status
+  }))
 
   // Fetch leads for the current user
   const { data: leads } = await supabase
@@ -36,11 +38,10 @@ export default async function LeadsPage() {
     .eq('user_id', user.id)
     .order('created_at', { ascending: false })
 
-     
   return (
     <LeadsPageClient 
       initialLeads={leads || []} 
-      services={services || []} 
+      agents={agents} 
     />
   )
 }
