@@ -839,12 +839,15 @@ class VikramAgent(Agent):
         llm_timeout = httpx.Timeout(connect=2.5, read=4.0, write=2.5, pool=2.5)
 
         if use_groq:
-            # Default to llama-3.1-8b-instant for sub-200ms TTFT latency and high 100k TPM rate limit
-            invalid_models = ("groq/compound-mini", "groq/compound", "openai/gpt-oss-20b", "llama-3.3-70b-versatile")
+            # Default to qwen/qwen3.8-27b for sub-1s TTFT latency, high 100k TPM rate limit, and verified availability on Groq
+            invalid_models = (
+                "groq/compound-mini", "groq/compound", "openai/gpt-oss-20b",
+                "openai/gpt-oss-120b", "llama-3.3-70b-versatile", "llama-3.1-8b-instant"
+            )
             if chosen_model and chosen_model.strip() and chosen_model.strip().lower() not in invalid_models:
                 groq_model = chosen_model.strip()
             else:
-                groq_model = "llama-3.1-8b-instant"
+                groq_model = "qwen/qwen3.8-27b"
 
             llm_plugin = openai.LLM(
                 model=groq_model,
@@ -892,7 +895,7 @@ class VikramAgent(Agent):
             )
             logger.info("[VikramAgent] Configured Gemini 2.5 Flash as secondary failover LLM")
         elif groq_api_key:
-            fallback_groq_model = "openai/gpt-oss-20b" if (locals().get('groq_model', '') != "openai/gpt-oss-20b") else "llama-3.1-8b-instant"
+            fallback_groq_model = "qwen/qwen3.8-27b"
             self._fallback_llm = openai.LLM(
                 model=fallback_groq_model,
                 base_url="https://api.groq.com/openai/v1",
