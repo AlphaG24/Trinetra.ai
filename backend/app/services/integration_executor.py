@@ -45,13 +45,16 @@ def format_whatsapp_number(num: str) -> str:
     if s.startswith("whatsapp:"):
         s = s.replace("whatsapp:", "")
     cleaned = re.sub(r'[^\d+]', '', s)
+    digits_only = re.sub(r'\D', '', cleaned)
+    if len(digits_only) < 7:
+        return ""
     if not cleaned.startswith('+'):
-        if len(cleaned) == 10:
-            cleaned = '+91' + cleaned
-        elif len(cleaned) == 12 and cleaned.startswith('91'):
-            cleaned = '+' + cleaned
+        if len(digits_only) == 10:
+            cleaned = '+91' + digits_only
+        elif len(digits_only) == 12 and digits_only.startswith('91'):
+            cleaned = '+' + digits_only
         else:
-            cleaned = '+' + cleaned
+            cleaned = '+' + digits_only
     return f"whatsapp:{cleaned}"
 
 class IntegrationExecutor:
@@ -534,6 +537,9 @@ class IntegrationExecutor:
                 return False
             from_whatsapp = format_whatsapp_number(from_number)
             to_whatsapp = format_whatsapp_number(to_number)
+            if not to_whatsapp or to_whatsapp == "whatsapp:+":
+                logger.warning(f"Twilio WhatsApp dispatch skipped: '{to_number}' is not a valid telephone number (e.g. Browser Sandbox test).")
+                return False
 
             url = f"https://api.twilio.com/2010-04-01/Accounts/{twilio_sid}/Messages.json"
             try:

@@ -827,8 +827,8 @@ class VikramAgent(Agent):
 
         use_groq = bool(groq_api_key) and (chosen_provider == "groq" or not gemini_api_key)
 
-        # Fast timeout for telephony voice: fail over rapidly instead of stalling on connection drops
-        llm_timeout = httpx.Timeout(connect=2.5, read=4.0, write=2.5, pool=2.5)
+        # Ultra-fast timeout for telephony voice: fail over rapidly (<2s) instead of stalling on connection drops or rate limits
+        llm_timeout = httpx.Timeout(connect=1.5, read=2.5, write=1.5, pool=1.5)
 
         if use_groq:
             # Default to qwen/qwen3.8-27b for sub-1s TTFT latency, high 100k TPM rate limit, and verified availability on Groq
@@ -848,7 +848,7 @@ class VikramAgent(Agent):
                 temperature=chosen_temp if temperature is not None else 0.6,
                 max_completion_tokens=150,
                 timeout=llm_timeout,
-                max_retries=1,
+                max_retries=0,
             )
             logger.info(f"[VikramAgent] Using Groq LLM ({groq_model}) for zero-latency voice response")
         elif gemini_api_key:
@@ -860,7 +860,7 @@ class VikramAgent(Agent):
                 temperature=chosen_temp,
                 max_completion_tokens=250,
                 timeout=llm_timeout,
-                max_retries=1,
+                max_retries=0,
             )
             logger.info(f"[VikramAgent] Using Google Gemini LLM ({gemini_model}) via OpenAI-compatible endpoint")
         else:
@@ -870,7 +870,7 @@ class VikramAgent(Agent):
                 api_key=os.getenv("OPENAI_API_KEY", ""),
                 temperature=chosen_temp,
                 timeout=llm_timeout,
-                max_retries=1,
+                max_retries=0,
             )
             logger.info("[VikramAgent] Using OpenAI GPT-4o-mini LLM")
 
@@ -883,7 +883,7 @@ class VikramAgent(Agent):
                 temperature=chosen_temp if temperature is not None else 0.6,
                 max_completion_tokens=250,
                 timeout=llm_timeout,
-                max_retries=1,
+                max_retries=0,
             )
             logger.info("[VikramAgent] Configured Gemini 2.5 Flash as secondary failover LLM")
         elif groq_api_key:
@@ -895,7 +895,7 @@ class VikramAgent(Agent):
                 temperature=chosen_temp if temperature is not None else 0.6,
                 max_completion_tokens=150,
                 timeout=llm_timeout,
-                max_retries=1,
+                max_retries=0,
             )
             logger.info(f"[VikramAgent] Configured Groq ({fallback_groq_model}) as secondary failover LLM")
         else:
@@ -1288,7 +1288,7 @@ Return a JSON object with:
 - timeline: when they want to buy (immediate, 1_month, 3_months, exploring)
 - call_summary: 2-sentence summary of the conversation
 - extracted_data: object with any other useful fields
-- sentiment: "positive", "neutral", or "negative"
+- sentiment: "positive", "neutral", or "negative". MUST be "positive" if the caller engaged, accepted a sample/WhatsApp/callback, or expressed interest. MUST be "negative" if annoyed, rude, or rejected. Otherwise "neutral".
 - callback_scheduled: true if the caller requested a callback or indicated they want to talk later (e.g., "call me 1 hr later", "kal call karna"). false otherwise.
 - callback_time_iso: a guess of the ISO-8601 datetime for the callback (in UTC), based on any raw text mentioned. Use the current time provided to resolve relative times. Format as "YYYY-MM-DDTHH:MM:SSZ". Null if callback_scheduled is false.
 - callback_reason: the context or reason for callback if callback_scheduled is true.
@@ -1404,8 +1404,14 @@ Only return valid JSON."""
     # Update voice_calls with extracted sentiment, outcome, caller_phone, caller_name and call summary
     if original_call_id:
         try:
+            raw_sentiment = str(lead_data.get("sentiment", "neutral")).lower().strip()
+            if (computed_outcome in ("Lead Captured", "Callback Scheduled") or lead_data.get("is_lead")) and raw_sentiment != "negative":
+                sentiment_val = "positive"
+            else:
+                sentiment_val = raw_sentiment if raw_sentiment in ("positive", "neutral", "negative") else "neutral"
+
             update_data = {
-                "sentiment": lead_data.get("sentiment", "neutral"),
+                "sentiment": sentiment_val,
                 "call_summary": lead_data.get("call_summary", ""),
                 "outcome": computed_outcome
             }
@@ -1417,7 +1423,7 @@ Only return valid JSON."""
             await asyncio.to_thread(
                 supabase_admin.table("voice_calls").update(update_data).eq("id", original_call_id).execute
             )
-            logger.info(f"[extract_and_save_lead] Updated voice_calls with sentiment and outcome (call_id: {original_call_id})")
+            logger.info(f"[extract_and_save_lead] Updated voice_calls with sentiment '{sentiment_val}' and outcome '{computed_outcome}' (call_id: {original_call_id})")
         except Exception as e:
             logger.error(f"Failed to update voice_call with extracted sentiment: {e}")
 
@@ -2531,49 +2537,48 @@ async def entrypoint(ctx: JobContext):
                 # Only increment minutes and save if there was actual speech or duration >= 3s
                 if duration < 3 and not (call_transcript_turns or _get_transcript_messages(agent_instance)):
                     logger.info(f"[entrypoint] Call duration {duration}s with no speech in room {ctx.room.name if ctx.room else 'unknown'}. Skipping ghost call.")
-                    return
+                else:
+                    if duration > 0:
+                        try:
+                            import math
+                            from app.services.usage_service import UsageService
+                            usage_service = UsageService(supabase_admin)
+                            await usage_service.increment_minutes(agent_id, duration)
+                            logger.info(f"Incremented usage for agent {agent_id}: {duration}s call -> {math.ceil(duration / 60)} minutes charged.")
+                        except Exception as usage_err:
+                            logger.error(f"Failed to increment usage minutes: {usage_err}")
 
-                if duration > 0:
-                    try:
-                        import math
-                        from app.services.usage_service import UsageService
-                        usage_service = UsageService(supabase_admin)
-                        await usage_service.increment_minutes(agent_id, duration)
-                        logger.info(f"Incremented usage for agent {agent_id}: {duration}s call -> {math.ceil(duration / 60)} minutes charged.")
-                    except Exception as usage_err:
-                        logger.error(f"Failed to increment usage minutes: {usage_err}")
+                    # Extract full transcript from accumulated turns or fallback
+                    transcript = "\n".join(call_transcript_turns).strip()
+                    if not transcript:
+                        messages = _get_transcript_messages(agent_instance)
+                        transcript = "\n".join([f"{getattr(m, 'role', '')}: {getattr(m, 'content', '')}" for m in messages if hasattr(m, 'role') and getattr(m, 'role', '') in ("user", "assistant")])
+                    
+                    if not contact_id and ctx.room:
+                        try:
+                            vc_res = await asyncio.to_thread(
+                                supabase_admin.table("voice_calls").select("metadata").eq("metadata->>room_name", ctx.room.name).limit(1).execute
+                            )
+                            if vc_res and vc_res.data and len(vc_res.data) > 0:
+                                meta = vc_res.data[0].get("metadata") or {}
+                                contact_id = meta.get("contact_id")
+                                if not call_sid:
+                                    call_sid = meta.get("provider_call_id") or meta.get("session_id")
+                        except Exception as e:
+                            logger.warning(f"Failed to lookup metadata from voice_calls for room {ctx.room.name}: {e}")
 
-                # Extract full transcript from accumulated turns or fallback
-                transcript = "\n".join(call_transcript_turns).strip()
-                if not transcript:
-                    messages = _get_transcript_messages(agent_instance)
-                    transcript = "\n".join([f"{getattr(m, 'role', '')}: {getattr(m, 'content', '')}" for m in messages if hasattr(m, 'role') and getattr(m, 'role', '') in ("user", "assistant")])
-                
-                if not contact_id and ctx.room:
-                    try:
-                        vc_res = await asyncio.to_thread(
-                            supabase_admin.table("voice_calls").select("metadata").eq("metadata->>room_name", ctx.room.name).limit(1).execute
+                    if transcript or duration >= 3:
+                        logger.info(f"Awaiting save/extraction of completed call details ({duration}s)...")
+                        await extract_and_save_lead(
+                            transcript or "Call completed.",
+                            agent_id,
+                            user_id,
+                            organization_id,
+                            duration,
+                            call_sid=call_sid,
+                            contact_id=contact_id,
+                            room_name=ctx.room.name if ctx.room else None
                         )
-                        if vc_res and vc_res.data and len(vc_res.data) > 0:
-                            meta = vc_res.data[0].get("metadata") or {}
-                            contact_id = meta.get("contact_id")
-                            if not call_sid:
-                                call_sid = meta.get("provider_call_id") or meta.get("session_id")
-                    except Exception as e:
-                        logger.warning(f"Failed to lookup metadata from voice_calls for room {ctx.room.name}: {e}")
-
-                if transcript or duration >= 3:
-                    logger.info(f"Awaiting save/extraction of completed call details ({duration}s)...")
-                    await extract_and_save_lead(
-                        transcript or "Call completed.",
-                        agent_id,
-                        user_id,
-                        organization_id,
-                        duration,
-                        call_sid=call_sid,
-                        contact_id=contact_id,
-                        room_name=ctx.room.name if ctx.room else None
-                    )
         except Exception as err:
             logger.error("Failed to execute final disconnect log save", exc_info=True)
         finally:
@@ -3340,88 +3345,86 @@ async def run_agent(room_name: str, agent_id: str | None = None, contact_id: str
                     await room.disconnect()
                 except Exception:
                     pass
-                return
+            else:
+                # Await lead extraction and analytics saving BEFORE room disconnects/exits
+                try:
+                    if agent_id and user_id:
+                        duration = int(time.time() - call_start_time)
+                        if duration < 3 and not (call_transcript_turns_ra or _get_transcript_messages(agent_instance)):
+                            logger.info(f"[In-Process Agent] Call duration < 3s with no speech in room '{room_name}'. Skipping ghost call save.")
+                        else:
+                            # Always increment minutes/quota if duration > 0, regardless of transcript
+                            if duration > 0:
+                                try:
+                                    import math
+                                    from app.services.usage_service import UsageService
+                                    usage_service = UsageService(supabase_admin)
+                                    await usage_service.increment_minutes(agent_id, duration)
+                                    logger.info(f"[In-Process Agent] Incremented usage for agent {agent_id}: {duration}s call -> {math.ceil(duration / 60)} minutes charged.")
+                                except Exception as usage_err:
+                                    logger.error(f"Failed to increment usage minutes: {usage_err}")
 
-            # Await lead extraction and analytics saving BEFORE room disconnects/exits
-            try:
-                if agent_id and user_id:
-                    duration = int(time.time() - call_start_time)
-                    if duration < 3 and not (call_transcript_turns_ra or _get_transcript_messages(agent_instance)):
-                        logger.info(f"[In-Process Agent] Call duration < 3s with no speech in room '{room_name}'. Skipping ghost call save.")
-                        return
-                    
-                    # Always increment minutes/quota if duration > 0, regardless of transcript
-                    if duration > 0:
+                            transcript = "\n".join(call_transcript_turns_ra).strip()
+                            if not transcript:
+                                messages = _get_transcript_messages(agent_instance)
+                                transcript = "\n".join([f"{getattr(m, 'role', '')}: {getattr(m, 'content', '')}" for m in messages if hasattr(m, 'role') and getattr(m, 'role', '') in ("user", "assistant")])
+                            
+                            call_sid = None
+                            if room_name:
+                                try:
+                                    vc_rec = supabase_admin.table("voice_calls").select("metadata").eq("metadata->>room_name", room_name).maybe_single().execute()
+                                    if vc_rec and getattr(vc_rec, 'data', None) and isinstance(vc_rec.data, dict):
+                                        meta = vc_rec.data.get("metadata") or {}
+                                        call_sid = meta.get("provider_call_id") or meta.get("session_id")
+                                except Exception as vc_sid_err:
+                                    logger.warning(f"Failed to lookup call_sid from voice_calls for room {room_name}: {vc_sid_err}")
+
+                            if not call_sid and room_name and ("twilio-" in room_name or "sip-" in room_name):
+                                call_sid = room_name.split("_")[0].replace("twilio-", "").replace("sip-", "")
+
+                            if transcript or duration > 0:
+                                logger.info(f"[In-Process Agent] Awaiting final call save ({duration}s)...")
+                                await extract_and_save_lead(
+                                    transcript or "Call completed.",
+                                    agent_id,
+                                    user_id,
+                                    organization_id,
+                                    duration,
+                                    call_sid=call_sid,
+                                    contact_id=contact_id,
+                                    room_name=room_name
+                                )
+
+                            # Safety: Update any stale in_progress voice_calls to final status
+                            try:
+                                final_status = "completed" if (transcript and duration > 0) else "no_answer"
+                                if room_name:
+                                    await asyncio.to_thread(
+                                        supabase_admin.table("voice_calls")
+                                        .update({"status": final_status, "duration_seconds": duration, "ended_at": datetime.utcnow().isoformat()})
+                                        .eq("metadata->>room_name", room_name)
+                                        .eq("status", "in_progress")
+                                        .execute
+                                    )
+                                    logger.info(f"[In-Process Agent] Updated voice_calls in room {room_name} -> {final_status}")
+                            except Exception as vc_cleanup_err:
+                                logger.warning(f"[In-Process Agent] voice_calls cleanup error: {vc_cleanup_err}")
+
+                    if contact_id:
                         try:
-                            import math
-                            from app.services.usage_service import UsageService
-                            usage_service = UsageService(supabase_admin)
-                            await usage_service.increment_minutes(agent_id, duration)
-                            logger.info(f"[In-Process Agent] Incremented usage for agent {agent_id}: {duration}s call -> {math.ceil(duration / 60)} minutes charged.")
-                        except Exception as usage_err:
-                            logger.error(f"Failed to increment usage minutes: {usage_err}")
-
-                    transcript = "\n".join(call_transcript_turns_ra).strip()
-                    if not transcript:
-                        messages = _get_transcript_messages(agent_instance)
-                        transcript = "\n".join([f"{getattr(m, 'role', '')}: {getattr(m, 'content', '')}" for m in messages if hasattr(m, 'role') and getattr(m, 'role', '') in ("user", "assistant")])
-                    
-                    call_sid = None
-                    if room_name:
-                        try:
-                            vc_rec = supabase_admin.table("voice_calls").select("metadata").eq("metadata->>room_name", room_name).maybe_single().execute()
-                            if vc_rec and getattr(vc_rec, 'data', None) and isinstance(vc_rec.data, dict):
-                                meta = vc_rec.data.get("metadata") or {}
-                                call_sid = meta.get("provider_call_id") or meta.get("session_id")
-                        except Exception as vc_sid_err:
-                            logger.warning(f"Failed to lookup call_sid from voice_calls for room {room_name}: {vc_sid_err}")
-
-                    if not call_sid and room_name and ("twilio-" in room_name or "sip-" in room_name):
-                        call_sid = room_name.split("_")[0].replace("twilio-", "").replace("sip-", "")
-
-                    if transcript or duration > 0:
-                        logger.info(f"[In-Process Agent] Awaiting final call save ({duration}s)...")
-                        await extract_and_save_lead(
-                            transcript or "Call completed.",
-                            agent_id,
-                            user_id,
-                            organization_id,
-                            duration,
-                            call_sid=call_sid,
-                            contact_id=contact_id,
-                            room_name=room_name
-                        )
-
-                    # Safety: Update any stale in_progress voice_calls to final status
-                    try:
-                        final_status = "completed" if (transcript and duration > 0) else "no_answer"
-                        if room_name:
+                            # Only mark as 'answered' if there was an actual conversation
+                            final_contact_status = "answered" if (duration > 0) else "no_answer"
                             await asyncio.to_thread(
-                                supabase_admin.table("voice_calls")
-                                .update({"status": final_status, "duration_seconds": duration, "ended_at": datetime.utcnow().isoformat()})
-                                .eq("metadata->>room_name", room_name)
-                                .eq("status", "in_progress")
+                                supabase_admin.table("campaign_contacts")
+                                .update({"call_status": final_contact_status, "last_attempt_at": datetime.utcnow().isoformat()})
+                                .eq("id", contact_id)
                                 .execute
                             )
-                            logger.info(f"[In-Process Agent] Updated voice_calls in room {room_name} -> {final_status}")
-                    except Exception as vc_cleanup_err:
-                        logger.warning(f"[In-Process Agent] voice_calls cleanup error: {vc_cleanup_err}")
-
-                if contact_id:
-                    try:
-                        # Only mark as 'answered' if there was an actual conversation
-                        final_contact_status = "answered" if (duration > 0) else "no_answer"
-                        await asyncio.to_thread(
-                            supabase_admin.table("campaign_contacts")
-                            .update({"call_status": final_contact_status, "last_attempt_at": datetime.utcnow().isoformat()})
-                            .eq("id", contact_id)
-                            .execute
-                        )
-                        logger.info(f"[In-Process Agent] Finalized campaign contact {contact_id} status to {final_contact_status}")
-                    except Exception as cc_err:
-                        logger.warning(f"Error setting contact status: {cc_err}")
-            except Exception as e:
-                logger.error("[In-Process Agent] Error saving stats", exc_info=True)
+                            logger.info(f"[In-Process Agent] Finalized campaign contact {contact_id} status to {final_contact_status}")
+                        except Exception as cc_err:
+                            logger.warning(f"Error setting contact status: {cc_err}")
+                except Exception as e:
+                    logger.error("[In-Process Agent] Error saving stats", exc_info=True)
 
             try:
                 _running_agent_rooms.discard(room_name)

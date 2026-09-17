@@ -1598,12 +1598,23 @@ async def upload_call_recording(
         if duration_seconds and duration_seconds > 0:
             update_data["duration_seconds"] = duration_seconds
 
-        res = supabase_admin.table("voice_calls").update(update_data).eq("session_id", room_name).execute()
-        if not getattr(res, "data", None):
-            res = supabase_admin.table("voice_calls").update(update_data).eq("provider_call_id", room_name).execute()
-        if not getattr(res, "data", None):
+        updated = False
+        try:
             res = supabase_admin.table("voice_calls").update(update_data).eq("metadata->>room_name", room_name).execute()
-        if not getattr(res, "data", None) and agent_id:
+            if getattr(res, "data", None) and len(res.data) > 0:
+                updated = True
+        except Exception as e:
+            print(f"[Recording Upload] Error querying metadata->>room_name: {e}", flush=True)
+
+        if not updated:
+            try:
+                res = supabase_admin.table("voice_calls").update(update_data).eq("metadata->>provider_call_id", room_name).execute()
+                if getattr(res, "data", None) and len(res.data) > 0:
+                    updated = True
+            except Exception as e:
+                print(f"[Recording Upload] Error querying metadata->>provider_call_id: {e}", flush=True)
+
+        if not updated and agent_id:
             try:
                 recent = supabase_admin.table("voice_calls").select("id")\
                     .eq("agent_id", agent_id)\
@@ -1613,8 +1624,9 @@ async def upload_call_recording(
                     .execute()
                 if recent and getattr(recent, "data", None) and len(recent.data) > 0:
                     supabase_admin.table("voice_calls").update(update_data).eq("id", recent.data[0]["id"]).execute()
-            except Exception:
-                pass
+                    updated = True
+            except Exception as e:
+                print(f"[Recording Upload] Error updating recent call fallback: {e}", flush=True)
 
         return {"status": "success", "recording_url": public_url}
     except Exception as exc:
