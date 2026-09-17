@@ -299,9 +299,9 @@ class ExpressiveTTSStream(tts.SynthesizeStream):
                     cleaned = fix_gender_verbs(clean_ssml(sentence), self._gender)
                     self._underlying.push_text(cleaned)
             self._buffer = sentences[-1]
-        elif len(self._buffer) >= 40 and re.search(r'[,;]\s+', self._buffer):
-            # Clause-level streaming chunking so TTS synthesizes clauses without waiting for full sentence
-            parts = re.split(r'(?<=[,;])\s+', self._buffer, maxsplit=1)
+        elif len(self._buffer) >= 60 and re.search(r'[,;—]\s+', self._buffer):
+            # Clause-level streaming chunking: only split when buffer is at least 60 chars to prevent micro-fragment cracking
+            parts = re.split(r'(?<=[,;—])\s+', self._buffer, maxsplit=1)
             if len(parts) > 1 and parts[0].strip():
                 cleaned = fix_gender_verbs(clean_ssml(parts[0]), self._gender)
                 self._underlying.push_text(cleaned)
@@ -659,6 +659,14 @@ def normalize_user_transcript(text: str, agent_name: str = "Aditi", is_female: b
         pattern = r'(?<![^\s,।!?.])' + re.escape(target) + r'(?![^\s,।!?.])'
         return re.sub(pattern, repl, s)
 
+    # 0. High-priority acoustic normalization for affirmative turns misheard by STT
+    # Short utterances like "hn", "hn btao", "ha btao" or faint "haan" are frequently transcribed as digit "1", "one", "वन"
+    t_clean = re.sub(r'[.,!?।]', '', t).strip().lower()
+    if t_clean in ("1", "one", "वन", "ek", "ek minute", "एक", "hn", "hn btao", "ha btao", "haa btao", "haan btao", "h btao", "ha btaiye", "hn btaiye", "haan btaiye", "1 btao"):
+        return "हाँ बताओ"
+    if t_clean.startswith(("hn btao", "ha btao", "haa btao", "haan btao", "h btao", "1 btao")):
+        return "हाँ बताओ"
+
     # 1. Normalize 'दीदी' / 'didi' to 'अदिति' / 'aditi' when agent is female / Aditi
     if is_female or "aditi" in (agent_name or "").lower():
         # Devanagari replacements:
@@ -771,9 +779,7 @@ class VikramAgent(Agent):
 
             # hi-IN provides fluent bilingual pronunciation for both Hindi and English words
             target_lang = "hi-IN" if language in ['hinglish', 'hi-IN', 'english'] else "en-IN"
-            sarvam_sample_rate = int(os.getenv("SARVAM_SAMPLE_RATE", "24000"))
-            if sarvam_sample_rate < 16000:
-                sarvam_sample_rate = 24000
+            sarvam_sample_rate = int(os.getenv("SARVAM_SAMPLE_RATE", "22050"))
             try:
                 tts_plugin = sarvam.TTS(
                     target_language_code=target_lang,
@@ -781,9 +787,10 @@ class VikramAgent(Agent):
                     speaker=sarvam_speaker,
                     pace=sarvam_pace,
                     pitch=sarvam_pitch,
+                    loudness=1.25,
                     speech_sample_rate=sarvam_sample_rate,
                     output_audio_codec="linear16",
-                    min_buffer_size=30,
+                    min_buffer_size=40,
                 )
             except Exception as sarvam_err:
                 logger.warning(f"[VikramAgent] Sarvam TTS custom init error ({sarvam_err}), falling back to safe defaults")
@@ -791,8 +798,8 @@ class VikramAgent(Agent):
                     target_language_code=target_lang,
                     model=model_name,
                     speaker=sarvam_speaker,
+                    loudness=1.25,
                     speech_sample_rate=sarvam_sample_rate,
-                    output_audio_codec="linear16",
                 )
         else:
             tts_plugin = elevenlabs.TTS(voice_id=voice_id)
@@ -800,17 +807,17 @@ class VikramAgent(Agent):
         sarvam_api_key = os.getenv("SARVAM_API_KEY", "").strip()
         gemini_api_key = (os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY") or "").strip()
 
-        # 1. Speech-to-Text: Use Sarvam Saaras v3 in codemix mode for Hinglish with bilingual keyword priming
+        # 1. Speech-to-Text: Use Sarvam Saarika v2.5 in transcribe mode for accurate Hindi/Hinglish speech recognition
         if sarvam_api_key and (voice_provider == 'sarvam' or language in ['hinglish', 'hi-IN']):
-            stt_prompt = "त्रिनेत्रा, अदिति, राहुल, बताओ, हाँ बताओ, हाँ अदिति बताओ, हाँजी, नमस्ते, बोलो, Trinetra, Aditi, Rahul, pricing, dental, clinic, haan batao, haan aditi batao, batao, bolo, Hello, Ha"
+            stt_prompt = "हाँ, बताओ, हाँ बताओ, हाँ अदिति बताओ, हाँजी, नमस्ते, बोलो, कहिए, क्या काम है, क्या बात है, haan, batao, haan batao, haanji, bolo, Hello"
             stt_plugin = sarvam.STT(
-                model="saaras:v3",
+                model="saarika:v2.5",
                 language="hi-IN",
-                mode="codemix",
+                mode="transcribe",
                 api_key=sarvam_api_key,
                 prompt=stt_prompt,
             )
-            logger.info("[VikramAgent] Using Sarvam STT (saaras:v3, mode=codemix, hi-IN, primed bilingual prompt) for Hinglish recognition")
+            logger.info("[VikramAgent] Using Sarvam STT (saarika:v2.5, mode=transcribe, hi-IN, primed prompt) for Hinglish recognition")
         else:
             stt_plugin = openai.STT(
                 model="whisper-large-v3",
@@ -832,12 +839,12 @@ class VikramAgent(Agent):
         llm_timeout = httpx.Timeout(connect=2.5, read=4.0, write=2.5, pool=2.5)
 
         if use_groq:
-            # Default to llama-3.3-70b-versatile for high 100k TPM rate limit and superior multilingual/Hinglish fluency
-            invalid_models = ("groq/compound-mini", "groq/compound", "openai/gpt-oss-20b")
+            # Default to llama-3.1-8b-instant for sub-200ms TTFT latency and high 100k TPM rate limit
+            invalid_models = ("groq/compound-mini", "groq/compound", "openai/gpt-oss-20b", "llama-3.3-70b-versatile")
             if chosen_model and chosen_model.strip() and chosen_model.strip().lower() not in invalid_models:
                 groq_model = chosen_model.strip()
             else:
-                groq_model = "llama-3.3-70b-versatile"
+                groq_model = "llama-3.1-8b-instant"
 
             llm_plugin = openai.LLM(
                 model=groq_model,
@@ -885,7 +892,7 @@ class VikramAgent(Agent):
             )
             logger.info("[VikramAgent] Configured Gemini 2.5 Flash as secondary failover LLM")
         elif groq_api_key:
-            fallback_groq_model = "llama-3.1-8b-instant" if (locals().get('groq_model', '') != "llama-3.1-8b-instant") else "llama-3.3-70b-versatile"
+            fallback_groq_model = "openai/gpt-oss-20b" if (locals().get('groq_model', '') != "openai/gpt-oss-20b") else "llama-3.1-8b-instant"
             self._fallback_llm = openai.LLM(
                 model=fallback_groq_model,
                 base_url="https://api.groq.com/openai/v1",
@@ -3048,6 +3055,7 @@ async def run_agent(room_name: str, agent_id: str | None = None, contact_id: str
     token = generate_agent_token(room_name)
 
     agent_instance = None
+    sarvam_pitch = (pitch - 1.0) if provider == 'sarvam' else pitch
     from livekit.agents import utils
     async with utils.http_context.open():
         agent_instance = VikramAgent(
@@ -3055,7 +3063,7 @@ async def run_agent(room_name: str, agent_id: str | None = None, contact_id: str
             voice_provider=provider,
             voice_id=voice_id,
             voice_speed=speed,
-            voice_pitch=pitch,
+            voice_pitch=sarvam_pitch,
             language=language,
             llm_provider=agent_data.get('llm_provider') if agent_data else None,
             llm_model=agent_data.get('llm_model') if agent_data else None,

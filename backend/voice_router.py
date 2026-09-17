@@ -17,7 +17,7 @@ import traceback
 from datetime import datetime, timedelta
 from typing import Dict, Any, Optional
 from fastapi import APIRouter, Header, HTTPException, Request, BackgroundTasks, File, UploadFile, Form, Response, WebSocket, WebSocketDisconnect, Query
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
 from pydantic import BaseModel
 from database import supabase, supabase_admin
 from google import genai
@@ -1402,6 +1402,8 @@ async def handle_twilio_voice_status(
                 "ended_at": datetime.utcnow().isoformat()
             }
             if recording_url:
+                if not recording_url.endswith(".mp3") and "twilio.com" in recording_url:
+                    recording_url = f"{recording_url}.mp3"
                 update_payload["recording_url"] = recording_url
 
             res = supabase_admin.table("voice_calls").update(update_payload).eq("provider_call_id", call_sid).execute()
@@ -1486,6 +1488,8 @@ async def handle_twilio_voice_recording(
         print(f"[Twilio Recording Webhook] Call: {call_sid} | RecSid: {recording_sid} | URL: {recording_url}", flush=True)
 
         if call_sid and recording_url:
+            if not recording_url.endswith(".mp3") and "twilio.com" in recording_url:
+                recording_url = f"{recording_url}.mp3"
             update_payload = {"recording_url": recording_url}
             # 1. Update indexed provider_call_id column
             res = supabase_admin.table("voice_calls").update(update_payload).eq("provider_call_id", call_sid).execute()
@@ -1507,6 +1511,109 @@ async def handle_twilio_voice_recording(
     except Exception as e:
         print(f"[Twilio Recording Webhook Error] {e}", flush=True)
         return Response(content="<Response/>", media_type="application/xml")
+
+
+@router.post("/api/voice/webhooks/voice/recordings/upload")
+@router.post("/recordings/upload")
+async def upload_call_recording(
+    file: UploadFile = File(...),
+    room_name: str = Form(...),
+    agent_id: Optional[str] = Form(None),
+    duration_seconds: Optional[int] = Form(0),
+):
+    """
+    Accepts browser web call audio recordings, saves them to persistent disk storage and Supabase storage,
+    and links the recording URL to the corresponding voice_calls record.
+    """
+    try:
+        recordings_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "recordings")
+        os.makedirs(recordings_dir, exist_ok=True)
+
+        ext = ".webm"
+        if file.filename and "." in file.filename:
+            ext = os.path.splitext(file.filename)[1] or ".webm"
+
+        safe_room = re.sub(r'[^a-zA-Z0-9_-]', '_', room_name)
+        filename = f"{safe_room}_{int(time.time())}{ext}"
+        local_filepath = os.path.join(recordings_dir, filename)
+
+        content = await file.read()
+        with open(local_filepath, "wb") as f:
+            f.write(content)
+
+        # Determine public URL: attempt Supabase Storage bucket first
+        public_url = None
+        supabase_url = os.getenv("SUPABASE_URL", "").rstrip("/")
+        try:
+            storage_path = f"recordings/{filename}"
+            content_type = file.content_type or "audio/webm"
+            await asyncio.to_thread(
+                supabase_admin.storage.from_("call-recordings").upload,
+                path=storage_path,
+                file=content,
+                file_options={"content-type": content_type}
+            )
+            if supabase_url:
+                public_url = f"{supabase_url}/storage/v1/object/public/call-recordings/{storage_path}"
+        except Exception as storage_err:
+            print(f"[Recording Upload] Supabase storage notice: {storage_err}", flush=True)
+
+        # Fallback to backend direct audio streaming endpoint
+        if not public_url:
+            backend_url = (os.getenv("BACKEND_URL") or os.getenv("NEXT_PUBLIC_BACKEND_URL") or "https://trinetra-voice-agent.onrender.com").rstrip("/")
+            public_url = f"{backend_url}/api/voice/recordings/{filename}"
+
+        print(f"[Recording Upload] Stored recording for room {room_name}: {public_url}", flush=True)
+
+        # Update voice_calls table
+        update_data = {"recording_url": public_url}
+        if duration_seconds and duration_seconds > 0:
+            update_data["duration_seconds"] = duration_seconds
+
+        res = supabase_admin.table("voice_calls").update(update_data).eq("session_id", room_name).execute()
+        if not getattr(res, "data", None):
+            res = supabase_admin.table("voice_calls").update(update_data).eq("provider_call_id", room_name).execute()
+        if not getattr(res, "data", None):
+            res = supabase_admin.table("voice_calls").update(update_data).eq("metadata->>room_name", room_name).execute()
+        if not getattr(res, "data", None) and agent_id:
+            try:
+                recent = supabase_admin.table("voice_calls").select("id")\
+                    .eq("agent_id", agent_id)\
+                    .is_("recording_url", "null")\
+                    .order("created_at", desc=True)\
+                    .limit(1)\
+                    .execute()
+                if recent and getattr(recent, "data", None) and len(recent.data) > 0:
+                    supabase_admin.table("voice_calls").update(update_data).eq("id", recent.data[0]["id"]).execute()
+            except Exception:
+                pass
+
+        return {"status": "success", "recording_url": public_url}
+    except Exception as exc:
+        print(f"[Recording Upload Error] {exc}", flush=True)
+        return JSONResponse({"error": str(exc)}, status_code=500)
+
+
+@router.get("/api/voice/recordings/{filename}")
+@router.get("/recordings/{filename}")
+async def serve_call_recording(filename: str):
+    """
+    Direct audio stream endpoint for recorded calls with HTTP Range header support.
+    """
+    recordings_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "recordings")
+    safe_filename = os.path.basename(filename)
+    filepath = os.path.join(recordings_dir, safe_filename)
+
+    if not os.path.exists(filepath):
+        raise HTTPException(status_code=404, detail="Call recording not found")
+
+    media_type = "audio/webm"
+    if safe_filename.endswith(".mp3"):
+        media_type = "audio/mpeg"
+    elif safe_filename.endswith(".wav"):
+        media_type = "audio/wav"
+
+    return FileResponse(filepath, media_type=media_type)
 
 
 

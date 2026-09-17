@@ -31,14 +31,26 @@ export function useVoiceAgent() {
 
   const roomRef = useRef<Room | null>(null)
   const timerRef = useRef<NodeJS.Timeout | null>(null)
-
+  const secondsConnectedRef = useRef<number>(0)
   const audioElementsRef = useRef<HTMLMediaElement[]>([])
+
+  // Recording pipeline refs
+  const audioContextRef = useRef<AudioContext | null>(null)
+  const mediaStreamDestRef = useRef<MediaStreamAudioDestinationNode | null>(null)
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
+  const recordedChunksRef = useRef<Blob[]>([])
+  const activeCallMetaRef = useRef<{ roomName: string; agentId?: string } | null>(null)
 
   const startTimer = useCallback(() => {
     if (timerRef.current) clearInterval(timerRef.current)
     setSecondsConnected(0)
+    secondsConnectedRef.current = 0
     timerRef.current = setInterval(() => {
-      setSecondsConnected((prev) => prev + 1)
+      setSecondsConnected((prev) => {
+        const next = prev + 1
+        secondsConnectedRef.current = next
+        return next
+      })
     }, 1000)
   }, [])
 
@@ -54,6 +66,51 @@ export function useVoiceAgent() {
   }, [])
 
   const disconnect = useCallback(() => {
+    // 1. Finalize and upload real call recording
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      const rec = mediaRecorderRef.current
+      const callMeta = activeCallMetaRef.current
+      const dur = secondsConnectedRef.current
+      rec.onstop = async () => {
+        const chunks = recordedChunksRef.current
+        if (chunks.length > 0) {
+          const audioBlob = new Blob(chunks, { type: rec.mimeType || 'audio/webm' })
+          if (audioBlob.size > 2000) {
+            try {
+              const formData = new FormData()
+              formData.append('file', audioBlob, `call_${callMeta?.roomName || 'web'}_${Date.now()}.webm`)
+              formData.append('room_name', callMeta?.roomName || 'trinetra-web-call')
+              if (callMeta?.agentId) {
+                formData.append('agent_id', callMeta.agentId)
+              }
+              formData.append('duration_seconds', String(dur))
+
+              const apiUrl = process.env.NEXT_PUBLIC_BACKEND_URL || process.env.NEXT_PUBLIC_FASTAPI_URL || 'http://127.0.0.1:8000'
+              await fetch(`${apiUrl}/api/voice/webhooks/voice/recordings/upload`, {
+                method: 'POST',
+                body: formData,
+              })
+              console.log('[useVoiceAgent] Real call recording successfully uploaded to backend')
+            } catch (upErr) {
+              console.warn('[useVoiceAgent] Upload recording notice:', upErr)
+            }
+          }
+        }
+      }
+      try {
+        rec.stop()
+      } catch {}
+      mediaRecorderRef.current = null
+    }
+
+    if (audioContextRef.current) {
+      try {
+        audioContextRef.current.close()
+      } catch {}
+      audioContextRef.current = null
+      mediaStreamDestRef.current = null
+    }
+
     // Detach and clean up all audio elements to prevent audio leaks/conflicts
     audioElementsRef.current.forEach(el => {
       try {
@@ -89,6 +146,39 @@ export function useVoiceAgent() {
 
     setConnectionState('connecting')
     setTranscripts([]) // Clear transcripts on new call start
+    activeCallMetaRef.current = { roomName, agentId }
+    recordedChunksRef.current = []
+
+    // Initialize Web Audio mixer for call recording
+    try {
+      if (typeof window !== 'undefined') {
+        const AudioCtx = window.AudioContext || (window as any).webkitAudioContext
+        if (AudioCtx) {
+          const ctx = new AudioCtx()
+          const dest = ctx.createMediaStreamDestination()
+          audioContextRef.current = ctx
+          mediaStreamDestRef.current = dest
+
+          const mimeType = typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+            ? 'audio/webm;codecs=opus'
+            : typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported('audio/webm')
+            ? 'audio/webm'
+            : ''
+          if (typeof MediaRecorder !== 'undefined') {
+            const recorder = mimeType ? new MediaRecorder(dest.stream, { mimeType }) : new MediaRecorder(dest.stream)
+            recorder.ondataavailable = (e) => {
+              if (e.data && e.data.size > 0) {
+                recordedChunksRef.current.push(e.data)
+              }
+            }
+            recorder.start(1000)
+            mediaRecorderRef.current = recorder
+          }
+        }
+      }
+    } catch (ctxErr) {
+      console.warn('[useVoiceAgent] Audio mixer setup warning:', ctxErr)
+    }
 
     try {
       // 1. Get LiveKit Room Token
@@ -119,6 +209,17 @@ export function useVoiceAgent() {
         try {
           const micTrack = await createLocalAudioTrack({ echoCancellation: true, noiseSuppression: true })
           await room.localParticipant.publishTrack(micTrack)
+
+          // Connect local mic to mixer recorder
+          if (audioContextRef.current && mediaStreamDestRef.current && micTrack.mediaStreamTrack) {
+            try {
+              const micStream = new MediaStream([micTrack.mediaStreamTrack])
+              const micSource = audioContextRef.current.createMediaStreamSource(micStream)
+              micSource.connect(mediaStreamDestRef.current)
+            } catch (micMixErr) {
+              console.warn('[useVoiceAgent] Mic mixer connect error:', micMixErr)
+            }
+          }
         } catch (micErr) {
           console.error('[LiveKit] Failed to publish mic track:', micErr)
           toast.error('Could not access microphone')
@@ -148,6 +249,17 @@ export function useVoiceAgent() {
           element.play().catch(err => {
             console.warn('[LiveKit] Audio element play error (autoplay blocked?):', err)
           })
+
+          // Connect agent audio track to mixer recorder
+          if (audioContextRef.current && mediaStreamDestRef.current && track.mediaStreamTrack) {
+            try {
+              const agentStream = new MediaStream([track.mediaStreamTrack])
+              const agentSource = audioContextRef.current.createMediaStreamSource(agentStream)
+              agentSource.connect(mediaStreamDestRef.current)
+            } catch (agentMixErr) {
+              console.warn('[useVoiceAgent] Agent track mixer connect error:', agentMixErr)
+            }
+          }
         }
       })
 
