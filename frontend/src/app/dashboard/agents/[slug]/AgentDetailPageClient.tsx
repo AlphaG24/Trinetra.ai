@@ -708,6 +708,7 @@ export function AgentDetailPageClient({
                 profile={profile}
                 onProfileUpdate={(updated) => setProfile(updated)}
                 sysConfig={sysConfig}
+                onRefreshCalls={() => fetchAgentData(true)}
               />
             )}
 

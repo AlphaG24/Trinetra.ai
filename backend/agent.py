@@ -299,13 +299,6 @@ class ExpressiveTTSStream(tts.SynthesizeStream):
                     cleaned = fix_gender_verbs(clean_ssml(sentence), self._gender)
                     self._underlying.push_text(cleaned)
             self._buffer = sentences[-1]
-        elif len(self._buffer) >= 60 and re.search(r'[,;—]\s+', self._buffer):
-            # Clause-level streaming chunking: only split when buffer is at least 60 chars to prevent micro-fragment cracking
-            parts = re.split(r'(?<=[,;—])\s+', self._buffer, maxsplit=1)
-            if len(parts) > 1 and parts[0].strip():
-                cleaned = fix_gender_verbs(clean_ssml(parts[0]), self._gender)
-                self._underlying.push_text(cleaned)
-                self._buffer = parts[1]
 
     def flush(self) -> None:
         if self._buffer.strip():
@@ -789,8 +782,7 @@ class VikramAgent(Agent):
                     pitch=sarvam_pitch,
                     loudness=1.25,
                     speech_sample_rate=sarvam_sample_rate,
-                    output_audio_codec="linear16",
-                    min_buffer_size=40,
+                    min_buffer_size=50,
                 )
             except Exception as sarvam_err:
                 logger.warning(f"[VikramAgent] Sarvam TTS custom init error ({sarvam_err}), falling back to safe defaults")
@@ -1063,18 +1055,9 @@ class VikramAgent(Agent):
         
         room_name = getattr(room, 'name', '') if room else ''
         logger.info(f"[VikramAgent] on_enter for room '{room_name}'. Waiting for remote participant to connect...")
-        for _ in range(30): # check every 50ms up to 1.5s for remote human/caller
+        for _ in range(100): # check every 50ms up to 5.0s for remote human/caller
             remotes = getattr(room, 'remote_participants', {}) if room else {}
             if remotes:
-                # Duplicate check: If another agent already connected, abort greeting to avoid double greeting
-                has_other_agent = any(
-                    (getattr(p, 'identity', '').startswith("agent") or "vikram" in getattr(p, 'identity', '').lower())
-                    for p in remotes.values()
-                )
-                if has_other_agent:
-                    logger.warning(f"[VikramAgent] on_enter detected another agent in room '{room_name}'. Suppressing duplicate greeting!")
-                    return
-
                 has_participant = any(
                     not (getattr(p, 'identity', '').startswith("agent") or "vikram" in getattr(p, 'identity', '').lower())
                     for p in remotes.values()
@@ -1083,8 +1066,8 @@ class VikramAgent(Agent):
                     logger.info(f"[VikramAgent] Remote participant connected in room '{room_name}'!")
                     break
             await asyncio.sleep(0.05)
-        # Brief 100ms settle time for audio tracks to subscribe instead of 500ms
-        await asyncio.sleep(0.1)
+        # Settle time for browser to subscribe to audio tracks so greeting is clearly heard
+        await asyncio.sleep(0.8)
 
         greeting = getattr(self, 'greeting_message', None)
         if not greeting:
@@ -2545,7 +2528,11 @@ async def entrypoint(ctx: JobContext):
             if agent_id and user_id:
                 duration = int(time.time() - call_start_time)
                 
-                # Always increment minutes/quota if duration > 0, regardless of transcript
+                # Only increment minutes and save if there was actual speech or duration >= 3s
+                if duration < 3 and not (call_transcript_turns or _get_transcript_messages(agent_instance)):
+                    logger.info(f"[entrypoint] Call duration {duration}s with no speech in room {ctx.room.name if ctx.room else 'unknown'}. Skipping ghost call.")
+                    return
+
                 if duration > 0:
                     try:
                         import math
@@ -2575,7 +2562,7 @@ async def entrypoint(ctx: JobContext):
                     except Exception as e:
                         logger.warning(f"Failed to lookup metadata from voice_calls for room {ctx.room.name}: {e}")
 
-                if transcript or duration > 0:
+                if transcript or duration >= 3:
                     logger.info(f"Awaiting save/extraction of completed call details ({duration}s)...")
                     await extract_and_save_lead(
                         transcript or "Call completed.",
@@ -3293,6 +3280,7 @@ async def run_agent(room_name: str, agent_id: str | None = None, contact_id: str
                 return
                 
             # Guard: Check if an agent participant is already connected
+            yielded_to_worker = False
             if room.remote_participants:
                 for p in room.remote_participants.values():
                     p_identity = (getattr(p, 'identity', '') or '').lower()
@@ -3307,12 +3295,14 @@ async def run_agent(room_name: str, agent_id: str | None = None, contact_id: str
                     )
                     if is_agent:
                         logger.warning(f"[DUPLICATE WORKER GUARD] Room '{room_name}' already has connected agent participant '{getattr(p, 'identity', '')}'. Disconnecting duplicate in-process agent.")
+                        yielded_to_worker = True
                         await room.disconnect()
                         return
 
             # Listen for dedicated worker joining later to yield immediately
             @room.on("participant_connected")
             def on_participant_connected_ra(participant: rtc.RemoteParticipant):
+                nonlocal yielded_to_worker
                 p_id = (getattr(participant, 'identity', '') or '').lower()
                 p_name = (getattr(participant, 'name', '') or '').lower()
                 p_kind = getattr(participant, 'kind', None)
@@ -3324,6 +3314,7 @@ async def run_agent(room_name: str, agent_id: str | None = None, contact_id: str
                     "agent" in p_name
                 ):
                     logger.warning(f"[DUPLICATE WORKER GUARD] Dedicated agent worker '{participant.identity}' joined room '{room_name}'. In-process agent yielding and disconnecting.")
+                    yielded_to_worker = True
                     done.set()
 
             await session.start(agent=agent_instance, room=room)
@@ -3343,10 +3334,21 @@ async def run_agent(room_name: str, agent_id: str | None = None, contact_id: str
         except Exception as e:
             logger.error(f"[In-Process Agent] Error: {e}")
         finally:
+            if yielded_to_worker:
+                logger.info(f"[In-Process Agent] Yielded room '{room_name}' to dedicated worker. Skipping duplicate call saving and billing.")
+                try:
+                    await room.disconnect()
+                except Exception:
+                    pass
+                return
+
             # Await lead extraction and analytics saving BEFORE room disconnects/exits
             try:
                 if agent_id and user_id:
                     duration = int(time.time() - call_start_time)
+                    if duration < 3 and not (call_transcript_turns_ra or _get_transcript_messages(agent_instance)):
+                        logger.info(f"[In-Process Agent] Call duration < 3s with no speech in room '{room_name}'. Skipping ghost call save.")
+                        return
                     
                     # Always increment minutes/quota if duration > 0, regardless of transcript
                     if duration > 0:

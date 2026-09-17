@@ -17,7 +17,10 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from voice_router import router as voice_router, telegram_router, agents_router, telephony_audio_stream, handle_exotel_voice_webhook
+from voice_router import (
+    router as voice_router, telegram_router, agents_router, telephony_audio_stream, 
+    handle_exotel_voice_webhook, upload_call_recording, serve_call_recording
+)
 from telemetry_router import router as telemetry_router
 from knowledge_router import router as knowledge_router
 from telephony_router import router as telephony_router, numbers_router
@@ -48,6 +51,13 @@ app.websocket("/webhooks/voice/exotel/{room_name}")(telephony_audio_stream)
 app.websocket("/webhooks/voice/exotel/stream")(telephony_audio_stream)
 app.websocket("/webhooks/voice/exotel/stream/{room_name}")(telephony_audio_stream)
 app.websocket("/webhooks/voice/twilio/stream/{room_name}")(telephony_audio_stream)
+# Explicit routes for call recording upload and audio playback to support all client URL configurations
+app.api_route("/api/voice/recordings/upload", methods=["POST"])(upload_call_recording)
+app.api_route("/api/voice/webhooks/voice/recordings/upload", methods=["POST"])(upload_call_recording)
+app.api_route("/webhooks/voice/recordings/upload", methods=["POST"])(upload_call_recording)
+app.api_route("/recordings/upload", methods=["POST"])(upload_call_recording)
+app.api_route("/api/voice/recordings/{filename}", methods=["GET"])(serve_call_recording)
+app.api_route("/recordings/{filename}", methods=["GET"])(serve_call_recording)
 app.include_router(telegram_router)
 app.include_router(telemetry_router)
 app.include_router(knowledge_router)

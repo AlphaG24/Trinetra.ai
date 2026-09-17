@@ -85,8 +85,8 @@ export function useVoiceAgent() {
               }
               formData.append('duration_seconds', String(dur))
 
-              const apiUrl = process.env.NEXT_PUBLIC_BACKEND_URL || process.env.NEXT_PUBLIC_FASTAPI_URL || 'http://127.0.0.1:8000'
-              await fetch(`${apiUrl}/api/voice/webhooks/voice/recordings/upload`, {
+              const apiUrl = (process.env.NEXT_PUBLIC_BACKEND_URL || process.env.NEXT_PUBLIC_FASTAPI_URL || 'https://trinetra-voice-agent.onrender.com').replace(/\/$/, '')
+              await fetch(`${apiUrl}/api/voice/recordings/upload`, {
                 method: 'POST',
                 body: formData,
               })
@@ -244,6 +244,8 @@ export function useVoiceAgent() {
         if (track.kind === Track.Kind.Audio) {
           const element = track.attach()
           element.autoplay = true
+          element.muted = false
+          element.volume = 1.0
           audioElementsRef.current.push(element)
           document.body.appendChild(element)
           element.play().catch(err => {

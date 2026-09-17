@@ -26,6 +26,7 @@ interface AgentOverviewTabProps {
   profile: any
   onProfileUpdate?: (updatedProfile: any) => void
   sysConfig?: Record<string, string>
+  onRefreshCalls?: () => void
 }
 
 export function AgentOverviewTab({ 
@@ -35,7 +36,8 @@ export function AgentOverviewTab({
   onTabChange,
   profile,
   onProfileUpdate,
-  sysConfig = {}
+  sysConfig = {},
+  onRefreshCalls
 }: AgentOverviewTabProps) {
   const router = useRouter()
   const [expandedCallId, setExpandedCallId] = useState<string | null>(null)
@@ -304,53 +306,11 @@ export function AgentOverviewTab({
 
       if (!freshProfile) return
 
-      // Assemble full transcript string
-      const fullTranscript = transcripts.map(t => `${t.speaker}: ${t.text}`).join('\n')
-      
-      // Compute mock sentiment based on positive keywords
-      const lowerTranscript = fullTranscript.toLowerCase()
-      let sentiment = 'neutral'
-      if (lowerTranscript.includes('thank') || lowerTranscript.includes('yes') || lowerTranscript.includes('great') || lowerTranscript.includes('awesome') || lowerTranscript.includes('good')) {
-        sentiment = 'positive'
-      } else if (lowerTranscript.includes('cancel') || lowerTranscript.includes('error') || lowerTranscript.includes('bad') || lowerTranscript.includes('no')) {
-        sentiment = 'negative'
-      }
+      // The backend voice agent handles authoritative voice_calls creation,
+      // full speech-to-text transcript saving, lead extraction, and audio recording attachment.
+      // We do not insert a duplicate client-side placeholder record here.
 
-      // 1. Insert into voice_calls (global telemetry & billing usage)
-      const voiceCallRecord: Record<string, any> = {
-        user_id: user.id,
-        agent_id: agent.id,
-        caller_phone: 'SANDBOX',
-        caller_name: 'Browser Sandbox',
-        status: 'completed',
-        duration_seconds: secs,
-        recording_url: null,
-        transcript: fullTranscript || 'No speech detected.',
-        sentiment: sentiment,
-        is_test_call: true,
-        started_at: new Date(Date.now() - secs * 1000).toISOString(),
-        ended_at: new Date().toISOString(),
-        metadata: {
-          provider: 'sandbox',
-          provider_call_id: `sandbox-${agent.id}-${Date.now()}`,
-          agent_number: agent.phone_number || 'SANDBOX_LINE',
-          direction: 'sandbox'
-        }
-      }
-      // Only include organization_id if it's a valid UUID
-      if (freshProfile.organization_id) {
-        voiceCallRecord.organization_id = freshProfile.organization_id
-      }
-
-      const { error: vcError } = await supabase
-        .from('voice_calls')
-        .insert(voiceCallRecord)
-
-      if (vcError) {
-        console.error('Failed to insert voice_calls record:', vcError)
-      }
-
-      // 3. Save minutes limits updates
+      // 1. Save minutes limits updates
       const updates: any = {}
       if (agent.is_demo) {
         const currentDemoUsed = freshProfile.demo_minutes_used || 0
@@ -400,7 +360,10 @@ export function AgentOverviewTab({
       
       fetchUsage()
       fetchStats()
-      toast.success(`Call logs saved (+${minsUsed} mins)`)
+      onRefreshCalls?.()
+      setTimeout(() => onRefreshCalls?.(), 2500)
+      setTimeout(() => onRefreshCalls?.(), 5000)
+      toast.success(`Call session completed (+${minsUsed} mins)`)
     } catch (err) {
       console.error("Failed to save call minutes:", err)
     }

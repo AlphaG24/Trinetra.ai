@@ -331,14 +331,42 @@ async def generate_livekit_token(req: LiveKitTokenRequest):
         print(f"[LIVEKIT TOKEN ERROR] PyJWT generation failed: {str(e)}", flush=True)
         token = f"dev_token_{identity}_{room_name}"
 
+    # Pre-record voice_calls entry for this web session to guarantee deterministic recording and transcript association
+    if req.agent_id:
+        try:
+            call_uid = None
+            call_oid = None
+            ag_data = supabase_admin.table("agents").select("user_id, organization_id").eq("id", req.agent_id).limit(1).execute()
+            if ag_data and ag_data.data:
+                call_uid = ag_data.data[0].get("user_id")
+                call_oid = ag_data.data[0].get("organization_id")
+            supabase_admin.table("voice_calls").insert({
+                "agent_id": req.agent_id,
+                "user_id": call_uid,
+                "organization_id": call_oid,
+                "caller_name": participant_name,
+                "caller_phone": "Browser Sandbox",
+                "status": "in_progress",
+                "started_at": datetime.utcnow().isoformat(),
+                "duration_seconds": 0,
+                "metadata": {
+                    "room_name": room_name,
+                    "provider_call_id": room_name,
+                    "session_id": room_name,
+                    "direction": "sandbox"
+                }
+            }).execute()
+        except Exception as vc_pre_err:
+            print(f"[LIVEKIT TOKEN] voice_calls pre-create notice: {vc_pre_err}", flush=True)
+
     # Spawn in-process agent worker (or fallback) to guarantee agent presence in web call
     in_process_enabled = os.getenv("ENABLE_IN_PROCESS_AGENT", "true").lower() in ("true", "1", "yes")
     if in_process_enabled:
         try:
             async def safe_run_agent(r_name: str, a_id: str):
                 try:
-                    # Allow 1.2s for external dedicated LiveKit worker to connect first
-                    await asyncio.sleep(1.2)
+                    # Allow 3.5s for external dedicated LiveKit worker to connect first
+                    await asyncio.sleep(3.5)
 
                     # Check if an external worker already joined the room
                     lk_url = os.getenv("LIVEKIT_URL")
@@ -1513,8 +1541,8 @@ async def handle_twilio_voice_recording(
         return Response(content="<Response/>", media_type="application/xml")
 
 
-@router.post("/api/voice/webhooks/voice/recordings/upload")
 @router.post("/recordings/upload")
+@router.post("/webhooks/voice/recordings/upload")
 async def upload_call_recording(
     file: UploadFile = File(...),
     room_name: str = Form(...),
