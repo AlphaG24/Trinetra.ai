@@ -210,6 +210,8 @@ async def apply_multi_personality_prompt(
 def clean_ssml(text: str, is_transcript: bool = False) -> str:
     if not text:
         return ""
+    # Strip any internal system prompts, flow notes, objection handling, or conversation guidance brackets
+    text = re.sub(r'\[(?:CRITICAL|FLOW NOTE|OBJECTION|CONVERSATION GUIDANCE)[^\]]*\]', '', text, flags=re.IGNORECASE)
     # Convert direction/audio emotion tags into natural spoken vocalizations for telephony TTS
     text = re.sub(r'\[(?:laughs?|chuckles?|giggles?)\]|\((?:laughs?|chuckles?|giggles?)\)|\*(?:laughs?|chuckles?|giggles?)\*', 'Haha, ', text, flags=re.IGNORECASE)
     text = re.sub(r'\[(?:sighs?|sighing)\]|\((?:sighs?|sighing)\)|\*(?:sighs?|sighing)\*', 'Ah... ', text, flags=re.IGNORECASE)
@@ -830,11 +832,12 @@ class VikramAgent(Agent):
         llm_timeout = httpx.Timeout(connect=2.5, read=4.0, write=2.5, pool=2.5)
 
         if use_groq:
-            # Default to openai/gpt-oss-20b for ultra-fast ~250ms TTFT streaming voice response
-            if chosen_model and chosen_model.strip() and chosen_model not in ("groq/compound-mini", "groq/compound"):
+            # Default to llama-3.3-70b-versatile for high 100k TPM rate limit and superior multilingual/Hinglish fluency
+            invalid_models = ("groq/compound-mini", "groq/compound", "openai/gpt-oss-20b")
+            if chosen_model and chosen_model.strip() and chosen_model.strip().lower() not in invalid_models:
                 groq_model = chosen_model.strip()
             else:
-                groq_model = "openai/gpt-oss-20b"
+                groq_model = "llama-3.3-70b-versatile"
 
             llm_plugin = openai.LLM(
                 model=groq_model,
@@ -881,17 +884,18 @@ class VikramAgent(Agent):
                 max_retries=1,
             )
             logger.info("[VikramAgent] Configured Gemini 2.5 Flash as secondary failover LLM")
-        elif groq_api_key and not use_groq:
+        elif groq_api_key:
+            fallback_groq_model = "llama-3.1-8b-instant" if (locals().get('groq_model', '') != "llama-3.1-8b-instant") else "llama-3.3-70b-versatile"
             self._fallback_llm = openai.LLM(
-                model="groq/compound-mini",
+                model=fallback_groq_model,
                 base_url="https://api.groq.com/openai/v1",
                 api_key=groq_api_key,
                 temperature=chosen_temp if temperature is not None else 0.6,
-                max_completion_tokens=250,
+                max_completion_tokens=150,
                 timeout=llm_timeout,
                 max_retries=1,
             )
-            logger.info("[VikramAgent] Configured Groq compound-mini as secondary failover LLM")
+            logger.info(f"[VikramAgent] Configured Groq ({fallback_groq_model}) as secondary failover LLM")
         else:
             self._fallback_llm = None
 
@@ -1024,10 +1028,14 @@ class VikramAgent(Agent):
                         f"Keep your response to 1-2 conversational sentences and ask an engaging discovery question. DO NOT say goodbye, DO NOT say '{getattr(self, 'ending_message', '')}'!]"
                     )
 
-                # Attach flow instruction to the user turn so that the last message role remains 'user' (required by Groq/OpenAI APIs)
+                # Store flow instruction on agent instance for transient injection in llm_node
                 if flow_instruction:
-                    current_turn = norm_txt or raw_txt
-                    new_message.content = [f"{current_turn}\n\n{flow_instruction}"]
+                    self._pending_flow_instruction = flow_instruction
+
+                # Keep new_message.content strictly containing the clean user utterance!
+                # NEVER append flow instructions here, otherwise they leak into the data channel transcript and DB logs.
+                current_turn = norm_txt or raw_txt
+                new_message.content = [current_turn]
         except Exception as e:
             logger.warning(f"[VikramAgent] on_user_turn_completed exception: {e}")
 
@@ -1048,8 +1056,17 @@ class VikramAgent(Agent):
         for _ in range(30): # check every 50ms up to 1.5s for remote human/caller
             remotes = getattr(room, 'remote_participants', {}) if room else {}
             if remotes:
+                # Duplicate check: If another agent already connected, abort greeting to avoid double greeting
+                has_other_agent = any(
+                    (getattr(p, 'identity', '').startswith("agent") or "vikram" in getattr(p, 'identity', '').lower())
+                    for p in remotes.values()
+                )
+                if has_other_agent:
+                    logger.warning(f"[VikramAgent] on_enter detected another agent in room '{room_name}'. Suppressing duplicate greeting!")
+                    return
+
                 has_participant = any(
-                    not (getattr(p, 'identity', '').startswith("agent_") or "vikram" in getattr(p, 'identity', '').lower())
+                    not (getattr(p, 'identity', '').startswith("agent") or "vikram" in getattr(p, 'identity', '').lower())
                     for p in remotes.values()
                 )
                 if has_participant:
@@ -1092,12 +1109,27 @@ class VikramAgent(Agent):
         Custom LLM node for VikramAgent:
         1. Context Sliding Window: Truncate to the last 6 conversation items while preserving
            the system prompt. This guarantees tokens stay within rate limits.
-        2. Dual-Tier Zero-Silence Fallback: If primary LLM encounters a 429 rate limit or network glitch,
-           immediately streams from the secondary high-capacity model (e.g. Gemini 2.5 Flash).
-        3. Emergency conversational anchor: If all LLMs fail, yields a polite bridge so the call doesn't stall.
+        2. Transient Flow Instruction Injection: Injects flow instructions into the truncated copy
+           for this turn only, without polluting permanent conversation history or leaking to user transcripts.
+        3. Dual-Tier Zero-Silence Fallback: If primary LLM encounters a 429 rate limit or network glitch,
+           immediately streams from the secondary high-capacity model (e.g. Gemini 2.5 Flash or Groq llama-3.1-8b).
+        4. Emergency conversational anchor: If all LLMs fail, yields a polite bridge so the call doesn't stall.
         """
+        flow_instruction = getattr(self, '_pending_flow_instruction', None)
+        self._pending_flow_instruction = None
+
         # Truncate context: preserve system message + last 6 conversation turns
         truncated_ctx = chat_ctx.copy().truncate(max_items=6)
+
+        # Inject flow instruction transiently into truncated_ctx without polluting chat_ctx or user transcript
+        if flow_instruction and hasattr(truncated_ctx, '_items') and truncated_ctx._items:
+            last_item = truncated_ctx._items[-1]
+            if getattr(last_item, 'role', '') == 'user':
+                orig_text = getattr(last_item, 'text_content', '') or (last_item.content[0] if last_item.content else '')
+                truncated_ctx._items[-1] = llm.ChatMessage(
+                    role="user",
+                    content=[f"{orig_text}\n\n[CONVERSATION GUIDANCE FOR THIS TURN]:\n{flow_instruction}"]
+                )
 
         try:
             async for chunk in Agent.default.llm_node(self, truncated_ctx, tools, model_settings):
@@ -1109,8 +1141,13 @@ class VikramAgent(Agent):
         # Tier 2: Secondary failover LLM
         if hasattr(self, '_fallback_llm') and self._fallback_llm:
             try:
-                activity = self._get_activity_or_raise()
-                conn_options = activity.session.conn_options.llm_conn_options if activity and hasattr(activity, 'session') and activity.session else None
+                conn_options = None
+                try:
+                    activity = self._get_activity_or_raise()
+                    if activity and hasattr(activity, 'session') and activity.session and hasattr(activity.session, 'conn_options'):
+                        conn_options = getattr(activity.session.conn_options, 'llm_conn_options', None)
+                except Exception:
+                    pass
                 tool_choice = model_settings.tool_choice if model_settings else None
 
                 async with self._fallback_llm.chat(
@@ -1801,15 +1838,18 @@ async def entrypoint(ctx: JobContext):
     if ctx.room and hasattr(ctx.room, 'remote_participants'):
         from livekit import rtc
         for p in ctx.room.remote_participants.values():
-            p_identity = getattr(p, 'identity', '') or ''
+            p_identity = (getattr(p, 'identity', '') or '').lower()
+            p_name = (getattr(p, 'name', '') or '').lower()
             p_kind = getattr(p, 'kind', None)
             is_agent = (
                 p_kind == getattr(rtc.ParticipantKind, 'PARTICIPANT_KIND_AGENT', 1) or
-                p_identity.startswith("agent-") or
-                p_identity.startswith("agent_worker_")
+                p_identity.startswith("agent") or
+                "agent" in p_identity or
+                "vikram" in p_identity or
+                "agent" in p_name
             )
-            if p_identity != local_id and is_agent:
-                logger.warning(f"[DUPLICATE WORKER GUARD] Room '{ctx.room.name}' already has connected agent participant '{p_identity}'. Disconnecting duplicate worker join.")
+            if (getattr(p, 'identity', '') or '') != local_id and is_agent:
+                logger.warning(f"[DUPLICATE WORKER GUARD] Room '{ctx.room.name}' already has connected agent participant '{getattr(p, 'identity', '')}'. Disconnecting duplicate worker join.")
                 try:
                     await ctx.room.disconnect()
                 except Exception:
@@ -2439,6 +2479,7 @@ async def entrypoint(ctx: JobContext):
 
             speaker = "agent" if role in ("assistant", "system") else "customer"
             clean_txt = clean_ssml(text, is_transcript=True)
+            clean_txt = re.sub(r'\[(?:CRITICAL|FLOW NOTE|OBJECTION|CONVERSATION GUIDANCE)[^\]]*\]', '', clean_txt, flags=re.IGNORECASE).strip()
             if role == "user" and clean_txt:
                 clean_txt = normalize_user_transcript(clean_txt, agent_name=bot_name, is_female=is_female)
 
@@ -3192,6 +3233,7 @@ async def run_agent(room_name: str, agent_id: str | None = None, contact_id: str
 
                 speaker = "agent" if role in ("assistant", "system") else "customer"
                 clean_txt = clean_ssml(text, is_transcript=True)
+                clean_txt = re.sub(r'\[(?:CRITICAL|FLOW NOTE|OBJECTION|CONVERSATION GUIDANCE)[^\]]*\]', '', clean_txt, flags=re.IGNORECASE).strip()
                 if role == "user" and clean_txt:
                     clean_txt = normalize_user_transcript(clean_txt, agent_name=bot_name, is_female=is_female)
 
@@ -3242,11 +3284,36 @@ async def run_agent(room_name: str, agent_id: str | None = None, contact_id: str
             # Guard: Check if an agent participant is already connected
             if room.remote_participants:
                 for p in room.remote_participants.values():
-                    p_identity = getattr(p, 'identity', '') or ''
-                    if p_identity.startswith("agent_") or p_identity.startswith("Vikram") or "agent" in p_identity.lower():
-                        logger.warning(f"[DUPLICATE WORKER GUARD] Room '{room_name}' already has connected agent participant '{p_identity}'. Disconnecting duplicate in-process agent.")
+                    p_identity = (getattr(p, 'identity', '') or '').lower()
+                    p_name = (getattr(p, 'name', '') or '').lower()
+                    p_kind = getattr(p, 'kind', None)
+                    is_agent = (
+                        p_kind == getattr(rtc.ParticipantKind, 'PARTICIPANT_KIND_AGENT', 1) or
+                        p_identity.startswith("agent") or
+                        "agent" in p_identity or
+                        "vikram" in p_identity or
+                        "agent" in p_name
+                    )
+                    if is_agent:
+                        logger.warning(f"[DUPLICATE WORKER GUARD] Room '{room_name}' already has connected agent participant '{getattr(p, 'identity', '')}'. Disconnecting duplicate in-process agent.")
                         await room.disconnect()
                         return
+
+            # Listen for dedicated worker joining later to yield immediately
+            @room.on("participant_connected")
+            def on_participant_connected_ra(participant: rtc.RemoteParticipant):
+                p_id = (getattr(participant, 'identity', '') or '').lower()
+                p_name = (getattr(participant, 'name', '') or '').lower()
+                p_kind = getattr(participant, 'kind', None)
+                if (
+                    p_kind == getattr(rtc.ParticipantKind, 'PARTICIPANT_KIND_AGENT', 1) or
+                    p_id.startswith("agent") or
+                    "agent" in p_id or
+                    "vikram" in p_id or
+                    "agent" in p_name
+                ):
+                    logger.warning(f"[DUPLICATE WORKER GUARD] Dedicated agent worker '{participant.identity}' joined room '{room_name}'. In-process agent yielding and disconnecting.")
+                    done.set()
 
             await session.start(agent=agent_instance, room=room)
             

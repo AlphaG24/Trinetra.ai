@@ -334,10 +334,40 @@ async def generate_livekit_token(req: LiveKitTokenRequest):
     # Spawn in-process agent worker (or fallback) to guarantee agent presence in web call
     in_process_enabled = os.getenv("ENABLE_IN_PROCESS_AGENT", "true").lower() in ("true", "1", "yes")
     if in_process_enabled:
-        print(f"[LIVEKIT AGENT] Guaranteed agent execution: spawning worker for room: {room_name} with agent_id: {req.agent_id}", flush=True)
         try:
             async def safe_run_agent(r_name: str, a_id: str):
                 try:
+                    # Allow 1.2s for external dedicated LiveKit worker to connect first
+                    await asyncio.sleep(1.2)
+
+                    # Check if an external worker already joined the room
+                    lk_url = os.getenv("LIVEKIT_URL")
+                    lk_key = os.getenv("LIVEKIT_API_KEY")
+                    lk_sec = os.getenv("LIVEKIT_API_SECRET")
+                    if lk_url and lk_key and lk_sec:
+                        try:
+                            from livekit import api
+                            lk = api.LiveKitAPI(lk_url, lk_key, lk_sec)
+                            part_res = await lk.room.list_participants(api.ListParticipantsRequest(room=r_name))
+                            await lk.aclose()
+                            for p in getattr(part_res, 'participants', []):
+                                p_id = (getattr(p, 'identity', '') or '').lower()
+                                p_nm = (getattr(p, 'name', '') or '').lower()
+                                p_kd = getattr(p, 'kind', None)
+                                is_worker = (
+                                    p_kd == api.ParticipantInfo.Kind.AGENT or
+                                    p_id.startswith("agent") or
+                                    "agent" in p_id or
+                                    "vikram" in p_id or
+                                    "agent" in p_nm
+                                )
+                                if is_worker:
+                                    print(f"[LIVEKIT AGENT] Dedicated worker '{p.identity}' already joined room '{r_name}'. Skipping in-process agent fallback.", flush=True)
+                                    return
+                        except Exception as check_err:
+                            logger.warning(f"[LIVEKIT AGENT] Room participant check error: {check_err}")
+
+                    print(f"[LIVEKIT AGENT] Spawning fallback in-process agent for room: {r_name} with agent_id: {a_id}", flush=True)
                     from agent import run_agent
                     # If a_id is empty, resolve from DB
                     if not a_id:
