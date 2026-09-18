@@ -771,6 +771,7 @@ class VikramAgent(Agent):
             logger.info(f"[VikramAgent] Sarvam TTS config: model={model_name}, speaker={sarvam_speaker} (orig={voice_id}), pace={sarvam_pace}, pitch={sarvam_pitch}, lang={language}")
 
             # hi-IN provides fluent bilingual pronunciation for both Hindi and English words
+            target_lang = "hi-IN" if language in ['hinglish', 'hi-IN', 'english'] else "en-IN"
             # WebRTC native sample rate: 24000 Hz (exact integer divisor of WebRTC 48kHz Opus)
             # linear16 sends raw uncompressed PCM, eliminating MP3 decode chunking jitter, clicks and voice breakages
             sarvam_sample_rate = int(os.getenv("SARVAM_SAMPLE_RATE", "24000"))
