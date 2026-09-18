@@ -19,7 +19,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from voice_router import (
     router as voice_router, telegram_router, agents_router, telephony_audio_stream, 
-    handle_exotel_voice_webhook, upload_call_recording, serve_call_recording
+    handle_exotel_voice_webhook, handle_twilio_voice_webhook, handle_twilio_voice_status,
+    handle_twilio_voice_recording, upload_call_recording, serve_call_recording
 )
 from telemetry_router import router as telemetry_router
 from knowledge_router import router as knowledge_router
@@ -50,6 +51,14 @@ app.websocket("/webhooks/voice/exotel")(telephony_audio_stream)
 app.websocket("/webhooks/voice/exotel/{room_name}")(telephony_audio_stream)
 app.websocket("/webhooks/voice/exotel/stream")(telephony_audio_stream)
 app.websocket("/webhooks/voice/exotel/stream/{room_name}")(telephony_audio_stream)
+
+# Support root-level HTTP & WebSocket routes for Twilio configured with or without /api/voice prefix
+app.api_route("/webhooks/voice/twilio", methods=["GET", "POST"])(handle_twilio_voice_webhook)
+app.api_route("/webhooks/voice/twilio/{organization_id}", methods=["GET", "POST"])(handle_twilio_voice_webhook)
+app.api_route("/webhooks/voice/twilio/status", methods=["GET", "POST"])(handle_twilio_voice_status)
+app.api_route("/webhooks/voice/twilio/status/{organization_id}", methods=["GET", "POST"])(handle_twilio_voice_status)
+app.api_route("/webhooks/voice/twilio/recording", methods=["GET", "POST"])(handle_twilio_voice_recording)
+app.api_route("/webhooks/voice/twilio/recording/{organization_id}", methods=["GET", "POST"])(handle_twilio_voice_recording)
 app.websocket("/webhooks/voice/twilio/stream/{room_name}")(telephony_audio_stream)
 # Explicit routes for call recording upload and audio playback to support all client URL configurations
 app.api_route("/api/voice/recordings/upload", methods=["POST"])(upload_call_recording)

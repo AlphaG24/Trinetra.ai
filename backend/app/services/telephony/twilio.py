@@ -216,7 +216,7 @@ class TwilioProvider(AbstractTelephonyProvider):
             self._handle_twilio_exception(e, "get_number_status")
 
     async def create_call_routing(self, phone_number: str, organization_id: str) -> Dict:
-        voice_url = f"{self.webhook_base}/webhooks/voice/twilio/{organization_id}"
+        voice_url = f"{self.webhook_base}/api/voice/webhooks/voice/twilio/{organization_id}"
         logger.info(f"[{self.provider_name}] Updating routing for *** -> {voice_url}")
         
         try:
