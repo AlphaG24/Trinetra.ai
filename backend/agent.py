@@ -3020,6 +3020,22 @@ async def run_agent(room_name: str, agent_id: str | None = None, contact_id: str
                     except Exception as e:
                         logger.error(f"Failed to fetch campaign contact {contact_id} in run_agent: {e}")
 
+                # Support scheduled callbacks: populate contact context from voice_calls metadata
+                if not campaign_contact and room_name:
+                    try:
+                        if 'meta' in locals() and meta and meta.get("is_callback"):
+                            cb_name = meta.get("prospect_name") or "Prospect"
+                            cb_notes = meta.get("notes") or "Scheduled callback"
+                            campaign_contact = {
+                                "full_name": cb_name,
+                                "phone": caller_number,
+                                "notes": f"Scheduled callback from previous conversation: {cb_notes}",
+                                "company_name": ""
+                            }
+                            logger.info(f"[Callback Context] Recognized automated callback for {cb_name} ({caller_number})")
+                    except Exception as cb_err:
+                        logger.warning(f"Failed to parse callback metadata: {cb_err}")
+
                 # Lookup Caller in customer_contacts
                 customer = None
                 if not campaign_contact and organization_id and caller_number != "Unknown":

@@ -94,6 +94,21 @@ async def app_startup():
     except Exception as e:
         print(f"[Startup] Pre-warm agent warning: {e}", flush=True)
 
+    try:
+        from app.services.callback_scheduler import CallbackSchedulerService
+        CallbackSchedulerService.start_worker()
+        print("[Startup] Automated Callback Scheduler Service initiated.", flush=True)
+    except Exception as e:
+        print(f"[Startup] Callback Scheduler Service start warning: {e}", flush=True)
+
+@app.on_event("shutdown")
+async def app_shutdown():
+    try:
+        from app.services.callback_scheduler import CallbackSchedulerService
+        CallbackSchedulerService.stop_worker()
+    except Exception as e:
+        print(f"[Shutdown] Callback Scheduler Service stop warning: {e}", flush=True)
+
 @app.api_route("/", methods=["GET", "HEAD"])
 def read_root():
     return {"message": "Trinetra Voice AI Backend is Active"}
