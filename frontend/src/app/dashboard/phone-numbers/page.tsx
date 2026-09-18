@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { 
   Phone, Zap, ChevronDown, ChevronUp, Globe, MapPin, 
   Smartphone, CreditCard, Check, Copy, HelpCircle, AlertCircle,
-  Search, RefreshCw, SlidersHorizontal, XCircle, Info, PhoneCall, ShoppingBag, Sparkles
+  Search, RefreshCw, SlidersHorizontal, XCircle, PhoneCall, ShoppingBag
 } from "lucide-react";
 import { NumberCard } from "@/src/components/phone-numbers/NumberCard";
 import { ManageNumberModal } from "@/src/components/phone-numbers/ManageNumberModal";
@@ -471,17 +471,6 @@ export default function PhoneNumbersPage() {
   return (
     <div className="flex-1 w-full p-4 md:p-6 lg:p-8 max-w-7xl mx-auto flex flex-col h-full overflow-y-auto text-left font-[family-name:var(--font-montserrat)]">
       
-      {/* Header Info Banner */}
-      <div className="mb-6 p-4 rounded-xl bg-gradient-to-r from-violet-600/10 to-indigo-600/10 border border-violet-500/20 flex items-start gap-3">
-        <Info className="w-5 h-5 text-violet-500 shrink-0 mt-0.5" />
-        <div>
-          <h4 className="text-sm font-bold text-[var(--heading)]">Telephony Infrastructure Dashboard</h4>
-          <p className="text-xs text-[var(--muted)] mt-1 leading-relaxed">
-            Acquire phone numbers to connect with your virtual AI assistants. Select from pre-purchased pool lines or request custom line provisioning.
-          </p>
-        </div>
-      </div>
-
       {/* Header Section */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8">
         <div>
@@ -557,20 +546,13 @@ export default function PhoneNumbersPage() {
         </div>
 
         {Array.isArray(numbers) && numbers.length < maxLimit && (
-          <div className="mb-6 p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
-                <Sparkles size={20} />
-              </div>
-              <div>
-                <h4 className="text-sm font-bold text-[var(--heading)]">
-                  You have {maxLimit - numbers.length} included phone {maxLimit - numbers.length === 1 ? "line" : "lines"} ready to claim!
-                </h4>
-                <p className="text-xs text-[var(--muted)]">
-                  Your plan or purchased pack includes numbers at no extra charge. Click &quot;Claim with Plan (₹0)&quot; on any available line below.
-                </p>
-              </div>
-            </div>
+          <div className="mb-6 px-5 py-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex flex-col justify-center">
+            <h4 className="text-sm font-bold text-[var(--heading)]">
+              You have {maxLimit - numbers.length} included phone {maxLimit - numbers.length === 1 ? "line" : "lines"} ready to claim!
+            </h4>
+            <p className="text-xs text-[var(--muted)] mt-1">
+              Your plan or purchased pack includes numbers at no extra charge. Click &quot;Claim with Plan (₹0)&quot; on any available line below.
+            </p>
           </div>
         )}
 
