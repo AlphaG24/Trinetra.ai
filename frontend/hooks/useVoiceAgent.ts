@@ -242,6 +242,17 @@ export function useVoiceAgent() {
 
       room.on(RoomEvent.TrackSubscribed, (track: RemoteTrack, publication: RemoteTrackPublication, participant: RemoteParticipant) => {
         if (track.kind === Track.Kind.Audio) {
+          // Detach any existing elements for this track to prevent phase distortion/duplicate playback
+          try {
+            track.detach().forEach((el) => {
+              try {
+                el.pause()
+                el.srcObject = null
+                el.remove()
+              } catch {}
+            })
+          } catch {}
+
           const element = track.attach()
           element.autoplay = true
           element.muted = false

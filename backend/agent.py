@@ -771,8 +771,9 @@ class VikramAgent(Agent):
             logger.info(f"[VikramAgent] Sarvam TTS config: model={model_name}, speaker={sarvam_speaker} (orig={voice_id}), pace={sarvam_pace}, pitch={sarvam_pitch}, lang={language}")
 
             # hi-IN provides fluent bilingual pronunciation for both Hindi and English words
-            target_lang = "hi-IN" if language in ['hinglish', 'hi-IN', 'english'] else "en-IN"
-            sarvam_sample_rate = int(os.getenv("SARVAM_SAMPLE_RATE", "22050"))
+            # WebRTC native sample rate: 24000 Hz (exact integer divisor of WebRTC 48kHz Opus)
+            # linear16 sends raw uncompressed PCM, eliminating MP3 decode chunking jitter, clicks and voice breakages
+            sarvam_sample_rate = int(os.getenv("SARVAM_SAMPLE_RATE", "24000"))
             try:
                 tts_plugin = sarvam.TTS(
                     target_language_code=target_lang,
@@ -782,16 +783,19 @@ class VikramAgent(Agent):
                     pitch=sarvam_pitch,
                     loudness=1.25,
                     speech_sample_rate=sarvam_sample_rate,
-                    min_buffer_size=50,
+                    output_audio_codec="linear16",
+                    min_buffer_size=60,
+                    max_chunk_length=180,
                 )
             except Exception as sarvam_err:
-                logger.warning(f"[VikramAgent] Sarvam TTS custom init error ({sarvam_err}), falling back to safe defaults")
+                logger.warning(f"[VikramAgent] Sarvam TTS custom init error ({sarvam_err}), falling back to safe linear16 defaults")
                 tts_plugin = sarvam.TTS(
                     target_language_code=target_lang,
                     model=model_name,
                     speaker=sarvam_speaker,
                     loudness=1.25,
                     speech_sample_rate=sarvam_sample_rate,
+                    output_audio_codec="linear16",
                 )
         else:
             tts_plugin = elevenlabs.TTS(voice_id=voice_id)
