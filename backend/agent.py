@@ -258,6 +258,10 @@ def fix_gender_verbs(text: str, gender: str) -> str:
     text = re.sub(r'24/7', 'twenty-four seven', text)
     text = re.sub(r'२४/७', '24 घंटे', text)
 
+    # Fix literal mistranslations of "I see" -> "seekh rahi hoon" / "seekh raha hoon"
+    text = re.sub(r'\b(?:main\s+)?seekh\s+(?:rahi|raha)\s+(?:hoon|hu|hun|hoo)\b', 'mujhe pata chala', text, flags=re.IGNORECASE)
+    text = re.sub(r'\bseekh\s+rahe\s+hain\b', 'dekh rahe hain', text, flags=re.IGNORECASE)
+
     if not gender:
         return text
 
@@ -485,11 +489,22 @@ def resolve_agent_greeting(
     modal = "sakti" if gender_tag == "female" else "sakta"
     
     if raw_greeting:
-        gm = raw_greeting.replace('{{agent_name}}', clean_name).replace('{agentName}', clean_name)
-        gm = gm.replace('{{company_name}}', business_name).replace('{companyName}', business_name)
-        if '{{customer_name}}' in gm or '{customerName}' in gm:
-            c_repl = f"{first_name} ji" if (first_name and language in ['hinglish', 'hi-IN']) else (first_name or "")
-            gm = gm.replace('{{customer_name}}', c_repl).replace('{customerName}', c_repl)
+        gm = raw_greeting.replace('{{agent_name}}', clean_name).replace('{agentName}', clean_name).replace('{agent_name}', clean_name)
+        gm = gm.replace('{{company_name}}', business_name).replace('{companyName}', business_name).replace('{company_name}', business_name)
+        
+        c_repl = f"{first_name} ji" if (first_name and language in ['hinglish', 'hi-IN']) else (first_name or "")
+        name_tokens = [
+            '{{customer_name}}', '{customerName}', '{customer_name}',
+            '{{contact_name}}', '{contactName}', '{contact_name}',
+            '{{name}}', '{name}', '[customer_name]', '[customerName]',
+            '[name]', '[Name]', '[contact_name]', '{{prospect_name}}',
+            '{prospect_name}', '[prospect_name]', '---', '___'
+        ]
+        has_token = any(t in gm for t in name_tokens)
+        if has_token:
+            for t in name_tokens:
+                if t in gm:
+                    gm = gm.replace(t, c_repl or "ji")
         elif first_name and first_name.lower() not in gm.lower():
             if re.search(r'^(Namaste|Hello|Hi)\b', gm, re.IGNORECASE):
                 gm = re.sub(r'^(Namaste|Hello|Hi)(\s+ji)?([,!\.]|\s+)', rf'\1 {first_name} ji, ', gm, count=1, flags=re.IGNORECASE)
@@ -1080,10 +1095,19 @@ class VikramAgent(Agent):
                         gender_instr = " CRITICAL GRAMMAR: You are FEMALE. Use strictly feminine verb forms ('karti hoon', 'bol rahi hoon', 'kar sakti hoon', 'chahti hoon', 'bhej deti hoon', 'seedhi baat karti hoon'). NEVER use male endings ('karta hoon', 'raha hoon', 'sakta hoon')."
                     elif getattr(self, 'gender', '') == 'male':
                         gender_instr = " CRITICAL GRAMMAR: You are MALE. Use strictly masculine verb forms ('karta hoon', 'bol raha hoon', 'kar sakta hoon', 'chahta hoon', 'bhej deta hoon', 'seedhi baat karta hoon')."
+                    intro_needed = ""
+                    greet_msg = getattr(self, 'greeting_message', '') or ''
+                    agent_name_val = getattr(self, 'bot_name', 'Aditi')
+                    b_name_val = getattr(self, 'business_name', '')
+                    if agent_name_val and agent_name_val.lower() not in greet_msg.lower():
+                        verb_intro = "bol rahi hoon" if getattr(self, 'gender', '') == 'female' else "bol raha hoon"
+                        comp_intro = f" {b_name_val} se" if b_name_val else ""
+                        intro_needed = f" Since you only checked their identity in your greeting, introduce yourself now: 'Namaste{name_prompt}! Main{comp_intro} {agent_name_val} {verb_intro}.' "
+
                     flow_instruction = (
-                        f"[CRITICAL FLOW NOTE: The prospect just gave permission to speak ('{norm_txt}'). "
-                        f"IMMEDIATELY introduce the reason you called{name_prompt}: '{campaign_goal}'.{gender_instr} "
-                        f"Keep your response to 1-2 conversational sentences and ask an engaging discovery question. DO NOT say goodbye, DO NOT say '{getattr(self, 'ending_message', '')}'!]"
+                        f"[CRITICAL FLOW NOTE: The prospect just confirmed / gave permission to speak ('{norm_txt}'). {intro_needed}"
+                        f"State why you called: '{campaign_goal}'.{gender_instr} "
+                        f"Keep your response strictly short (1-2 sentences), speak naturally, and ask ONE discovery question. DO NOT say goodbye, DO NOT say '{getattr(self, 'ending_message', '')}'!]"
                     )
 
                 # Store flow instruction on agent instance for transient injection in llm_node

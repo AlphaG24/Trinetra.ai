@@ -77,20 +77,39 @@ export function CampaignDetailClient({ campaignId }: CampaignDetailClientProps) 
   const [retryingContactId, setRetryingContactId] = useState<string | null>(null)
   const [showTranscriptModal, setShowTranscriptModal] = useState(false)
   const [selectedTranscript, setSelectedTranscript] = useState<any>(null)
+  const [selectedRecordingUrl, setSelectedRecordingUrl] = useState<string | null>(null)
   const [selectedCallerName, setSelectedCallerName] = useState<string>('Contact')
+  const [selectedDuration, setSelectedDuration] = useState<number | undefined>(undefined)
 
-  const handleOpenTranscript = async (callId: string, contactName: string) => {
+  const handleOpenTranscript = async (callId: string, contactName: string, contactId?: string) => {
     try {
       setSelectedCallerName(contactName || 'Contact')
       setSelectedTranscript(null)
+      setSelectedRecordingUrl(null)
+      setSelectedDuration(undefined)
       setShowTranscriptModal(true)
 
       const supabase = createClient()
-      const { data } = await supabase
+      let query = supabase
         .from('voice_calls')
-        .select('transcript_text, transcript')
-        .or(`id.eq.${callId},metadata->>provider_call_id.eq.${callId},metadata->>session_id.eq.${callId}`)
-        .maybeSingle()
+        .select('transcript_text, transcript, recording_url, duration_seconds')
+
+      if (callId && contactId) {
+        query = query.or(`id.eq.${callId},metadata->>provider_call_id.eq.${callId},metadata->>session_id.eq.${callId},metadata->>contact_id.eq.${contactId}`)
+      } else if (callId) {
+        query = query.or(`id.eq.${callId},metadata->>provider_call_id.eq.${callId},metadata->>session_id.eq.${callId}`)
+      } else if (contactId) {
+        query = query.eq('metadata->>contact_id', contactId)
+      }
+
+      const { data } = await query.order('created_at', { ascending: false }).limit(1).maybeSingle()
+
+      if (data?.recording_url) {
+        setSelectedRecordingUrl(data.recording_url)
+      }
+      if (data?.duration_seconds !== undefined) {
+        setSelectedDuration(data.duration_seconds)
+      }
 
       if (data?.transcript_text || data?.transcript) {
         setSelectedTranscript(data.transcript_text || data.transcript)
@@ -718,11 +737,10 @@ export function CampaignDetailClient({ campaignId }: CampaignDetailClientProps) 
                       })()}
                     </td>
                     <td className="px-6 py-4 text-center font-semibold font-mono text-[var(--body)]">{item.call_attempts}</td>
-                    <td className="px-6 py-4 space-y-1">
-                      {item.call_id && (
+                      {(item.call_id || item.call_attempts > 0) && (
                         <button
                           type="button"
-                          onClick={() => handleOpenTranscript(item.call_id!, item.full_name)}
+                          onClick={() => handleOpenTranscript(item.call_id || '', item.full_name, item.id)}
                           className="block text-[10px] text-violet-500 hover:text-violet-400 font-bold hover:underline cursor-pointer text-left"
                         >
                           View Call Transcript
@@ -736,7 +754,7 @@ export function CampaignDetailClient({ campaignId }: CampaignDetailClientProps) 
                           View Extracted Lead
                         </Link>
                       )}
-                      {!item.call_id && !item.lead_id && <span className="text-[var(--muted)]">—</span>}
+                      {!item.call_id && !item.lead_id && item.call_attempts === 0 && <span className="text-[var(--muted)]">—</span>}
                     </td>
                     <td className="px-6 py-4 text-right">
                       {(() => {
@@ -794,8 +812,11 @@ export function CampaignDetailClient({ campaignId }: CampaignDetailClientProps) 
         onClose={() => {
           setShowTranscriptModal(false)
           setSelectedTranscript(null)
+          setSelectedRecordingUrl(null)
+          setSelectedDuration(undefined)
         }}
         transcript={selectedTranscript}
+        recordingUrl={selectedRecordingUrl}
         callerName={selectedCallerName}
       />
     </div>
