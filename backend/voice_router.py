@@ -22,6 +22,9 @@ from pydantic import BaseModel
 from database import supabase, supabase_admin
 from google import genai
 import asyncio
+import logging
+
+logger = logging.getLogger("voice_router")
 try:
     import audioop  # Python <= 3.11 built-in
 except ModuleNotFoundError:
