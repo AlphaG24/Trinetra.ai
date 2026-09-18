@@ -82,7 +82,10 @@ export function LeadsPageClient({ initialLeads, agents = [], services = [] }: Le
   // Transcript Modal State
   const [showTranscriptModal, setShowTranscriptModal] = useState(false)
   const [selectedTranscript, setSelectedTranscript] = useState<string | null>(null)
+  const [selectedRecordingUrl, setSelectedRecordingUrl] = useState<string | null>(null)
+  const [selectedDuration, setSelectedDuration] = useState<number | undefined>(undefined)
   const [transcriptCallerName, setTranscriptCallerName] = useState<string>('Prospect')
+  const [callingLeadId, setCallingLeadId] = useState<string | null>(null)
 
   const displayAgents = useMemo(() => {
     if (agents && agents.length > 0) return agents
@@ -214,17 +217,57 @@ export function LeadsPageClient({ initialLeads, agents = [], services = [] }: Le
     }
   }
 
+  // Trigger outbound call with AI Voice Agent
+  const handleCallLead = async (lead: Lead) => {
+    const phone = lead.phone || lead.contact_phone
+    if (!phone) {
+      toast.error('No phone number registered for this lead')
+      return
+    }
+    const agentId = lead.agent_id || (agents && agents.length > 0 ? agents[0].id : null)
+    if (!agentId) {
+      toast.error('No voice agent available to place the call')
+      return
+    }
+
+    setCallingLeadId(lead.id)
+    const displayName = lead.full_name || lead.contact_name || phone
+    const toastId = toast.loading(`Initiating AI call to ${displayName}...`)
+    try {
+      const res = await fetch('/api/telephony/outbound-call', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          to_phone: phone,
+          agent_id: agentId,
+        })
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to trigger outbound call')
+      }
+      toast.success(`Call placed! AI Agent is dialing ${phone}.`, { id: toastId })
+    } catch (err: any) {
+      console.error('Call failed:', err)
+      toast.error(err.message || 'Failed to place call', { id: toastId })
+    } finally {
+      setCallingLeadId(null)
+    }
+  }
+
   // View transcript
   const handleViewTranscript = async (callId: string, prospectName: string) => {
     try {
       setTranscriptCallerName(prospectName || 'Prospect')
       setSelectedTranscript(null)
+      setSelectedRecordingUrl(null)
+      setSelectedDuration(undefined)
       setShowTranscriptModal(true)
 
       const supabase = createClient()
       const { data } = await supabase
         .from('voice_calls')
-        .select('transcript_text, transcript')
+        .select('transcript_text, transcript, recording_url, duration_seconds')
         .or(`id.eq.${callId},metadata->>provider_call_id.eq.${callId},metadata->>session_id.eq.${callId}`)
         .maybeSingle()
 
@@ -232,6 +275,12 @@ export function LeadsPageClient({ initialLeads, agents = [], services = [] }: Le
         setSelectedTranscript(data.transcript_text || data.transcript)
       } else {
         setSelectedTranscript('No transcript record found for this call.')
+      }
+      if (data?.recording_url) {
+        setSelectedRecordingUrl(data.recording_url)
+      }
+      if (data?.duration_seconds) {
+        setSelectedDuration(data.duration_seconds)
       }
     } catch (err) {
       console.error(err)
@@ -571,13 +620,19 @@ export function LeadsPageClient({ initialLeads, agents = [], services = [] }: Le
                           <td className="px-5 py-3.5 whitespace-nowrap text-right">
                             <div className="flex items-center justify-end gap-1.5">
                               {phone && (
-                                <a
-                                  href={`tel:${phone}`}
-                                  className="p-1.5 bg-[var(--primary-bg)] hover:bg-violet-500/20 text-violet-500 rounded-lg transition-colors"
-                                  title={`Direct dial: ${phone}`}
+                                <button
+                                  type="button"
+                                  onClick={() => handleCallLead(lead)}
+                                  disabled={callingLeadId === lead.id}
+                                  className="p-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 rounded-lg transition-colors disabled:opacity-50 cursor-pointer flex items-center justify-center"
+                                  title={`Call lead via AI Agent (${phone})`}
                                 >
-                                  <Phone className="w-3.5 h-3.5" />
-                                </a>
+                                  {callingLeadId === lead.id ? (
+                                    <RefreshCw className="w-3.5 h-3.5 animate-spin text-amber-500" />
+                                  ) : (
+                                    <Phone className="w-3.5 h-3.5" />
+                                  )}
+                                </button>
                               )}
 
                               {email && (
@@ -718,12 +773,19 @@ export function LeadsPageClient({ initialLeads, agents = [], services = [] }: Le
                   </button>
                 )}
                 {selectedLead.phone && (
-                  <a
-                    href={`tel:${selectedLead.phone}`}
-                    className="inline-flex items-center gap-1 px-3 py-1.5 bg-[var(--card-bg)] hover:bg-[var(--hover-bg)] border border-[var(--border)] text-[var(--heading)] rounded-xl text-xs font-semibold transition-all"
+                  <button
+                    type="button"
+                    onClick={() => handleCallLead(selectedLead)}
+                    disabled={callingLeadId === selectedLead.id}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-semibold shadow-sm transition-all disabled:opacity-50 cursor-pointer"
                   >
-                    <Phone className="w-3.5 h-3.5 text-emerald-500" /> Dial
-                  </a>
+                    {callingLeadId === selectedLead.id ? (
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Phone className="w-3.5 h-3.5" />
+                    )}
+                    {callingLeadId === selectedLead.id ? 'Dialing...' : 'Call with AI Agent'}
+                  </button>
                 )}
               </div>
               <button
@@ -743,8 +805,11 @@ export function LeadsPageClient({ initialLeads, agents = [], services = [] }: Le
         onClose={() => {
           setShowTranscriptModal(false)
           setSelectedTranscript(null)
+          setSelectedRecordingUrl(null)
+          setSelectedDuration(undefined)
         }}
         transcript={selectedTranscript}
+        recordingUrl={selectedRecordingUrl}
         callerName={transcriptCallerName}
       />
     </div>
