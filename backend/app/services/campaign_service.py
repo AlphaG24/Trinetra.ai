@@ -694,6 +694,8 @@ class CampaignService:
                     "status": "in_progress",
                     "duration_seconds": 0,
                     "transcript": "",
+                    "provider_call_id": call_sid,
+                    "session_id": call_sid,
                     "metadata": {
                         "from_number": agent_phone,
                         "to_number": contact["phone"],
@@ -710,6 +712,23 @@ class CampaignService:
                 if call_res.data:
                     call_id = call_res.data[0]["id"]
                     logger.info(f"[Campaign] Logged outbound call record: {call_id}")
+
+                # Proactively sync campaign contact to customer_contacts table
+                if organization_id and contact.get("phone"):
+                    try:
+                        from app.services.caller_lookup import CallerLookupService
+                        lookup_svc = CallerLookupService(supabase_admin)
+                        await lookup_svc.add_manual(organization_id, {
+                            "phone_number": contact["phone"],
+                            "full_name": contact.get("full_name") or contact.get("name") or "Unknown",
+                            "company": contact.get("company_name") or contact.get("company") or "",
+                            "notes": f"Enrolled via Campaign: {campaign_data.get('name', 'Outbound Campaign')}",
+                            "import_source": "campaign",
+                            "tags": ["campaign", campaign_data.get("name", "campaign-contact")]
+                        })
+                        logger.info(f"[Campaign] Proactively synced contact {contact['phone']} to customer_contacts")
+                    except Exception as sync_err:
+                        logger.warning(f"[Campaign] Notice during customer_contacts proactive sync: {sync_err}")
             except Exception as call_log_err:
                 logger.error(f"Failed to log outbound call record: {call_log_err}")
                     

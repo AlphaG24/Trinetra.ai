@@ -59,6 +59,12 @@ app.api_route("/webhooks/voice/twilio/status", methods=["GET", "POST"])(handle_t
 app.api_route("/webhooks/voice/twilio/status/{organization_id}", methods=["GET", "POST"])(handle_twilio_voice_status)
 app.api_route("/webhooks/voice/twilio/recording", methods=["GET", "POST"])(handle_twilio_voice_recording)
 app.api_route("/webhooks/voice/twilio/recording/{organization_id}", methods=["GET", "POST"])(handle_twilio_voice_recording)
+app.api_route("/api/voice/webhooks/voice/twilio/recording", methods=["GET", "POST"])(handle_twilio_voice_recording)
+app.api_route("/api/voice/webhooks/voice/twilio/recording/{organization_id}", methods=["GET", "POST"])(handle_twilio_voice_recording)
+app.api_route("/webhooks/voice/exotel/recording", methods=["GET", "POST"])(handle_exotel_voice_webhook)
+app.api_route("/webhooks/voice/exotel/recording/{organization_id}", methods=["GET", "POST"])(handle_exotel_voice_webhook)
+app.api_route("/api/voice/webhooks/voice/exotel/recording", methods=["GET", "POST"])(handle_exotel_voice_webhook)
+app.api_route("/api/voice/webhooks/voice/exotel/recording/{organization_id}", methods=["GET", "POST"])(handle_exotel_voice_webhook)
 app.websocket("/webhooks/voice/twilio/stream/{room_name}")(telephony_audio_stream)
 # Explicit routes for call recording upload and audio playback to support all client URL configurations
 app.api_route("/api/voice/recordings/upload", methods=["POST"])(upload_call_recording)

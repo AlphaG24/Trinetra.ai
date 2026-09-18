@@ -352,6 +352,8 @@ async def generate_livekit_token(req: LiveKitTokenRequest):
                 "status": "in_progress",
                 "started_at": datetime.utcnow().isoformat(),
                 "duration_seconds": 0,
+                "provider_call_id": room_name,
+                "session_id": room_name,
                 "metadata": {
                     "room_name": room_name,
                     "provider_call_id": room_name,
@@ -368,8 +370,9 @@ async def generate_livekit_token(req: LiveKitTokenRequest):
         try:
             async def safe_run_agent(r_name: str, a_id: str):
                 try:
-                    # Allow 3.5s for external dedicated LiveKit worker to connect first
-                    await asyncio.sleep(3.5)
+                    # Optimized sleep guard: 0.5s for outbound telephony, 1.0s for web calls
+                    is_outbound = r_name.startswith(("twilio--", "exotel--", "sip-"))
+                    await asyncio.sleep(0.5 if is_outbound else 1.0)
 
                     # Check if an external worker already joined the room
                     lk_url = os.getenv("LIVEKIT_URL")
@@ -1017,6 +1020,21 @@ async def handle_exotel_voice_webhook(
                     }
                 }, on_conflict="provider_call_id").execute()
 
+                # Proactive fallback: fetch Exotel recording directly if call completed/terminated and recording_url is missing
+                if call_status.lower() in ["completed", "terminated"] and not recording_url and call_sid:
+                    async def _fetch_exotel_recording_bg(exo_csid: str):
+                        await asyncio.sleep(4)
+                        try:
+                            from app.services.telephony.exotel_adapter import ExotelProvider
+                            exo_adapter = ExotelProvider()
+                            exo_rec = await exo_adapter.get_recording(exo_csid)
+                            if exo_rec:
+                                supabase_admin.table("voice_calls").update({"recording_url": exo_rec}).eq("provider_call_id", exo_csid).execute()
+                                print(f"[Exotel Webhook] Proactively fetched & stored recording for {exo_csid}: {exo_rec}", flush=True)
+                        except Exception as ex_rec_err:
+                            print(f"[Exotel Webhook] Proactive recording fetch notice for {exo_csid}: {ex_rec_err}", flush=True)
+                    asyncio.create_task(_fetch_exotel_recording_bg(call_sid))
+
                 if contact_id and call_status.lower() in ["completed", "in-progress", "busy", "no-answer", "failed"]:
                     stat_map = {
                         "completed": "answered",
@@ -1441,6 +1459,29 @@ async def handle_twilio_voice_status(
             if not getattr(res, "data", None):
                 supabase_admin.table("voice_calls").update(update_payload).eq("metadata->>provider_call_id", call_sid).execute()
 
+            # Proactive fallback: fetch recording directly from Twilio REST API if not yet received via webhook
+            if call_status == "completed" and not recording_url and call_sid and not call_sid.startswith("mock"):
+                async def _fetch_twilio_recording_fallback(sid: str):
+                    try:
+                        await asyncio.sleep(4)
+                        from app.services.telephony.twilio import TwilioProvider
+                        tw_svc = TwilioProvider()
+                        if getattr(tw_svc, "client", None):
+                            recordings = await asyncio.to_thread(lambda: tw_svc.client.calls(sid).recordings.list())
+                            if recordings and len(recordings) > 0:
+                                rec = recordings[0]
+                                r_uri = getattr(rec, "uri", "") or ""
+                                rec_url = f"https://api.twilio.com{r_uri.replace('.json', '.mp3')}"
+                                supabase_admin.table("voice_calls").update({"recording_url": rec_url}).eq("provider_call_id", sid).execute()
+                                try:
+                                    supabase_admin.table("calls").update({"recording_url": rec_url}).eq("session_id", sid).execute()
+                                except Exception:
+                                    pass
+                                print(f"[Twilio Status Webhook] Proactively fetched & stored recording for {sid}: {rec_url}", flush=True)
+                    except Exception as f_err:
+                        print(f"[Twilio Status Webhook] Proactive recording fetch notice for {sid}: {f_err}", flush=True)
+                asyncio.create_task(_fetch_twilio_recording_fallback(call_sid))
+
             # Also update campaign_contacts immediately
             try:
                 vc = supabase_admin.table("voice_calls").select("metadata, id").or_(f"provider_call_id.eq.{call_sid},metadata->>provider_call_id.eq.{call_sid}").limit(1).execute()
@@ -1591,32 +1632,57 @@ async def upload_call_recording(
 
         # Fallback to backend direct audio streaming endpoint
         if not public_url:
-            backend_url = (os.getenv("BACKEND_URL") or os.getenv("NEXT_PUBLIC_BACKEND_URL") or "https://trinetra-voice-agent.onrender.com").rstrip("/")
+            backend_url = (os.getenv("TRINETRA_WEBHOOK_BASE_URL") or os.getenv("BACKEND_URL") or os.getenv("NEXT_PUBLIC_BACKEND_URL") or "https://trinetra-ai-1-6f2n.onrender.com").rstrip("/")
             public_url = f"{backend_url}/api/voice/recordings/{filename}"
 
         print(f"[Recording Upload] Stored recording for room {room_name}: {public_url}", flush=True)
 
         # Update voice_calls table
-        update_data = {"recording_url": public_url}
+        update_data = {
+            "recording_url": public_url,
+            "status": "completed",
+            "ended_at": datetime.utcnow().isoformat()
+        }
         if duration_seconds and duration_seconds > 0:
             update_data["duration_seconds"] = duration_seconds
 
         updated = False
+        # 1. Direct indexed match on provider_call_id
         try:
-            res = supabase_admin.table("voice_calls").update(update_data).eq("metadata->>room_name", room_name).execute()
+            res = supabase_admin.table("voice_calls").update(update_data).eq("provider_call_id", room_name).execute()
             if getattr(res, "data", None) and len(res.data) > 0:
                 updated = True
         except Exception as e:
-            print(f"[Recording Upload] Error querying metadata->>room_name: {e}", flush=True)
+            print(f"[Recording Upload] Error querying provider_call_id: {e}", flush=True)
 
+        # 2. Direct indexed match on session_id
         if not updated:
             try:
-                res = supabase_admin.table("voice_calls").update(update_data).eq("metadata->>provider_call_id", room_name).execute()
+                res = supabase_admin.table("voice_calls").update(update_data).eq("session_id", room_name).execute()
+                if getattr(res, "data", None) and len(res.data) > 0:
+                    updated = True
+            except Exception as e:
+                print(f"[Recording Upload] Error querying session_id: {e}", flush=True)
+
+        # 3. PostgREST filter on metadata->>room_name
+        if not updated:
+            try:
+                res = supabase_admin.table("voice_calls").update(update_data).filter("metadata->>room_name", "eq", room_name).execute()
+                if getattr(res, "data", None) and len(res.data) > 0:
+                    updated = True
+            except Exception as e:
+                print(f"[Recording Upload] Error querying metadata->>room_name: {e}", flush=True)
+
+        # 4. PostgREST filter on metadata->>provider_call_id
+        if not updated:
+            try:
+                res = supabase_admin.table("voice_calls").update(update_data).filter("metadata->>provider_call_id", "eq", room_name).execute()
                 if getattr(res, "data", None) and len(res.data) > 0:
                     updated = True
             except Exception as e:
                 print(f"[Recording Upload] Error querying metadata->>provider_call_id: {e}", flush=True)
 
+        # 5. Fallback: match most recent unrecorded call for this agent
         if not updated and agent_id:
             try:
                 recent = supabase_admin.table("voice_calls").select("id")\

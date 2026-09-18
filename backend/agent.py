@@ -2753,6 +2753,10 @@ async def run_agent(room_name: str, agent_id: str | None = None, contact_id: str
                 if provider == 'elevenlabs' and (voice_id in fake_elevenlabs_ids or '-' in voice_id):
                     provider = 'sarvam'
                     voice_id = 'anushka'
+
+                if provider == 'sarvam' and str(voice_id).lower() == 'aditi':
+                    # Sarvam bulbul:v3 uses ritu as conversational female voice
+                    voice_id = 'ritu'
                     
                 if agent_data.get("primary_language"): language = agent_data["primary_language"]
                 if agent_data.get("voice_speed"): speed = agent_data["voice_speed"]
@@ -3084,11 +3088,11 @@ async def run_agent(room_name: str, agent_id: str | None = None, contact_id: str
         session = AgentSession(
             vad=get_vad_model(),
             turn_detection="vad",
-            min_endpointing_delay=0.1,
-            max_endpointing_delay=0.25,
+            min_endpointing_delay=0.3,
+            max_endpointing_delay=0.6,
             preemptive_generation=True,
-            min_interruption_duration=0.5,
-            min_interruption_words=2,
+            min_interruption_duration=0.8,
+            min_interruption_words=3,
             resume_false_interruption=True,
         )
         done = asyncio.Event()
@@ -3271,19 +3275,19 @@ async def run_agent(room_name: str, agent_id: str | None = None, contact_id: str
 
         try:
             connected = False
-            for connect_attempt in range(3):
+            for connect_attempt in range(2):
                 try:
-                    await asyncio.wait_for(room.connect(livekit_url, token), timeout=8.0)
+                    await asyncio.wait_for(room.connect(livekit_url, token), timeout=5.0)
                     connected = True
                     print(f"[Agent] Connected to LiveKit", flush=True)
                     _active_livekit_rooms.add(room)
                     break
                 except asyncio.TimeoutError:
-                    logger.warning(f"[Agent] LiveKit connection attempt {connect_attempt + 1} timed out after 8s. Retrying...")
-                    await asyncio.sleep(0.3)
+                    logger.warning(f"[Agent] LiveKit connection attempt {connect_attempt + 1} timed out after 5s. Retrying...")
+                    await asyncio.sleep(0.2)
                 except Exception as connect_err:
                     logger.warning(f"[Agent] LiveKit connection attempt {connect_attempt + 1} failed: {connect_err}. Retrying...")
-                    await asyncio.sleep(0.3)
+                    await asyncio.sleep(0.2)
 
             if not connected:
                 logger.error(f"[Agent] Failed to connect to LiveKit after 4 attempts for room {room_name}")

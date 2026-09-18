@@ -75,7 +75,7 @@ export function useVoiceAgent() {
         const chunks = recordedChunksRef.current
         if (chunks.length > 0) {
           const audioBlob = new Blob(chunks, { type: rec.mimeType || 'audio/webm' })
-          if (audioBlob.size > 2000) {
+          if (audioBlob.size > 500) {
             try {
               const formData = new FormData()
               formData.append('file', audioBlob, `call_${callMeta?.roomName || 'web'}_${Date.now()}.webm`)
@@ -85,7 +85,7 @@ export function useVoiceAgent() {
               }
               formData.append('duration_seconds', String(dur))
 
-              const apiUrl = (process.env.NEXT_PUBLIC_BACKEND_URL || process.env.NEXT_PUBLIC_FASTAPI_URL || 'https://trinetra-voice-agent.onrender.com').replace(/\/$/, '')
+              const apiUrl = (process.env.NEXT_PUBLIC_BACKEND_URL || process.env.NEXT_PUBLIC_FASTAPI_URL || 'https://trinetra-ai-1-6f2n.onrender.com').replace(/\/$/, '')
               await fetch(`${apiUrl}/api/voice/recordings/upload`, {
                 method: 'POST',
                 body: formData,
@@ -98,6 +98,9 @@ export function useVoiceAgent() {
         }
       }
       try {
+        if (rec.state === 'recording') {
+          rec.requestData()
+        }
         rec.stop()
       } catch {}
       mediaRecorderRef.current = null
