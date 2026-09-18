@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { AnimatePresence, motion } from "framer-motion";
 import { Check, ChevronDown, Info, Plus, X } from "lucide-react";
@@ -113,14 +113,26 @@ function asBoolean(value: unknown) {
   return false;
 }
 
-function formatPaise(value: number | null) {
+function formatPrice(value: number | null, currency: "INR" | "USD" = "INR") {
   if (value === null || !Number.isFinite(value)) return "";
+  if (currency === "USD") {
+    const dollars = value / 100;
+    const whole = Number.isInteger(dollars);
+    return `$${new Intl.NumberFormat("en-US", {
+      minimumFractionDigits: whole ? 0 : 2,
+      maximumFractionDigits: whole ? 0 : 2,
+    }).format(dollars)}`;
+  }
   const rupees = value / 100;
   const whole = Number.isInteger(rupees);
   return `\u20B9${new Intl.NumberFormat("en-IN", {
     minimumFractionDigits: whole ? 0 : 2,
     maximumFractionDigits: whole ? 0 : 2,
   }).format(rupees)}`;
+}
+
+function formatPaise(value: number | null, currency: "INR" | "USD" = "INR") {
+  return formatPrice(value, currency);
 }
 
 function getFeatureNumber(plan: PlanRecord, key: string) {
@@ -162,9 +174,9 @@ function formatIncludedValue(value: number | null, unit: string) {
   return `${value.toLocaleString("en-IN")} ${unit}`;
 }
 
-function getMonthlyDisplayPrice(plan: PlanRecord, billingMode: BillingMode) {
+function getMonthlyDisplayPrice(plan: PlanRecord, billingMode: BillingMode, currency: "INR" | "USD" = "INR") {
   if (plan.priceMonthly === 0) return "Custom";
-  return formatPaise(billingMode === "annual" ? plan.priceAnnual : plan.priceMonthly);
+  return formatPrice(billingMode === "annual" ? plan.priceAnnual : plan.priceMonthly, currency);
 }
 
 function getCardFeatures(plan: PlanRecord) {
@@ -508,25 +520,31 @@ function PricingCard({
   plan,
   index,
   billingMode,
+  currencyMode = "INR",
+  publicConfig,
 }: {
   plan: PlanRecord;
   index: number;
   billingMode: BillingMode;
+  currencyMode?: "INR" | "USD";
+  publicConfig?: any;
 }) {
   const isPopular = plan.isPopular;
   const cardFeatures = getCardFeatures(plan);
-  const setupFee = getSetupFee(plan);
+  const setupFee = currencyMode === "USD" ? null : getSetupFee(plan);
   const minimumMonths = getMinimumMonths(plan);
   const savings = getAnnualSavings(plan);
-  const displayPrice = getMonthlyDisplayPrice(plan, billingMode);
-  const monthlyPrice = formatPaise(plan.priceMonthly);
-  const overageLine = [
-    plan.overageVoicePerMinute !== null ? `${formatPaise(plan.overageVoicePerMinute)}/min` : "",
-    plan.overageChatPerConversation !== null ? `${formatPaise(plan.overageChatPerConversation)}/chat` : "",
-    plan.overageSocialPerPost !== null ? `${formatPaise(plan.overageSocialPerPost)}/post` : "",
-  ]
-    .filter(Boolean)
-    .join(" • ");
+  const displayPrice = getMonthlyDisplayPrice(plan, billingMode, currencyMode);
+  const monthlyPrice = formatPrice(plan.priceMonthly, currencyMode);
+  const overageLine = currencyMode === "USD"
+    ? `${publicConfig?.overage_per_minute_usd_cents ? `$${(parseInt(publicConfig.overage_per_minute_usd_cents, 10) / 100).toFixed(2)}` : "$0.12"}/min`
+    : [
+        plan.overageVoicePerMinute !== null ? `${formatPrice(plan.overageVoicePerMinute, currencyMode)}/min` : "",
+        plan.overageChatPerConversation !== null ? `${formatPrice(plan.overageChatPerConversation, currencyMode)}/chat` : "",
+        plan.overageSocialPerPost !== null ? `${formatPrice(plan.overageSocialPerPost, currencyMode)}/post` : "",
+      ]
+        .filter(Boolean)
+        .join(" • ");
 
   return (
     <motion.div
@@ -572,12 +590,12 @@ function PricingCard({
 
           {billingMode === "annual" && savings ? (
             <div className="mt-[18px] inline-flex rounded-full bg-[rgba(16,185,129,0.12)] px-[10px] py-[4px] font-sans text-[12px] font-medium text-[#34D399]">
-              Save {formatPaise(savings)}/year
+              Save {formatPrice(savings, currencyMode)}/year
             </div>
           ) : null}
         </div>
 
-        {setupFee ? <div className="mt-[8px] font-sans text-[13px] text-[#8D86A8]">One-time setup: {formatPaise(setupFee)}</div> : null}
+        {setupFee ? <div className="mt-[8px] font-sans text-[13px] text-[#8D86A8]">One-time setup: {formatPrice(setupFee, currencyMode)}</div> : null}
         {plan.description ? <p className="mt-[14px] min-h-[42px] font-sans text-[14px] leading-[1.6] text-[#B8B0D1]">{plan.description}</p> : null}
 
         <div className="my-[20px] h-px w-full bg-[#1E0A35]" />
@@ -610,11 +628,21 @@ function PricingCard({
   );
 }
 
-import { useEffect } from 'react';
-
 export default function PricingPage() {
   const { data: dbPlans, loading } = useActivePlans();
   const [publicConfig, setPublicConfig] = useState<any>(null);
+  const [currencyMode, setCurrencyMode] = useState<"INR" | "USD">("INR");
+
+  useEffect(() => {
+    try {
+      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || "";
+      if (tz && !tz.includes("Calcutta") && !tz.includes("Kolkata") && !tz.includes("Asia/Colombo")) {
+        setCurrencyMode("USD");
+      }
+    } catch {
+      // fallback to INR
+    }
+  }, []);
 
   useEffect(() => {
     fetch('/api/public/config')
@@ -628,29 +656,48 @@ export default function PricingPage() {
   }, []);
 
   const plans = useMemo(() => {
-    if (!publicConfig) return dbPlans;
+    if (!publicConfig && !dbPlans.length) return dbPlans;
 
     return dbPlans.map(plan => {
       const p = { ...plan };
-      if (p.slug === 'starter') {
-        p.priceMonthly = parseInt(publicConfig.starter_price_paisa || '499900', 10);
-        p.priceAnnual = Math.round(p.priceMonthly * 0.8);
-        p.includedVoiceMinutes = parseInt(publicConfig.starter_minutes || '500', 10);
-      } else if (p.slug === 'growth') {
-        p.name = 'Professional';
-        p.priceMonthly = parseInt(publicConfig.professional_price_paisa || '1499900', 10);
-        p.priceAnnual = Math.round(p.priceMonthly * 0.8);
-        p.includedVoiceMinutes = parseInt(publicConfig.professional_minutes || '2000', 10);
-      } else if (p.slug === 'scale') {
-        p.name = 'Enterprise';
-        p.priceMonthly = parseInt(publicConfig.enterprise_price_paisa || '0', 10);
-        p.priceAnnual = 0;
-        p.includedVoiceMinutes = parseInt(publicConfig.enterprise_minutes || '10000', 10);
-        p.description = 'Tailored limits, custom integrations, and dedicated SLA for large enterprises.';
+      if (currencyMode === "USD") {
+        if (p.slug === 'starter') {
+          p.priceMonthly = parseInt(publicConfig?.starter_price_usd_cents || '8900', 10);
+          p.priceAnnual = Math.round(p.priceMonthly * 0.8);
+          p.includedVoiceMinutes = parseInt(publicConfig?.starter_minutes || '500', 10);
+        } else if (p.slug === 'growth') {
+          p.name = 'Professional';
+          p.priceMonthly = parseInt(publicConfig?.professional_price_usd_cents || '24900', 10);
+          p.priceAnnual = Math.round(p.priceMonthly * 0.8);
+          p.includedVoiceMinutes = parseInt(publicConfig?.professional_minutes || '2000', 10);
+        } else if (p.slug === 'scale') {
+          p.name = 'Enterprise';
+          p.priceMonthly = parseInt(publicConfig?.enterprise_price_usd_cents || '59900', 10);
+          p.priceAnnual = Math.round(p.priceMonthly * 0.8);
+          p.includedVoiceMinutes = parseInt(publicConfig?.enterprise_minutes || '10000', 10);
+          p.description = 'Global tailored limits, international numbers, and dedicated SLA.';
+        }
+      } else {
+        if (p.slug === 'starter') {
+          p.priceMonthly = parseInt(publicConfig?.starter_price_paisa || '499900', 10);
+          p.priceAnnual = Math.round(p.priceMonthly * 0.8);
+          p.includedVoiceMinutes = parseInt(publicConfig?.starter_minutes || '500', 10);
+        } else if (p.slug === 'growth') {
+          p.name = 'Professional';
+          p.priceMonthly = parseInt(publicConfig?.professional_price_paisa || '1499900', 10);
+          p.priceAnnual = Math.round(p.priceMonthly * 0.8);
+          p.includedVoiceMinutes = parseInt(publicConfig?.professional_minutes || '2000', 10);
+        } else if (p.slug === 'scale') {
+          p.name = 'Enterprise';
+          p.priceMonthly = parseInt(publicConfig?.enterprise_price_paisa || '0', 10);
+          p.priceAnnual = 0;
+          p.includedVoiceMinutes = parseInt(publicConfig?.enterprise_minutes || '10000', 10);
+          p.description = 'Tailored limits, custom integrations, and dedicated SLA for large enterprises.';
+        }
       }
       return p;
     });
-  }, [dbPlans, publicConfig]);
+  }, [dbPlans, publicConfig, currencyMode]);
 
   const { data: siteConfig } = useSiteConfig();
   const [billingMode, setBillingMode] = useState<BillingMode>("monthly");
@@ -693,7 +740,35 @@ export default function PricingPage() {
               Choose the plan that fits your business. Scale anytime.
             </p>
 
-            <div className="mt-[32px] flex justify-center">
+            {/* Currency Selector */}
+            <div className="mt-[28px] flex justify-center">
+              <div className="inline-flex items-center gap-1 rounded-full border border-[#1E0A35] bg-[#130224] p-[3px] shadow-[0_0_20px_rgba(139,92,246,0.08)]">
+                <button
+                  type="button"
+                  onClick={() => setCurrencyMode("INR")}
+                  className={`flex items-center gap-1.5 px-3.5 py-1 rounded-full text-xs font-semibold transition-all ${
+                    currencyMode === "INR"
+                      ? "bg-[#8B5CF6] text-white shadow-sm"
+                      : "text-[#8D86A8] hover:text-[#FAF7FF]"
+                  }`}
+                >
+                  <span>🇮🇳</span> India (INR ₹)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCurrencyMode("USD")}
+                  className={`flex items-center gap-1.5 px-3.5 py-1 rounded-full text-xs font-semibold transition-all ${
+                    currencyMode === "USD"
+                      ? "bg-[#8B5CF6] text-white shadow-sm"
+                      : "text-[#8D86A8] hover:text-[#FAF7FF]"
+                  }`}
+                >
+                  <span>🌐</span> Global (USD $)
+                </button>
+              </div>
+            </div>
+
+            <div className="mt-[20px] flex justify-center">
               <div className="relative flex h-[44px] w-full max-w-[280px] items-center rounded-full border border-[#1E0A35] bg-[#130224] p-[4px] shadow-[0_0_20px_rgba(139,92,246,0.05)]">
                 <motion.div
                   className="absolute bottom-[4px] top-[4px] rounded-full bg-[#8B5CF6]"
@@ -747,7 +822,14 @@ export default function PricingPage() {
             <section className="px-[20px] pb-[54px]">
               <div className="mx-auto grid max-w-[1180px] grid-cols-1 items-stretch gap-[24px] lg:grid-cols-3">
                 {plans.map((plan, index) => (
-                  <PricingCard key={plan.slug} plan={plan} index={index} billingMode={billingMode} />
+                  <PricingCard 
+                    key={plan.slug} 
+                    plan={plan} 
+                    index={index} 
+                    billingMode={billingMode} 
+                    currencyMode={currencyMode}
+                    publicConfig={publicConfig}
+                  />
                 ))}
               </div>
             </section>

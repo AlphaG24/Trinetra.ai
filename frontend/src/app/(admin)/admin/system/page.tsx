@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { ApiKeyManager } from '@/components/admin/ApiKeyManager'
 import { 
   Sliders, Key, Send, CreditCard, RefreshCw, Save, Loader2, AlertTriangle,
-  Gift, DollarSign, ShieldAlert, Cpu, Percent, WrenchIcon
+  Gift, DollarSign, ShieldAlert, Cpu, Percent, WrenchIcon, Globe
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { createClient } from '@/lib/client'
@@ -41,6 +41,14 @@ export default function SystemConfigPage() {
     inbound_number_cost_paisa: '49900',
     overage_per_minute_paisa: '200',
     maintenance_mode: 'false',
+
+    // International (USD) plan pricing & numbers
+    starter_price_usd_cents: '8900',
+    professional_price_usd_cents: '24900',
+    enterprise_price_usd_cents: '59900',
+    trial_price_usd_cents: '500',
+    foreign_number_cost_usd_cents: '1500',
+    overage_per_minute_usd_cents: '12',
   })
 
   const [loading, setLoading] = useState(true)
@@ -140,6 +148,17 @@ export default function SystemConfigPage() {
     const rupees = parseFloat(rupeeValueStr || '0')
     const paisa = isNaN(rupees) ? 0 : Math.round(rupees * 100)
     handleChange(key, String(paisa))
+  }
+
+  const displayDollars = (centsStr: string) => {
+    const cents = parseInt(centsStr || '0', 10)
+    return isNaN(cents) ? 0 : cents / 100
+  }
+
+  const handleDollarChange = (key: string, dollarValueStr: string) => {
+    const dollars = parseFloat(dollarValueStr || '0')
+    const cents = isNaN(dollars) ? 0 : Math.round(dollars * 100)
+    handleChange(key, String(cents))
   }
 
   const handleRotateSingle = (key: string) => {
@@ -405,6 +424,86 @@ export default function SystemConfigPage() {
                   value={configs.enterprise_minutes || ''}
                   onChange={(e) => handleChange('enterprise_minutes', e.target.value)}
                   className="w-full bg-black border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:border-violet-500 outline-none"
+                  min="0"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* INTERNATIONAL (USD) PLAN PRICING */}
+        <div className="bg-zinc-950/60 border border-zinc-900 rounded-2xl p-6 space-y-6">
+          <h2 className="text-sm font-bold text-white uppercase tracking-wider border-b border-zinc-900 pb-3 flex items-center gap-2">
+            <Globe className="w-4 h-4 text-sky-400" />
+            International (USD) Plan Pricing
+          </h2>
+
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Global Starter Price ($/mo)</label>
+                <input 
+                  type="number"
+                  value={displayDollars(configs.starter_price_usd_cents || '8900')}
+                  onChange={(e) => handleDollarChange('starter_price_usd_cents', e.target.value)}
+                  className="w-full bg-black border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:border-sky-500 outline-none"
+                  min="0"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Global Pro Price ($/mo)</label>
+                <input 
+                  type="number"
+                  value={displayDollars(configs.professional_price_usd_cents || '24900')}
+                  onChange={(e) => handleDollarChange('professional_price_usd_cents', e.target.value)}
+                  className="w-full bg-black border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:border-sky-500 outline-none"
+                  min="0"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Global Enterprise ($/mo)</label>
+                <input 
+                  type="number"
+                  value={displayDollars(configs.enterprise_price_usd_cents || '59900')}
+                  onChange={(e) => handleDollarChange('enterprise_price_usd_cents', e.target.value)}
+                  className="w-full bg-black border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:border-sky-500 outline-none"
+                  min="0"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Global Trial Price ($)</label>
+                <input 
+                  type="number"
+                  value={displayDollars(configs.trial_price_usd_cents || '500')}
+                  onChange={(e) => handleDollarChange('trial_price_usd_cents', e.target.value)}
+                  className="w-full bg-black border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:border-sky-500 outline-none"
+                  min="0"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Foreign Number Cost ($/mo)</label>
+                <input 
+                  type="number"
+                  value={displayDollars(configs.foreign_number_cost_usd_cents || '1500')}
+                  onChange={(e) => handleDollarChange('foreign_number_cost_usd_cents', e.target.value)}
+                  className="w-full bg-black border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:border-sky-500 outline-none"
+                  min="0"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Overage Rate ($/min)</label>
+                <input 
+                  type="number"
+                  step="0.01"
+                  value={displayDollars(configs.overage_per_minute_usd_cents || '12')}
+                  onChange={(e) => handleDollarChange('overage_per_minute_usd_cents', e.target.value)}
+                  className="w-full bg-black border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:border-sky-500 outline-none"
                   min="0"
                 />
               </div>

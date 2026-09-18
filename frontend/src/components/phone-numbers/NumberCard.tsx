@@ -34,6 +34,8 @@ export interface NumberCardProps {
   isPoolItem?: boolean;
   isBuying?: boolean;
   hasWinningBid?: boolean;
+  hasIncludedSlot?: boolean;
+  onClaimIncluded?: (num: any) => void;
 }
 
 export function NumberCard({ 
@@ -45,7 +47,9 @@ export function NumberCard({
   onClaimBid,
   isPoolItem = false,
   isBuying = false,
-  hasWinningBid = false
+  hasWinningBid = false,
+  hasIncludedSlot = false,
+  onClaimIncluded
 }: NumberCardProps) {
   const [copied, setCopied] = useState(false);
 
@@ -178,6 +182,14 @@ export function NumberCard({
               className="px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs uppercase tracking-wider transition-all shadow-sm shadow-emerald-600/20"
             >
               {phoneNumber.is_assigned ? "Bid for Next Cycle" : "Bid Now"}
+            </button>
+          ) : hasIncludedSlot ? (
+            <button
+              onClick={() => onClaimIncluded && onClaimIncluded(phoneNumber)}
+              disabled={isBuying}
+              className="px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs uppercase tracking-wider transition-all shadow-sm shadow-emerald-600/20"
+            >
+              {isBuying ? "Claiming..." : "Claim with Plan (₹0)"}
             </button>
           ) : (
             <button

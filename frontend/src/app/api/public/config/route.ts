@@ -26,7 +26,10 @@ export async function GET() {
       "professional_price_paisa", "professional_minutes",
       "enterprise_price_paisa", "enterprise_minutes",
       "max_agents_free", "max_agents_starter", "max_agents_professional",
-      "inbound_number_cost_paisa", "overage_per_minute_paisa"
+      "inbound_number_cost_paisa", "overage_per_minute_paisa",
+      "starter_price_usd_cents", "professional_price_usd_cents",
+      "enterprise_price_usd_cents", "trial_price_usd_cents",
+      "foreign_number_cost_usd_cents", "overage_per_minute_usd_cents"
     ]
 
     const configMap: Record<string, string> = {}

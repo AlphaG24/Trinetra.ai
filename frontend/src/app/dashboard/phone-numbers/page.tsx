@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { 
   Phone, Zap, ChevronDown, ChevronUp, Globe, MapPin, 
   Smartphone, CreditCard, Check, Copy, HelpCircle, AlertCircle,
-  Search, RefreshCw, SlidersHorizontal, XCircle, Info, PhoneCall, ShoppingBag
+  Search, RefreshCw, SlidersHorizontal, XCircle, Info, PhoneCall, ShoppingBag, Sparkles
 } from "lucide-react";
 import { NumberCard } from "@/src/components/phone-numbers/NumberCard";
 import { ManageNumberModal } from "@/src/components/phone-numbers/ManageNumberModal";
@@ -220,6 +220,28 @@ export default function PhoneNumbersPage() {
     fetchPoolNumbers();
     fetchAgents();
   }, []);
+
+  const handleClaimIncludedNumber = async (poolNum: any) => {
+    try {
+      setBuyingId(poolNum.id);
+      const res = await fetch("/api/phone-numbers/claim-included", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ number_id: poolNum.id })
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to claim included number");
+
+      toast.success(data.message || "Phone line secured successfully with your plan!");
+      fetchPurchasedNumbers();
+      fetchPoolNumbers();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to claim number");
+    } finally {
+      setBuyingId(null);
+    }
+  };
 
   const handleBuyPoolNumber = async (poolNum: any) => {
     const isAtLimit = Array.isArray(numbers) ? numbers.length >= maxLimit : false;
@@ -534,6 +556,24 @@ export default function PhoneNumbersPage() {
           </div>
         </div>
 
+        {Array.isArray(numbers) && numbers.length < maxLimit && (
+          <div className="mb-6 p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
+                <Sparkles size={20} />
+              </div>
+              <div>
+                <h4 className="text-sm font-bold text-[var(--heading)]">
+                  You have {maxLimit - numbers.length} included phone {maxLimit - numbers.length === 1 ? "line" : "lines"} ready to claim!
+                </h4>
+                <p className="text-xs text-[var(--muted)]">
+                  Your plan or purchased pack includes numbers at no extra charge. Click &quot;Claim with Plan (₹0)&quot; on any available line below.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {poolLoading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {[1, 2, 3].map((i) => (
@@ -581,8 +621,10 @@ export default function PhoneNumbersPage() {
                     renewal_date: num.renewal_date
                   }}
                   isPoolItem={true}
+                  hasIncludedSlot={Array.isArray(numbers) && numbers.length < maxLimit}
                   isBuying={buyingId === num.id}
                   onBuyNow={handleBuyPoolNumber}
+                  onClaimIncluded={handleClaimIncludedNumber}
                   onPlaceBid={() => handleOpenBidModal(num)}
                   onClaimBid={() => handleClaimBid(num)}
                 />

@@ -457,49 +457,87 @@ export async function POST(request: Request) {
                 }
               }
             } else if (prod.type === 'phone_number') {
-              additionalNumbersToAdd += prod.quantity * item.quantity
+              const countNeeded = prod.quantity * item.quantity;
+              additionalNumbersToAdd += countNeeded;
 
-              // Automatically provision phone numbers JIT
-              const fastApiUrl = process.env.NEXT_PUBLIC_FASTAPI_URL || 'http://127.0.0.1:8000';
-              const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-              for (let i = 0; i < prod.quantity * item.quantity; i++) {
+              // Claim numbers directly from pre-stocked admin inventory
+              for (let i = 0; i < countNeeded; i++) {
                 try {
-                  const fastApiBody = {
-                    organization_id: profile.organization_id || null,
-                    did_type: 'mobile',
-                    provider: profile.country === 'IN' ? 'exotel' : 'twilio',
-                    user_id: user.id,
-                    area_code: profile.country === 'IN' ? '022' : '212'
-                  };
+                  const targetProvider = profile.country === 'IN' ? 'exotel' : 'twilio';
+                  
+                  // Query for an unassigned number in inventory for this provider
+                  let { data: availableNumber } = await adminClient
+                    .from('phone_numbers')
+                    .select('*')
+                    .eq('is_assigned', false)
+                    .eq('status', 'available')
+                    .eq('provider', targetProvider)
+                    .limit(1)
+                    .maybeSingle();
 
-                  const backendResponse = await fetch(`${fastApiUrl}/api/numbers/provision`, {
-                    method: 'POST',
-                    headers: {
-                      'Content-Type': 'application/json',
-                      'Authorization': `Bearer ${serviceRoleKey}`
-                    },
-                    body: JSON.stringify(fastApiBody)
-                  });
+                  // Fallback to any unassigned available number in stock
+                  if (!availableNumber) {
+                    const { data: fallbackNum } = await adminClient
+                      .from('phone_numbers')
+                      .select('*')
+                      .eq('is_assigned', false)
+                      .eq('status', 'available')
+                      .limit(1)
+                      .maybeSingle();
+                    availableNumber = fallbackNum;
+                  }
 
-                  if (backendResponse.ok) {
-                    const backendData = await backendResponse.json();
-                    const phoneData = backendData.data?.phone_number || backendData;
-                    
+                  if (availableNumber) {
+                    // Claim and assign to this user's organization
+                    await adminClient
+                      .from('phone_numbers')
+                      .update({
+                        is_assigned: true,
+                        status: 'active',
+                        organization_id: profile.organization_id || null,
+                        assigned_org_id: profile.organization_id || null,
+                        assigned_at: new Date().toISOString()
+                      })
+                      .eq('id', availableNumber.id);
+
+                    // If user has an agent that has no assigned number yet, auto-link it
+                    if (profile.organization_id) {
+                      const { data: orgAgents } = await adminClient
+                        .from('agents')
+                        .select('id')
+                        .eq('organization_id', profile.organization_id)
+                        .neq('status', 'deleted')
+                        .limit(1);
+
+                      if (orgAgents && orgAgents.length > 0) {
+                        const agentId = orgAgents[0].id;
+                        try {
+                          await adminClient.from('agent_phone_numbers').insert({
+                            agent_id: agentId,
+                            phone_number_id: availableNumber.id,
+                            is_primary: true
+                          });
+                          await adminClient.from('phone_numbers').update({ assigned_agent_id: agentId }).eq('id', availableNumber.id);
+                        } catch (linkErr) {
+                          console.warn('[Verify Payment] Could not auto-link agent to claimed number:', linkErr);
+                        }
+                      }
+                    }
+
                     // Insert activity log
                     await adminClient.from("activity_log").insert({
                       user_id: user.id,
                       organization_id: profile.organization_id || null,
                       activity_type: 'number_provisioned',
-                      title: 'Phone Number Provisioned',
-                      description: `Provisioned ${phoneData.phone_number || 'a number'} (${phoneData.city || 'local'}, ${phoneData.did_type || 'mobile'})`
+                      title: 'Pack Phone Number Assigned',
+                      description: `Assigned number ${availableNumber.phone_number} from purchased package`
                     });
-                    console.log('[Verify Payment] Automatically provisioned number:', phoneData.phone_number);
+                    console.log('[Verify Payment] Automatically assigned pre-stocked number from package:', availableNumber.phone_number);
                   } else {
-                    console.error('[Verify Payment] Phone provisioning backend returned error:', await backendResponse.text());
+                    console.log('[Verify Payment] Inventory currently empty; user credited with number entitlement slot to claim from catalog.');
                   }
                 } catch (provisionErr: any) {
-                  console.error('[Verify Payment] Failed to provision phone number during bundle payment:', provisionErr.message);
+                  console.error('[Verify Payment] Failed to claim phone number during bundle payment:', provisionErr.message);
                 }
               }
             }
