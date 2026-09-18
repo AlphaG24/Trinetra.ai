@@ -1716,7 +1716,7 @@ async def telephony_audio_stream(websocket: WebSocket, room_name: Optional[str] 
     call_sid = uuid.uuid4().hex[:8]
     stream_sid = None
 
-    # Wait for initial setup messages from carrier (Exotel sends 'connected' then 'start' with caller phone)
+    # Wait for initial setup messages from carrier (Twilio sends 'connected' then 'start', Exotel sends 'connected' then 'start')
     start_deadline = time.perf_counter() + 2.0
     while time.perf_counter() < start_deadline:
         try:
@@ -1725,18 +1725,29 @@ async def telephony_audio_stream(websocket: WebSocket, room_name: Optional[str] 
             msg_obj = json.loads(raw)
             buffered_msgs.append(msg_obj)
 
-            m_sid = (
-                msg_obj.get("call_sid") or msg_obj.get("CallSid") or 
-                msg_obj.get("stream_sid") or msg_obj.get("streamSid") or
-                (msg_obj.get("start", {}).get("call_sid") if isinstance(msg_obj.get("start"), dict) else None) or
-                (msg_obj.get("start", {}).get("streamSid") if isinstance(msg_obj.get("start"), dict) else None)
+            start_dict = msg_obj.get("start", {}) if isinstance(msg_obj.get("start"), dict) else {}
+
+            # Separate stream_sid (stream identifier) from call_sid (call identifier)
+            ext_stream = (
+                msg_obj.get("streamSid") or 
+                start_dict.get("streamSid") or 
+                msg_obj.get("stream_sid") or 
+                start_dict.get("stream_sid")
             )
-            if m_sid:
-                call_sid = m_sid
-                stream_sid = m_sid
+            if ext_stream:
+                stream_sid = str(ext_stream).strip()
+
+            ext_call = (
+                start_dict.get("callSid") or 
+                start_dict.get("call_sid") or 
+                msg_obj.get("callSid") or 
+                msg_obj.get("CallSid") or 
+                msg_obj.get("call_sid")
+            )
+            if ext_call:
+                call_sid = str(ext_call).strip()
 
             if not caller_phone:
-                start_dict = msg_obj.get("start", {}) if isinstance(msg_obj.get("start"), dict) else {}
                 custom_p = start_dict.get("customParameters", {}) if isinstance(start_dict.get("customParameters"), dict) else {}
                 inferred = (
                     custom_p.get("From") or custom_p.get("from") or custom_p.get("CallFrom") or
@@ -1762,7 +1773,9 @@ async def telephony_audio_stream(websocket: WebSocket, room_name: Optional[str] 
         # Route to India Sales Agent assigned to 09513886363
         room_name = f"exotel--dd4da4c1-9deb-4047-8927-5e12402e6b1f--{caller_tag}--{call_sid}"
 
-    print(f"[WebSocket] Telephony caller ({caller_phone or clean_caller or 'Unknown'}) connected to room: {room_name}", flush=True)
+    is_exotel = ("exotel" in str(websocket.url.path)) or (room_name is not None and "exotel" in room_name)
+    provider_name = "exotel" if is_exotel else "twilio"
+    print(f"[{provider_name.upper()} WebSocket] Caller ({caller_phone or clean_caller or 'Unknown'}) connected to room: {room_name} (call_sid={call_sid}, stream_sid={stream_sid})", flush=True)
 
     # Lookup caller name from customer_contacts if available
     caller_name = None
@@ -1776,13 +1789,42 @@ async def telephony_audio_stream(websocket: WebSocket, room_name: Optional[str] 
         except Exception:
             pass
 
-    # Pre-record voice_calls entry immediately
-    async def _pre_record_exotel_call():
+    # Pre-record or link voice_calls entry without creating duplicate records for outbound calls
+    async def _pre_record_telephony_call():
         try:
+            # Check if an outbound call record already exists for this room
+            existing = await asyncio.to_thread(
+                supabase_admin.table("voice_calls")
+                .select("id, metadata")
+                .eq("metadata->>room_name", room_name)
+                .limit(1)
+                .execute
+            )
+            if existing.data:
+                ex_id = existing.data[0]["id"]
+                ex_meta = existing.data[0].get("metadata") or {}
+                ex_meta["provider_call_id"] = call_sid
+                ex_meta["session_id"] = call_sid
+                if stream_sid:
+                    ex_meta["stream_sid"] = stream_sid
+                ex_meta["provider"] = provider_name
+                await asyncio.to_thread(
+                    supabase_admin.table("voice_calls")
+                    .update({
+                        "status": "in_progress",
+                        "metadata": ex_meta
+                    })
+                    .eq("id", ex_id)
+                    .execute
+                )
+                print(f"[Telephony WebSocket] Linked existing outbound voice_call {ex_id} for room {room_name}", flush=True)
+                return
+
+            # Inbound call: create fresh voice_call entry
             await asyncio.to_thread(
                 supabase_admin.table("voice_calls").insert({
                     "user_id": "9363a829-8d11-42ae-bfff-d8ea5c17a71b",
-                    "agent_id": "dd4da4c1-9deb-4047-8927-5e12402e6b1f",
+                    "agent_id": agent_to_run,
                     "organization_id": "b1ddf1e9-abc1-4ff4-90f5-3ac66913738a",
                     "caller_phone": clean_caller or caller_phone or "Unknown",
                     "caller_name": caller_name,
@@ -1791,13 +1833,14 @@ async def telephony_audio_stream(websocket: WebSocket, room_name: Optional[str] 
                         "room_name": room_name,
                         "provider_call_id": call_sid,
                         "session_id": call_sid,
-                        "provider": "exotel"
+                        "stream_sid": stream_sid,
+                        "provider": provider_name
                     }
                 }).execute
             )
         except Exception as vc_err:
             print(f"[Pre-record Call Warning] {vc_err}", flush=True)
-    asyncio.create_task(_pre_record_exotel_call())
+    asyncio.create_task(_pre_record_telephony_call())
 
     # 1. Connect to LiveKit room cleanly (without asyncio.wait_for to prevent Rust FFI panics on cancellation)
     room = rtc.Room()
@@ -1945,10 +1988,16 @@ async def telephony_audio_stream(websocket: WebSocket, room_name: Optional[str] 
                         pcm_buffer.clear()
                     if stream_sid and not is_ws_closed:
                         try:
-                            await websocket.send_json({
-                                "event": "clear",
-                                "streamSid": stream_sid
-                            })
+                            if is_exotel:
+                                await websocket.send_json({
+                                    "event": "clear",
+                                    "stream_sid": stream_sid
+                                })
+                            else:
+                                await websocket.send_json({
+                                    "event": "clear",
+                                    "streamSid": stream_sid
+                                })
                         except Exception:
                             pass
                 asyncio.create_task(flush_twilio())
@@ -2068,15 +2117,25 @@ async def telephony_audio_stream(websocket: WebSocket, room_name: Optional[str] 
 
                 speech_frames_sent += 1
 
-                msg_out = {
-                    "event": "media",
-                    "media": {
-                        "payload": out_payload
+                if is_exotel:
+                    msg_out = {
+                        "event": "media",
+                        "stream_sid": stream_sid,
+                        "media": {
+                            "payload": out_payload
+                        }
                     }
-                }
-                if stream_sid:
-                    msg_out["streamSid"] = stream_sid
-                    msg_out["stream_sid"] = stream_sid
+                else:
+                    if not stream_sid:
+                        # Twilio strictly requires streamSid; do not send media packet without it
+                        continue
+                    msg_out = {
+                        "event": "media",
+                        "streamSid": stream_sid,
+                        "media": {
+                            "payload": out_payload
+                        }
+                    }
                 await websocket.send_json(msg_out)
 
                 if speech_frames_sent % (30 if is_exotel else 150) == 1:
@@ -2111,14 +2170,24 @@ async def telephony_audio_stream(websocket: WebSocket, room_name: Optional[str] 
             if event in ("start", "connected"):
                 start_data = msg.get("start", {}) if isinstance(msg.get("start"), dict) else {}
                 custom_p = start_data.get("customParameters", {}) if isinstance(start_data.get("customParameters"), dict) else {}
-                stream_sid = (
+                ext_stream = (
                     start_data.get("streamSid") or 
                     start_data.get("stream_sid") or 
                     msg.get("streamSid") or 
-                    msg.get("stream_sid") or
-                    msg.get("call_sid") or
-                    msg.get("callSid")
+                    msg.get("stream_sid")
                 )
+                if ext_stream:
+                    stream_sid = str(ext_stream).strip()
+
+                ext_call = (
+                    start_data.get("callSid") or 
+                    start_data.get("call_sid") or 
+                    msg.get("callSid") or 
+                    msg.get("call_sid")
+                )
+                if ext_call:
+                    call_sid = str(ext_call).strip()
+
                 inferred_phone = (
                     custom_p.get("From") or custom_p.get("from") or custom_p.get("CallFrom") or
                     start_data.get("from") or start_data.get("From") or start_data.get("caller") or
@@ -2138,9 +2207,13 @@ async def telephony_audio_stream(websocket: WebSocket, room_name: Optional[str] 
                         except Exception:
                             pass
                     asyncio.create_task(_update_vc())
-                print(f"[Telephony WebSocket] Media stream active: {stream_sid}", flush=True)
+                print(f"[Telephony WebSocket] Media stream active: stream_sid={stream_sid}, call_sid={call_sid}", flush=True)
 
             elif event == "media":
+                if not stream_sid:
+                    media_sid = msg.get("streamSid") or msg.get("stream_sid")
+                    if media_sid:
+                        stream_sid = str(media_sid).strip()
                 media = msg.get("media", {})
                 payload_b64 = media.get("payload")
                 if payload_b64:
