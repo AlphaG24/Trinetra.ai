@@ -1455,9 +1455,9 @@ async def handle_twilio_voice_status(
                     recording_url = f"{recording_url}.mp3"
                 update_payload["recording_url"] = recording_url
 
-            res = supabase_admin.table("voice_calls").update(update_payload).eq("provider_call_id", call_sid).execute()
+            res = supabase_admin.table("voice_calls").update(update_payload).eq("metadata->>provider_call_id", call_sid).execute()
             if not getattr(res, "data", None):
-                supabase_admin.table("voice_calls").update(update_payload).eq("metadata->>provider_call_id", call_sid).execute()
+                res = supabase_admin.table("voice_calls").update(update_payload).eq("metadata->>session_id", call_sid).execute()
 
             # Proactive fallback: fetch recording directly from Twilio REST API if not yet received via webhook
             if call_status == "completed" and not recording_url and call_sid and not call_sid.startswith("mock"):
@@ -1470,21 +1470,42 @@ async def handle_twilio_voice_status(
                             recordings = await asyncio.to_thread(lambda: tw_svc.client.calls(sid).recordings.list())
                             if recordings and len(recordings) > 0:
                                 rec = recordings[0]
-                                r_uri = getattr(rec, "uri", "") or ""
-                                rec_url = f"https://api.twilio.com{r_uri.replace('.json', '.mp3')}"
-                                supabase_admin.table("voice_calls").update({"recording_url": rec_url}).eq("provider_call_id", sid).execute()
-                                try:
-                                    supabase_admin.table("calls").update({"recording_url": rec_url}).eq("session_id", sid).execute()
-                                except Exception:
-                                    pass
-                                print(f"[Twilio Status Webhook] Proactively fetched & stored recording for {sid}: {rec_url}", flush=True)
+                                rec_sid = getattr(rec, "sid", "") or ""
+                                if not rec_sid and getattr(rec, "uri", ""):
+                                    rec_sid = rec.uri.split("/")[-1].replace(".json", "")
+                                if rec_sid:
+                                    rec_url = f"/api/recordings/twilio/{rec_sid}.mp3"
+                                    # Cache recording file locally
+                                    try:
+                                        rec_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "recordings")
+                                        os.makedirs(rec_dir, exist_ok=True)
+                                        rec_file = os.path.join(rec_dir, f"{rec_sid}.mp3")
+                                        if not os.path.exists(rec_file):
+                                            async with httpx.AsyncClient(timeout=30.0) as dl_client:
+                                                tw_url = f"https://api.twilio.com/2010-04-01/Accounts/{tw_svc.account_sid}/Recordings/{rec_sid}.mp3"
+                                                tw_resp = await dl_client.get(tw_url, auth=(tw_svc.account_sid, tw_svc.auth_token), follow_redirects=True)
+                                                if tw_resp.status_code == 200 and len(tw_resp.content) > 500:
+                                                    with open(rec_file, "wb") as rf:
+                                                        rf.write(tw_resp.content)
+                                    except Exception as dl_err:
+                                        print(f"[Twilio Audio Download Notice] {dl_err}", flush=True)
+
+                                    supabase_admin.table("voice_calls").update({"recording_url": rec_url}).eq("metadata->>provider_call_id", sid).execute()
+                                    supabase_admin.table("voice_calls").update({"recording_url": rec_url}).eq("metadata->>session_id", sid).execute()
+                                    try:
+                                        supabase_admin.table("calls").update({"recording_url": rec_url}).eq("session_id", sid).execute()
+                                    except Exception:
+                                        pass
+                                    print(f"[Twilio Status Webhook] Proactively fetched & stored recording for {sid}: {rec_url}", flush=True)
                     except Exception as f_err:
                         print(f"[Twilio Status Webhook] Proactive recording fetch notice for {sid}: {f_err}", flush=True)
                 asyncio.create_task(_fetch_twilio_recording_fallback(call_sid))
 
             # Also update campaign_contacts immediately
             try:
-                vc = supabase_admin.table("voice_calls").select("metadata, id").or_(f"provider_call_id.eq.{call_sid},metadata->>provider_call_id.eq.{call_sid}").limit(1).execute()
+                vc = supabase_admin.table("voice_calls").select("metadata, id").eq("metadata->>provider_call_id", call_sid).limit(1).execute()
+                if not getattr(vc, "data", None):
+                    vc = supabase_admin.table("voice_calls").select("metadata, id").eq("metadata->>session_id", call_sid).limit(1).execute()
                 if vc and getattr(vc, "data", None) and len(vc.data) > 0 and isinstance(vc.data[0], dict) and vc.data[0].get("metadata"):
                     cid = vc.data[0]["metadata"].get("contact_id")
                     camp_id = vc.data[0]["metadata"].get("campaign_id")
@@ -1559,25 +1580,21 @@ async def handle_twilio_voice_recording(
 
         print(f"[Twilio Recording Webhook] Call: {call_sid} | RecSid: {recording_sid} | URL: {recording_url}", flush=True)
 
-        if call_sid and recording_url:
-            if not recording_url.endswith(".mp3") and "twilio.com" in recording_url:
-                recording_url = f"{recording_url}.mp3"
-            update_payload = {"recording_url": recording_url}
-            # 1. Update indexed provider_call_id column
-            res = supabase_admin.table("voice_calls").update(update_payload).eq("provider_call_id", call_sid).execute()
-            # 2. Fallback to metadata->>provider_call_id
-            if not getattr(res, "data", None):
-                res = supabase_admin.table("voice_calls").update(update_payload).eq("metadata->>provider_call_id", call_sid).execute()
-            # 3. Fallback to session_id / metadata->>session_id
-            if not getattr(res, "data", None):
-                res = supabase_admin.table("voice_calls").update(update_payload).eq("session_id", call_sid).execute()
-            if not getattr(res, "data", None):
-                supabase_admin.table("voice_calls").update(update_payload).eq("metadata->>session_id", call_sid).execute()
+        if call_sid and (recording_url or recording_sid):
+            rec_sid = recording_sid
+            if not rec_sid and recording_url:
+                rec_sid = recording_url.split("/")[-1].replace(".json", "").replace(".mp3", "")
+            
+            stored_url = f"/api/recordings/twilio/{rec_sid}.mp3" if rec_sid else recording_url
+
+            update_payload = {"recording_url": stored_url}
+            supabase_admin.table("voice_calls").update(update_payload).eq("metadata->>provider_call_id", call_sid).execute()
+            supabase_admin.table("voice_calls").update(update_payload).eq("metadata->>session_id", call_sid).execute()
             try:
-                supabase_admin.table("calls").update({"recording_url": recording_url}).eq("session_id", call_sid).execute()
+                supabase_admin.table("calls").update({"recording_url": stored_url}).eq("session_id", call_sid).execute()
             except Exception:
                 pass
-            print(f"[Twilio Recording Webhook] Successfully stored recording_url {recording_url} for call {call_sid} in voice_calls", flush=True)
+            print(f"[Twilio Recording Webhook] Successfully stored recording_url {stored_url} for call {call_sid} in voice_calls", flush=True)
 
         return Response(content="<Response/>", media_type="application/xml")
     except Exception as e:
@@ -1724,6 +1741,46 @@ async def serve_call_recording(filename: str):
 
     return FileResponse(filepath, media_type=media_type)
 
+
+@router.get("/api/voice/recordings/twilio/{recording_sid}.mp3")
+@router.get("/recordings/twilio/{recording_sid}.mp3")
+async def proxy_twilio_recording(recording_sid: str):
+    """
+    Streams Twilio recording MP3 audio authenticated with Twilio AccountSid & AuthToken.
+    Supports HTTP Range requests for in-browser seeking and scrubbing.
+    Caches the audio file locally in recordings/ directory for instant repeat playback.
+    """
+    recordings_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "recordings")
+    os.makedirs(recordings_dir, exist_ok=True)
+    safe_sid = re.sub(r'[^a-zA-Z0-9_-]', '', recording_sid.replace('.mp3', ''))
+    local_file = os.path.join(recordings_dir, f"{safe_sid}.mp3")
+
+    if os.path.exists(local_file) and os.path.getsize(local_file) > 1000:
+        return FileResponse(local_file, media_type="audio/mpeg")
+
+    from app.services.config_service import ConfigService
+    account_sid = ConfigService.get("TWILIO_ACCOUNT_SID") or os.getenv("TWILIO_ACCOUNT_SID")
+    auth_token = ConfigService.get("TWILIO_AUTH_TOKEN") or os.getenv("TWILIO_AUTH_TOKEN")
+    if not account_sid or not auth_token:
+        raise HTTPException(status_code=500, detail="Twilio credentials not configured")
+
+    twilio_url = f"https://api.twilio.com/2010-04-01/Accounts/{account_sid}/Recordings/{safe_sid}.mp3"
+
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            resp = await client.get(twilio_url, auth=(account_sid, auth_token), follow_redirects=True)
+            if resp.status_code == 200 and len(resp.content) > 500:
+                with open(local_file, "wb") as f:
+                    f.write(resp.content)
+                return FileResponse(local_file, media_type="audio/mpeg")
+            else:
+                print(f"[Twilio Audio Proxy] Twilio returned status {resp.status_code} for {safe_sid}", flush=True)
+                raise HTTPException(status_code=resp.status_code, detail="Twilio recording not accessible")
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[Twilio Audio Proxy] Error fetching recording {safe_sid}: {e}", flush=True)
+        raise HTTPException(status_code=502, detail=f"Failed to fetch Twilio audio: {str(e)}")
 
 
 # --- TWILIO BI-DIRECTIONAL WEBSOCKET AUDIO BRIDGE ---

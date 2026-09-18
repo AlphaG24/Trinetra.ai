@@ -241,27 +241,49 @@ def clean_ssml(text: str, is_transcript: bool = False) -> str:
     text = text.replace('\u00a0', ' ')
     # Clean up double punctuation and spacing before punctuation
     text = re.sub(r'[,;]\s*[,;]', ',', text)
-    text = re.sub(r'\s+([,!?\.])', r'\1', text)
+    # Normalize 24/7 so Indian TTS speaks naturally instead of "chaubis by saat"
+    text = re.sub(r'\b24/7\b', 'twenty-four seven', text)
+    text = re.sub(r'24/7', 'twenty-four seven', text)
     # Clean whitespace
     text = re.sub(r'\s+', ' ', text).strip()
     return text
 
 def fix_gender_verbs(text: str, gender: str) -> str:
-    """Post-process LLM output to enforce gender-consistent Hindi/Hinglish verb forms.
-    Corrects male verbs when agent is female and vice-versa."""
-    if not text or not gender:
+    """Post-process LLM output and TTS text to enforce gender-consistent Hindi/Hinglish verb forms
+    and natural spoken pronunciation (e.g. 24/7 -> twenty-four seven)."""
+    if not text:
         return text
+    # Fix 24/7 pronunciation so TTS never says 'chaubis by saat'
+    text = re.sub(r'\b24/7\b', 'twenty-four seven', text)
+    text = re.sub(r'24/7', 'twenty-four seven', text)
+    text = re.sub(r'२४/७', '24 घंटे', text)
+
+    if not gender:
+        return text
+
     if gender == 'female':
         # male -> female verb corrections
         text = re.sub(r'\b(samajh|bol|kar|dekh|sun|bata|soch|likh|padh|ja)\s+raha\s+(hoon|hu|hun|hoo)\b', r'\1 rahi \2', text, flags=re.IGNORECASE)
         text = re.sub(r'\brha\s+(hu|hoon|hun|hoo)\b', r'rahi \1', text, flags=re.IGNORECASE)
         text = re.sub(r'\b(samajh|kar|dekh|bol|sun|bata|soch|le|de|ja)\s+sakta\s+(hoon|hu|hun|hoo)\b', r'\1 sakti \2', text, flags=re.IGNORECASE)
-        text = re.sub(r'\b(karta|chahta|samajhta|dekhta|sochta|bolta|sunta|jaanta|maanta)\s+(hoon|hu|hun|hoo)\b', 
+        text = re.sub(r'\b(karta|chahta|samajhta|dekhta|sochta|bolta|sunta|jaanta|maanta|batata|dikhata)\s+(hoon|hu|hun|hoo)\b', 
                        lambda m: m.group(1).rstrip('a') + 'i ' + m.group(2), text, flags=re.IGNORECASE)
+        text = re.sub(r'\bbhej\s+deta\s+(hoon|hu|hun|hoo)\b', r'bhej deti \1', text, flags=re.IGNORECASE)
+        text = re.sub(r'\bcall\s+nahi\s+karunga\b', 'call nahi karungi', text, flags=re.IGNORECASE)
+        text = re.sub(r'\blamba\s+time\s+nahi\s+lunga\b', 'lamba time nahi lungi', text, flags=re.IGNORECASE)
+        text = re.sub(r'\bconnect\s+kar\s+lunga\b', 'connect kar lungi', text, flags=re.IGNORECASE)
+        text = re.sub(r'\bseedhi\s+baat\s+karta\s+(hoon|hu|hun|hoo)\b', r'seedhi baat karti \1', text, flags=re.IGNORECASE)
     elif gender == 'male':
         # female -> male verb corrections  
         text = re.sub(r'\b(samajh|bol|kar|dekh|sun|bata|soch|likh|padh|ja)\s+rahi\s+(hoon|hu|hun|hoo)\b', r'\1 raha \2', text, flags=re.IGNORECASE)
         text = re.sub(r'\b(samajh|kar|dekh|bol|sun|bata|soch|le|de|ja)\s+sakti\s+(hoon|hu|hun|hoo)\b', r'\1 sakta \2', text, flags=re.IGNORECASE)
+        text = re.sub(r'\b(karti|chahti|samajhti|dekti|sochti|bolti|sunti|jaanti|maanti|batati|dikhati)\s+(hoon|hu|hun|hoo)\b', 
+                       lambda m: m.group(1).rstrip('i') + 'a ' + m.group(2), text, flags=re.IGNORECASE)
+        text = re.sub(r'\bbhej\s+deti\s+(hoon|hu|hun|hoo)\b', r'bhej deta \1', text, flags=re.IGNORECASE)
+        text = re.sub(r'\bcall\s+nahi\s+karungi\b', 'call nahi karunga', text, flags=re.IGNORECASE)
+        text = re.sub(r'\blamba\s+time\s+nahi\s+lungi\b', 'lamba time nahi lunga', text, flags=re.IGNORECASE)
+        text = re.sub(r'\bconnect\s+kar\s+lungi\b', 'connect kar lunga', text, flags=re.IGNORECASE)
+        text = re.sub(r'\bseedhi\s+baat\s+karti\s+(hoon|hu|hun|hoo)\b', r'seedhi baat karta \1', text, flags=re.IGNORECASE)
     return text
 
 def text_to_ssml(text: str, provider: str = "sarvam") -> str:
@@ -575,15 +597,29 @@ def apply_gender_grammar_directives(system_prompt: str, gender_tag: str, bot_nam
     Ensures female voices consistently use feminine endings (rahi hoon, sakti hoon, etc.)
     and male voices consistently use masculine endings (raha hoon, sakta hoon, etc.).
     """
+    # Normalize 24/7 to natural speech in system prompt
+    system_prompt = re.sub(r'\b24/7\b', 'twenty-four seven', system_prompt)
+    system_prompt = re.sub(r'24/7', 'twenty-four seven', system_prompt)
+
     if gender_tag == 'female':
+        # Resolve slashed alternatives to female forms
+        system_prompt = re.sub(r'\b(?:raha/rahi|rahi/raha)\b', 'rahi', system_prompt, flags=re.IGNORECASE)
+        system_prompt = re.sub(r'\b(?:sakta/sakti|sakti/sakta)\b', 'sakti', system_prompt, flags=re.IGNORECASE)
+        system_prompt = re.sub(r'\b(?:karta/karti|karti/karta)\b', 'karti', system_prompt, flags=re.IGNORECASE)
+        system_prompt = re.sub(r'\b(?:chahta/chahti|chahti/chahta)\b', 'chahti', system_prompt, flags=re.IGNORECASE)
+        system_prompt = re.sub(r'\b(?:deta/deti|deti/deta)\b', 'deti', system_prompt, flags=re.IGNORECASE)
+        system_prompt = re.sub(r'\b(?:karunga/karungi|karungi/karunga)\b', 'karungi', system_prompt, flags=re.IGNORECASE)
+        system_prompt = re.sub(r'\b(?:lunga/lungi|lungi/lunga)\b', 'lungi', system_prompt, flags=re.IGNORECASE)
+
         system_prompt = re.sub(r'\b(samajh|bol|kar|dekh|sun|bata)\s+raha\s+(hoon|hu|hun)\b', r'\1 rahi \2', system_prompt, flags=re.IGNORECASE)
         system_prompt = re.sub(r'\b(samajh|kar|dekh|bol)\s+sakta\s+(hoon|hu|hun)\b', r'\1 sakti \2', system_prompt, flags=re.IGNORECASE)
-        system_prompt = re.sub(r'\b(karta|chahta|samajhta)\s+(hoon|hu|hun)\b', lambda m: m.group(1)[:-1] + 'i ' + m.group(2), system_prompt, flags=re.IGNORECASE)
+        system_prompt = re.sub(r'\b(karta|chahta|samajhta|dekhta|sochta|bolta|sunta|jaanta|maanta|batata|dikhata)\s+(hoon|hu|hun)\b', lambda m: m.group(1)[:-1] + 'i ' + m.group(2), system_prompt, flags=re.IGNORECASE)
         system_prompt = re.sub(r'\bbhej\s+deta\s+(hoon|hu|hun)\b', r'bhej deti \1', system_prompt, flags=re.IGNORECASE)
         system_prompt = re.sub(r'\bcall\s+nahi\s+karunga\b', 'call nahi karungi', system_prompt, flags=re.IGNORECASE)
         system_prompt = re.sub(r'\brespect\s+karta\s+(hoon|hu|hun)\b', r'respect karti \1', system_prompt, flags=re.IGNORECASE)
         system_prompt = re.sub(r'\bconnect\s+kar\s+lunga\b', 'connect kar lungi', system_prompt, flags=re.IGNORECASE)
         system_prompt = re.sub(r'\blamba\s+time\s+nahi\s+lunga\b', 'lamba time nahi lungi', system_prompt, flags=re.IGNORECASE)
+        system_prompt = re.sub(r'\bseedhi\s+baat\s+karta\s+(hoon|hu|hun)\b', r'seedhi baat karti \1', system_prompt, flags=re.IGNORECASE)
         if '## CRITICAL FEMALE GENDER & HINDI GRAMMAR DIRECTIVE' not in system_prompt:
             system_prompt += (
                 f"\n\n## CRITICAL FEMALE GENDER & HINDI GRAMMAR DIRECTIVE (STRICT & NON-NEGOTIABLE):\n"
@@ -593,6 +629,7 @@ def apply_gender_grammar_directives(system_prompt: str, gender_tag: str, bot_nam
                 f"  * ALWAYS say: 'Main bol rahi hoon' (STRICTLY NEVER say 'bol raha hoon' or 'bol rha hu').\n"
                 f"  * ALWAYS say: 'Main aapki madad kar sakti hoon' (STRICTLY NEVER say 'kar sakta hoon').\n"
                 f"  * ALWAYS say: 'Main check karti hoon' (STRICTLY NEVER say 'karta hoon').\n"
+                f"  * ALWAYS say: 'Main seedhi baat karti hoon' (STRICTLY NEVER say 'karta hoon').\n"
                 f"  * ALWAYS say: 'Main janna chahti hoon' (STRICTLY NEVER say 'chahta hoon').\n"
                 f"  * ALWAYS say: 'Main WhatsApp bhej deti hoon' (STRICTLY NEVER say 'bhej deta hoon').\n"
                 f"  * ALWAYS say: 'Main call nahi karungi' (STRICTLY NEVER say 'call nahi karunga').\n"
@@ -600,14 +637,23 @@ def apply_gender_grammar_directives(system_prompt: str, gender_tag: str, bot_nam
             )
     else:
         # Male gender voice and grammar enforcement
+        system_prompt = re.sub(r'\b(?:raha/rahi|rahi/raha)\b', 'raha', system_prompt, flags=re.IGNORECASE)
+        system_prompt = re.sub(r'\b(?:sakta/sakti|sakti/sakta)\b', 'sakta', system_prompt, flags=re.IGNORECASE)
+        system_prompt = re.sub(r'\b(?:karta/karti|karti/karta)\b', 'karta', system_prompt, flags=re.IGNORECASE)
+        system_prompt = re.sub(r'\b(?:chahta/chahti|chahti/chahta)\b', 'chahta', system_prompt, flags=re.IGNORECASE)
+        system_prompt = re.sub(r'\b(?:deta/deti|deti/deta)\b', 'deta', system_prompt, flags=re.IGNORECASE)
+        system_prompt = re.sub(r'\b(?:karunga/karungi|karungi/karunga)\b', 'karunga', system_prompt, flags=re.IGNORECASE)
+        system_prompt = re.sub(r'\b(?:lunga/lungi|lungi/lunga)\b', 'lunga', system_prompt, flags=re.IGNORECASE)
+
         system_prompt = re.sub(r'\b(samajh|bol|kar|dekh|sun|bata)\s+rahi\s+(hoon|hu|hun)\b', r'\1 raha \2', system_prompt, flags=re.IGNORECASE)
         system_prompt = re.sub(r'\b(samajh|kar|dekh|bol)\s+sakti\s+(hoon|hu|hun)\b', r'\1 sakta \2', system_prompt, flags=re.IGNORECASE)
-        system_prompt = re.sub(r'\b(karti|chahti|samajhti)\s+(hoon|hu|hun)\b', lambda m: m.group(1)[:-1] + 'a ' + m.group(2), system_prompt, flags=re.IGNORECASE)
+        system_prompt = re.sub(r'\b(karti|chahti|samajhti|dekti|sochti|bolti|sunti|jaanti|maanti|batati|dikhati)\s+(hoon|hu|hun)\b', lambda m: m.group(1)[:-1] + 'a ' + m.group(2), system_prompt, flags=re.IGNORECASE)
         system_prompt = re.sub(r'\bbhej\s+deti\s+(hoon|hu|hun)\b', r'bhej deta \1', system_prompt, flags=re.IGNORECASE)
         system_prompt = re.sub(r'\bcall\s+nahi\s+karungi\b', 'call nahi karunga', system_prompt, flags=re.IGNORECASE)
         system_prompt = re.sub(r'\brespect\s+karti\s+(hoon|hu|hun)\b', r'respect karta \1', system_prompt, flags=re.IGNORECASE)
         system_prompt = re.sub(r'\bconnect\s+kar\s+lungi\b', 'connect kar lunga', system_prompt, flags=re.IGNORECASE)
         system_prompt = re.sub(r'\blamba\s+time\s+nahi\s+lungi\b', 'lamba time nahi lunga', system_prompt, flags=re.IGNORECASE)
+        system_prompt = re.sub(r'\bseedhi\s+baat\s+karti\s+(hoon|hu|hun)\b', r'seedhi baat karta \1', system_prompt, flags=re.IGNORECASE)
         if '## CRITICAL MALE GENDER & HINDI GRAMMAR DIRECTIVE' not in system_prompt:
             system_prompt += (
                 f"\n\n## CRITICAL MALE GENDER & HINDI GRAMMAR DIRECTIVE (STRICT & NON-NEGOTIABLE):\n"
@@ -1029,9 +1075,14 @@ class VikramAgent(Agent):
                     campaign_goal = getattr(self, 'campaign_goal', '') or 'Discuss our products, services, and pricing'
                     c_name = getattr(self, 'prospect_name', '')
                     name_prompt = f" to {c_name}" if c_name else ""
+                    gender_instr = ""
+                    if getattr(self, 'gender', '') == 'female':
+                        gender_instr = " CRITICAL GRAMMAR: You are FEMALE. Use strictly feminine verb forms ('karti hoon', 'bol rahi hoon', 'kar sakti hoon', 'chahti hoon', 'bhej deti hoon', 'seedhi baat karti hoon'). NEVER use male endings ('karta hoon', 'raha hoon', 'sakta hoon')."
+                    elif getattr(self, 'gender', '') == 'male':
+                        gender_instr = " CRITICAL GRAMMAR: You are MALE. Use strictly masculine verb forms ('karta hoon', 'bol raha hoon', 'kar sakta hoon', 'chahta hoon', 'bhej deta hoon', 'seedhi baat karta hoon')."
                     flow_instruction = (
                         f"[CRITICAL FLOW NOTE: The prospect just gave permission to speak ('{norm_txt}'). "
-                        f"IMMEDIATELY introduce the reason you called{name_prompt}: '{campaign_goal}'. "
+                        f"IMMEDIATELY introduce the reason you called{name_prompt}: '{campaign_goal}'.{gender_instr} "
                         f"Keep your response to 1-2 conversational sentences and ask an engaging discovery question. DO NOT say goodbye, DO NOT say '{getattr(self, 'ending_message', '')}'!]"
                     )
 
@@ -1097,6 +1148,21 @@ class VikramAgent(Agent):
             allow_interruptions=False
         )
 
+    def _clean_chunk(self, chunk):
+        gender = getattr(self, 'gender', '')
+        if not gender:
+            return chunk
+        if isinstance(chunk, str):
+            return fix_gender_verbs(clean_ssml(chunk), gender)
+        try:
+            if hasattr(chunk, 'choices') and chunk.choices:
+                choice = chunk.choices[0]
+                if hasattr(choice, 'delta') and choice.delta and hasattr(choice.delta, 'content') and choice.delta.content:
+                    choice.delta.content = fix_gender_verbs(clean_ssml(choice.delta.content), gender)
+        except Exception:
+            pass
+        return chunk
+
     async def llm_node(
         self,
         chat_ctx: llm.ChatContext,
@@ -1131,7 +1197,7 @@ class VikramAgent(Agent):
 
         try:
             async for chunk in Agent.default.llm_node(self, truncated_ctx, tools, model_settings):
-                yield chunk
+                yield self._clean_chunk(chunk)
             return
         except Exception as llm_err:
             logger.warning(f"[VikramAgent] Primary LLM failed ({llm_err}). Triggering failover to secondary model...")
@@ -1152,7 +1218,7 @@ class VikramAgent(Agent):
                     chat_ctx=truncated_ctx, tools=tools, tool_choice=tool_choice, conn_options=conn_options
                 ) as fallback_stream:
                     async for chunk in fallback_stream:
-                        yield chunk
+                        yield self._clean_chunk(chunk)
                 logger.info("[VikramAgent] Fallback LLM streamed successfully!")
                 return
             except Exception as fb_err:
@@ -1569,37 +1635,54 @@ Only return valid JSON."""
             except Exception as e:
                 logger.error(f"Failed to save lead: {e}")
 
-        # Automatic Sync to customer_contacts table
+        # Sync to customer_contacts table:
+        # For outbound calls: ONLY sync if the prospect showed positive interest, requested callback, or became a lead.
+        # For inbound calls: sync regular callers for recognition.
         try:
-            contact_phone_to_sync = (
-                (resolved_phone if resolved_phone != "Unknown" else None) or
-                (existing_call.get("caller_phone") if existing_call else None) or 
-                (existing_call.get("metadata", {}).get("to_number") if existing_call else None)
+            is_outbound = bool(contact_id) or (existing_call and (existing_call.get("direction") == "outbound" or existing_call.get("metadata", {}).get("direction") == "outbound"))
+            has_positive_interest = bool(
+                lead_id or
+                (lead_data and (
+                    lead_data.get("is_lead") or 
+                    lead_data.get("callback_scheduled") or 
+                    lead_data.get("callback_requested") or 
+                    lead_data.get("sentiment") in ("positive", "interested") or
+                    lead_data.get("interest_level") in ("medium", "high", "hot")
+                ))
             )
-            if not contact_phone_to_sync and original_call_id:
-                try:
-                    call_rec = await asyncio.to_thread(
-                        supabase_admin.table("voice_calls").select("caller_phone").eq("id", original_call_id).single().execute
-                    )
-                    if call_rec.data:
-                        contact_phone_to_sync = call_rec.data.get("caller_phone")
-                except Exception:
-                    pass
 
-            if contact_phone_to_sync and contact_phone_to_sync != "Unknown" and organization_id:
-                from app.services.caller_lookup import CallerLookupService
-                c_svc = CallerLookupService(supabase_admin)
-                await c_svc.upsert_from_call(
-                    organization_id=organization_id,
-                    phone_number=contact_phone_to_sync,
-                    caller_name=resolved_name if resolved_name != "Prospect" else None,
-                    email=lead_data.get("contact_email") if lead_data else None,
-                    company=lead_data.get("company") if lead_data else None,
-                    call_summary=lead_data.get("call_summary") if lead_data else None,
-                    direction="inbound" if not contact_id else "outbound",
-                    tags=["lead"] if (lead_data and lead_data.get("is_lead")) else None
+            if is_outbound and not has_positive_interest:
+                logger.info(f"[extract_and_save_lead] Outbound call to prospect did not result in a positive lead/callback. Skipping customer_contacts sync to keep CRM clean.")
+            else:
+                contact_phone_to_sync = (
+                    (resolved_phone if resolved_phone != "Unknown" else None) or
+                    (existing_call.get("caller_phone") if existing_call else None) or 
+                    (existing_call.get("metadata", {}).get("to_number") if existing_call else None)
                 )
-                logger.info(f"[extract_and_save_lead] Synced caller {contact_phone_to_sync} to customer_contacts")
+                if not contact_phone_to_sync and original_call_id:
+                    try:
+                        call_rec = await asyncio.to_thread(
+                            supabase_admin.table("voice_calls").select("caller_phone").eq("id", original_call_id).single().execute
+                        )
+                        if call_rec.data:
+                            contact_phone_to_sync = call_rec.data.get("caller_phone")
+                    except Exception:
+                        pass
+
+                if contact_phone_to_sync and contact_phone_to_sync != "Unknown" and organization_id:
+                    from app.services.caller_lookup import CallerLookupService
+                    c_svc = CallerLookupService(supabase_admin)
+                    await c_svc.upsert_from_call(
+                        organization_id=organization_id,
+                        phone_number=contact_phone_to_sync,
+                        caller_name=resolved_name if resolved_name != "Prospect" else None,
+                        email=lead_data.get("contact_email") if lead_data else None,
+                        company=lead_data.get("company") if lead_data else None,
+                        call_summary=lead_data.get("call_summary") if lead_data else None,
+                        direction="outbound" if is_outbound else "inbound",
+                        tags=["lead"] if (lead_data and lead_data.get("is_lead")) else None
+                    )
+                    logger.info(f"[extract_and_save_lead] Synced caller {contact_phone_to_sync} to customer_contacts (is_outbound={is_outbound})")
         except Exception as c_sync_err:
             logger.warning(f"[extract_and_save_lead] Customer contacts sync failed: {c_sync_err}")
 
@@ -1660,16 +1743,36 @@ Only return valid JSON."""
 
             except Exception as e:
                 logger.error(f"Failed to schedule callback: {e}")
-        # Resolve contact_id from metadata if not explicitly passed
-        if not contact_id and call_sid:
+        # Resolve contact_id from metadata or room_name if not explicitly passed
+        if not contact_id and original_call_id:
             try:
                 call_res = await asyncio.to_thread(
-                    supabase_admin.table("voice_calls").select("metadata").eq("metadata->>provider_call_id", call_sid).maybe_single().execute
+                    supabase_admin.table("voice_calls").select("metadata").eq("id", original_call_id).maybe_single().execute
                 )
                 if call_res.data and call_res.data.get("metadata"):
                     contact_id = call_res.data["metadata"].get("contact_id")
             except Exception as e:
                 logger.error(f"Failed to resolve contact_id from voice_calls metadata in extract_and_save_lead: {e}")
+
+        if not contact_id and call_sid:
+            try:
+                call_res = await asyncio.to_thread(
+                    supabase_admin.table("voice_calls").select("metadata").or_(f"metadata->>provider_call_id.eq.{call_sid},metadata->>session_id.eq.{call_sid}").order("created_at", desc=True).limit(1).execute
+                )
+                if call_res.data and len(call_res.data) > 0 and call_res.data[0].get("metadata"):
+                    contact_id = call_res.data[0]["metadata"].get("contact_id")
+            except Exception as e:
+                logger.error(f"Failed to resolve contact_id from voice_calls metadata by call_sid in extract_and_save_lead: {e}")
+
+        if not contact_id and room_name and "--" in room_name:
+            p = room_name.split("--")
+            if len(p) >= 3:
+                try:
+                    import uuid as _uuid
+                    _uuid.UUID(str(p[2]))
+                    contact_id = p[2]
+                except Exception:
+                    pass
 
         # 4. Update Campaign Stats and dispositions if outbound campaign call
         if contact_id:
@@ -1707,27 +1810,6 @@ Only return valid JSON."""
                             logger.info(f"[Campaign Update] Incremented leads_generated for campaign {campaign_id}")
             except Exception as campaign_err:
                 logger.error(f"Failed to update campaign/contact statistics: {campaign_err}")
-
-        # 5. Upsert into customer_contacts for CRM & Returning Caller Recognition
-        try:
-            from app.services.caller_lookup import CallerLookupService
-            caller_svc = CallerLookupService(supabase_admin)
-            upsert_phone = lead_data.get("contact_phone") or (existing_call.get("caller_phone") if existing_call else None) or (existing_call.get("metadata", {}).get("to_number") if existing_call else None) or (existing_call.get("metadata", {}).get("from_number") if existing_call else None) or ""
-            c_dir = (existing_call.get("metadata", {}).get("direction") if existing_call else None) or (existing_call.get("direction") if existing_call else None) or "inbound"
-            
-            if organization_id and upsert_phone and upsert_phone != "Unknown":
-                await caller_svc.upsert_from_call(
-                    organization_id=organization_id,
-                    phone_number=upsert_phone,
-                    caller_name=lead_data.get("contact_name"),
-                    email=lead_data.get("contact_email"),
-                    company=lead_data.get("company"),
-                    call_summary=lead_data.get("call_summary"),
-                    direction=c_dir
-                )
-                logger.info(f"[extract_and_save_lead] Upserted customer_contacts for org {organization_id}, phone {upsert_phone}")
-        except Exception as cc_err:
-            logger.warning(f"[extract_and_save_lead] Failed to upsert customer_contacts: {cc_err}")
 
         # 6. Dispatch post-call summary alert to Dashboard & Telegram
         if user_id:
@@ -1893,15 +1975,26 @@ async def entrypoint(ctx: JobContext):
             if parts[1] not in ("noagent", "None", "", "unknown", "call"):
                 agent_id = parts[1]
             if parts[2] not in ("nocontact", "None", "", "unknown"):
-                cleaned_digits = re.sub(r'[^\d+]', '', parts[2])
-                if len(cleaned_digits) >= 10:
-                    if len(cleaned_digits) == 11 and cleaned_digits.startswith('0'):
-                        cleaned_digits = cleaned_digits[1:]
-                    elif len(cleaned_digits) == 12 and cleaned_digits.startswith('91'):
-                        cleaned_digits = cleaned_digits[2:]
-                    caller_number = cleaned_digits
-                else:
+                is_uuid = False
+                try:
+                    import uuid as _uuid
+                    _uuid.UUID(str(parts[2]))
+                    is_uuid = True
+                except Exception:
+                    is_uuid = False
+
+                if is_uuid:
                     contact_id = parts[2]
+                else:
+                    cleaned_digits = re.sub(r'[^\d+]', '', parts[2])
+                    if len(cleaned_digits) >= 10:
+                        if len(cleaned_digits) == 11 and cleaned_digits.startswith('0'):
+                            cleaned_digits = cleaned_digits[1:]
+                        elif len(cleaned_digits) == 12 and cleaned_digits.startswith('91'):
+                            cleaned_digits = cleaned_digits[2:]
+                        caller_number = cleaned_digits
+                    else:
+                        contact_id = parts[2]
             call_sid = parts[3]
             logger.info(f"[Telephony Entrypoint] Parsed agent_id='{agent_id}', caller_number='{caller_number}', contact_id='{contact_id}', call_sid='{call_sid}' from room '{ctx.room.name}'")
     elif not agent_id and ctx.room and ctx.room.name.startswith("room-"):
@@ -2109,7 +2202,11 @@ async def entrypoint(ctx: JobContext):
                         )
                         campaign_contact = c_res.data
                         if campaign_contact:
-                            logger.info(f"[Twilio Entrypoint] Successfully loaded campaign contact {contact_id}: Name='{campaign_contact.get('full_name')}', Notes='{campaign_contact.get('notes')}'")
+                            if (caller_number == "Unknown" or not caller_number) and campaign_contact.get("phone"):
+                                caller_number = campaign_contact["phone"]
+                            if (not db_caller_name or db_caller_name == "Unknown Caller") and campaign_contact.get("full_name"):
+                                db_caller_name = campaign_contact["full_name"]
+                            logger.info(f"[Twilio Entrypoint] Successfully loaded campaign contact {contact_id}: Name='{campaign_contact.get('full_name')}', Phone='{campaign_contact.get('phone')}', Notes='{campaign_contact.get('notes')}'")
                     except Exception as e:
                         logger.error(f"Failed to fetch campaign contact {contact_id}: {e}")
 
@@ -2822,20 +2919,46 @@ async def run_agent(room_name: str, agent_id: str | None = None, contact_id: str
                 if default_greeting:
                     default_greeting = default_greeting.strip('\'"')
 
+                # Structured room name format: twilio--{agent_id}--{contact_id}--{nonce_or_sid}
+                if room_name and "--" in room_name:
+                    parts = room_name.split("--")
+                    if len(parts) >= 3:
+                        if not agent_id and parts[1] not in ("noagent", "None", "", "unknown", "call"):
+                            agent_id = parts[1]
+                        val = parts[2]
+                        is_uuid = False
+                        try:
+                            import uuid as _uuid
+                            _uuid.UUID(str(val))
+                            is_uuid = True
+                        except Exception:
+                            is_uuid = False
+                        if is_uuid:
+                            contact_id = val
+                        elif val not in ("nocontact", "None", "", "unknown"):
+                            cleaned = re.sub(r'[^\d+]', '', val)
+                            if len(cleaned) >= 10:
+                                caller_number = cleaned
+
                 # Fetch Caller identity from voice_calls metadata or room_name
                 caller_number = "Unknown"
                 if room_name:
                     try:
                         vc_res = await asyncio.to_thread(
                             supabase_admin.table("voice_calls")
-                            .select("caller_phone")
-                            .eq("metadata->>room_name", room_name)
+                            .select("caller_phone, metadata")
+                            .or_(f"metadata->>room_name.eq.{room_name},metadata->>provider_call_id.eq.{room_name}")
                             .order("started_at", desc=True)
                             .limit(1)
                             .execute
                         )
-                        if vc_res.data and vc_res.data[0].get("caller_phone"):
-                            caller_number = vc_res.data[0]["caller_phone"]
+                        if vc_res.data and len(vc_res.data) > 0:
+                            v_row = vc_res.data[0]
+                            if v_row.get("caller_phone"):
+                                caller_number = v_row["caller_phone"]
+                            meta = v_row.get("metadata") or {}
+                            if not contact_id and meta.get("contact_id"):
+                                contact_id = meta.get("contact_id")
                     except Exception as vc_err:
                         logger.warning(f"Could not fetch caller_phone from voice_calls for room {room_name}: {vc_err}")
 
@@ -2867,6 +2990,9 @@ async def run_agent(room_name: str, agent_id: str | None = None, contact_id: str
                             supabase_admin.table("campaign_contacts").select("*").eq("id", contact_id).maybe_single().execute
                         )
                         campaign_contact = c_res.data
+                        if campaign_contact:
+                            if (caller_number == "Unknown" or not caller_number) and campaign_contact.get("phone"):
+                                caller_number = campaign_contact["phone"]
                     except Exception as e:
                         logger.error(f"Failed to fetch campaign contact {contact_id} in run_agent: {e}")
 

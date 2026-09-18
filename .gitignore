@@ -84,3 +84,8 @@ frontend/test_pdf.js
 supabase/.temp/
 *.tsbuildinfo
 
+# Audio recordings cache
+backend/recordings/
+*.mp3
+*.wav
+

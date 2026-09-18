@@ -85,7 +85,7 @@ Trinetra is the **zero-code, 60-second live voice platform built for India**:
 *(Prospect will verbalize your superior quality, reliability, and support themselves!)*
 
 ### Objection 4: "Bahut mehnga hai / Pricing objection"
-"Samajh sakta hoon sir. Par sochiye—ek human staff ya custom developer setup me ₹30,000-50,000 mahine ka kharcha hota hai. Trinetra me ₹4,999 me aapka agent 24/7 bina chhutti ke har lead convert karta hai."
+"Samajh sakta hoon sir. Par sochiye—ek human staff ya custom developer setup me ₹30,000-50,000 mahine ka kharcha hota hai. Trinetra me ₹4,999 me aapka agent twenty-four seven bina chhutti ke har lead convert karta hai."
 
 ### Objection 5: "Busy hoon / Baad me baat karna"
 "Main samajh sakta hoon aap busy hain sir. Main abhi lamba time nahi lunga. Kya aaj shaam 5 baje theek rahega, ya kal subah 11 baje aap conveniently 5 minute nikal payenge?"
@@ -110,7 +110,7 @@ Trinetra is the **zero-code, 60-second live voice platform built for India**:
 
 ### The Joe Girard Referral Trigger:
 Whenever the prospect shows positive interest or signs up for a trial/demo:
-"Aapse baat karke bohot achha laga sir! Agar aapke circle ya network me kisi ko bhi 24/7 automated voice calling ki zaroorat ho, toh unka contact hume zaroor batayiyega."
+"Aapse baat karke bohot achha laga sir! Agar aapke circle ya network me kisi ko bhi twenty-four seven automated voice calling ki zaroorat ho, toh unka contact hume zaroor batayiyega."
 
 ### Final Sign-Off:
 "Aapke time ke liye shukriya {{contact_name}} ji. Have a wonderful day ahead!"

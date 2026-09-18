@@ -38,9 +38,17 @@ export function CallAudioPlayer({
     if (trimmed.includes('trinetra-voice-recordings.s3.amazonaws.com') || trimmed.includes('sandbox_recording.mp3')) {
       return null
     }
-    // Twilio recordings require .mp3 for direct audio streaming
-    if (trimmed.includes('api.twilio.com') && !trimmed.endsWith('.mp3') && !trimmed.endsWith('.wav')) {
-      return `${trimmed}.mp3`
+    // Twilio recordings require authentication: proxy through /api/recordings/twilio/... to avoid 401 Unauthorized
+    if (trimmed.includes('api.twilio.com')) {
+      const match = trimmed.match(/Recordings\/(RE[a-f0-9]+)/i)
+      if (match && match[1]) {
+        return `/api/recordings/twilio/${match[1]}.mp3`
+      }
+      const parts = trimmed.split('/')
+      const last = parts[parts.length - 1].replace(/\.(mp3|wav|json)$/i, '')
+      if (last.startsWith('RE')) {
+        return `/api/recordings/twilio/${last}.mp3`
+      }
     }
     return trimmed
   }, [recordingUrl])
