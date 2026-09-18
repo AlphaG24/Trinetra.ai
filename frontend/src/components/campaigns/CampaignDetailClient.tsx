@@ -737,6 +737,7 @@ export function CampaignDetailClient({ campaignId }: CampaignDetailClientProps) 
                       })()}
                     </td>
                     <td className="px-6 py-4 text-center font-semibold font-mono text-[var(--body)]">{item.call_attempts}</td>
+                    <td className="px-6 py-4 space-y-1">
                       {(item.call_id || item.call_attempts > 0) && (
                         <button
                           type="button"
