@@ -1344,9 +1344,7 @@ async def handle_twilio_voice_webhook(
                     existing_meta["session_id"] = call_sid
                     await asyncio.to_thread(
                         supabase_admin.table("voice_calls").update({
-                            "metadata": existing_meta,
-                            "provider_call_id": call_sid,
-                            "session_id": call_sid
+                            "metadata": existing_meta
                         }).eq("id", existing_row["id"]).execute
                     )
                     print(f"[Twilio Voice] Updated existing call record: {call_sid} (room: {room_name})", flush=True)
@@ -2026,8 +2024,8 @@ async def telephony_audio_stream(websocket: WebSocket, room_name: Optional[str] 
 
     async def _dispatch_agent():
         try:
-            # 1. Check if external worker joins within 1.0s
-            for _ in range(10):
+            # 1. Check if external worker joins within 2.5s (LiveKit dispatch takes ~1-2s on Render)
+            for _ in range(25):
                 remotes = getattr(room, 'remote_participants', {}) if room else {}
                 for p in remotes.values():
                     p_id = getattr(p, 'identity', '') or ''
@@ -2238,9 +2236,9 @@ async def telephony_audio_stream(websocket: WebSocket, room_name: Optional[str] 
                                 is_playing = False
                                 empty_ticks = 0
 
-                # On Exotel, once the agent has started speaking, keep continuous 40ms silence frames
-                # flowing during listening pauses so the carrier media gateway never drops the line
-                if is_exotel and speech_frames_sent > 0 and not chunk and not is_silence_fill:
+                # Keep continuous silence frames flowing during listening pauses
+                # so the carrier media gateway (Twilio, Exotel, mobile operators) never mutes or drops the line
+                if speech_frames_sent > 0 and not chunk and not is_silence_fill:
                     is_silence_fill = True
 
                 if not is_playing and not chunk and not is_silence_fill:

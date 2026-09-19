@@ -1038,12 +1038,29 @@ class VikramAgent(Agent):
             )
             logger.info("[VikramAgent] Using Groq Whisper STT (whisper-large-v3, detect_language=True)")
 
-        # Determine LLM Provider: Groq is preferred for voice AI to avoid Google Free Tier 20 req/day quota limits
+        # Determine LLM Provider: Test Groq health if key present; automatically use Gemini 2.5 Flash if Groq invalid or unavailable
         chosen_provider = (llm_provider or os.getenv("LLM_PROVIDER", "groq")).strip().lower()
         chosen_model = (llm_model or os.getenv("LLM_MODEL", "")).strip()
         chosen_temp = float(temperature) if temperature is not None else 0.7
 
-        use_groq = bool(groq_api_key) and (chosen_provider == "groq" or not gemini_api_key)
+        global _groq_healthy
+        if '_groq_healthy' not in globals():
+            _groq_healthy = None
+
+        if groq_api_key and _groq_healthy is None:
+            try:
+                # Fast 1.2s probe to verify Groq key validity
+                with httpx.Client(timeout=1.2) as client:
+                    probe_res = client.get(
+                        "https://api.groq.com/openai/v1/models",
+                        headers={"Authorization": f"Bearer {groq_api_key}"}
+                    )
+                    _groq_healthy = (probe_res.status_code == 200)
+            except Exception:
+                _groq_healthy = False
+            logger.info(f"[VikramAgent] Groq health check result: {_groq_healthy}")
+
+        use_groq = bool(groq_api_key) and (_groq_healthy is True) and (chosen_provider == "groq" or not gemini_api_key)
 
         # Ultra-fast timeout for telephony voice: fail over rapidly (<2s) instead of stalling on connection drops or rate limits
         llm_timeout = httpx.Timeout(connect=1.5, read=2.5, write=1.5, pool=1.5)
@@ -1076,7 +1093,7 @@ class VikramAgent(Agent):
                 base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
                 api_key=gemini_api_key,
                 temperature=chosen_temp,
-                max_completion_tokens=250,
+                max_completion_tokens=150,
                 timeout=llm_timeout,
                 max_retries=0,
             )
@@ -1091,6 +1108,7 @@ class VikramAgent(Agent):
                 max_retries=0,
             )
             logger.info("[VikramAgent] Using OpenAI GPT-4o-mini LLM")
+
 
         # Setup secondary failover LLM: if primary ever hits 429 or network glitch, fail over seamlessly
         if gemini_api_key and use_groq:
@@ -1191,10 +1209,10 @@ class VikramAgent(Agent):
                 # Only treat as liveness check if utterance is short (<= 3 words), so full sentences like "Hello, main kal baat karunga" are not hijacked!
                 is_liveness_check = any((t_lower == lw or t_lower.startswith(lw)) and len(t_lower.split()) <= 3 for lw in liveness_words)
 
-                if is_liveness_check and turn_count >= 2:
+                if is_liveness_check and (turn_count >= 1 or getattr(self, '_has_introduced_self', False)):
                     flow_instruction = (
                         f"[CRITICAL FLOW NOTE: The caller is checking if you are still on the line ('{norm_txt}'). "
-                        f"STRICTLY DO NOT RE-INTRODUCE YOURSELF! DO NOT say 'Main {agent_name} {v_bol}' or repeat your greeting! "
+                        f"STRICTLY DO NOT RE-INTRODUCE YOURSELF! DO NOT say 'Main {agent_name} {v_bol}' or repeat your greeting or purpose! "
                         f"Simply confirm you are listening and ask how to proceed: e.g. 'Ji sir, main bilkul {v_sun}, boliye na?' or 'Haan ji sir, main yahin hoon.']"
                     )
 
@@ -1373,15 +1391,21 @@ class VikramAgent(Agent):
         # Truncate context: preserve system message + last 30 conversation turns (prevents mid-call memory loss)
         truncated_ctx = chat_ctx.copy().truncate(max_items=30)
 
-        # Inject flow instruction transiently into truncated_ctx without polluting chat_ctx or user transcript
-        if flow_instruction and hasattr(truncated_ctx, '_items') and truncated_ctx._items:
+        # Inject flow instruction and continuity reminder transiently into truncated_ctx without polluting chat_ctx or user transcript
+        if hasattr(truncated_ctx, '_items') and truncated_ctx._items:
             last_item = truncated_ctx._items[-1]
             if getattr(last_item, 'role', '') == 'user':
                 orig_text = getattr(last_item, 'text_content', '') or (last_item.content[0] if last_item.content else '')
-                truncated_ctx._items[-1] = llm.ChatMessage(
-                    role="user",
-                    content=[f"{orig_text}\n\n[CONVERSATION GUIDANCE FOR THIS TURN]:\n{flow_instruction}"]
-                )
+                guidance_parts = []
+                if getattr(self, '_has_introduced_self', False):
+                    guidance_parts.append("[CONTINUITY: You have ALREADY introduced yourself. STRICTLY NEVER repeat 'Hello, mai...' or re-introduce yourself. Respond directly.]")
+                if flow_instruction:
+                    guidance_parts.append(f"[CONVERSATION GUIDANCE FOR THIS TURN]:\n{flow_instruction}")
+                if guidance_parts:
+                    truncated_ctx._items[-1] = llm.ChatMessage(
+                        role="user",
+                        content=[f"{orig_text}\n\n" + "\n\n".join(guidance_parts)]
+                    )
 
         try:
             async for chunk in Agent.default.llm_node(self, truncated_ctx, tools, model_settings):
@@ -1496,7 +1520,6 @@ async def extract_and_save_lead(transcript: str, agent_id: str, user_id: str, or
             call_res = await asyncio.to_thread(
                 supabase_admin.table("voice_calls").update({
                     "transcript": transcript,
-                    "transcript_text": transcript,
                     "status": "completed",
                     "duration_seconds": duration_seconds
                 }).eq("id", existing_call["id"]).execute
@@ -1514,7 +1537,6 @@ async def extract_and_save_lead(transcript: str, agent_id: str, user_id: str, or
                     "agent_id": agent_id,
                     "organization_id": organization_id,
                     "transcript": transcript,
-                    "transcript_text": transcript,
                     "sentiment": "neutral",
                     "status": "completed",
                     "duration_seconds": duration_seconds,
@@ -1529,6 +1551,29 @@ async def extract_and_save_lead(transcript: str, agent_id: str, user_id: str, or
     # 2. Extract Lead, Callback, and Sentiment using Gemini Flash (or Groq fallback)
     gemini_key = (os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY") or "").strip()
     groq_key = os.getenv("GROQ_API_KEY", "").strip()
+    
+    # Detect caller country and timezone from caller_phone
+    phone_check = str(resolved_phone or "")
+    clean_digits = re.sub(r'\D', '', phone_check)
+    if phone_check.startswith("+91") or phone_check.startswith("91") or (len(clean_digits) == 10 and clean_digits[0] in '6789'):
+        caller_tz = "Asia/Kolkata"
+        tz_label = "IST (UTC+05:30)"
+    elif phone_check.startswith("+44"):
+        caller_tz = "Europe/London"
+        tz_label = "BST/GMT (UTC+00:00/+01:00)"
+    elif phone_check.startswith("+1"):
+        caller_tz = "America/New_York"
+        tz_label = "US Eastern (UTC-04:00/05:00)"
+    else:
+        caller_tz = "Asia/Kolkata"
+        tz_label = "IST (UTC+05:30)"
+
+    import zoneinfo
+    try:
+        caller_local_now = datetime.now(zoneinfo.ZoneInfo(caller_tz)).strftime('%Y-%m-%d %I:%M %p')
+    except Exception:
+        caller_local_now = datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')
+
     current_time_str = datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')
 
     prompt = f"""Analyze this sales call transcript and extract lead and callback information.
@@ -1536,7 +1581,13 @@ async def extract_and_save_lead(transcript: str, agent_id: str, user_id: str, or
 Transcript:
 {transcript[:4000]}
 
-Current time is {current_time_str}.
+Current UTC time is {current_time_str}.
+Caller's local timezone is {caller_tz} ({tz_label}).
+Caller's current local time is {caller_local_now}.
+
+IMPORTANT TIMEZONE DIRECTIVE:
+If the caller requested a callback (e.g. "kal 10 baje", "shaam 5 baje", "call tomorrow morning at 10 AM", "call in 2 hours"):
+Interpret their requested time in their LOCAL timezone ({caller_tz}), and convert that exact time to UTC ISO-8601 ending in 'Z' for callback_time_iso.
 
 Return a JSON object with:
 - is_lead: boolean. MUST BE TRUE ONLY IF the caller actively engaged in conversation, showed genuine commercial interest in products/services, asked about pricing/features, or agreed to a purchase/demo/callback. MUST BE FALSE if the call only consisted of greetings, pickup acknowledgments ("hello", "haan bolo", "batao"), early hangup, or if no substantive business conversation occurred.
@@ -1926,6 +1977,7 @@ Only return valid JSON."""
                         "prospect_name": cb_name,
                         "prospect_phone": cb_phone,
                         "scheduled_at": callback_time,
+                        "timezone": caller_tz if 'caller_tz' in locals() else "Asia/Kolkata",
                         "notes": lead_data.get("callback_reason") or "Callback requested by prospect during call.",
                         "status": "scheduled",
                         "priority": "normal"

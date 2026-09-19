@@ -2,6 +2,7 @@
 
 import { Copy, MapPin, Smartphone, Check } from "lucide-react";
 import { useState } from "react";
+import { PlanValidityTimer } from "@/src/components/shared/PlanValidityTimer";
 
 export interface NumberCardProps {
   phoneNumber: {
@@ -148,6 +149,19 @@ export function NumberCard({
             </div>
           )}
         </div>
+
+        {/* Pack Validity Timer for Active / Purchased Numbers */}
+        {!isPoolItem && (phoneNumber.provisioned_at || phoneNumber.renewal_date) && (
+          <div className="mb-3 pt-2.5 border-t border-[var(--border)]">
+            <PlanValidityTimer
+              createdAt={phoneNumber.provisioned_at}
+              expiresAt={phoneNumber.renewal_date}
+              validityDays={30}
+              size="xs"
+              showProgress={true}
+            />
+          </div>
+        )}
       </div>
 
       {/* Bottom Row */}

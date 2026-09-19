@@ -2,9 +2,34 @@
 
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { X, Calendar, User, Phone, Tag, AlignLeft, AlertCircle } from "lucide-react";
+import { X, Calendar, User, Phone, Tag, AlignLeft, AlertCircle, Globe } from "lucide-react";
 import { useDashboardStore } from "@/store/dashboardStore";
 import { toast } from "sonner";
+
+export const TIMEZONE_OPTIONS = [
+  { value: "Asia/Kolkata", label: "India (IST, UTC+5:30)" },
+  { value: "America/New_York", label: "US Eastern (EST/EDT)" },
+  { value: "America/Chicago", label: "US Central (CST/CDT)" },
+  { value: "America/Denver", label: "US Mountain (MST/MDT)" },
+  { value: "America/Los_Angeles", label: "US Pacific (PST/PDT)" },
+  { value: "Europe/London", label: "UK / London (GMT/BST)" },
+  { value: "Europe/Paris", label: "Central Europe (CET/CEST)" },
+  { value: "Asia/Dubai", label: "UAE / Dubai (GST, UTC+4)" },
+  { value: "Asia/Singapore", label: "Singapore / Malaysia (SGT, UTC+8)" },
+  { value: "Australia/Sydney", label: "Australia (AEST/AEDT)" },
+  { value: "UTC", label: "Universal UTC (UTC+0)" },
+];
+
+export function getUtcIsoFromTz(dateStr: string, timeStr: string, timeZone: string): string {
+  const targetDate = new Date(`${dateStr}T${timeStr}:00`);
+  try {
+    const invDate = new Date(targetDate.toLocaleString('en-US', { timeZone }));
+    const diff = targetDate.getTime() - invDate.getTime();
+    return new Date(targetDate.getTime() + diff).toISOString();
+  } catch (e) {
+    return targetDate.toISOString();
+  }
+}
 
 export interface ScheduleCallbackModalProps {
   isOpen: boolean;
@@ -30,6 +55,13 @@ export function ScheduleCallbackModal({
   const [selectedAgentId, setSelectedAgentId] = useState("");
   const [date, setDate] = useState("");
   const [time, setTime] = useState("");
+  const [timezone, setTimezone] = useState(() => {
+    try {
+      return Intl.DateTimeFormat().resolvedOptions().timeZone || "Asia/Kolkata";
+    } catch (e) {
+      return "Asia/Kolkata";
+    }
+  });
   const [priority, setPriority] = useState("normal");
   const [notes, setNotes] = useState("");
   
@@ -102,8 +134,8 @@ export function ScheduleCallbackModal({
       return;
     }
 
-    const scheduledDateTime = new Date(`${date}T${time}`);
-    if (scheduledDateTime <= new Date()) {
+    const scheduledIso = getUtcIsoFromTz(date, time, timezone);
+    if (new Date(scheduledIso) <= new Date()) {
       setErrorMsg("Scheduled time must be in the future.");
       return;
     }
@@ -119,7 +151,8 @@ export function ScheduleCallbackModal({
           agent_id: selectedAgentId,
           prospect_name: prospectName.trim() || "Unknown",
           prospect_phone: prospectPhone.trim(),
-          scheduled_at: scheduledDateTime.toISOString(),
+          scheduled_at: scheduledIso,
+          timezone: timezone,
           notes: notes.trim(),
           priority,
           lead_id: initialLeadId || null
@@ -285,6 +318,29 @@ export function ScheduleCallbackModal({
                     className="w-full px-4 py-2.5 bg-[var(--background)] border border-[var(--border)] rounded-xl text-[var(--body)] focus:outline-none focus:border-violet-500 transition-colors text-sm font-medium cursor-pointer"
                   />
                 </div>
+              </div>
+
+              {/* Timezone Selection */}
+              <div className="space-y-1.5">
+                <label className="text-[var(--muted)] text-xs font-bold uppercase tracking-wider flex items-center gap-1.5">
+                  <Globe className="w-3.5 h-3.5" /> Timezone <span className="text-rose-500">*</span>
+                </label>
+                <select
+                  value={timezone}
+                  onChange={(e) => setTimezone(e.target.value)}
+                  disabled={loading}
+                  required
+                  className="w-full px-4 py-2.5 bg-[var(--background)] border border-[var(--border)] rounded-xl text-[var(--body)] focus:outline-none focus:border-violet-500 transition-colors text-sm font-medium cursor-pointer"
+                >
+                  {TIMEZONE_OPTIONS.map((tz) => (
+                    <option key={tz.value} value={tz.value}>
+                      {tz.label}
+                    </option>
+                  ))}
+                  {!TIMEZONE_OPTIONS.some(tz => tz.value === timezone) && (
+                    <option value={timezone}>{timezone}</option>
+                  )}
+                </select>
               </div>
 
               {/* Priority Selection */}

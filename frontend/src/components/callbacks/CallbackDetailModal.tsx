@@ -4,9 +4,10 @@ import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { 
   X, Calendar, User, Phone, Tag, AlignLeft, 
-  CheckCircle2, XCircle, RefreshCw, AlertCircle, Copy, Check, Trash2 
+  CheckCircle2, XCircle, RefreshCw, AlertCircle, Copy, Check, Trash2, Globe 
 } from "lucide-react";
 import { toast } from "sonner";
+import { TIMEZONE_OPTIONS, getUtcIsoFromTz } from "@/src/components/callbacks/ScheduleCallbackModal";
 
 export interface CallbackDetailModalProps {
   isOpen: boolean;
@@ -26,6 +27,7 @@ export function CallbackDetailModal({
   
   const [reschedDate, setReschedDate] = useState("");
   const [reschedTime, setReschedTime] = useState("");
+  const [reschedTimezone, setReschedTimezone] = useState("Asia/Kolkata");
   const [reschedReason, setReschedReason] = useState("");
   
   const [loading, setLoading] = useState(false);
@@ -36,6 +38,7 @@ export function CallbackDetailModal({
       setIsRescheduling(false);
       setErrorMsg("");
       setReschedReason("");
+      setReschedTimezone(callback.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || "Asia/Kolkata");
       
       // Default reschedule time: tomorrow at 10 AM
       const tomorrow = new Date();
@@ -124,8 +127,8 @@ export function CallbackDetailModal({
       return;
     }
 
-    const scheduledDateTime = new Date(`${reschedDate}T${reschedTime}`);
-    if (scheduledDateTime <= new Date()) {
+    const scheduledIso = getUtcIsoFromTz(reschedDate, reschedTime, reschedTimezone);
+    if (new Date(scheduledIso) <= new Date()) {
       setErrorMsg("Scheduled time must be in the future.");
       return;
     }
@@ -138,7 +141,8 @@ export function CallbackDetailModal({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          scheduled_at: scheduledDateTime.toISOString(),
+          scheduled_at: scheduledIso,
+          timezone: reschedTimezone,
           reason: reschedReason.trim()
         }),
       });
@@ -270,9 +274,13 @@ export function CallbackDetailModal({
                     Scheduled Time
                   </span>
                   <div className="text-sm font-bold text-[var(--heading)] font-mono">
-                    {new Date(callback.scheduled_at).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}
+                    {new Date(callback.scheduled_at).toLocaleString(undefined, { 
+                      dateStyle: 'medium', 
+                      timeStyle: 'short',
+                      timeZone: callback.timezone || undefined
+                    })}
                   </div>
-                  <span className="text-[10px] text-[var(--muted)] block font-medium mt-0.5">Timezone: {callback.timezone}</span>
+                  <span className="text-[10px] text-[var(--muted)] block font-medium mt-0.5">Timezone: {callback.timezone || "Asia/Kolkata"}</span>
                 </div>
               </div>
 
@@ -334,6 +342,27 @@ export function CallbackDetailModal({
                         className="w-full px-3 py-2 bg-[var(--background)] border border-[var(--border)] rounded-lg text-xs text-[var(--body)] focus:outline-none focus:border-violet-500"
                       />
                     </div>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[var(--muted)] text-[10px] font-bold uppercase tracking-wider flex items-center gap-1">
+                      <Globe className="w-3 h-3 text-violet-400" /> Timezone
+                    </label>
+                    <select
+                      value={reschedTimezone}
+                      onChange={(e) => setReschedTimezone(e.target.value)}
+                      disabled={loading}
+                      required
+                      className="w-full px-3 py-2 bg-[var(--background)] border border-[var(--border)] rounded-lg text-xs text-[var(--body)] focus:outline-none focus:border-violet-500 cursor-pointer"
+                    >
+                      {TIMEZONE_OPTIONS.map((tz) => (
+                        <option key={tz.value} value={tz.value}>
+                          {tz.label}
+                        </option>
+                      ))}
+                      {!TIMEZONE_OPTIONS.some(tz => tz.value === reschedTimezone) && (
+                        <option value={reschedTimezone}>{reschedTimezone}</option>
+                      )}
+                    </select>
                   </div>
                   <div className="space-y-1">
                     <label className="text-[var(--muted)] text-[10px] font-bold uppercase tracking-wider">Reason for Rescheduling</label>

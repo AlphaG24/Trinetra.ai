@@ -85,7 +85,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
     }
 
-    const { agent_id, prospect_name, prospect_phone, scheduled_at, notes, priority, lead_id, original_call_id } = payload;
+    const { agent_id, prospect_name, prospect_phone, scheduled_at, timezone, notes, priority, lead_id, original_call_id } = payload;
 
     if (!agent_id) {
       return NextResponse.json({ error: "Agent ID is required" }, { status: 400 });
@@ -125,6 +125,7 @@ export async function POST(request: Request) {
         prospect_name: prospect_name || "Unknown",
         prospect_phone,
         scheduled_at,
+        timezone: timezone || "Asia/Kolkata",
         notes: notes || "",
         priority: (priority || "normal").toLowerCase(),
         status: "scheduled"

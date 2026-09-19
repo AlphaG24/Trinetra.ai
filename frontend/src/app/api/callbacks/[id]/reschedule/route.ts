@@ -23,10 +23,10 @@ export async function POST(request: Request, { params }: RouteParams) {
       return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
     }
 
-    const { scheduled_at, reason } = payload;
+    const { scheduled_at, reason, timezone } = payload;
 
     if (!scheduled_at) {
-      return NextResponse.json({ error: "New scheduled time is required" }, { status: 400 });
+      return NextResponse.json({ error: "Scheduled time is required" }, { status: 400 });
     }
 
     if (new Date(scheduled_at) <= new Date()) {
@@ -55,6 +55,7 @@ export async function POST(request: Request, { params }: RouteParams) {
       .from("callbacks")
       .update({
         scheduled_at,
+        timezone: timezone || callback.timezone || "Asia/Kolkata",
         attempt_count: 0,
         notes: updatedNotes,
         status: "scheduled", // reset back to scheduled if it was in missed/cancelled

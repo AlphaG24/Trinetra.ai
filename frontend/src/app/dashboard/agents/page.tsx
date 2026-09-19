@@ -7,6 +7,7 @@ import { Bot, Plus, ChevronRight, Trash2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { cleanAgentName } from '@/src/utils/formatAgentName'
 import { PageHeaderSkeleton, CardGridSkeleton } from '@/src/components/ui/skeleton'
+import { PlanValidityTimer } from '@/src/components/shared/PlanValidityTimer'
 
 interface UserAgent {
   id: string
@@ -190,7 +191,17 @@ export default function AgentsDashboardPage() {
                         </div>
                       </div>
 
-                      <div className="flex items-center justify-between border-t border-[var(--border)] pt-3 mt-4 relative z-10">
+                      <div className="mt-3 pt-2.5 border-t border-[var(--border)] relative z-10">
+                        <PlanValidityTimer
+                          createdAt={agent.created_at}
+                          expiresAt={(agent as any).subscription_expires_at}
+                          validityDays={(agent as any).validity_days || 30}
+                          size="xs"
+                          showProgress={true}
+                        />
+                      </div>
+
+                      <div className="flex items-center justify-between border-t border-[var(--border)] pt-3 mt-3 relative z-10">
                         <span className="text-[10px] text-[var(--muted)] font-mono">ID: {agentId.slice(0, 8)}...</span>
                         <ChevronRight className="w-4 h-4 text-[var(--muted)] group-hover:text-[var(--heading)] group-hover:translate-x-0.5 transition-all" />
                       </div>
@@ -237,7 +248,17 @@ export default function AgentsDashboardPage() {
                         </div>
                       </div>
 
-                      <div className="flex items-center justify-between border-t border-[var(--border)] pt-3 mt-4 relative z-10">
+                      <div className="mt-3 pt-2.5 border-t border-[var(--border)] relative z-10">
+                        <PlanValidityTimer
+                          createdAt={agent.created_at}
+                          expiresAt={(agent as any).subscription_expires_at}
+                          validityDays={(agent as any).validity_days || 30}
+                          size="xs"
+                          showProgress={true}
+                        />
+                      </div>
+
+                      <div className="flex items-center justify-between border-t border-[var(--border)] pt-3 mt-3 relative z-10">
                         <span className="text-[10px] text-[var(--muted)] font-mono">ID: {agentId.slice(0, 8)}...</span>
                         <ChevronRight className="w-4 h-4 text-[var(--muted)] group-hover:text-[var(--heading)] group-hover:translate-x-0.5 transition-all" />
                       </div>

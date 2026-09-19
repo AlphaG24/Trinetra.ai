@@ -8,6 +8,7 @@ import { toast } from 'sonner'
 import { createClient } from '@/utils/supabase/client'
 import { useVoiceAgent } from '@/hooks/useVoiceAgent'
 import { AgentCallingStatus } from './AgentCallingStatus'
+import { PlanValidityTimer } from '@/src/components/shared/PlanValidityTimer'
 
 interface CallLog {
   id: string
@@ -618,6 +619,16 @@ export function AgentOverviewTab({
           <div className="space-y-4">
             <h2 className="text-lg font-bold font-display text-[var(--heading)] text-left">Agent Usage</h2>
             <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-6 shadow-sm space-y-4 text-left">
+              <div className="pb-3 border-b border-[var(--border)]">
+                <span className="text-xs font-montserrat font-bold text-[var(--heading)] uppercase block mb-2">Plan Validity</span>
+                <PlanValidityTimer
+                  createdAt={agent.created_at}
+                  expiresAt={agent.subscription_expires_at || agent.renewal_date}
+                  validityDays={agent.validity_days || 30}
+                  size="sm"
+                  showProgress={true}
+                />
+              </div>
               {usageLoading ? (
                 <div className="flex justify-center p-2"><Loader2 className="w-5 h-5 animate-spin text-[var(--muted)]" /></div>
               ) : agentUsage ? (
