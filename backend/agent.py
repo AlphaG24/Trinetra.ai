@@ -248,11 +248,38 @@ def clean_ssml(text: str, is_transcript: bool = False) -> str:
     text = re.sub(r'\s+', ' ', text).strip()
     return text
 
-def fix_gender_verbs(text: str, gender: str) -> str:
-    """Post-process LLM output and TTS text to enforce gender-consistent Hindi/Hinglish verb forms
-    and natural spoken pronunciation (e.g. 24/7 -> twenty-four seven)."""
+DIGIT_WORDS = {
+    '0': 'zero', '1': 'one', '2': 'two', '3': 'three', '4': 'four',
+    '5': 'five', '6': 'six', '7': 'seven', '8': 'eight', '9': 'nine'
+}
+
+def verbalize_digits(text: str) -> str:
+    """Convert phone numbers and sequences of digits (5 to 12 digits) into clear English spoken words.
+    E.g. 7895895668 -> 'seven eight nine five eight, nine five six six eight'.
+    Prevents Indian neural TTS from pronouncing phone numbers as cardinal Hindi numbers ('सात अरब...')."""
     if not text:
         return text
+
+    def _replace_number(match):
+        digits = match.group(0)
+        words = [DIGIT_WORDS.get(d, d) for d in digits]
+        if len(words) == 10:
+            return " ".join(words[:5]) + ", " + " ".join(words[5:])
+        elif len(words) >= 6:
+            mid = len(words) // 2
+            return " ".join(words[:mid]) + ", " + " ".join(words[mid:])
+        return " ".join(words)
+
+    return re.sub(r'\b\d{5,12}\b', _replace_number, text)
+
+def fix_gender_verbs(text: str, gender: str) -> str:
+    """Post-process LLM output and TTS text to enforce gender-consistent Hindi/Hinglish verb forms
+    and natural spoken pronunciation (e.g. 24/7 -> twenty-four seven, phone numbers in English digits)."""
+    if not text:
+        return text
+    # Fix phone numbers so TTS speaks digits in English instead of Hindi cardinal numbers
+    text = verbalize_digits(text)
+
     # Fix 24/7 pronunciation so TTS never says 'chaubis by saat'
     text = re.sub(r'\b24/7\b', 'twenty-four seven', text)
     text = re.sub(r'24/7', 'twenty-four seven', text)
@@ -1164,21 +1191,10 @@ class VikramAgent(Agent):
         await asyncio.sleep(0.8)
 
         greeting = getattr(self, 'greeting_message', None)
-        if not greeting:
-            if getattr(self, 'language', 'hinglish') in ['hinglish', 'hi-IN']:
-                _bname = getattr(self, 'business_name', '') or ''
-                _comp = f" {_bname} se" if _bname else ""
-                _bn = getattr(self, 'bot_name', 'Agent')
-                if getattr(self, 'gender', 'male') == 'female':
-                    greeting = f"Namaste ji, main{_comp} {_bn} bol rahi hoon. Kya main 30 second ke liye aapka time le sakti hoon?"
-                else:
-                    greeting = f"Namaste ji, main{_comp} {_bn} bol raha hoon. Kya main 30 second ke liye aapka time le sakta hoon?"
-            else:
-                _bname = getattr(self, 'business_name', '') or ''
-                _comp = f" from {_bname}" if _bname else ""
-                _bn = getattr(self, 'bot_name', 'Agent')
-                greeting = f"Hello, this is {_bn}{_comp}. How can I help you today?"
-            
+        if not greeting or not str(greeting).strip():
+            logger.info("[VikramAgent] No greeting_message configured or empty — waiting for caller to speak first.")
+            return
+
         logger.info(f"[VikramAgent] Speaking greeting: '{greeting}'")
         print(f"[Agent] Speaking greeting: '{greeting}'", flush=True)
         await self.session.say(
@@ -1310,7 +1326,7 @@ async def extract_and_save_lead(transcript: str, agent_id: str, user_id: str, or
         try:
             res_room = await asyncio.to_thread(
                 supabase_admin.table("voice_calls").select("id, caller_phone, caller_name, metadata")
-                .eq("metadata->>room_name", room_name)
+                .or_(f"provider_call_id.eq.{room_name},session_id.eq.{room_name},metadata->>room_name.eq.{room_name}")
                 .order("created_at", desc=True)
                 .limit(1)
                 .execute
@@ -2285,12 +2301,13 @@ async def entrypoint(ctx: JobContext):
                 
                 raw_name = agent_data.get('name', 'Agent') if agent_data else 'Agent'
                 clean_name = re.sub(r'^\[[^\]]+\]\s*', '', raw_name)
-                clean_name = re.sub(r'\s*-\s*(Demo|Trial)\s*$', '', clean_name, flags=re.IGNORECASE)
-                if clean_name.lower() in ('multi agent', 'multi-agent', 'agent', ''):
-                    if raw_greeting and re.search(r'\baditi\b', raw_greeting, re.IGNORECASE):
-                        clean_name = "Aditi"
+                clean_name = re.sub(r'\s*-\s*(Demo|Trial)\s*$', '', clean_name, flags=re.IGNORECASE).strip()
+                if clean_name.lower() in ('multi agent', 'multi-agent', 'agent', 'sales agent', 'appointment agent', 'support agent', 'lead qualifier', ''):
+                    v_str = str(voice_id).strip().lower()
+                    if v_str in sarvam_female or v_str in sarvam_male:
+                        clean_name = v_str.capitalize()
                     elif gender_tag == 'female':
-                        clean_name = "Aditi" if str(voice_id).lower() == "aditi" else "Anushka"
+                        clean_name = "Aditi"
                     else:
                         clean_name = "Vikram"
                 bot_name = clean_name
@@ -3147,12 +3164,13 @@ async def run_agent(room_name: str, agent_id: str | None = None, contact_id: str
 
                 raw_name = agent_data.get('name', 'Agent')
                 clean_name = re.sub(r'^\[[^\]]+\]\s*', '', raw_name)
-                clean_name = re.sub(r'\s*-\s*(Demo|Trial)\s*$', '', clean_name, flags=re.IGNORECASE)
-                if clean_name.lower() in ('multi agent', 'multi-agent', 'agent', ''):
-                    if raw_greeting and re.search(r'\baditi\b', raw_greeting, re.IGNORECASE):
-                        clean_name = "Aditi"
+                clean_name = re.sub(r'\s*-\s*(Demo|Trial)\s*$', '', clean_name, flags=re.IGNORECASE).strip()
+                if clean_name.lower() in ('multi agent', 'multi-agent', 'agent', 'sales agent', 'appointment agent', 'support agent', 'lead qualifier', ''):
+                    v_str = str(voice_id).strip().lower()
+                    if v_str in sarvam_female or (hasattr(self, 'sarvam_male') and v_str in self.sarvam_male):
+                        clean_name = v_str.capitalize()
                     elif gender_tag == 'female':
-                        clean_name = "Aditi" if str(voice_id).lower() == "aditi" else "Anushka"
+                        clean_name = "Aditi"
                     else:
                         clean_name = "Vikram"
                 bot_name = clean_name

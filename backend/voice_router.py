@@ -1679,56 +1679,76 @@ async def upload_call_recording(
         if duration_seconds and duration_seconds > 0:
             update_data["duration_seconds"] = duration_seconds
 
+        # Match record with retries to handle post-call summarization delay (agent.py LLM run)
         updated = False
-        # 1. Direct indexed match on provider_call_id
-        try:
-            res = supabase_admin.table("voice_calls").update(update_data).eq("provider_call_id", room_name).execute()
-            if getattr(res, "data", None) and len(res.data) > 0:
+        for attempt in range(3):
+            # 1. Direct indexed match on provider_call_id
+            try:
+                res = supabase_admin.table("voice_calls").update(update_data).eq("provider_call_id", room_name).execute()
+                if getattr(res, "data", None) and len(res.data) > 0:
+                    updated = True
+                    break
+            except Exception as e:
+                print(f"[Recording Upload] Error querying provider_call_id: {e}", flush=True)
+
+            # 2. Direct indexed match on session_id
+            if not updated:
+                try:
+                    res = supabase_admin.table("voice_calls").update(update_data).eq("session_id", room_name).execute()
+                    if getattr(res, "data", None) and len(res.data) > 0:
+                        updated = True
+                        break
+                except Exception as e:
+                    print(f"[Recording Upload] Error querying session_id: {e}", flush=True)
+
+            # 3. PostgREST filter on metadata->>room_name
+            if not updated:
+                try:
+                    res = supabase_admin.table("voice_calls").update(update_data).filter("metadata->>room_name", "eq", room_name).execute()
+                    if getattr(res, "data", None) and len(res.data) > 0:
+                        updated = True
+                        break
+                except Exception as e:
+                    print(f"[Recording Upload] Error querying metadata->>room_name: {e}", flush=True)
+
+            if not updated and attempt < 2:
+                await asyncio.sleep(1.0)
+
+        # If not found after retries, create a dedicated row for this room session instead of blindly attaching to an old unrelated call!
+        if not updated:
+            try:
+                call_uid = None
+                call_oid = None
+                if agent_id:
+                    ag_data = supabase_admin.table("agents").select("user_id, organization_id").eq("id", agent_id).limit(1).execute()
+                    if ag_data and ag_data.data:
+                        call_uid = ag_data.data[0].get("user_id")
+                        call_oid = ag_data.data[0].get("organization_id")
+                new_row = {
+                    "agent_id": agent_id,
+                    "user_id": call_uid,
+                    "organization_id": call_oid,
+                    "caller_name": "Web Sandbox User",
+                    "caller_phone": "Browser Sandbox",
+                    "status": "completed",
+                    "started_at": datetime.utcnow().isoformat(),
+                    "ended_at": datetime.utcnow().isoformat(),
+                    "duration_seconds": duration_seconds or 0,
+                    "recording_url": public_url,
+                    "provider_call_id": room_name,
+                    "session_id": room_name,
+                    "metadata": {
+                        "room_name": room_name,
+                        "provider_call_id": room_name,
+                        "session_id": room_name,
+                        "direction": "sandbox"
+                    }
+                }
+                supabase_admin.table("voice_calls").insert(new_row).execute()
+                print(f"[Recording Upload] Created new voice_calls record for room {room_name}", flush=True)
                 updated = True
-        except Exception as e:
-            print(f"[Recording Upload] Error querying provider_call_id: {e}", flush=True)
-
-        # 2. Direct indexed match on session_id
-        if not updated:
-            try:
-                res = supabase_admin.table("voice_calls").update(update_data).eq("session_id", room_name).execute()
-                if getattr(res, "data", None) and len(res.data) > 0:
-                    updated = True
             except Exception as e:
-                print(f"[Recording Upload] Error querying session_id: {e}", flush=True)
-
-        # 3. PostgREST filter on metadata->>room_name
-        if not updated:
-            try:
-                res = supabase_admin.table("voice_calls").update(update_data).filter("metadata->>room_name", "eq", room_name).execute()
-                if getattr(res, "data", None) and len(res.data) > 0:
-                    updated = True
-            except Exception as e:
-                print(f"[Recording Upload] Error querying metadata->>room_name: {e}", flush=True)
-
-        # 4. PostgREST filter on metadata->>provider_call_id
-        if not updated:
-            try:
-                res = supabase_admin.table("voice_calls").update(update_data).filter("metadata->>provider_call_id", "eq", room_name).execute()
-                if getattr(res, "data", None) and len(res.data) > 0:
-                    updated = True
-            except Exception as e:
-                print(f"[Recording Upload] Error querying metadata->>provider_call_id: {e}", flush=True)
-
-        # 5. Fallback: match most recent unrecorded call for this agent
-        if not updated and agent_id:
-            try:
-                recent = supabase_admin.table("voice_calls").select("id")\
-                    .eq("agent_id", agent_id)\
-                    .is_("recording_url", "null")\
-                    .order("created_at", desc=True)\
-                    .limit(1)\
-                    .execute()
-                if recent and getattr(recent, "data", None) and len(recent.data) > 0:
-                    supabase_admin.table("voice_calls").update(update_data).eq("id", recent.data[0]["id"]).execute()
-                    updated = True
-            except Exception as e:
-                print(f"[Recording Upload] Error updating recent call fallback: {e}", flush=True)
+                print(f"[Recording Upload] Error creating fallback row for room {room_name}: {e}", flush=True)
 
         return {"status": "success", "recording_url": public_url}
     except Exception as exc:

@@ -105,7 +105,7 @@ class CallbackSchedulerService:
         attempt_count = (cb.get("attempt_count") or 0) + 1
         max_attempts = cb.get("max_attempts") or 3
 
-        if not prospect_phone or prospect_phone.lower() in ("unknown", "none", ""):
+        if not prospect_phone or str(prospect_phone).lower() in ("unknown", "none", ""):
             logger.warning(f"[CallbackScheduler] Callback {cb_id} has invalid phone ({prospect_phone}). Marking as missed.")
             await asyncio.to_thread(
                 supabase_admin.table("callbacks").update({
@@ -114,6 +114,16 @@ class CallbackSchedulerService:
                 }).eq("id", cb_id).execute
             )
             return
+
+        import re
+        clean_phone = re.sub(r'[^0-9+]', '', str(prospect_phone))
+        if len(clean_phone) == 10 and clean_phone[0] in '6789':
+            clean_phone = f"+91{clean_phone}"
+        elif len(clean_phone) == 12 and clean_phone.startswith("91"):
+            clean_phone = f"+{clean_phone}"
+        elif len(clean_phone) == 11 and clean_phone.startswith("0"):
+            clean_phone = f"+91{clean_phone[1:]}"
+        prospect_phone = clean_phone
 
         # Atomically claim/lock this callback to prevent concurrent duplicate calls
         claim_res = await asyncio.to_thread(
@@ -140,8 +150,9 @@ class CallbackSchedulerService:
                 else:
                     raise ValueError(f"No agent configured for organization {org_id}")
 
-            # 2. Resolve telephony provider
-            provider = get_provider("twilio")
+            # 2. Resolve telephony provider for the organization
+            from app.services.telephony.factory import get_provider_for_organization
+            provider = get_provider_for_organization(org_id) if org_id else get_provider("twilio")
 
             # 3. Resolve caller phone number (from_phone)
             from_phone = None

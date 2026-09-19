@@ -8,7 +8,6 @@ import {
   CheckCircle2, AlertCircle, FileSpreadsheet, Play, Pause, Clock
 } from 'lucide-react'
 import { toast } from 'sonner'
-import { CallAudioPlayer } from '@/src/components/shared/CallAudioPlayer'
 
 interface CustomerContact {
   id: string
@@ -33,6 +32,8 @@ interface CallLog {
   recording_url: string | null
   direction: string
   transcript?: string | null
+  call_summary?: string | null
+  outcome?: string | null
 }
 
 export function CustomerDatabaseClient() {
@@ -624,15 +625,19 @@ export function CustomerDatabaseClient() {
                             )}
                           </div>
 
-                            <div className="mt-3">
-                              <CallAudioPlayer
-                                recordingUrl={call.recording_url}
-                                transcript={call.transcript}
-                                durationSeconds={call.duration_seconds}
-                                callerName={selectedCustomerForHistory?.full_name || 'Customer'}
-                              />
+                          {call.call_summary && (
+                            <div className="mt-2 text-xs text-[var(--body)] bg-[var(--card-bg)] p-3 rounded-lg border border-[var(--border)]/60 leading-relaxed">
+                              <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted)] block mb-1">Call Summary</span>
+                              {call.call_summary}
                             </div>
-                          </div>
+                          )}
+                          {call.outcome && (
+                            <div className="flex items-center gap-1.5 text-[11px] text-[var(--muted)]">
+                              <span>Outcome:</span>
+                              <span className="font-semibold text-[var(--heading)] capitalize">{call.outcome}</span>
+                            </div>
+                          )}
+                        </div>
                       ))}
                     </div>
                   )}
