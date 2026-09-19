@@ -117,12 +117,19 @@ class CallbackSchedulerService:
 
         import re
         clean_phone = re.sub(r'[^0-9+]', '', str(prospect_phone))
-        if len(clean_phone) == 10 and clean_phone[0] in '6789':
+        # Strip erroneous +1/1 prefix mistakenly prepended to 10-digit Indian numbers (e.g. +17818065871 -> +917818065871)
+        if (clean_phone.startswith("+1") and len(clean_phone) == 12) or (clean_phone.startswith("1") and len(clean_phone) == 11):
+            ten_digit = clean_phone[-10:]
+            if ten_digit[0] in '6789':
+                clean_phone = f"+91{ten_digit}"
+        elif len(clean_phone) == 10 and clean_phone[0] in '6789':
             clean_phone = f"+91{clean_phone}"
-        elif len(clean_phone) == 12 and clean_phone.startswith("91"):
+        elif len(clean_phone) == 12 and clean_phone.startswith("91") and clean_phone[2] in '6789':
             clean_phone = f"+{clean_phone}"
-        elif len(clean_phone) == 11 and clean_phone.startswith("0"):
+        elif len(clean_phone) == 11 and clean_phone.startswith("0") and clean_phone[1] in '6789':
             clean_phone = f"+91{clean_phone[1:]}"
+        elif not clean_phone.startswith("+"):
+            clean_phone = f"+{clean_phone}"
         prospect_phone = clean_phone
 
         # Atomically claim/lock this callback to prevent concurrent duplicate calls
@@ -139,28 +146,69 @@ class CallbackSchedulerService:
             return
 
         try:
-            # 1. Resolve agent
-            if not agent_id:
-                # Lookup default agent for the organization
+            # 1. Resolve agent details
+            agent_data = None
+            if agent_id:
+                try:
+                    a_res = await asyncio.to_thread(
+                        supabase_admin.table("agents")
+                        .select("id, name, organization_id, phone_number, telephony_provider")
+                        .eq("id", agent_id)
+                        .maybe_single()
+                        .execute
+                    )
+                    agent_data = a_res.data if a_res else None
+                except Exception as ae:
+                    logger.warning(f"[CallbackScheduler] Error fetching agent {agent_id}: {ae}")
+
+            if not agent_data and org_id:
                 a_res = await asyncio.to_thread(
-                    supabase_admin.table("agents").select("id").eq("organization_id", org_id).limit(1).execute
+                    supabase_admin.table("agents")
+                    .select("id, name, organization_id, phone_number, telephony_provider")
+                    .eq("organization_id", org_id)
+                    .limit(1)
+                    .execute
                 )
-                if a_res.data:
-                    agent_id = a_res.data[0]["id"]
-                else:
-                    raise ValueError(f"No agent configured for organization {org_id}")
+                if a_res.data and len(a_res.data) > 0:
+                    agent_data = a_res.data[0]
+                    agent_id = agent_data["id"]
 
-            # 2. Resolve telephony provider for the organization
-            from app.services.telephony.factory import get_provider_for_organization
-            provider = get_provider_for_organization(org_id) if org_id else get_provider("twilio")
-
-            # 3. Resolve caller phone number (from_phone)
             from_phone = None
-            if org_id:
+            chosen_provider = None
+
+            # 2. Check if agent has a direct phone_number and provider configured
+            if agent_data:
+                if agent_data.get("phone_number"):
+                    from_phone = agent_data["phone_number"]
+                if agent_data.get("telephony_provider"):
+                    chosen_provider = str(agent_data["telephony_provider"]).lower().strip()
+
+            # 3. Check agent_phone_numbers mapping table if not resolved
+            if not from_phone and agent_id:
+                try:
+                    apn_res = await asyncio.to_thread(
+                        supabase_admin.table("agent_phone_numbers")
+                        .select("phone_numbers(phone_number, provider)")
+                        .eq("agent_id", agent_id)
+                        .order("is_primary", desc=True)
+                        .limit(1)
+                        .execute
+                    )
+                    if apn_res.data and len(apn_res.data) > 0:
+                        pn_row = apn_res.data[0].get("phone_numbers") or {}
+                        if pn_row.get("phone_number"):
+                            from_phone = pn_row["phone_number"]
+                            if not chosen_provider:
+                                chosen_provider = (pn_row.get("provider") or "").lower().strip()
+                except Exception as apn_err:
+                    logger.warning(f"[CallbackScheduler] Error querying agent_phone_numbers: {apn_err}")
+
+            # 4. Check organization active phone numbers if not resolved
+            if not from_phone and org_id:
                 try:
                     num_res = await asyncio.to_thread(
                         supabase_admin.table("phone_numbers")
-                        .select("phone_number")
+                        .select("phone_number, provider")
                         .eq("organization_id", org_id)
                         .eq("status", "active")
                         .limit(1)
@@ -168,18 +216,47 @@ class CallbackSchedulerService:
                     )
                     if num_res.data and len(num_res.data) > 0:
                         from_phone = num_res.data[0]["phone_number"]
+                        if not chosen_provider:
+                            chosen_provider = (num_res.data[0].get("provider") or "").lower().strip()
                 except Exception as ne:
                     logger.warning(f"[CallbackScheduler] Failed to query organization phone: {ne}")
 
+            # 5. Telephony provider resolution based on assigned phone number & destination
+            has_exotel = bool(ConfigService.get("EXOTEL_API_KEY") or os.getenv("EXOTEL_API_KEY"))
+            has_twilio = bool(ConfigService.get("TWILIO_ACCOUNT_SID") or os.getenv("TWILIO_ACCOUNT_SID"))
+
+            if chosen_provider in ("exotel", "twilio"):
+                pass
+            elif from_phone and (from_phone.startswith("+91") or from_phone.startswith("91")) and has_exotel:
+                chosen_provider = "exotel"
+            elif from_phone and from_phone.startswith("+1") and has_twilio:
+                chosen_provider = "twilio"
+            elif prospect_phone.startswith("+91") and has_exotel:
+                # If calling an Indian number, prioritize Indian telephony provider (Exotel)
+                chosen_provider = "exotel"
+            elif has_twilio:
+                chosen_provider = "twilio"
+            elif has_exotel:
+                chosen_provider = "exotel"
+            else:
+                chosen_provider = "simulated"
+
+            # Set appropriate caller ID for the selected provider
             if not from_phone:
-                from_phone = os.getenv("TWILIO_PHONE_NUMBER") or "+12282950908"
+                if chosen_provider == "exotel":
+                    from_phone = ConfigService.get("EXOTEL_CALLER_ID") or os.getenv("EXOTEL_CALLER_ID") or "+918000000000"
+                else:
+                    from_phone = os.getenv("TWILIO_PHONE_NUMBER") or "+12282950908"
 
-            # 4. Prepare room name and webhook URL
+            from app.services.telephony.factory import get_provider
+            provider = get_provider(chosen_provider)
+
+            # 6. Prepare room name and webhook URL for the chosen provider
             webhook_base = ConfigService.get("TRINETRA_WEBHOOK_BASE_URL") or os.getenv("TRINETRA_WEBHOOK_BASE_URL") or "http://localhost:8000"
-            unique_room = f"twilio--{agent_id}--callback--{cb_id[:8]}"
-            webhook_url = f"{webhook_base}/api/voice/webhooks/voice/twilio/{org_id}?agent_id={agent_id}&room_name={unique_room}&is_callback=true&callback_id={cb_id}"
+            unique_room = f"{chosen_provider}--{agent_id}--callback--{cb_id[:8]}"
+            webhook_url = f"{webhook_base}/api/voice/webhooks/voice/{chosen_provider}/{org_id}?agent_id={agent_id}&room_name={unique_room}&is_callback=true&callback_id={cb_id}"
 
-            # 5. Insert initial voice_calls record
+            # 7. Insert initial voice_calls record
             await asyncio.to_thread(
                 supabase_admin.table("voice_calls").insert({
                     "organization_id": org_id,
@@ -193,13 +270,14 @@ class CallbackSchedulerService:
                         "callback_id": cb_id,
                         "prospect_name": prospect_name,
                         "notes": notes,
-                        "room_name": unique_room
+                        "room_name": unique_room,
+                        "provider": chosen_provider
                     }
                 }).execute
             )
 
-            # 6. Place outbound call via Telephony Provider
-            logger.info(f"[CallbackScheduler] Placing automated callback to {prospect_name} ({prospect_phone}) from {from_phone} (Room: {unique_room})")
+            # 8. Place outbound call via Telephony Provider
+            logger.info(f"[CallbackScheduler] Placing automated callback to {prospect_name} ({prospect_phone}) from {from_phone} via {chosen_provider} (Room: {unique_room})")
             call_res = await provider.make_outbound_call(
                 to_number=prospect_phone,
                 from_number=from_phone,

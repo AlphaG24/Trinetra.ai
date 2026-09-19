@@ -242,9 +242,15 @@ function VoiceWorkspace({ tool, quota, user, logs, router }: VoiceWorkspaceProps
       <TranscriptModal
         isOpen={selectedCall !== null}
         onClose={() => setSelectedCall(null)}
-        transcript={selectedCall?.event_data?.transcript || "Voice sandbox execution log fetched successfully. No extended transcript registered for this run."}
-        recordingUrl={selectedCall?.event_data?.recording_url || null}
-        callerName="Voice Sandbox Execution"
+        transcript={
+          selectedCall?.transcript_text ||
+          selectedCall?.transcript ||
+          selectedCall?.event_data?.transcript_text ||
+          selectedCall?.event_data?.transcript ||
+          "Voice sandbox execution log fetched successfully. No extended transcript registered for this run."
+        }
+        recordingUrl={selectedCall?.recording_url || selectedCall?.event_data?.recording_url || null}
+        callerName={selectedCall?.prospect_name || selectedCall?.event_data?.prospect_name || selectedCall?.phone_number || "Voice Sandbox Execution"}
       />
     </div>
   )

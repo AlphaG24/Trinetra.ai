@@ -1043,7 +1043,7 @@ async def handle_exotel_voice_webhook(
                             exo_adapter = ExotelProvider()
                             exo_rec = await exo_adapter.get_recording(exo_csid)
                             if exo_rec:
-                                supabase_admin.table("voice_calls").update({"recording_url": exo_rec}).eq("provider_call_id", exo_csid).execute()
+                                supabase_admin.table("voice_calls").update({"recording_url": exo_rec}).filter("metadata->>provider_call_id", "eq", exo_csid).execute()
                                 print(f"[Exotel Webhook] Proactively fetched & stored recording for {exo_csid}: {exo_rec}", flush=True)
                         except Exception as ex_rec_err:
                             print(f"[Exotel Webhook] Proactive recording fetch notice for {exo_csid}: {ex_rec_err}", flush=True)

@@ -867,6 +867,9 @@ export function AgentOverviewTab({
                             key={t.id || idx}
                             className={`flex flex-col ${!isAgent ? 'items-end' : 'items-start'}`}
                           >
+                            <span className="text-[9px] text-[var(--muted)] font-semibold uppercase tracking-wider px-1 mb-1">
+                              {!isAgent ? 'You' : (agent?.name || 'Agent')}
+                            </span>
                             <div
                               className={`max-w-[85%] rounded-xl px-3 py-1.5 text-[11px] leading-normal border border-[var(--border)] ${
                                 !isAgent
@@ -876,9 +879,6 @@ export function AgentOverviewTab({
                             >
                               <p>{t.text}</p>
                             </div>
-                            <span className="text-[8px] text-[var(--muted)] font-semibold uppercase tracking-wider px-1 mt-0.5">
-                              {!isAgent ? 'You' : 'Agent'}
-                            </span>
                           </div>
                         )
                       })

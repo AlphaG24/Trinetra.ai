@@ -254,24 +254,44 @@ DIGIT_WORDS = {
     '5': 'five', '6': 'six', '7': 'seven', '8': 'eight', '9': 'nine'
 }
 
+DEVA_DIGITS_MAP = {
+    '०': '0', '१': '1', '२': '2', '३': '3', '४': '4',
+    '५': '5', '६': '6', '७': '7', '८': '8', '९': '9'
+}
+
 def verbalize_digits(text: str) -> str:
-    """Convert phone numbers and sequences of digits (5 to 12 digits) into clear English spoken words.
-    E.g. 7895895668 -> 'seven eight nine five eight, nine five six six eight'.
-    Prevents Indian neural TTS from pronouncing phone numbers as cardinal Hindi numbers ('सात अरब...')."""
+    """Convert phone numbers, digit chunks, and standalone numbers into clear English spoken words.
+    E.g. 6294 -> 'six two, nine four', 7895895668 -> 'seven eight nine five eight, nine five six six eight'.
+    Prevents Indian neural TTS from vocalizing phone numbers or digit chunks as Hindi cardinal numbers ('छह हज़ार...', 'सात अरब...')."""
     if not text:
         return text
 
-    def _replace_number(match):
+    # Convert any Devanagari numerals to standard ASCII digits first
+    for deva, asc in DEVA_DIGITS_MAP.items():
+        text = text.replace(deva, asc)
+
+    def _replace_number_chunk(match):
         digits = match.group(0)
         words = [DIGIT_WORDS.get(d, d) for d in digits]
         if len(words) == 10:
             return " ".join(words[:5]) + ", " + " ".join(words[5:])
-        elif len(words) >= 6:
+        elif len(words) >= 4:
             mid = len(words) // 2
             return " ".join(words[:mid]) + ", " + " ".join(words[mid:])
         return " ".join(words)
 
-    return re.sub(r'\b\d{5,12}\b', _replace_number, text)
+    # 1. Verbalize any sequence of 2 or more digits into clear English digit words
+    text = re.sub(r'\b\d{2,15}\b', _replace_number_chunk, text)
+
+    # 2. Verbalize single isolated digits in numeric contexts (e.g., 'number hai 6', 'digit 4', 'code 9')
+    text = re.sub(
+        r'\b(number|no\.?|code|digit|dial|hai|he|tha|thi)\s+([0-9])\b',
+        lambda m: f"{m.group(1)} {DIGIT_WORDS.get(m.group(2), m.group(2))}",
+        text,
+        flags=re.IGNORECASE
+    )
+
+    return text
 
 def fix_gender_verbs(text: str, gender: str, caller_gender: str = "male") -> str:
     """Post-process LLM output and TTS text to enforce gender-consistent Hindi/Hinglish verb forms
@@ -822,7 +842,43 @@ def normalize_user_transcript(text: str, agent_name: str = "Aditi", is_female: b
         t = re.sub(r'\bdidi\b', r'aditi', t, flags=re.IGNORECASE)
         t = re.sub(r'\bbtao\b', r'batao', t, flags=re.IGNORECASE)
 
-    # 2. General affirmative and brand normalizations
+    # 2. Transliterate Devanagari digits to ASCII digits
+    for deva, asc in DEVA_DIGITS_MAP.items():
+        t = t.replace(deva, asc)
+
+    # 3. Transliterate spoken Devanagari phonetic number words into English digits
+    # E.g. 'टू नाइन फोर' -> '2 9 4' -> '294'
+    deva_num_words = {
+        'शून्य': '0', 'ज़ीरो': '0', 'जीरो': '0',
+        'वन': '1', 'एक': '1',
+        'टू': '2', 'दो': '2',
+        'थ्री': '3', 'तीन': '3',
+        'फोर': '4', 'चार': '4',
+        'फाइव': '5', 'पाँच': '5', 'पांच': '5',
+        'सिक्स': '6', 'छह': '6', 'छः': '6',
+        'सेवन': '7', 'सात': '7',
+        'एट': '8', 'आठ': '8',
+        'नाइन': '9', 'नौ': '9',
+    }
+    for d_word, d_digit in deva_num_words.items():
+        t = rep_deva(t, d_word, d_digit)
+
+    # Clean up spaced digits into unified numbers if sequence of digits: e.g. "2 9 4" -> "294"
+    t = re.sub(r'(?<=\b\d)\s+(?=\d\b)', '', t)
+
+    # 4. Correct acoustic mishearings of prospect name
+    t = rep_deva(t, 'रहा होगा', 'Raghav')
+
+    # 5. Clean common transactional terms to natural Hinglish for readable transcripts
+    t = rep_deva(t, 'मेरा नाम है', 'Mera naam hai')
+    t = rep_deva(t, 'मेरा नाम', 'Mera naam')
+    t = rep_deva(t, 'कांटेक्ट नंबर है', 'Contact number hai')
+    t = rep_deva(t, 'कांटेक्ट नंबर', 'Contact number')
+    t = rep_deva(t, 'अपॉइंटमेंट', 'appointment')
+    t = rep_deva(t, 'शेड्यूल', 'schedule')
+    t = rep_deva(t, 'कन्फर्म', 'confirm')
+
+    # 6. General affirmative and brand normalizations
     t = rep_deva(t, 'हा बताओ', 'हाँ बताओ')
     t = rep_deva(t, 'हा', 'हाँ')
     t = rep_deva(t, 'त्रिनेत्र', 'त्रिनेत्रा')
@@ -931,7 +987,7 @@ class VikramAgent(Agent):
                     speaker=sarvam_speaker,
                     pace=sarvam_pace,
                     pitch=sarvam_pitch,
-                    loudness=1.0,
+                    loudness=1.3,
                     speech_sample_rate=sarvam_sample_rate,
                     output_audio_codec="linear16",
                 )
@@ -941,7 +997,7 @@ class VikramAgent(Agent):
                     target_language_code=target_lang,
                     model=model_name,
                     speaker=sarvam_speaker,
-                    loudness=1.0,
+                    loudness=1.3,
                     speech_sample_rate=sarvam_sample_rate,
                     output_audio_codec="linear16",
                 )
@@ -951,17 +1007,27 @@ class VikramAgent(Agent):
         sarvam_api_key = os.getenv("SARVAM_API_KEY", "").strip()
         gemini_api_key = (os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY") or "").strip()
 
-        # 1. Speech-to-Text: Use Sarvam Saarika v2.5 in transcribe mode for accurate Hindi/Hinglish speech recognition
+        # 1. Speech-to-Text: Use Sarvam Saaras v3 in codemix mode for authentic Hinglish & English digits recognition
         if sarvam_api_key and (voice_provider == 'sarvam' or language in ['hinglish', 'hi-IN']):
-            stt_prompt = "हाँ, बताओ, हाँ बताओ, हाँ अदिति बताओ, हाँजी, नमस्ते, बोलो, कहिए, क्या काम है, क्या बात है, haan, batao, haan batao, haanji, bolo, Hello"
-            stt_plugin = sarvam.STT(
-                model="saarika:v2.5",
-                language="hi-IN",
-                mode="transcribe",
-                api_key=sarvam_api_key,
-                prompt=stt_prompt,
-            )
-            logger.info("[VikramAgent] Using Sarvam STT (saarika:v2.5, mode=transcribe, hi-IN, primed prompt) for Hinglish recognition")
+            stt_prompt = "Haan, batao, haanji, mera naam Raghav hai, contact number 9876543210, appointment schedule karna hai, Hello"
+            try:
+                stt_plugin = sarvam.STT(
+                    model="saaras:v3",
+                    mode="codemix",
+                    language="unknown",
+                    api_key=sarvam_api_key,
+                    prompt=stt_prompt,
+                )
+                logger.info("[VikramAgent] Using Sarvam STT (saaras:v3, mode=codemix, language=unknown) for Hinglish & English digits")
+            except Exception as sarvam_stt_err:
+                logger.warning(f"[VikramAgent] saaras:v3 codemix init failed ({sarvam_stt_err}), falling back to saarika:v2.5")
+                stt_plugin = sarvam.STT(
+                    model="saarika:v2.5",
+                    language="hi-IN",
+                    mode="transcribe",
+                    api_key=sarvam_api_key,
+                    prompt=stt_prompt,
+                )
         else:
             stt_plugin = openai.STT(
                 model="whisper-large-v3",
@@ -1054,6 +1120,7 @@ class VikramAgent(Agent):
             self._fallback_llm = None
 
         self.caller_gender = "male"
+        self._has_introduced_self = False
 
         # Wrap TTS with ExpressiveTTSWrapper for SSML cleaning and gender-consistent verb correction
         wrapped_tts = ExpressiveTTSWrapper(
@@ -1070,8 +1137,8 @@ class VikramAgent(Agent):
             llm=llm_plugin,
             tts=wrapped_tts,
             vad=get_vad_model(),
-            min_endpointing_delay=0.5,
-            max_endpointing_delay=1.5,
+            min_endpointing_delay=0.9,
+            max_endpointing_delay=2.5,
             min_consecutive_speech_delay=0.4,
             use_tts_aligned_transcript=True,
         )
@@ -1200,10 +1267,11 @@ class VikramAgent(Agent):
                         greet_msg = getattr(self, 'greeting_message', '') or ''
                         agent_name_val = getattr(self, 'bot_name', 'Aditi')
                         b_name_val = getattr(self, 'business_name', '')
-                        if agent_name_val and agent_name_val.lower() not in greet_msg.lower():
+                        if agent_name_val and agent_name_val.lower() not in greet_msg.lower() and not getattr(self, '_has_introduced_self', False):
                             verb_intro = "bol rahi hoon" if getattr(self, 'gender', '') == 'female' else "bol raha hoon"
                             comp_intro = f" {b_name_val} se" if b_name_val else ""
                             intro_needed = f" Since you only checked their identity in your greeting, introduce yourself now: 'Namaste{name_prompt}! Main{comp_intro} {agent_name_val} {verb_intro}.' "
+                            self._has_introduced_self = True
 
                         flow_instruction = (
                             f"[CRITICAL FLOW NOTE: The prospect just confirmed / gave permission to speak ('{norm_txt}'). {intro_needed}"
@@ -1255,6 +1323,11 @@ class VikramAgent(Agent):
             logger.info("[VikramAgent] No greeting_message configured or empty — waiting for caller to speak first.")
             return
 
+        # If greeting already introduced the agent name, mark as introduced so agent never repeats it
+        agent_name_val = getattr(self, 'bot_name', '')
+        if agent_name_val and agent_name_val.lower() in str(greeting).lower():
+            self._has_introduced_self = True
+
         logger.info(f"[VikramAgent] Speaking greeting: '{greeting}'")
         print(f"[Agent] Speaking greeting: '{greeting}'", flush=True)
         await self.session.say(
@@ -1286,8 +1359,8 @@ class VikramAgent(Agent):
     ):
         """
         Custom LLM node for VikramAgent:
-        1. Context Sliding Window: Truncate to the last 6 conversation items while preserving
-           the system prompt. This guarantees tokens stay within rate limits.
+        1. Context Sliding Window: Truncate to the last 30 conversation items while preserving
+           the system prompt. Retains caller name, phone number, and conversation continuity throughout the call.
         2. Transient Flow Instruction Injection: Injects flow instructions into the truncated copy
            for this turn only, without polluting permanent conversation history or leaking to user transcripts.
         3. Dual-Tier Zero-Silence Fallback: If primary LLM encounters a 429 rate limit or network glitch,
@@ -1297,8 +1370,8 @@ class VikramAgent(Agent):
         flow_instruction = getattr(self, '_pending_flow_instruction', None)
         self._pending_flow_instruction = None
 
-        # Truncate context: preserve system message + last 6 conversation turns
-        truncated_ctx = chat_ctx.copy().truncate(max_items=6)
+        # Truncate context: preserve system message + last 30 conversation turns (prevents mid-call memory loss)
+        truncated_ctx = chat_ctx.copy().truncate(max_items=30)
 
         # Inject flow instruction transiently into truncated_ctx without polluting chat_ctx or user transcript
         if flow_instruction and hasattr(truncated_ctx, '_items') and truncated_ctx._items:
@@ -1423,6 +1496,7 @@ async def extract_and_save_lead(transcript: str, agent_id: str, user_id: str, or
             call_res = await asyncio.to_thread(
                 supabase_admin.table("voice_calls").update({
                     "transcript": transcript,
+                    "transcript_text": transcript,
                     "status": "completed",
                     "duration_seconds": duration_seconds
                 }).eq("id", existing_call["id"]).execute
@@ -1440,6 +1514,7 @@ async def extract_and_save_lead(transcript: str, agent_id: str, user_id: str, or
                     "agent_id": agent_id,
                     "organization_id": organization_id,
                     "transcript": transcript,
+                    "transcript_text": transcript,
                     "sentiment": "neutral",
                     "status": "completed",
                     "duration_seconds": duration_seconds,
@@ -2251,9 +2326,15 @@ async def entrypoint(ctx: JobContext):
 - If customer is confused: Slow down, simplify
   "Let me explain this step by step. First..."
 
-### Conversation Memory:
+### Conversation Memory & Continuity (CRITICAL):
 - Reference earlier parts of this call: "As we discussed earlier..."
 - Reference past calls (if customer recognized): "I see you called last week about..."
+- You have ALREADY greeted the caller. NEVER repeat your greeting ("Hello, mai ... bol rahi hoon, kaise help kar sakti hoon?") mid-conversation!
+- NEVER re-introduce yourself once the call is in progress. Maintain full context of the caller's name, requested services, and details already provided.
+
+### English Number Pronunciation (CRITICAL MANDATORY RULE):
+- ALWAYS write and speak all numbers, phone numbers, quantities, dates, times, and amounts in ENGLISH digits (e.g. "nine four five two zero...", "2 PM", "15 minutes").
+- NEVER write numbers in Devanagari script (like 'छह', 'दो', 'नौ') and NEVER vocalize numbers as Hindi cardinal words ('छह हज़ार', 'चौरानवे', 'सात अरब') unless the user specifically asks you to speak in pure Hindi.
 """
                 if "## HUMAN EXPRESSIVENESS RULES" not in system_prompt:
                     system_prompt += expressive_instructions
@@ -3094,11 +3175,18 @@ async def run_agent(room_name: str, agent_id: str | None = None, contact_id: str
 - If customer is confused: Slow down, simplify
   "Let me explain this step by step. First..."
 
-### Conversation Memory:
+### Conversation Memory & Continuity (CRITICAL):
 - Reference earlier parts of this call: "As we discussed earlier..."
 - Reference past calls (if customer recognized): "I see you called last week about..."
+- You have ALREADY greeted the caller. NEVER repeat your greeting ("Hello, mai ... bol rahi hoon, kaise help kar sakti hoon?") mid-conversation!
+- NEVER re-introduce yourself once the call is in progress. Maintain full context of the caller's name, requested services, and details already provided.
+
+### English Number Pronunciation (CRITICAL MANDATORY RULE):
+- ALWAYS write and speak all numbers, phone numbers, quantities, dates, times, and amounts in ENGLISH digits (e.g. "nine four five two zero...", "2 PM", "15 minutes").
+- NEVER write numbers in Devanagari script (like 'छह', 'दो', 'नौ') and NEVER vocalize numbers as Hindi cardinal words ('छह हज़ार', 'चौरानवे', 'सात अरब') unless the user specifically asks you to speak in pure Hindi.
 """
-                system_prompt += expressive_instructions
+                if "## HUMAN EXPRESSIVENESS RULES" not in system_prompt:
+                    system_prompt += expressive_instructions
 
                 # Use custom greeting if set, otherwise template default
                 default_greeting = None
