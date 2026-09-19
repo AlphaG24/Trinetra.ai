@@ -85,13 +85,13 @@ def get_vad_model():
         _vad_model = silero.VAD.load()
         logger.info("Silero VAD model loaded successfully!")
     return _vad_model
-
+PROMPTS_DIR = os.path.join(os.path.dirname(__file__), "prompts")
 
 
 def load_system_prompt() -> str:
     """Load the Vikram Sharma professional sales agent prompt."""
     try:
-        prompt_path = os.path.join(os.path.dirname(__file__), "prompts", "vikram_sharma.txt")
+        prompt_path = os.path.join(PROMPTS_DIR, "vikram_sharma.txt")
         with open(prompt_path, "r", encoding="utf-8") as f:
             return f.read()
     except:
@@ -316,27 +316,55 @@ class ExpressiveTTSStream(tts.SynthesizeStream):
 
     def push_text(self, text: str) -> None:
         import re
+        if not text:
+            return
         self._buffer += text
-        # Low-latency streaming: split on sentence terminators (. ! ? । \n)
-        sentences = re.split(r'(?<=[.!?।\n])\s+', self._buffer)
+        
+        # Normalize multiple dots / ellipses into a comma pause to prevent empty chunk splits
+        normalized = re.sub(r'\.{2,}', ', ', self._buffer)
+        
+        # Split on sentence terminators (. ! ? । \n)
+        sentences = re.split(r'(?<=[.!?।\n])\s+', normalized)
         if len(sentences) > 1:
             for sentence in sentences[:-1]:
                 if sentence.strip():
                     cleaned = fix_gender_verbs(clean_ssml(sentence), self._gender)
-                    self._underlying.push_text(cleaned)
+                    if cleaned.strip():
+                        self._underlying.push_text(cleaned + " ")
             self._buffer = sentences[-1]
+        elif len(self._buffer) >= 60:
+            # If buffer has grown long without terminal punctuation, stream on natural clause boundary
+            clause_match = re.search(r'^(.*[,;:])\s+(.+)$', self._buffer)
+            if clause_match:
+                clause = clause_match.group(1)
+                remainder = clause_match.group(2)
+                cleaned = fix_gender_verbs(clean_ssml(clause), self._gender)
+                if cleaned.strip():
+                    self._underlying.push_text(cleaned + " ")
+                self._buffer = remainder
+            elif len(self._buffer) >= 90:
+                # Word boundary fallback for long run-on sentences
+                last_space = self._buffer.rfind(' ')
+                if last_space > 25:
+                    chunk = self._buffer[:last_space]
+                    self._buffer = self._buffer[last_space+1:]
+                    cleaned = fix_gender_verbs(clean_ssml(chunk), self._gender)
+                    if cleaned.strip():
+                        self._underlying.push_text(cleaned + " ")
 
     def flush(self) -> None:
         if self._buffer.strip():
             cleaned = fix_gender_verbs(clean_ssml(self._buffer), self._gender)
-            self._underlying.push_text(cleaned)
+            if cleaned.strip():
+                self._underlying.push_text(cleaned)
             self._buffer = ""
         self._underlying.flush()
 
     def end_input(self) -> None:
         if self._buffer.strip():
             cleaned = fix_gender_verbs(clean_ssml(self._buffer), self._gender)
-            self._underlying.push_text(cleaned)
+            if cleaned.strip():
+                self._underlying.push_text(cleaned)
             self._buffer = ""
         self._underlying.end_input()
 
@@ -846,8 +874,8 @@ class VikramAgent(Agent):
                     loudness=1.25,
                     speech_sample_rate=sarvam_sample_rate,
                     output_audio_codec="linear16",
-                    min_buffer_size=60,
-                    max_chunk_length=180,
+                    min_buffer_size=40,
+                    max_chunk_length=150,
                 )
             except Exception as sarvam_err:
                 logger.warning(f"[VikramAgent] Sarvam TTS custom init error ({sarvam_err}), falling back to safe linear16 defaults")
@@ -2115,7 +2143,7 @@ async def entrypoint(ctx: JobContext):
                     "professional": "\n\n## PERSONALITY STYLE: PROFESSIONAL\n- Speak formally, politely, and professionally.\n- Be concise and business-like.\n- Avoid excessive slang or casual language.\n- Keep your focus on efficiency and clear facts.",
                     "friendly": "\n\n## PERSONALITY STYLE: FRIENDLY\n- Speak in a warm, friendly, and conversational tone.\n- Use natural fillers and expressions (e.g., 'actually', 'hmm', 'dekhiye', 'bilkul').\n- Be enthusiastic and welcoming.",
                     "assertive": "\n\n## PERSONALITY STYLE: ASSERTIVE\n- Speak directly, confidently, and proactively.\n- Be sales-focused, persuasive, and clear about value propositions.\n- Guide the conversation proactively.",
-                    "empathetic": "\n\n## PERSONALITY STYLE: EMPATHETIC\n- Speak in a highly caring, patient, and understanding tone.\n- If the caller shares problems, show deep empathy and validate their feelings.\n- Slow down and explain things step-by-step."
+                    "empathetic": "\n\n## PERSONALITY STYLE: EMPATHETIC\n- Speak in a caring, patient, and understanding tone.\n- Listen attentively and validate the caller's concerns with genuine warmth.\n- Keep sentences concise, natural, and fluent. Never insert artificial hesitation, trailing pauses, or stutters."
                 }
                 system_prompt += personality_prompts.get(personality.lower(), personality_prompts["friendly"])
                 
@@ -2370,22 +2398,69 @@ async def entrypoint(ctx: JobContext):
                     system_prompt += kb_context
 
                 # --- MULTI-PERSONALITY SETUP ---
-                # Only activate if 2+ personalities are enabled. Single-personality agents skip entirely.
                 personalities_raw = agent_data.get("personalities")
                 enabled_count = _count_enabled_personalities(personalities_raw)
-                if enabled_count >= 2:
+                if enabled_count == 1:
+                    agent_data["_multi_personality_enabled"] = False
+                    try:
+                        p_dict = json.loads(personalities_raw) if isinstance(personalities_raw, str) else (personalities_raw or {})
+                        active_role = next((k for k, v in p_dict.items() if v is True), None)
+                        if active_role:
+                            role_headers = {
+                                "appointment": "Appointment Booking Agent",
+                                "sales": "Sales Agent",
+                                "support": "Customer Support Agent",
+                                "lead_qualifier": "Lead Qualifier Agent"
+                            }
+                            expected_header = role_headers.get(active_role, "")
+                            if expected_header and expected_header.lower() not in system_prompt.lower():
+                                from app.services.prompt_service import PromptService
+                                prompt_svc = PromptService(supabase_admin)
+                                resolved_prompt = await prompt_svc.get_prompt(active_role)
+                                raw_name = agent_data.get('name', 'Agent')
+                                clean_name = re.sub(r'^\[[^\]]+\]\s*', '', raw_name)
+                                clean_name = re.sub(r'\s*-\s*(Demo|Trial)\s*$', '', clean_name, flags=re.IGNORECASE)
+                                resolved_prompt = resolved_prompt.replace('{{agent_name}}', clean_name).replace('{agentName}', clean_name)
+                                company_n = business_name_val or agent_data.get('business_name') or ''
+                                resolved_prompt = resolved_prompt.replace('{{company_name}}', company_n).replace('{companyName}', company_n)
+                                system_prompt = resolved_prompt + personality_prompts.get(personality.lower(), personality_prompts["friendly"])
+                                if "## HUMAN EXPRESSIVENESS RULES" not in system_prompt:
+                                    system_prompt += expressive_instructions
+                                logger.info(f"[SINGLE-PERSONALITY AUTO-SYNC] Overrode mismatched prompt with active role '{active_role}' for agent {agent_id}")
+                    except Exception as sp_err:
+                        logger.warning(f"[SINGLE-PERSONALITY AUTO-SYNC] Error: {sp_err}")
+                elif enabled_count >= 2:
                     try:
                         enabled_personalities = (
                             json.loads(personalities_raw)
                             if isinstance(personalities_raw, str)
                             else (personalities_raw or {})
                         )
-                        # Store on agent_data for use in the session hook
                         agent_data["_multi_personality_enabled"] = True
                         agent_data["_enabled_personalities"] = enabled_personalities
-                        # Build the suffix that gets appended to every personality prompt
-                        # (personality style + expressive rules — already appended above)
-                        # We capture everything added after the raw system_prompt base
+
+                        # Check if base prompt is already multi-agent; if not, initialize with multi_agent.txt
+                        if "SYSTEM PROMPT: Multi-Personality Agent" not in system_prompt and "INTENT DETECTION" not in system_prompt:
+                            from app.services.prompt_service import PromptService
+                            prompt_svc = PromptService(supabase_admin)
+                            multi_base = prompt_svc._load_from_file("multi_agent")
+                            if not multi_base or "You are" not in multi_base:
+                                path_m = os.path.normpath(os.path.join(PROMPTS_DIR, "multi_agent.txt"))
+                                if os.path.exists(path_m):
+                                    with open(path_m, "r", encoding="utf-8") as mf:
+                                        multi_base = mf.read()
+                            if multi_base:
+                                raw_name = agent_data.get('name', 'Agent')
+                                clean_name = re.sub(r'^\[[^\]]+\]\s*', '', raw_name)
+                                clean_name = re.sub(r'\s*-\s*(Demo|Trial)\s*$', '', clean_name, flags=re.IGNORECASE)
+                                multi_base = multi_base.replace('{{agent_name}}', clean_name).replace('{agentName}', clean_name)
+                                company_n = business_name_val or agent_data.get('business_name') or ''
+                                multi_base = multi_base.replace('{{company_name}}', company_n).replace('{companyName}', company_n)
+                                system_prompt = multi_base + personality_prompts.get(personality.lower(), personality_prompts["friendly"])
+                                if "## HUMAN EXPRESSIVENESS RULES" not in system_prompt:
+                                    system_prompt += expressive_instructions
+                                logger.info(f"[MULTI-PERSONALITY] Initialized starting prompt with multi_agent.txt for agent {agent_id}")
+
                         agent_data["_prompt_suffix"] = system_prompt[len(agent_data.get("system_prompt") or load_system_prompt()):]
                         logger.info(
                             f"[MULTI-PERSONALITY] Agent {agent_id} has {enabled_count} personalities enabled: "
@@ -2401,10 +2476,19 @@ async def entrypoint(ctx: JobContext):
         except Exception as e:
             logger.error(f"Failed to fetch config for agent: {e}")
 
-    # Map pitch Shift specifically for Sarvam Bulbul relative shift range [-0.75, 0.75]
-    sarvam_pitch = pitch
+    # Map pitch Shift specifically for Sarvam Bulbul relative shift range [-0.5, 0.5]
+    sarvam_pitch = 0.0
     if provider == 'sarvam':
-        sarvam_pitch = pitch - 1.0
+        try:
+            p_flt = float(pitch)
+            if 0.5 <= p_flt <= 1.5:
+                sarvam_pitch = p_flt - 1.0
+            elif abs(p_flt) <= 0.5:
+                sarvam_pitch = p_flt
+            else:
+                sarvam_pitch = max(-0.5, min(0.5, p_flt / 24.0))
+        except Exception:
+            sarvam_pitch = 0.0
 
     # 2. Create the agent instance with actual settings
     agent_instance = VikramAgent(
@@ -3187,7 +3271,36 @@ async def run_agent(room_name: str, agent_id: str | None = None, contact_id: str
                 # --- MULTI-PERSONALITY SETUP (run_agent path) ---
                 personalities_raw = agent_data.get("personalities")
                 enabled_count = _count_enabled_personalities(personalities_raw)
-                if enabled_count >= 2:
+                if enabled_count == 1:
+                    agent_data["_multi_personality_enabled"] = False
+                    try:
+                        p_dict = json.loads(personalities_raw) if isinstance(personalities_raw, str) else (personalities_raw or {})
+                        active_role = next((k for k, v in p_dict.items() if v is True), None)
+                        if active_role:
+                            role_headers = {
+                                "appointment": "Appointment Booking Agent",
+                                "sales": "Sales Agent",
+                                "support": "Customer Support Agent",
+                                "lead_qualifier": "Lead Qualifier Agent"
+                            }
+                            expected_header = role_headers.get(active_role, "")
+                            if expected_header and expected_header.lower() not in system_prompt.lower():
+                                from app.services.prompt_service import PromptService
+                                prompt_svc = PromptService(supabase_admin)
+                                resolved_prompt = await prompt_svc.get_prompt(active_role)
+                                raw_name = agent_data.get('name', 'Agent')
+                                clean_name = re.sub(r'^\[[^\]]+\]\s*', '', raw_name)
+                                clean_name = re.sub(r'\s*-\s*(Demo|Trial)\s*$', '', clean_name, flags=re.IGNORECASE)
+                                resolved_prompt = resolved_prompt.replace('{{agent_name}}', clean_name).replace('{agentName}', clean_name)
+                                company_n = business_name_val or agent_data.get('business_name') or ''
+                                resolved_prompt = resolved_prompt.replace('{{company_name}}', company_n).replace('{companyName}', company_n)
+                                system_prompt = resolved_prompt + personality_prompts.get(personality.lower(), personality_prompts["friendly"])
+                                if "## HUMAN EXPRESSIVENESS RULES" not in system_prompt:
+                                    system_prompt += expressive_instructions
+                                logger.info(f"[SINGLE-PERSONALITY AUTO-SYNC (run_agent)] Overrode prompt with role '{active_role}' for agent {agent_id}")
+                    except Exception as sp_err:
+                        logger.warning(f"[SINGLE-PERSONALITY AUTO-SYNC (run_agent)] Error: {sp_err}")
+                elif enabled_count >= 2:
                     try:
                         _ep = (
                             json.loads(personalities_raw)
@@ -3196,6 +3309,27 @@ async def run_agent(room_name: str, agent_id: str | None = None, contact_id: str
                         )
                         agent_data["_multi_personality_enabled"] = True
                         agent_data["_enabled_personalities"] = _ep
+
+                        if "SYSTEM PROMPT: Multi-Personality Agent" not in system_prompt and "INTENT DETECTION" not in system_prompt:
+                            from app.services.prompt_service import PromptService
+                            prompt_svc = PromptService(supabase_admin)
+                            multi_base = prompt_svc._load_from_file("multi_agent")
+                            if not multi_base or "You are" not in multi_base:
+                                path_m = os.path.normpath(os.path.join(PROMPTS_DIR, "multi_agent.txt"))
+                                if os.path.exists(path_m):
+                                    with open(path_m, "r", encoding="utf-8") as mf:
+                                        multi_base = mf.read()
+                            if multi_base:
+                                raw_name = agent_data.get('name', 'Agent')
+                                clean_name = re.sub(r'^\[[^\]]+\]\s*', '', raw_name)
+                                clean_name = re.sub(r'\s*-\s*(Demo|Trial)\s*$', '', clean_name, flags=re.IGNORECASE)
+                                multi_base = multi_base.replace('{{agent_name}}', clean_name).replace('{agentName}', clean_name)
+                                company_n = business_name_val or agent_data.get('business_name') or ''
+                                multi_base = multi_base.replace('{{company_name}}', company_n).replace('{companyName}', company_n)
+                                system_prompt = multi_base + personality_prompts.get(personality.lower(), personality_prompts["friendly"])
+                                if "## HUMAN EXPRESSIVENESS RULES" not in system_prompt:
+                                    system_prompt += expressive_instructions
+
                         agent_data["_prompt_suffix"] = system_prompt[len(agent_data.get("system_prompt") or load_system_prompt()):]
                         logger.info(
                             f"[MULTI-PERSONALITY] run_agent: {enabled_count} personalities enabled"

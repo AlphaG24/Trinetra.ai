@@ -12,8 +12,12 @@ export async function POST(request: Request) {
 
     if (!response.ok) {
         const errText = await response.text();
-        console.error("[Enhance Messages] Backend error:", errText);
-        return NextResponse.json({ error: "Failed to enhance messages" }, { status: 500 });
+        console.warn("[Enhance Messages] Backend warning, returning original messages:", errText);
+        return NextResponse.json({
+            enhanced_greeting: body.greeting || '',
+            enhanced_fallback: body.fallback || '',
+            enhanced_ending: body.ending || ''
+        });
     }
 
     const data = await response.json();

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { toast } from 'sonner'
 import { Sparkles, BriefcaseBusiness, Headphones, CalendarCheck, UserSearch, ChevronDown, ChevronUp } from 'lucide-react'
 
@@ -14,6 +14,7 @@ interface PersonalityConfig {
 interface PersonalitySelectorProps {
   agentId: string
   initialPersonalities?: PersonalityConfig | null
+  onPersonalitiesChange?: (newConfig: PersonalityConfig) => void
 }
 
 const PERSONALITY_OPTIONS = [
@@ -53,36 +54,28 @@ const PERSONALITY_OPTIONS = [
 
 const COLOR_MAP: Record<string, Record<string, string>> = {
   violet: {
-    bg: 'bg-violet-500/10',
-    border: 'border-violet-500/30',
-    icon: 'text-violet-400',
-    badge: 'bg-violet-500/20 text-violet-300',
-    ring: 'ring-violet-500/40',
-    dot: 'bg-violet-400',
+    activeBg: 'bg-violet-500/10 border-violet-500/40 ring-violet-500/30',
+    iconBg: 'bg-violet-500/20 text-violet-600 dark:text-violet-400',
+    badge: 'bg-violet-500/15 text-violet-700 dark:text-violet-300 border-violet-500/25',
+    dot: 'bg-violet-500',
   },
   blue: {
-    bg: 'bg-blue-500/10',
-    border: 'border-blue-500/30',
-    icon: 'text-blue-400',
-    badge: 'bg-blue-500/20 text-blue-300',
-    ring: 'ring-blue-500/40',
-    dot: 'bg-blue-400',
+    activeBg: 'bg-blue-500/10 border-blue-500/40 ring-blue-500/30',
+    iconBg: 'bg-blue-500/20 text-blue-600 dark:text-blue-400',
+    badge: 'bg-blue-500/15 text-blue-700 dark:text-blue-300 border-blue-500/25',
+    dot: 'bg-blue-500',
   },
   emerald: {
-    bg: 'bg-emerald-500/10',
-    border: 'border-emerald-500/30',
-    icon: 'text-emerald-400',
-    badge: 'bg-emerald-500/20 text-emerald-300',
-    ring: 'ring-emerald-500/40',
-    dot: 'bg-emerald-400',
+    activeBg: 'bg-emerald-500/10 border-emerald-500/40 ring-emerald-500/30',
+    iconBg: 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400',
+    badge: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/25',
+    dot: 'bg-emerald-500',
   },
   amber: {
-    bg: 'bg-amber-500/10',
-    border: 'border-amber-500/30',
-    icon: 'text-amber-400',
-    badge: 'bg-amber-500/20 text-amber-300',
-    ring: 'ring-amber-500/40',
-    dot: 'bg-amber-400',
+    activeBg: 'bg-amber-500/10 border-amber-500/40 ring-amber-500/30',
+    iconBg: 'bg-amber-500/20 text-amber-600 dark:text-amber-400',
+    badge: 'bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/25',
+    dot: 'bg-amber-500',
   },
 }
 
@@ -93,12 +86,22 @@ const DEFAULT_PERSONALITIES: PersonalityConfig = {
   lead_qualifier: false,
 }
 
-export function PersonalitySelector({ agentId, initialPersonalities }: PersonalitySelectorProps) {
+export function PersonalitySelector({
+  agentId,
+  initialPersonalities,
+  onPersonalitiesChange
+}: PersonalitySelectorProps) {
   const [personalities, setPersonalities] = useState<PersonalityConfig>(
     initialPersonalities || DEFAULT_PERSONALITIES
   )
   const [saving, setSaving] = useState(false)
-  const [expanded, setExpanded] = useState(false)
+  const [expanded, setExpanded] = useState(true)
+
+  useEffect(() => {
+    if (initialPersonalities) {
+      setPersonalities(initialPersonalities)
+    }
+  }, [initialPersonalities])
 
   const enabledCount = Object.values(personalities).filter(Boolean).length
   const isMultiEnabled = enabledCount >= 2
@@ -132,130 +135,147 @@ export function PersonalitySelector({ agentId, initialPersonalities }: Personali
 
         const newCount = Object.values(next).filter(Boolean).length
         if (newCount >= 2) {
-          toast.success(`Multi-personality mode active — ${newCount} roles enabled!`)
+          toast.success(`Multi-personality active — ${newCount} roles enabled!`)
         } else {
-          toast.success('Personality settings updated.')
+          const activeName = PERSONALITY_OPTIONS.find(o => next[o.key])?.label || 'Single'
+          toast.success(`${activeName} role active and prompt synchronized!`)
+        }
+
+        if (onPersonalitiesChange) {
+          onPersonalitiesChange(next)
         }
       } catch (err: any) {
         // Revert on failure
         setPersonalities(personalities)
-        toast.error('Failed to save: ' + err.message)
+        toast.error('Failed to save personality: ' + err.message)
       } finally {
         setSaving(false)
       }
     },
-    [agentId, personalities, enabledCount]
+    [agentId, personalities, enabledCount, onPersonalitiesChange]
   )
 
   return (
-    <div className="rounded-xl border border-zinc-800/60 bg-zinc-900/40 overflow-hidden">
-      {/* Header — clickable to expand/collapse */}
+    <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl shadow-sm overflow-hidden transition-all duration-200">
+      {/* Header — Clickable to expand/collapse */}
       <button
+        type="button"
         id="personality-selector-toggle"
         onClick={() => setExpanded(!expanded)}
-        className="w-full flex items-center justify-between px-5 py-4 hover:bg-zinc-800/30 transition-colors group"
+        className="w-full flex items-center justify-between px-6 py-5 hover:bg-[var(--hover-bg)]/50 transition-colors group cursor-pointer text-left"
       >
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-600/30 to-indigo-600/20 border border-violet-500/30 flex items-center justify-center">
-            <Sparkles className="w-4 h-4 text-violet-400" />
+        <div className="flex items-center gap-3.5">
+          <div className="w-10 h-10 rounded-xl bg-violet-500/10 border border-violet-500/25 flex items-center justify-center shrink-0">
+            <Sparkles className="w-5 h-5 text-violet-600 dark:text-violet-400" />
           </div>
-          <div className="text-left">
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-semibold text-zinc-100">Multi-Personality Mode</span>
-              {isMultiEnabled && (
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-violet-500/20 text-violet-300 border border-violet-500/30 uppercase tracking-wide animate-pulse">
-                  Active
+          <div>
+            <div className="flex items-center gap-2.5">
+              <span className="text-base font-bold font-display text-[var(--heading)]">
+                Multi-Personality Mode
+              </span>
+              {isMultiEnabled ? (
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 uppercase tracking-wide">
+                  Active ({enabledCount} Roles)
+                </span>
+              ) : (
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-[var(--background)] text-[var(--muted)] border border-[var(--border)] uppercase tracking-wide">
+                  Single Role
                 </span>
               )}
             </div>
-            <p className="text-xs text-zinc-500 mt-0.5">
+            <p className="text-xs text-[var(--muted)] mt-0.5">
               {isMultiEnabled
-                ? `${enabledCount} roles active — agent switches intent automatically`
-                : 'Enable 2+ roles to activate dynamic intent switching'}
+                ? `${enabledCount} roles active — agent automatically detects caller intent and switches roles`
+                : 'Select 2+ roles to activate dynamic intent switching, or 1 role for dedicated focus'}
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2.5">
           {saving && (
             <div className="w-4 h-4 border-2 border-violet-500 border-t-transparent rounded-full animate-spin" />
           )}
           {expanded ? (
-            <ChevronUp className="w-4 h-4 text-zinc-500 group-hover:text-zinc-300 transition-colors" />
+            <ChevronUp className="w-5 h-5 text-[var(--muted)] group-hover:text-[var(--heading)] transition-colors" />
           ) : (
-            <ChevronDown className="w-4 h-4 text-zinc-500 group-hover:text-zinc-300 transition-colors" />
+            <ChevronDown className="w-5 h-5 text-[var(--muted)] group-hover:text-[var(--heading)] transition-colors" />
           )}
         </div>
       </button>
 
-      {/* Collapsible body */}
+      {/* Collapsible Body */}
       {expanded && (
-        <div className="px-5 pb-5 border-t border-zinc-800/60">
-          {/* Info banner */}
-          <div className="mt-4 mb-4 px-4 py-3 rounded-lg bg-indigo-950/40 border border-indigo-500/20 flex items-start gap-3">
-            <Sparkles className="w-4 h-4 text-indigo-400 mt-0.5 shrink-0" />
-            <p className="text-xs text-indigo-200/70 leading-relaxed">
-              The agent will automatically detect what the caller needs and switch roles instantly —
-              without interrupting the conversation. Enable at least 2 roles to activate.
+        <div className="px-6 pb-6 pt-1 border-t border-[var(--border)] space-y-4">
+          {/* Info Banner */}
+          <div className="mt-3 px-4 py-3 rounded-xl bg-violet-500/10 border border-violet-500/20 flex items-start gap-3">
+            <Sparkles className="w-4 h-4 text-violet-600 dark:text-violet-400 mt-0.5 shrink-0" />
+            <p className="text-xs text-[var(--heading)]/85 leading-relaxed font-sans">
+              <strong>Dynamic Intent Switching:</strong> When 2 or more roles are enabled, the agent detects what the caller needs from their first few words and seamlessly adopts the right personality. When 1 role is enabled, the agent operates in dedicated mode.
             </p>
           </div>
 
-          {/* Personality toggles */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {/* Personality Toggles Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
             {PERSONALITY_OPTIONS.map(({ key, label, icon: Icon, color, description, keywords }) => {
               const enabled = personalities[key]
               const c = COLOR_MAP[color]
 
               return (
                 <button
+                  type="button"
                   key={key}
                   id={`personality-toggle-${key}`}
                   onClick={() => handleToggle(key)}
                   disabled={saving}
-                  className={`relative flex items-start gap-3 p-4 rounded-xl border text-left transition-all duration-200 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed ${
+                  className={`relative flex items-start gap-3.5 p-4 rounded-xl border text-left transition-all duration-200 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed ${
                     enabled
-                      ? `${c.bg} ${c.border} ring-1 ${c.ring}`
-                      : 'bg-zinc-900/30 border-zinc-800/50 hover:border-zinc-700/50 hover:bg-zinc-800/30'
+                      ? `${c.activeBg} ring-1 shadow-sm`
+                      : 'bg-[var(--background)] border-[var(--border)] hover:border-[var(--border)]/80 hover:bg-[var(--hover-bg)]/40'
                   }`}
                 >
-                  {/* Toggle indicator */}
+                  {/* Toggle Pill Indicator */}
                   <div
-                    className={`absolute top-3 right-3 w-8 h-4.5 h-[18px] rounded-full transition-all duration-200 flex items-center px-0.5 ${
-                      enabled ? 'bg-violet-600' : 'bg-zinc-700'
+                    className={`absolute top-3.5 right-3.5 w-9 h-5 rounded-full transition-colors duration-200 flex items-center px-0.5 ${
+                      enabled ? 'bg-violet-600 dark:bg-violet-500' : 'bg-gray-300 dark:bg-zinc-700'
                     }`}
                   >
                     <div
-                      className={`w-3.5 h-3.5 rounded-full bg-white shadow transition-transform duration-200 ${
-                        enabled ? 'translate-x-3' : 'translate-x-0'
+                      className={`w-4 h-4 rounded-full bg-white shadow-sm transition-transform duration-200 ${
+                        enabled ? 'translate-x-4' : 'translate-x-0'
                       }`}
                     />
                   </div>
 
-                  {/* Icon */}
+                  {/* Role Icon */}
                   <div
-                    className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${
-                      enabled ? c.bg : 'bg-zinc-800/50'
+                    className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border ${
+                      enabled
+                        ? `${c.iconBg} border-current/20`
+                        : 'bg-[var(--card-bg)] text-[var(--muted)] border-[var(--border)]'
                     }`}
                   >
-                    <Icon className={`w-4 h-4 ${enabled ? c.icon : 'text-zinc-500'}`} />
+                    <Icon className="w-4 h-4" />
                   </div>
 
-                  {/* Text */}
-                  <div className="flex-1 min-w-0 pr-8">
+                  {/* Role Details */}
+                  <div className="flex-1 min-w-0 pr-7">
                     <div className="flex items-center gap-2 mb-1">
-                      <span className={`text-sm font-semibold ${enabled ? 'text-zinc-100' : 'text-zinc-400'}`}>
+                      <span className={`text-sm font-bold font-display ${enabled ? 'text-[var(--heading)]' : 'text-[var(--muted)]'}`}>
                         {label}
                       </span>
                       {enabled && (
-                        <span className={`w-1.5 h-1.5 rounded-full ${c.dot}`} />
+                        <span className={`w-2 h-2 rounded-full ${c.dot}`} />
                       )}
                     </div>
-                    <p className={`text-xs leading-relaxed ${enabled ? 'text-zinc-400' : 'text-zinc-600'}`}>
+                    <p className={`text-xs leading-relaxed ${enabled ? 'text-[var(--heading)]/80' : 'text-[var(--muted)]'}`}>
                       {description}
                     </p>
                     {enabled && (
-                      <div className="flex flex-wrap gap-1 mt-2">
+                      <div className="flex flex-wrap gap-1 mt-2.5">
                         {keywords.slice(0, 3).map((kw) => (
-                          <span key={kw} className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${c.badge}`}>
+                          <span
+                            key={kw}
+                            className={`px-2 py-0.5 rounded-md text-[10px] font-medium border ${c.badge}`}
+                          >
                             {kw}
                           </span>
                         ))}
@@ -267,16 +287,22 @@ export function PersonalitySelector({ agentId, initialPersonalities }: Personali
             })}
           </div>
 
-          {/* Status line */}
-          <div className="mt-4 flex items-center gap-2">
-            <div className={`w-2 h-2 rounded-full ${isMultiEnabled ? 'bg-emerald-400 animate-pulse' : 'bg-zinc-600'}`} />
-            <span className={`text-xs ${isMultiEnabled ? 'text-emerald-400' : 'text-zinc-500'}`}>
-              {isMultiEnabled
-                ? `Multi-personality active — ${enabledCount} roles enabled`
-                : enabledCount === 1
-                ? 'Single-personality mode — enable one more role to activate switching'
-                : 'No personalities enabled — enable at least one'}
-            </span>
+          {/* Status Line */}
+          <div className="pt-2 flex items-center justify-between border-t border-[var(--border)]/60 text-xs">
+            <div className="flex items-center gap-2">
+              <div
+                className={`w-2 h-2 rounded-full ${
+                  isMultiEnabled ? 'bg-emerald-500 animate-pulse' : 'bg-violet-500'
+                }`}
+              />
+              <span className={`text-xs font-medium ${isMultiEnabled ? 'text-emerald-600 dark:text-emerald-400' : 'text-[var(--muted)]'}`}>
+                {isMultiEnabled
+                  ? `Multi-personality active — ${enabledCount} roles enabled`
+                  : enabledCount === 1
+                  ? 'Single-personality mode active (enable 2+ roles to activate switching)'
+                  : 'Please enable at least one role'}
+              </span>
+            </div>
           </div>
         </div>
       )}

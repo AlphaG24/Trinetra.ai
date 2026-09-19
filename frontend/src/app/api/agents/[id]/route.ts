@@ -21,13 +21,99 @@ export async function PATCH(
     const allowedKeys = [
       'name', 'role', 'voice_provider', 'voice_id', 'cloned_voice_id', 'voice_speed', 'voice_pitch',
       'system_prompt', 'temperature', 'max_tokens', 'greeting_message', 'fallback_message', 'ending_message',
-      'personality', 'personalities'
+      'personality', 'personalities', 'primary_language'
     ];
 
     const updates: Record<string, any> = {};
     for (const key of allowedKeys) {
       if (key in body) {
         updates[key] = body[key];
+      }
+    }
+
+    // Auto-synchronize system prompt if personalities was updated and no explicit system_prompt was sent
+    if (body.personalities && !body.system_prompt) {
+      try {
+        const pObj = typeof body.personalities === 'string' ? JSON.parse(body.personalities) : body.personalities;
+        const enabledRoles = Object.entries(pObj).filter(([_, v]) => Boolean(v)).map(([k]) => k);
+
+        let templateFile: string | null = null;
+        let defaultGreeting = '';
+
+        if (enabledRoles.length === 1) {
+          const role = enabledRoles[0];
+          const ROLE_MAP: Record<string, { file: string; greeting: string }> = {
+            sales: {
+              file: 'sales_agent.txt',
+              greeting: 'Hello, main {name} bol raha hoon {company} se. Kya main 30 second le sakta hoon?'
+            },
+            support: {
+              file: 'support_agent.txt',
+              greeting: 'Hello, main {name} bol rahi hoon {company} support team se. Kaise help kar sakti hoon?'
+            },
+            appointment: {
+              file: 'appointment_agent.txt',
+              greeting: 'Hello, main {name} bol rahi hoon {company} se. Kaise help kar sakti hoon?'
+            },
+            lead_qualifier: {
+              file: 'lead_qualifier.txt',
+              greeting: 'Hello, main {name} bol raha hoon. Aapne hamari website pe enquiry ki thi. Kaise help kar sakta hoon?'
+            }
+          };
+          if (ROLE_MAP[role]) {
+            templateFile = ROLE_MAP[role].file;
+            defaultGreeting = ROLE_MAP[role].greeting;
+          }
+        } else if (enabledRoles.length >= 2) {
+          templateFile = 'multi_agent.txt';
+          defaultGreeting = 'Hello, main {name} bol raha hoon {company} se. Kaise help kar sakta hoon?';
+        }
+
+        if (templateFile) {
+          const fs = await import('fs');
+          const path = await import('path');
+          const possiblePaths = [
+            path.resolve(process.cwd(), '../backend/prompts', templateFile),
+            path.resolve(process.cwd(), 'backend/prompts', templateFile),
+            path.resolve('/app/backend/prompts', templateFile),
+          ];
+
+          let promptContent: string | null = null;
+          for (const p of possiblePaths) {
+            if (fs.existsSync(p)) {
+              promptContent = fs.readFileSync(p, 'utf-8');
+              break;
+            }
+          }
+
+          if (promptContent) {
+            const { data: existingAgent } = await supabase
+              .from('agents')
+              .select('name, business_name')
+              .eq('id', agentId)
+              .single();
+
+            const rawName = existingAgent?.name || 'Agent';
+            const cleanName = rawName.replace(/^\[[^\]]+\]\s*/, '').replace(/\s*-\s*(Demo|Trial)\s*$/i, '');
+            const companyName = existingAgent?.business_name || 'Trinetra';
+
+            promptContent = promptContent
+              .replace(/\{\{agent_name\}\}/g, cleanName)
+              .replace(/\{agentName\}/g, cleanName)
+              .replace(/\{\{company_name\}\}/g, companyName)
+              .replace(/\{companyName\}/g, companyName);
+
+            updates.system_prompt = promptContent;
+
+            if (!body.greeting_message && defaultGreeting) {
+              updates.greeting_message = defaultGreeting
+                .replace('{name}', cleanName)
+                .replace('{company}', companyName);
+            }
+          }
+        }
+      } catch (syncErr) {
+        console.warn('[Agent Update API] Failed to auto-sync prompt template:', syncErr);
       }
     }
 

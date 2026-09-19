@@ -811,36 +811,52 @@ Return ONLY valid JSON with exactly these keys:
 
 If a field is empty in the input, return empty string for that field.
 
-DO NOT add any explanation. DO NOT wrap in markdown. ONLY the JSON object."""
+DO NOT add any explanation. DO NOT wrap in markdown. ONLY return the valid JSON object."""
 
-    messages_text = f"""Enhance these messages for perfect TTS pronunciation:
+    messages_text = f"""Enhance these messages for perfect TTS pronunciation and return in JSON format:
 
 GREETING: {req.greeting or '(empty)'}
 FALLBACK: {req.fallback or '(empty)'}
 ENDING: {req.ending or '(empty)'}"""
 
-    async with httpx.AsyncClient(timeout=30.0) as client:
-        res = await client.post(
-            "https://api.groq.com/openai/v1/chat/completions",
-            headers={"Authorization": f"Bearer {groq_key}", "Content-Type": "application/json"},
-            json={
-                "model": os.getenv("GROQ_LLM_MODEL", "openai/gpt-oss-120b"),
-                "messages": [
-                    {"role": "system", "content": prompt},
-                    {"role": "user", "content": messages_text}
-                ],
-                "temperature": 0.1,
-                "max_tokens": 500,
-                "response_format": {"type": "json_object"}
-            }
-        )
-        
-        if res.status_code != 200:
-            raise HTTPException(status_code=500, detail=f"Groq error: {res.text}")
+    fallback_result = {
+        "enhanced_greeting": req.greeting or "",
+        "enhanced_fallback": req.fallback or "",
+        "enhanced_ending": req.ending or ""
+    }
+
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            res = await client.post(
+                "https://api.groq.com/openai/v1/chat/completions",
+                headers={"Authorization": f"Bearer {groq_key}", "Content-Type": "application/json"},
+                json={
+                    "model": os.getenv("GROQ_LLM_MODEL", "qwen/qwen3.8-27b"),
+                    "messages": [
+                        {"role": "system", "content": prompt},
+                        {"role": "user", "content": messages_text}
+                    ],
+                    "temperature": 0.1,
+                    "max_tokens": 1500,
+                    "response_format": {"type": "json_object"}
+                }
+            )
             
-        data = res.json()
-        enhanced = json.loads(data["choices"][0]["message"]["content"])
-        return enhanced
+            if res.status_code != 200:
+                print(f"[Enhance Messages] Groq returned status {res.status_code}: {res.text}", flush=True)
+                return fallback_result
+                
+            data = res.json()
+            raw_content = data.get("choices", [{}])[0].get("message", {}).get("content", "{}")
+            enhanced = json.loads(raw_content)
+            return {
+                "enhanced_greeting": enhanced.get("enhanced_greeting") or req.greeting or "",
+                "enhanced_fallback": enhanced.get("enhanced_fallback") or req.fallback or "",
+                "enhanced_ending": enhanced.get("enhanced_ending") or req.ending or ""
+            }
+    except Exception as err:
+        print(f"[Enhance Messages] Exception during enhance: {err}", flush=True)
+        return fallback_result
 
 # --- EXOTEL INBOUND & OUTBOUND VOICE WEBHOOKS ---
 
