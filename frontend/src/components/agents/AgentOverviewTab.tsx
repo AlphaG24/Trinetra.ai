@@ -383,30 +383,20 @@ export function AgentOverviewTab({
       return
     }
 
-    try {
-      setMicPermissionError(null)
-      toast.info("Requesting microphone access...")
-      
-      // Prompt user for mic
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      
-      // Stop testing stream tracks immediately to release device lock
-      stream.getTracks().forEach(track => track.stop())
-    } catch (err: any) {
-      console.error("Microphone access denied:", err)
-      const errMsg = "Microphone access is required to test voice calls. Please enable permission in your browser settings."
-      setMicPermissionError(errMsg)
-      toast.error("Microphone permission denied.")
-      return
-    }
-
+    setMicPermissionError(null)
     const roomName = `room-${agent.id}-${Date.now().toString().slice(-6)}`
 
     try {
       toast.success(`Launching browser sandbox call...`)
       await startCall(roomName, 'ConsoleTester', agent.id)
     } catch (err: any) {
-      toast.error("Failed to start call: " + err.message)
+      if (err?.name === 'NotAllowedError' || err?.message?.includes('Permission denied')) {
+        const errMsg = "Microphone access is required to test voice calls. Please enable permission in your browser settings."
+        setMicPermissionError(errMsg)
+        toast.error("Microphone permission denied.")
+      } else {
+        toast.error("Failed to start call: " + err.message)
+      }
     }
   }
 

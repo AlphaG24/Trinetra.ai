@@ -370,9 +370,9 @@ async def generate_livekit_token(req: LiveKitTokenRequest):
         try:
             async def safe_run_agent(r_name: str, a_id: str):
                 try:
-                    # Optimized sleep guard: 0.5s for outbound telephony, 1.0s for web calls
+                    # Optimized sleep guard: 0.3s for outbound telephony, 0.2s for web calls
                     is_outbound = r_name.startswith(("twilio--", "exotel--", "sip-"))
-                    await asyncio.sleep(0.5 if is_outbound else 1.0)
+                    await asyncio.sleep(0.3 if is_outbound else 0.2)
 
                     # Check if an external worker already joined the room
                     lk_url = os.getenv("LIVEKIT_URL")

@@ -244,8 +244,9 @@ def clean_ssml(text: str, is_transcript: bool = False) -> str:
     # Normalize 24/7 so Indian TTS speaks naturally instead of "chaubis by saat"
     text = re.sub(r'\b24/7\b', 'twenty-four seven', text)
     text = re.sub(r'24/7', 'twenty-four seven', text)
-    # Clean whitespace
+    # Clean whitespace and strip stray enclosing quotes
     text = re.sub(r'\s+', ' ', text).strip()
+    text = text.strip('"\'`“”‘’').strip()
     return text
 
 DIGIT_WORDS = {
@@ -272,11 +273,15 @@ def verbalize_digits(text: str) -> str:
 
     return re.sub(r'\b\d{5,12}\b', _replace_number, text)
 
-def fix_gender_verbs(text: str, gender: str) -> str:
+def fix_gender_verbs(text: str, gender: str, caller_gender: str = "male") -> str:
     """Post-process LLM output and TTS text to enforce gender-consistent Hindi/Hinglish verb forms
     and natural spoken pronunciation (e.g. 24/7 -> twenty-four seven, phone numbers in English digits)."""
     if not text:
         return text
+
+    # Strip any stray enclosing quotes from TTS/LLM output
+    text = text.strip().strip('"\'`“”‘’').strip()
+
     # Fix phone numbers so TTS speaks digits in English instead of Hindi cardinal numbers
     text = verbalize_digits(text)
 
@@ -288,6 +293,18 @@ def fix_gender_verbs(text: str, gender: str) -> str:
     # Fix literal mistranslations of "I see" -> "seekh rahi hoon" / "seekh raha hoon"
     text = re.sub(r'\b(?:main\s+)?seekh\s+(?:rahi|raha)\s+(?:hoon|hu|hun|hoo)\b', 'mujhe pata chala', text, flags=re.IGNORECASE)
     text = re.sub(r'\bseekh\s+rahe\s+hain\b', 'dekh rahe hain', text, flags=re.IGNORECASE)
+
+    # Rule: Addressing the caller ('Aap') in polite Hindi/Hinglish
+    # If caller is not confirmed female, 'aap' must ALWAYS take respectful masculine plural,
+    # NEVER feminine ('rahi hongi', 'rahi hain', 'chahti hain', 'sakti hain')!
+    if caller_gender != 'female':
+        text = re.sub(r'\baap\s+([^.?!,]+?)\s+rahi\s+hongi\b', r'aap \1 rahe honge', text, flags=re.IGNORECASE)
+        text = re.sub(r'\baap\s+([^.?!,]+?)\s+rahi\s+hain\b', r'aap \1 rahe hain', text, flags=re.IGNORECASE)
+        text = re.sub(r'\baap\s+([^.?!,]+?)\s+sakti\s+hain\b', r'aap \1 sakte hain', text, flags=re.IGNORECASE)
+        text = re.sub(r'\baap\s+([^.?!,]+?)\s+chahti\s+hain\b', r'aap \1 chahte hain', text, flags=re.IGNORECASE)
+        text = re.sub(r'\baap\s+([^.?!,]+?)\s+karti\s+hain\b', r'aap \1 karte hain', text, flags=re.IGNORECASE)
+        text = re.sub(r'\baap\s+call\s+kar\s+rahi\s+hongi\b', 'aap call kar rahe honge', text, flags=re.IGNORECASE)
+        text = re.sub(r'\bkar\s+rahi\s+hongi\b', 'kar rahe honge', text, flags=re.IGNORECASE)
 
     if not gender:
         return text
@@ -322,12 +339,13 @@ def text_to_ssml(text: str, provider: str = "sarvam") -> str:
     return clean_ssml(text)
 
 class ExpressiveTTSStream(tts.SynthesizeStream):
-    def __init__(self, tts_instance, underlying_stream, provider="sarvam", gender=""):
+    def __init__(self, tts_instance, underlying_stream, provider="sarvam", gender="", caller_gender="male"):
         import re
         self._underlying = underlying_stream
         self._tts = tts_instance
         self._provider = provider
         self._gender = gender
+        self._caller_gender = caller_gender
         self._buffer = ""
 
     async def _run(self, output_emitter) -> None:
@@ -353,7 +371,7 @@ class ExpressiveTTSStream(tts.SynthesizeStream):
             # We have at least one complete clause/sentence with punctuation
             complete_chunk = "".join(parts[:-1])
             self._buffer = parts[-1]
-            cleaned = fix_gender_verbs(clean_ssml(complete_chunk), self._gender)
+            cleaned = fix_gender_verbs(clean_ssml(complete_chunk), self._gender, self._caller_gender)
             if cleaned.strip():
                 self._underlying.push_text(cleaned)
         elif len(self._buffer) >= 150 and " " in self._buffer:
@@ -361,13 +379,13 @@ class ExpressiveTTSStream(tts.SynthesizeStream):
             last_space = self._buffer.rfind(" ")
             chunk = self._buffer[:last_space]
             self._buffer = self._buffer[last_space + 1:]
-            cleaned = fix_gender_verbs(clean_ssml(chunk), self._gender)
+            cleaned = fix_gender_verbs(clean_ssml(chunk), self._gender, self._caller_gender)
             if cleaned.strip():
                 self._underlying.push_text(cleaned + " ")
 
     def flush(self) -> None:
         if self._buffer.strip():
-            cleaned = fix_gender_verbs(clean_ssml(self._buffer), self._gender)
+            cleaned = fix_gender_verbs(clean_ssml(self._buffer), self._gender, self._caller_gender)
             if cleaned.strip():
                 self._underlying.push_text(cleaned)
             self._buffer = ""
@@ -375,7 +393,7 @@ class ExpressiveTTSStream(tts.SynthesizeStream):
 
     def end_input(self) -> None:
         if self._buffer.strip():
-            cleaned = fix_gender_verbs(clean_ssml(self._buffer), self._gender)
+            cleaned = fix_gender_verbs(clean_ssml(self._buffer), self._gender, self._caller_gender)
             if cleaned.strip():
                 self._underlying.push_text(cleaned)
             self._buffer = ""
@@ -391,10 +409,11 @@ class ExpressiveTTSStream(tts.SynthesizeStream):
         return await self._underlying.__anext__()
 
 class ExpressiveTTSWrapper(tts.TTS):
-    def __init__(self, underlying_tts, provider="sarvam", gender=""):
+    def __init__(self, underlying_tts, provider="sarvam", gender="", caller_gender_fn=None):
         self._underlying = underlying_tts
         self._provider = provider
         self._gender = gender
+        self._caller_gender_fn = caller_gender_fn
         super().__init__(
             capabilities=underlying_tts.capabilities,
             sample_rate=underlying_tts.sample_rate,
@@ -414,12 +433,14 @@ class ExpressiveTTSWrapper(tts.TTS):
         return self._underlying.provider
 
     def synthesize(self, text: str, *args, **kwargs):
-        cleaned = fix_gender_verbs(clean_ssml(text), self._gender)
+        caller_g = self._caller_gender_fn() if callable(self._caller_gender_fn) else "male"
+        cleaned = fix_gender_verbs(clean_ssml(text), self._gender, caller_g)
         return self._underlying.synthesize(cleaned, *args, **kwargs)
 
     def stream(self, *args, **kwargs):
         underlying_stream = self._underlying.stream(*args, **kwargs)
-        return ExpressiveTTSStream(self, underlying_stream, self._provider, self._gender)
+        caller_g = self._caller_gender_fn() if callable(self._caller_gender_fn) else "male"
+        return ExpressiveTTSStream(self, underlying_stream, provider=self._provider, gender=self._gender, caller_gender=caller_g)
 
 def generate_personalized_greeting(name: str, tags: list, last_call: str | None, notes: str | None, language: str, gender: str, company_name: str = "") -> str:
     """Generate a warm, natural personalized greeting based on customer history"""
@@ -552,6 +573,7 @@ def resolve_agent_greeting(
             else:
                 gm = f"Namaste {first_name} ji! {gm}"
         gm = re.sub(r'\s+', ' ', gm).strip()
+        gm = gm.strip('"\'`“”‘’').strip()
         gm = gm.replace(" ,", ",").replace(" !", "!").replace(" .", ".")
         return gm
     
@@ -632,7 +654,15 @@ def build_outbound_sales_protocol(
         f"- If the prospect says 'no', 'nahi chahiye', 'not interested', 'busy hoon' TWICE in the call:\n"
         f"  STOP SELLING IMMEDIATELY. Do not attempt a third angle, a third hook, or a third ask.\n"
         f"  Close with dignity: 'Bilkul sir, respect {'karti' if gender_tag == 'female' else 'karta'} hoon. Aapka time dene ke liye shukriya, have a great day!'\n"
-        f"- First 'no': You may try ONE different angle (empathy + curiosity). Second 'no': EXIT gracefully.\n"
+        f"\n"
+        f"### THIRD-PARTY PICKUP / PROSPECT ABSENT PROTOCOL (CRITICAL):\n"
+        f"- If someone else answers or indicates that the prospect ({p_name}) is NOT available / not here (e.g. 'wo yahan nahi hain', 'phone ghar pe hai', 'bahar gaye hain', 'office mein hain', 'abhi baat nahi ho sakti', 'baad mein call karna'):\n"
+        f"  1. DO NOT try to sell, pitch, or push services onto this person.\n"
+        f"  2. Respond warmly, politely, and respectfully:\n"
+        f"     'Theek hai, koi baat nahi ji! Jab bhi wo wapas aayein, kya aap unhe bata denge ki Trinetra se {bot_name} ka call aaya tha?'\n"
+        f"  3. Ask gently when they will return or be available: 'Wo lagbhag kab tak free honge?'\n"
+        f"  4. Acknowledge and wrap up: 'Bahut shukriya! Main unhe 3-4 ghante baad ya sham ko dobara connect kar {gender_verb_listen if gender_tag == 'female' else 'lunga'}. Have a great day!'\n"
+        f"  5. End the call smoothly without lingering.\n"
         f"\n"
         f"### TELEPHONY RULES:\n"
         f"- 1-2 sentences max per turn (12-20 words). No monologues, no lists, no paragraphs.\n"
@@ -724,6 +754,19 @@ def apply_gender_grammar_directives(system_prompt: str, gender_tag: str, bot_nam
                 f"  * ALWAYS say: 'Main call nahi karunga' (STRICTLY NEVER say 'call nahi karungi').\n"
                 f"- Never use female grammatical endings ('rahi', 'sakti', 'karti', 'chahti', 'lungi', 'karungi') when referring to yourself."
             )
+
+    if '## CALLER ADDRESSING & GENDER RULES' not in system_prompt:
+        system_prompt += (
+            f"\n\n## CALLER ADDRESSING & GENDER RULES (CRITICAL & STRICT):\n"
+            f"- Polite Address Rule for Caller ('Aap'):\n"
+            f"  * When speaking to or addressing the caller ('Aap'), ALWAYS use respectful masculine plural forms by default:\n"
+            f"    - ALWAYS say: 'Aap call kar rahe honge' (STRICTLY NEVER say 'aap call kar rahi hongi' unless the caller is definitely a woman).\n"
+            f"    - ALWAYS say: 'Aap bata sakte hain' (STRICTLY NEVER 'aap bata sakti hain' unless caller is female).\n"
+            f"    - ALWAYS say: 'Aap kya chahte hain?' / 'Aap keh rahe the' / 'Aap dekh sakte hain'.\n"
+            f"  * Remember: Feminine verb endings ('rahi hoon', 'sakti hoon', 'karti hoon', 'bol rahi hoon') apply ONLY to YOU ({bot_name}), NEVER to the caller!\n"
+            f"  * If the caller mentions a male name (e.g. Raghav, Ketan, Rahul, Amit) or uses male verbs ('main bol raha hoon', 'main soch raha tha'), treat them as male.\n"
+            f"  * Only if the caller introduces herself with a female name or female self-verbs ('main bol rahi hoon'), use feminine respectful address ('aap keh rahi theen')."
+        )
 
     if '## UNIVERSAL EQ' not in system_prompt:
         system_prompt += (
@@ -1010,8 +1053,15 @@ class VikramAgent(Agent):
         else:
             self._fallback_llm = None
 
+        self.caller_gender = "male"
+
         # Wrap TTS with ExpressiveTTSWrapper for SSML cleaning and gender-consistent verb correction
-        wrapped_tts = ExpressiveTTSWrapper(tts_plugin, provider=voice_provider, gender=self.gender)
+        wrapped_tts = ExpressiveTTSWrapper(
+            tts_plugin,
+            provider=voice_provider,
+            gender=self.gender,
+            caller_gender_fn=lambda: getattr(self, 'caller_gender', 'male')
+        )
 
         # Directly pass wrapped TTS so LLM tokens stream to TTS in real time with zero buffering delay
         super().__init__(
@@ -1032,12 +1082,21 @@ class VikramAgent(Agent):
         """
         Intercepts user turn right before the LLM generates a response:
         1. Normalizes phonetic mishearings in user speech ('हाँ दीदी बताओ' -> 'हाँ अदिति बताओ').
-        2. If caller gave affirmative permission to speak ('haan', 'batao', 'bolo', etc.) in early turns:
+        2. Dynamically detects caller gender from their speech signals.
+        3. If caller gave affirmative permission to speak ('haan', 'batao', 'bolo', etc.) in early turns:
            Injects a high-priority turn instruction to pitch the campaign reason and strictly forbids goodbye.
         """
         try:
             if new_message and new_message.content:
                 raw_txt = new_message.raw_text_content or ""
+                # Dynamically detect caller gender from speech signals or introductions
+                if re.search(r'\b(main\s+.*?\s+(?:raha\s+hoon|raha\s+tha|sakta\s+hoon|karta\s+hoon|gaya\s+tha|aaya\s+tha)|mera\s+naam\s+(?:raghav|rahul|ketan|amit|rohit|vikram|varun|suresh|ramesh|ayush|mohit|deepak|sachin|abhishek|harsh))\b', raw_txt, re.IGNORECASE):
+                    self.caller_gender = "male"
+                    logger.info("[VikramAgent] Caller identified as male based on speech cues")
+                elif re.search(r'\b(main\s+.*?\s+(?:rahi\s+hoon|rahi\s+thi|sakti\s+hoon|karti\s+hoon|gayi\s+thi|aayi\s+thi)|mera\s+naam\s+(?:priya|pooja|neha|ananya|aarti|shreya|simran|kavita|sunita|divya|sneha|riya))\b', raw_txt, re.IGNORECASE):
+                    self.caller_gender = "female"
+                    logger.info("[VikramAgent] Caller identified as female based on speech cues")
+
                 agent_name = getattr(self, 'bot_name', None) or 'Agent'
                 is_female = getattr(self, 'gender', 'male') == 'female'
                 v_bol = "bol rahi hoon" if is_female else "bol raha hoon"
@@ -1177,7 +1236,7 @@ class VikramAgent(Agent):
         
         room_name = getattr(room, 'name', '') if room else ''
         logger.info(f"[VikramAgent] on_enter for room '{room_name}'. Waiting for remote participant to connect...")
-        for _ in range(100): # check every 50ms up to 5.0s for remote human/caller
+        for _ in range(30): # check every 50ms up to 1.5s max for remote human/caller
             remotes = getattr(room, 'remote_participants', {}) if room else {}
             if remotes:
                 has_participant = any(
@@ -1189,7 +1248,7 @@ class VikramAgent(Agent):
                     break
             await asyncio.sleep(0.05)
         # Settle time for browser to subscribe to audio tracks so greeting is clearly heard
-        await asyncio.sleep(0.8)
+        await asyncio.sleep(0.2)
 
         greeting = getattr(self, 'greeting_message', None)
         if not greeting or not str(greeting).strip():
@@ -1205,15 +1264,16 @@ class VikramAgent(Agent):
 
     def _clean_chunk(self, chunk):
         gender = getattr(self, 'gender', '')
+        caller_g = getattr(self, 'caller_gender', 'male')
         if not gender:
             return chunk
         if isinstance(chunk, str):
-            return fix_gender_verbs(clean_ssml(chunk), gender)
+            return fix_gender_verbs(clean_ssml(chunk), gender, caller_gender=caller_g)
         try:
             if hasattr(chunk, 'choices') and chunk.choices:
                 choice = chunk.choices[0]
                 if hasattr(choice, 'delta') and choice.delta and hasattr(choice.delta, 'content') and choice.delta.content:
-                    choice.delta.content = fix_gender_verbs(clean_ssml(choice.delta.content), gender)
+                    choice.delta.content = fix_gender_verbs(clean_ssml(choice.delta.content), gender, caller_gender=caller_g)
         except Exception:
             pass
         return chunk
@@ -1415,9 +1475,9 @@ Return a JSON object with:
 - call_summary: 2-sentence summary of the conversation
 - extracted_data: object with any other useful fields
 - sentiment: "positive", "neutral", or "negative". MUST be "positive" if the caller engaged, accepted a sample/WhatsApp/callback, or expressed interest. MUST be "negative" if annoyed, rude, or rejected. Otherwise "neutral".
-- callback_scheduled: true if the caller requested a callback or indicated they want to talk later (e.g., "call me 1 hr later", "kal call karna"). false otherwise.
-- callback_time_iso: a guess of the ISO-8601 datetime for the callback (in UTC), based on any raw text mentioned. Use the current time provided to resolve relative times. Format as "YYYY-MM-DDTHH:MM:SSZ". Null if callback_scheduled is false.
-- callback_reason: the context or reason for callback if callback_scheduled is true.
+- callback_scheduled: true if the caller requested a callback OR if the target prospect was absent / not available (e.g. someone else answered saying he/she is not here, out of office, phone left behind, busy, or agreed to a later callback). false otherwise.
+- callback_time_iso: a guess of the ISO-8601 datetime for the callback (in UTC), based on any raw text mentioned. If prospect was absent and callback was agreed/rescheduled, default to 3 hours after current time unless a specific time was requested. Format as "YYYY-MM-DDTHH:MM:SSZ". Null if callback_scheduled is false.
+- callback_reason: the context or reason for callback if callback_scheduled is true (e.g. "Prospect absent: out of office / phone at home; message left with third party" or user's requested time).
 - callback_name: the prospect's name to use for the callback if callback_scheduled is true.
 
 Only return valid JSON."""
@@ -1459,6 +1519,23 @@ Only return valid JSON."""
                 logger.info(f"[extract_and_save_lead] Gemini lead extraction succeeded: is_lead={lead_data.get('is_lead')}, callback={lead_data.get('callback_scheduled')}")
         except Exception as g_err:
             logger.warning(f"[extract_and_save_lead] Gemini extraction failed: {g_err}")
+
+    # Programmatic failsafe for third-party pickup & absent prospect auto-rescheduling
+    absent_patterns = [
+        r'\b(?:wo\s+)?(?:abhi\s+)?(?:yahan\s+)?nahi\s+(?:hai|hain)\b',
+        r'\b(?:bahar|office|kaam\s+pe)\s+gaye\s+(?:hai|hain)\b',
+        r'\bphone\s+ghar\s+pe\s+(?:hai|chhod)\b',
+        r'\bnot\s+(?:here|available)\b',
+        r'\b(?:baad\s+me|baad\s+mein)\s+(?:call|baat)\b',
+        r'\bunhe\s+bata\s+denge\b'
+    ]
+    is_absent_pickup = any(re.search(pat, transcript, re.IGNORECASE) for pat in absent_patterns)
+    if is_absent_pickup and not lead_data.get("callback_scheduled"):
+        from datetime import timedelta
+        lead_data["callback_scheduled"] = True
+        lead_data["callback_time_iso"] = (datetime.utcnow() + timedelta(hours=3)).replace(microsecond=0).isoformat() + "Z"
+        lead_data["callback_reason"] = "Prospect absent during call; phone answered by third party; rescheduled for +3 hours."
+        lead_data["is_lead"] = False
 
     # Code-level qualification guard: If customer spoke fewer than 6 words or only greeting words, force is_lead to False
     customer_turns = [l.replace("customer:", "").strip() for l in transcript.split("\n") if l.strip().startswith("customer:")]
