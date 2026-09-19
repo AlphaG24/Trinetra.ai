@@ -6,7 +6,7 @@ import Link from 'next/link'
 import { 
   Bot, ArrowLeft, Copy, Check, LayoutDashboard, Mic, BookOpen, Brain, 
   PhoneIncoming, Users, BarChart3, Lock, AlertCircle, RefreshCw, Clock, Phone,
-  CalendarClock, Settings2
+  CalendarClock, Settings2, Pencil, X, Loader2
 } from 'lucide-react'
 import { createClient } from '@/lib/client'
 import { AgentCallbacksTab } from '../../../../components/agents/AgentCallbacksTab'
@@ -81,6 +81,69 @@ export function AgentDetailPageClient({
 
   // Ref to stop the heartbeat poll once the session is detected as expired
   const sessionExpired = useRef(false)
+
+  // Agent Name Editing State
+  const [isEditingName, setIsEditingName] = useState(false)
+  const [nameInput, setNameInput] = useState('')
+  const [savingName, setSavingName] = useState(false)
+
+  const handleStartEditName = () => {
+    setNameInput(agent?.agent_name || '')
+    setIsEditingName(true)
+  }
+
+  const handleCancelEditName = () => {
+    setIsEditingName(false)
+  }
+
+  const handleSaveName = async () => {
+    const trimmed = nameInput.trim()
+    if (!trimmed) {
+      toast.error("Agent name cannot be empty")
+      return
+    }
+    if (trimmed === agent?.agent_name) {
+      setIsEditingName(false)
+      return
+    }
+
+    try {
+      setSavingName(true)
+      const res = await fetch(`/api/agents/${agentId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: trimmed })
+      })
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.error || "Failed to update agent name")
+      }
+
+      const cleanName = trimmed
+        .replace(/^\[[^\]]+\]\s*/, '')
+        .replace(/\s*-\s*(Demo|Trial)\s*$/i, '')
+        .trim()
+
+      setAgent((prev: any) => ({
+        ...prev,
+        agent_name: cleanName,
+        raw_name: trimmed,
+        name: trimmed
+      }))
+
+      setAgents(agents.map(a => a.id === agentId ? { ...a, name: trimmed } : a))
+      mutate('/api/dashboard/overview')
+
+      setIsEditingName(false)
+      toast.success(`Agent name updated to "${cleanName}"`)
+    } catch (err: any) {
+      console.error(err)
+      toast.error(err.message || "Failed to update agent name")
+    } finally {
+      setSavingName(false)
+    }
+  }
 
   const handleCopyAgentId = () => {
     navigator.clipboard.writeText(agentId)
@@ -543,7 +606,50 @@ export function AgentDetailPageClient({
             <Bot className="w-6 h-6" />
           </div>
           <div>
-            <h1 className="text-xl font-bold text-[var(--heading)] font-display tracking-tight">{agent.agent_name}</h1>
+            {isEditingName ? (
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={nameInput}
+                  onChange={(e) => setNameInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleSaveName()
+                    if (e.key === 'Escape') handleCancelEditName()
+                  }}
+                  autoFocus
+                  disabled={savingName}
+                  className="px-3 py-1 bg-[var(--background)] border border-violet-500 rounded-lg text-lg font-bold text-[var(--heading)] font-display focus:outline-none focus:ring-2 focus:ring-violet-500/30 min-w-[200px]"
+                  placeholder="Enter agent name..."
+                />
+                <button
+                  onClick={handleSaveName}
+                  disabled={savingName}
+                  className="p-1.5 bg-violet-600 hover:bg-violet-700 text-white rounded-lg transition-colors shadow-sm cursor-pointer"
+                  title="Save Name (Enter)"
+                >
+                  {savingName ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                </button>
+                <button
+                  onClick={handleCancelEditName}
+                  disabled={savingName}
+                  className="p-1.5 hover:bg-[var(--hover-bg)] text-[var(--muted)] hover:text-[var(--heading)] rounded-lg transition-colors cursor-pointer"
+                  title="Cancel (Esc)"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 group">
+                <h1 className="text-xl font-bold text-[var(--heading)] font-display tracking-tight">{agent.agent_name}</h1>
+                <button
+                  onClick={handleStartEditName}
+                  className="p-1 text-[var(--muted)] hover:text-violet-500 hover:bg-[var(--hover-bg)] rounded-md transition-colors cursor-pointer opacity-70 group-hover:opacity-100"
+                  title="Rename Agent"
+                >
+                  <Pencil className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
             <div className="flex items-center gap-1.5 mt-1 text-[10px] text-[var(--muted)] font-mono">
               <span>ID: {agentId}</span>
               <button 

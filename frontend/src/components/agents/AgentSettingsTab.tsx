@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { RefreshCw, Trash2, Loader2, Settings2, AlertTriangle } from 'lucide-react'
+import { RefreshCw, Trash2, Loader2, Settings2, AlertTriangle, UserCheck, Check } from 'lucide-react'
 import { toast } from 'sonner'
 
 interface AgentSettingsTabProps {
@@ -11,6 +11,37 @@ interface AgentSettingsTabProps {
 
 export function AgentSettingsTab({ agent, onDelete }: AgentSettingsTabProps) {
   const [resetting, setResetting] = useState(false)
+  const [agentName, setAgentName] = useState(agent?.agent_name || agent?.name || '')
+  const [savingName, setSavingName] = useState(false)
+
+  const handleSaveName = async () => {
+    const trimmed = agentName.trim()
+    if (!trimmed) {
+      toast.error("Agent name cannot be empty")
+      return
+    }
+
+    try {
+      setSavingName(true)
+      const res = await fetch(`/api/agents/${agent.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: trimmed })
+      })
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.error || "Failed to update agent name")
+      }
+
+      toast.success(`Agent name updated to "${trimmed}"`)
+    } catch (err: any) {
+      console.error(err)
+      toast.error(err.message || "Failed to update agent name")
+    } finally {
+      setSavingName(false)
+    }
+  }
 
   const handleResetAgent = async () => {
     if (!window.confirm("Are you sure you want to reset the entire agent? This will restore both Behavior and Voice configurations to their default templates. This action cannot be undone.")) {
@@ -47,8 +78,49 @@ export function AgentSettingsTab({ agent, onDelete }: AgentSettingsTabProps) {
             <Settings2 className="w-5 h-5 text-violet-500" /> Agent Settings
           </h2>
           <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
-            Manage advanced settings, configuration resets, and agent deletion.
+            Manage agent identity, advanced settings, configuration resets, and agent deletion.
           </p>
+        </div>
+      </div>
+
+      {/* Agent Identity & Name Card */}
+      <div className="bg-white dark:bg-[#0D0120] border border-zinc-200 dark:border-white/5 rounded-2xl p-6 shadow-sm space-y-4">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2 text-violet-500">
+            <UserCheck className="w-4 h-4" />
+            <h3 className="text-sm font-bold">Agent Name & Identity</h3>
+          </div>
+          <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed font-merriweather">
+            The name your agent introduces itself as during calls (e.g., "Shubh", "Priya", "Dr. Sharma's Assistant"), and how it appears across all dashboards and analytics.
+          </p>
+        </div>
+
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 pt-1">
+          <input
+            type="text"
+            value={agentName}
+            onChange={(e) => setAgentName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') handleSaveName()
+            }}
+            placeholder="e.g. Shubh, Priya, Nexus Support"
+            className="flex-1 px-4 py-2.5 bg-zinc-50 dark:bg-black/40 border border-zinc-200 dark:border-white/10 rounded-xl text-sm text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500/30 transition-all"
+          />
+          <button
+            onClick={handleSaveName}
+            disabled={savingName || !agentName.trim()}
+            className="flex items-center justify-center gap-1.5 px-5 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-700 text-white font-bold text-xs uppercase tracking-wider transition-all disabled:opacity-50 cursor-pointer shadow-md"
+          >
+            {savingName ? (
+              <>
+                <Loader2 className="w-3.5 h-3.5 animate-spin" /> Saving...
+              </>
+            ) : (
+              <>
+                <Check className="w-3.5 h-3.5" /> Save Name
+              </>
+            )}
+          </button>
         </div>
       </div>
 

@@ -356,8 +356,8 @@ class ExpressiveTTSStream(tts.SynthesizeStream):
             cleaned = fix_gender_verbs(clean_ssml(complete_chunk), self._gender)
             if cleaned.strip():
                 self._underlying.push_text(cleaned)
-        elif len(self._buffer) >= 40 and " " in self._buffer:
-            # If no punctuation after 40 chars, split on last word boundary to keep audio flowing smoothly
+        elif len(self._buffer) >= 150 and " " in self._buffer:
+            # If no punctuation after 150 chars, split on last word boundary to keep audio flowing smoothly
             last_space = self._buffer.rfind(" ")
             chunk = self._buffer[:last_space]
             self._buffer = self._buffer[last_space + 1:]
@@ -891,8 +891,6 @@ class VikramAgent(Agent):
                     loudness=1.25,
                     speech_sample_rate=sarvam_sample_rate,
                     output_audio_codec="linear16",
-                    min_buffer_size=40,
-                    max_chunk_length=150,
                 )
             except Exception as sarvam_err:
                 logger.warning(f"[VikramAgent] Sarvam TTS custom init error ({sarvam_err}), falling back to safe linear16 defaults")
@@ -1123,37 +1121,36 @@ class VikramAgent(Agent):
                             f"'Bilkul sir, main samajh {v_samajh_short} hoon. Main aapko convenient time pe {v_connect}—aaj shaam 5 baje theek rahega ya kal subah 11 baje?']"
                         )
 
-                # 4. Affirmative permission in early turns
-                affirmative_starters = [
-                    "haan", "ha", "haa", "batao", "btao", "bataiye", "bolo", "bolie",
-                    "kahiye", "yes", "sure", "go ahead",
-                    "हाँ", "हां", "बताओ", "बताइए", "बोलो", "बोलिए", "कहिए", "अदिति बताओ", "अदिति बोलो"
-                ]
-                is_affirmative = any(aff in t_lower for aff in affirmative_starters)
+                # 4. Affirmative permission in early turns (ONLY for outbound campaign calls, max once per call)
+                is_outbound = getattr(self, 'call_direction', 'inbound') == 'outbound' or bool(getattr(self, 'campaign_contact', None))
+                if is_outbound and not getattr(self, '_intro_hook_done', False):
+                    affirmative_pattern = r'\b(haan|haa|batao|btao|bataiye|bolo|bolie|kahiye|yes|sure|go ahead)\b|[हाँ|हां|बताओ|बताइए|बोलो|बोलिए|कहिए]'
+                    is_affirmative = bool(re.search(affirmative_pattern, t_lower, flags=re.IGNORECASE))
 
-                if is_affirmative and turn_count <= 4 and not is_outside and not is_rejection and not flow_instruction:
-                    campaign_goal = getattr(self, 'campaign_goal', '') or 'Discuss our products, services, and pricing'
-                    c_name = getattr(self, 'prospect_name', '')
-                    name_prompt = f" to {c_name}" if c_name else ""
-                    gender_instr = ""
-                    if getattr(self, 'gender', '') == 'female':
-                        gender_instr = " CRITICAL GRAMMAR: You are FEMALE. Use strictly feminine verb forms ('karti hoon', 'bol rahi hoon', 'kar sakti hoon', 'chahti hoon', 'bhej deti hoon', 'seedhi baat karti hoon'). NEVER use male endings ('karta hoon', 'raha hoon', 'sakta hoon')."
-                    elif getattr(self, 'gender', '') == 'male':
-                        gender_instr = " CRITICAL GRAMMAR: You are MALE. Use strictly masculine verb forms ('karta hoon', 'bol raha hoon', 'kar sakta hoon', 'chahta hoon', 'bhej deta hoon', 'seedhi baat karta hoon')."
-                    intro_needed = ""
-                    greet_msg = getattr(self, 'greeting_message', '') or ''
-                    agent_name_val = getattr(self, 'bot_name', 'Aditi')
-                    b_name_val = getattr(self, 'business_name', '')
-                    if agent_name_val and agent_name_val.lower() not in greet_msg.lower():
-                        verb_intro = "bol rahi hoon" if getattr(self, 'gender', '') == 'female' else "bol raha hoon"
-                        comp_intro = f" {b_name_val} se" if b_name_val else ""
-                        intro_needed = f" Since you only checked their identity in your greeting, introduce yourself now: 'Namaste{name_prompt}! Main{comp_intro} {agent_name_val} {verb_intro}.' "
+                    if is_affirmative and turn_count <= 3 and not is_outside and not is_rejection and not flow_instruction:
+                        self._intro_hook_done = True
+                        campaign_goal = getattr(self, 'campaign_goal', '') or 'Discuss our products, services, and pricing'
+                        c_name = getattr(self, 'prospect_name', '')
+                        name_prompt = f" to {c_name}" if c_name else ""
+                        gender_instr = ""
+                        if getattr(self, 'gender', '') == 'female':
+                            gender_instr = " CRITICAL GRAMMAR: You are FEMALE. Use strictly feminine verb forms ('karti hoon', 'bol rahi hoon', 'kar sakti hoon', 'chahti hoon', 'bhej deti hoon', 'seedhi baat karti hoon'). NEVER use male endings ('karta hoon', 'raha hoon', 'sakta hoon')."
+                        elif getattr(self, 'gender', '') == 'male':
+                            gender_instr = " CRITICAL GRAMMAR: You are MALE. Use strictly masculine verb forms ('karta hoon', 'bol raha hoon', 'kar sakta hoon', 'chahta hoon', 'bhej deta hoon', 'seedhi baat karta hoon')."
+                        intro_needed = ""
+                        greet_msg = getattr(self, 'greeting_message', '') or ''
+                        agent_name_val = getattr(self, 'bot_name', 'Aditi')
+                        b_name_val = getattr(self, 'business_name', '')
+                        if agent_name_val and agent_name_val.lower() not in greet_msg.lower():
+                            verb_intro = "bol rahi hoon" if getattr(self, 'gender', '') == 'female' else "bol raha hoon"
+                            comp_intro = f" {b_name_val} se" if b_name_val else ""
+                            intro_needed = f" Since you only checked their identity in your greeting, introduce yourself now: 'Namaste{name_prompt}! Main{comp_intro} {agent_name_val} {verb_intro}.' "
 
-                    flow_instruction = (
-                        f"[CRITICAL FLOW NOTE: The prospect just confirmed / gave permission to speak ('{norm_txt}'). {intro_needed}"
-                        f"State why you called: '{campaign_goal}'.{gender_instr} "
-                        f"Keep your response strictly short (1-2 sentences), speak naturally, and ask ONE discovery question. DO NOT say goodbye, DO NOT say '{getattr(self, 'ending_message', '')}'!]"
-                    )
+                        flow_instruction = (
+                            f"[CRITICAL FLOW NOTE: The prospect just confirmed / gave permission to speak ('{norm_txt}'). {intro_needed}"
+                            f"State why you called: '{campaign_goal}'.{gender_instr} "
+                            f"Keep your response strictly short (1-2 sentences), speak naturally, and ask ONE discovery question. DO NOT say goodbye, DO NOT say '{getattr(self, 'ending_message', '')}'!]"
+                        )
 
                 # Store flow instruction on agent instance for transient injection in llm_node
                 if flow_instruction:
@@ -2334,10 +2331,22 @@ async def entrypoint(ctx: JobContext):
                     direction=call_direction
                 )
 
-                # Substitute placeholders in system_prompt
+                # Substitute placeholders in system_prompt and scrub generic identity
                 company_display = business_name_val or 'our company'
-                system_prompt = system_prompt.replace('{{agent_name}}', clean_name).replace('{agentName}', clean_name)
                 system_prompt = system_prompt.replace('{{company_name}}', company_display).replace('{companyName}', company_display)
+                
+                # Active scrub of all generic names to enforce custom/selected bot identity
+                generic_names = [
+                    r'\{\{agent_name\}\}', r'\{agentName\}', r'\{agent_name\}', r'\{name\}',
+                    r'\bMulti Agent\b', r'\bmulti agent\b', r'\bSales Agent\b', r'\bsales agent\b',
+                    r'\bAppointment Agent\b', r'\bappointment agent\b', r'\bSupport Agent\b', r'\bsupport agent\b',
+                    r'\bLead Qualifier\b', r'\blead qualifier\b'
+                ]
+                for pat in generic_names:
+                    system_prompt = re.sub(pat, clean_name, system_prompt)
+                if greeting_message:
+                    for pat in generic_names:
+                        greeting_message = re.sub(pat, clean_name, greeting_message)
 
                 if campaign_contact:
                     c_name = campaign_contact.get("full_name") or ""
@@ -3193,10 +3202,22 @@ async def run_agent(room_name: str, agent_id: str | None = None, contact_id: str
                     direction=call_direction
                 )
 
-                # Substitute placeholders in system_prompt
+                # Substitute placeholders in system_prompt and scrub generic identity
                 company_display = business_name_val or 'our company'
-                system_prompt = system_prompt.replace('{{agent_name}}', clean_name).replace('{agentName}', clean_name)
                 system_prompt = system_prompt.replace('{{company_name}}', company_display).replace('{companyName}', company_display)
+                
+                # Active scrub of all generic names to enforce custom/selected bot identity
+                generic_names = [
+                    r'\{\{agent_name\}\}', r'\{agentName\}', r'\{agent_name\}', r'\{name\}',
+                    r'\bMulti Agent\b', r'\bmulti agent\b', r'\bSales Agent\b', r'\bsales agent\b',
+                    r'\bAppointment Agent\b', r'\bappointment agent\b', r'\bSupport Agent\b', r'\bsupport agent\b',
+                    r'\bLead Qualifier\b', r'\blead qualifier\b'
+                ]
+                for pat in generic_names:
+                    system_prompt = re.sub(pat, clean_name, system_prompt)
+                if greeting_message:
+                    for pat in generic_names:
+                        greeting_message = re.sub(pat, clean_name, greeting_message)
 
                 if campaign_contact:
                     c_name = campaign_contact.get("full_name") or ""

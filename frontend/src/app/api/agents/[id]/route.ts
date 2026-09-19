@@ -117,6 +117,61 @@ export async function PATCH(
       }
     }
 
+    // Auto-synchronize greeting and prompt if name was updated
+    if (body.name) {
+      try {
+        const cleanName = body.name
+          .replace(/^\[[^\]]+\]\s*/, '')
+          .replace(/\s*-\s*(Demo|Trial)\s*$/i, '')
+          .trim();
+
+        if (cleanName) {
+          const { data: existingAgent } = await supabase
+            .from('agents')
+            .select('name, greeting_message, system_prompt')
+            .eq('id', agentId)
+            .single();
+
+          if (existingAgent) {
+            const oldRawName = existingAgent.name || '';
+            const oldCleanName = oldRawName
+              .replace(/^\[[^\]]+\]\s*/, '')
+              .replace(/\s*-\s*(Demo|Trial)\s*$/i, '')
+              .trim();
+
+            if (!body.greeting_message && existingAgent.greeting_message) {
+              let gm = existingAgent.greeting_message;
+              if (oldCleanName && oldCleanName !== cleanName) {
+                gm = gm.split(oldCleanName).join(cleanName);
+              }
+              gm = gm.replace(/\bMulti\s+Agent\b/gi, cleanName)
+                     .replace(/\bSales\s+Agent\b/gi, cleanName)
+                     .replace(/\bAppointment\s+Agent\b/gi, cleanName)
+                     .replace(/\{\{agent_name\}\}/g, cleanName)
+                     .replace(/\{agentName\}/g, cleanName)
+                     .replace(/\{name\}/g, cleanName);
+              updates.greeting_message = gm;
+            }
+
+            if (!body.system_prompt && existingAgent.system_prompt) {
+              let sp = existingAgent.system_prompt;
+              if (oldCleanName && oldCleanName !== cleanName) {
+                sp = sp.split(oldCleanName).join(cleanName);
+              }
+              sp = sp.replace(/\bMulti\s+Agent\b/gi, cleanName)
+                     .replace(/\bSales\s+Agent\b/gi, cleanName)
+                     .replace(/\bAppointment\s+Agent\b/gi, cleanName)
+                     .replace(/\{\{agent_name\}\}/g, cleanName)
+                     .replace(/\{agentName\}/g, cleanName);
+              updates.system_prompt = sp;
+            }
+          }
+        }
+      } catch (nameSyncErr) {
+        console.warn('[Agent Update API] Failed to auto-sync name across prompts:', nameSyncErr);
+      }
+    }
+
     if (Object.keys(updates).length === 0) {
       return NextResponse.json({ error: "No valid update parameters provided." }, { status: 400 });
     }
