@@ -319,38 +319,24 @@ class ExpressiveTTSStream(tts.SynthesizeStream):
         if not text:
             return
         self._buffer += text
-        
-        # Normalize multiple dots / ellipses into a comma pause to prevent empty chunk splits
-        normalized = re.sub(r'\.{2,}', ', ', self._buffer)
-        
-        # Split on sentence terminators (. ! ? । \n)
-        sentences = re.split(r'(?<=[.!?।\n])\s+', normalized)
-        if len(sentences) > 1:
-            for sentence in sentences[:-1]:
-                if sentence.strip():
-                    cleaned = fix_gender_verbs(clean_ssml(sentence), self._gender)
-                    if cleaned.strip():
-                        self._underlying.push_text(cleaned + " ")
-            self._buffer = sentences[-1]
-        elif len(self._buffer) >= 60:
-            # If buffer has grown long without terminal punctuation, stream on natural clause boundary
-            clause_match = re.search(r'^(.*[,;:])\s+(.+)$', self._buffer)
-            if clause_match:
-                clause = clause_match.group(1)
-                remainder = clause_match.group(2)
-                cleaned = fix_gender_verbs(clean_ssml(clause), self._gender)
-                if cleaned.strip():
-                    self._underlying.push_text(cleaned + " ")
-                self._buffer = remainder
-            elif len(self._buffer) >= 90:
-                # Word boundary fallback for long run-on sentences
-                last_space = self._buffer.rfind(' ')
-                if last_space > 25:
-                    chunk = self._buffer[:last_space]
-                    self._buffer = self._buffer[last_space+1:]
-                    cleaned = fix_gender_verbs(clean_ssml(chunk), self._gender)
-                    if cleaned.strip():
-                        self._underlying.push_text(cleaned + " ")
+
+        # Split on natural speech boundaries: punctuation marks (comma, period, exclamation, question mark, danda, semicolon, colon, newline)
+        parts = re.split(r'([,.;:!?।\n]+)', self._buffer)
+        if len(parts) >= 3:
+            # We have at least one complete clause/sentence with punctuation
+            complete_chunk = "".join(parts[:-1])
+            self._buffer = parts[-1]
+            cleaned = fix_gender_verbs(clean_ssml(complete_chunk), self._gender)
+            if cleaned.strip():
+                self._underlying.push_text(cleaned)
+        elif len(self._buffer) >= 40 and " " in self._buffer:
+            # If no punctuation after 40 chars, split on last word boundary to keep audio flowing smoothly
+            last_space = self._buffer.rfind(" ")
+            chunk = self._buffer[:last_space]
+            self._buffer = self._buffer[last_space + 1:]
+            cleaned = fix_gender_verbs(clean_ssml(chunk), self._gender)
+            if cleaned.strip():
+                self._underlying.push_text(cleaned + " ")
 
     def flush(self) -> None:
         if self._buffer.strip():
@@ -1005,9 +991,9 @@ class VikramAgent(Agent):
             llm=llm_plugin,
             tts=wrapped_tts,
             vad=get_vad_model(),
-            min_endpointing_delay=0.1,
-            max_endpointing_delay=0.35,
-            min_consecutive_speech_delay=0.3,
+            min_endpointing_delay=0.5,
+            max_endpointing_delay=1.5,
+            min_consecutive_speech_delay=0.4,
             use_tts_aligned_transcript=True,
         )
 
@@ -2535,11 +2521,11 @@ async def entrypoint(ctx: JobContext):
     session = AgentSession(
         vad=get_vad_model(),
         turn_detection="vad",
-        min_endpointing_delay=0.1,
-        max_endpointing_delay=0.25,
+        min_endpointing_delay=0.5,
+        max_endpointing_delay=1.5,
         preemptive_generation=True,
-        min_interruption_duration=0.5,
-        min_interruption_words=2,
+        min_interruption_duration=0.8,
+        min_interruption_words=3,
         resume_false_interruption=True,
     )
     call_start_time = time.time()
@@ -3388,8 +3374,8 @@ async def run_agent(room_name: str, agent_id: str | None = None, contact_id: str
         session = AgentSession(
             vad=get_vad_model(),
             turn_detection="vad",
-            min_endpointing_delay=0.3,
-            max_endpointing_delay=0.6,
+            min_endpointing_delay=0.5,
+            max_endpointing_delay=1.5,
             preemptive_generation=True,
             min_interruption_duration=0.8,
             min_interruption_words=3,
