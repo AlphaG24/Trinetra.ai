@@ -789,6 +789,21 @@ def normalize_user_transcript(text: str, agent_name: str = "Aditi", is_female: b
 
     return re.sub(r'\s+', ' ', t).strip()
 
+SARVAM_MALE_VOICES = [
+    'shubh', 'aditya', 'rahul', 'rohan', 'amit', 'dev', 'ratan', 'varun', 
+    'manan', 'sumit', 'kabir', 'aayan', 'ashutosh', 'advait', 'anand', 
+    'tarun', 'sunny', 'mani', 'gokul', 'vijay', 'mohit', 'rehan', 'soham',
+    'arvind', 'neel', 'arjun', 'amol'
+]
+SARVAM_FEMALE_VOICES = [
+    'aditi', 'ritu', 'priya', 'neha', 'pooja', 'simran', 'kavya', 'ishita', 'shreya', 
+    'roopa', 'tanya', 'shruti', 'suhani', 'kavitha', 'rupali', 'amelia', 
+    'sophia', 'anushka', 'maya', 'diya', 'meera', 'pavithra', 'sita', 'radha', 'leela', 
+    'shimmer', 'alloy', 'nova', 'fable', 'rachel', 'domi', 'bella', 'elli', 'sarah'
+]
+sarvam_male = SARVAM_MALE_VOICES
+sarvam_female = SARVAM_FEMALE_VOICES
+
 class VikramAgent(Agent):
     def __init__(
         self,
@@ -808,23 +823,12 @@ class VikramAgent(Agent):
         
         self.language = language
         
-        sarvam_male = [
-            'shubh', 'aditya', 'rahul', 'rohan', 'amit', 'dev', 'ratan', 'varun', 
-            'manan', 'sumit', 'kabir', 'aayan', 'ashutosh', 'advait', 'anand', 
-            'tarun', 'sunny', 'mani', 'gokul', 'vijay', 'mohit', 'rehan', 'soham',
-            'arvind', 'neel', 'arjun', 'amol'
-        ]
-        sarvam_female = [
-            'ritu', 'priya', 'neha', 'pooja', 'simran', 'kavya', 'ishita', 'shreya', 
-            'roopa', 'tanya', 'shruti', 'suhani', 'kavitha', 'rupali', 'amelia', 
-            'sophia', 'anushka', 'maya', 'diya', 'meera', 'pavithra', 'aditi'
-        ]
         elevenlabs_male = ['pNInz6obpgDQGcFmaJgB', 'TxGEqnHWrfWFTfGW9XjX']
-        self.gender = 'male' if voice_id in sarvam_male or voice_id in elevenlabs_male else 'female'
+        self.gender = 'male' if voice_id in SARVAM_MALE_VOICES or voice_id in elevenlabs_male else 'female'
 
         if voice_provider == 'sarvam':
             # bulbul:v3 validation check: ensure speaker is compatible with bulbul:v3
-            bulbul_v3_speakers = sarvam_male + sarvam_female
+            bulbul_v3_speakers = SARVAM_MALE_VOICES + SARVAM_FEMALE_VOICES
             if voice_id not in bulbul_v3_speakers:
                 voice_id = 'ritu' if self.gender == 'female' else 'shubh'
 
@@ -2295,8 +2299,7 @@ async def entrypoint(ctx: JobContext):
                 except Exception as e:
                     logger.error(f"Failed to fetch profile for greeting: {e}")
 
-                sarvam_female = ['aditi', 'ritu', 'priya', 'neha', 'pooja', 'simran', 'kavya', 'ishita', 'shreya', 'roopa', 'tanya', 'shruti', 'suhani', 'kavitha', 'rupali', 'amelia', 'sophia', 'anushka', 'maya', 'diya', 'meera', 'sita', 'radha', 'leela', 'shimmer', 'alloy', 'nova', 'fable', 'rachel', 'domi', 'bella', 'elli', 'sarah']
-                is_female = (str(voice_id).lower() in sarvam_female or (agent_data and (agent_data.get("gender") == "female" or agent_data.get("voice_gender") == "female")))
+                is_female = (str(voice_id).lower() in SARVAM_FEMALE_VOICES or (agent_data and (agent_data.get("gender") == "female" or agent_data.get("voice_gender") == "female")))
                 gender_tag = 'female' if is_female else 'male'
                 
                 raw_name = agent_data.get('name', 'Agent') if agent_data else 'Agent'
@@ -2304,7 +2307,7 @@ async def entrypoint(ctx: JobContext):
                 clean_name = re.sub(r'\s*-\s*(Demo|Trial)\s*$', '', clean_name, flags=re.IGNORECASE).strip()
                 if clean_name.lower() in ('multi agent', 'multi-agent', 'agent', 'sales agent', 'appointment agent', 'support agent', 'lead qualifier', ''):
                     v_str = str(voice_id).strip().lower()
-                    if v_str in sarvam_female or v_str in sarvam_male:
+                    if v_str in SARVAM_FEMALE_VOICES or v_str in SARVAM_MALE_VOICES:
                         clean_name = v_str.capitalize()
                     elif gender_tag == 'female':
                         clean_name = "Aditi"
@@ -3154,12 +3157,7 @@ async def run_agent(room_name: str, agent_id: str | None = None, contact_id: str
                 except Exception as e:
                     logger.error(f"Failed to fetch profile for greeting in run_agent: {e}")
 
-                sarvam_female = [
-                    'ritu', 'priya', 'neha', 'pooja', 'simran', 'kavya', 'ishita', 'shreya', 
-                    'roopa', 'tanya', 'shruti', 'suhani', 'kavitha', 'rupali', 'amelia', 
-                    'sophia', 'anushka', 'maya', 'diya', 'meera', 'pavithra', 'aditi'
-                ]
-                gender_tag = 'female' if voice_id in sarvam_female else 'male'
+                gender_tag = 'female' if str(voice_id).lower() in SARVAM_FEMALE_VOICES else 'male'
                 is_female = (gender_tag == 'female')
 
                 raw_name = agent_data.get('name', 'Agent')
@@ -3167,7 +3165,7 @@ async def run_agent(room_name: str, agent_id: str | None = None, contact_id: str
                 clean_name = re.sub(r'\s*-\s*(Demo|Trial)\s*$', '', clean_name, flags=re.IGNORECASE).strip()
                 if clean_name.lower() in ('multi agent', 'multi-agent', 'agent', 'sales agent', 'appointment agent', 'support agent', 'lead qualifier', ''):
                     v_str = str(voice_id).strip().lower()
-                    if v_str in sarvam_female or (hasattr(self, 'sarvam_male') and v_str in self.sarvam_male):
+                    if v_str in SARVAM_FEMALE_VOICES or v_str in SARVAM_MALE_VOICES:
                         clean_name = v_str.capitalize()
                     elif gender_tag == 'female':
                         clean_name = "Aditi"
