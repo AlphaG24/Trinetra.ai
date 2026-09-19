@@ -352,8 +352,6 @@ async def generate_livekit_token(req: LiveKitTokenRequest):
                 "status": "in_progress",
                 "started_at": datetime.utcnow().isoformat(),
                 "duration_seconds": 0,
-                "provider_call_id": room_name,
-                "session_id": room_name,
                 "metadata": {
                     "room_name": room_name,
                     "provider_call_id": room_name,
@@ -1682,39 +1680,30 @@ async def upload_call_recording(
         # Match record with retries to handle post-call summarization delay (agent.py LLM run)
         updated = False
         for attempt in range(3):
-            # 1. Direct indexed match on provider_call_id
+            # 1. PostgREST filter on metadata->>room_name (primary reliable index for sandbox & telephony rooms)
             try:
-                res = supabase_admin.table("voice_calls").update(update_data).eq("provider_call_id", room_name).execute()
+                res = supabase_admin.table("voice_calls").update(update_data).filter("metadata->>room_name", "eq", room_name).execute()
                 if getattr(res, "data", None) and len(res.data) > 0:
                     updated = True
+                    print(f"[Recording Upload] Successfully linked recording to voice_call record by room_name: {room_name}", flush=True)
                     break
             except Exception as e:
-                print(f"[Recording Upload] Error querying provider_call_id: {e}", flush=True)
+                print(f"[Recording Upload] Notice querying metadata->>room_name: {e}", flush=True)
 
-            # 2. Direct indexed match on session_id
+            # 2. Fallback check on metadata->>provider_call_id or session_id
             if not updated:
                 try:
-                    res = supabase_admin.table("voice_calls").update(update_data).eq("session_id", room_name).execute()
+                    res = supabase_admin.table("voice_calls").update(update_data).filter("metadata->>provider_call_id", "eq", room_name).execute()
                     if getattr(res, "data", None) and len(res.data) > 0:
                         updated = True
                         break
                 except Exception as e:
-                    print(f"[Recording Upload] Error querying session_id: {e}", flush=True)
-
-            # 3. PostgREST filter on metadata->>room_name
-            if not updated:
-                try:
-                    res = supabase_admin.table("voice_calls").update(update_data).filter("metadata->>room_name", "eq", room_name).execute()
-                    if getattr(res, "data", None) and len(res.data) > 0:
-                        updated = True
-                        break
-                except Exception as e:
-                    print(f"[Recording Upload] Error querying metadata->>room_name: {e}", flush=True)
+                    print(f"[Recording Upload] Notice querying metadata->>provider_call_id: {e}", flush=True)
 
             if not updated and attempt < 2:
                 await asyncio.sleep(1.0)
 
-        # If not found after retries, create a dedicated row for this room session instead of blindly attaching to an old unrelated call!
+        # If not found after retries, create a dedicated row for this room session
         if not updated:
             try:
                 call_uid = None
@@ -1735,8 +1724,6 @@ async def upload_call_recording(
                     "ended_at": datetime.utcnow().isoformat(),
                     "duration_seconds": duration_seconds or 0,
                     "recording_url": public_url,
-                    "provider_call_id": room_name,
-                    "session_id": room_name,
                     "metadata": {
                         "room_name": room_name,
                         "provider_call_id": room_name,
@@ -1745,7 +1732,7 @@ async def upload_call_recording(
                     }
                 }
                 supabase_admin.table("voice_calls").insert(new_row).execute()
-                print(f"[Recording Upload] Created new voice_calls record for room {room_name}", flush=True)
+                print(f"[Recording Upload] Created new voice_calls record for room {room_name} with recording_url: {public_url}", flush=True)
                 updated = True
             except Exception as e:
                 print(f"[Recording Upload] Error creating fallback row for room {room_name}: {e}", flush=True)

@@ -365,8 +365,8 @@ class ExpressiveTTSStream(tts.SynthesizeStream):
             return
         self._buffer += text
 
-        # Split on natural speech boundaries: punctuation marks (comma, period, exclamation, question mark, danda, semicolon, colon, newline)
-        parts = re.split(r'([,.;:!?।\n]+)', self._buffer)
+        # Split on natural speech boundaries: full stops, questions, exclamations, danda, or clauses with sufficient length
+        parts = re.split(r'([.!?।\n]+|(?<=.{20})[,;:]+)', self._buffer)
         if len(parts) >= 3:
             # We have at least one complete clause/sentence with punctuation
             complete_chunk = "".join(parts[:-1])
@@ -374,8 +374,8 @@ class ExpressiveTTSStream(tts.SynthesizeStream):
             cleaned = fix_gender_verbs(clean_ssml(complete_chunk), self._gender, self._caller_gender)
             if cleaned.strip():
                 self._underlying.push_text(cleaned)
-        elif len(self._buffer) >= 150 and " " in self._buffer:
-            # If no punctuation after 150 chars, split on last word boundary to keep audio flowing smoothly
+        elif len(self._buffer) >= 120 and " " in self._buffer:
+            # If no punctuation after 120 chars, split on last word boundary to keep audio flowing smoothly
             last_space = self._buffer.rfind(" ")
             chunk = self._buffer[:last_space]
             self._buffer = self._buffer[last_space + 1:]
@@ -931,7 +931,7 @@ class VikramAgent(Agent):
                     speaker=sarvam_speaker,
                     pace=sarvam_pace,
                     pitch=sarvam_pitch,
-                    loudness=1.25,
+                    loudness=1.0,
                     speech_sample_rate=sarvam_sample_rate,
                     output_audio_codec="linear16",
                 )
@@ -941,7 +941,7 @@ class VikramAgent(Agent):
                     target_language_code=target_lang,
                     model=model_name,
                     speaker=sarvam_speaker,
-                    loudness=1.25,
+                    loudness=1.0,
                     speech_sample_rate=sarvam_sample_rate,
                     output_audio_codec="linear16",
                 )
@@ -1387,7 +1387,7 @@ async def extract_and_save_lead(transcript: str, agent_id: str, user_id: str, or
         try:
             res_room = await asyncio.to_thread(
                 supabase_admin.table("voice_calls").select("id, caller_phone, caller_name, metadata")
-                .or_(f"provider_call_id.eq.{room_name},session_id.eq.{room_name},metadata->>room_name.eq.{room_name}")
+                .filter("metadata->>room_name", "eq", room_name)
                 .order("created_at", desc=True)
                 .limit(1)
                 .execute

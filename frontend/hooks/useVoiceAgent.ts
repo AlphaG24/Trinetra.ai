@@ -32,7 +32,9 @@ export function useVoiceAgent() {
   const roomRef = useRef<Room | null>(null)
   const timerRef = useRef<NodeJS.Timeout | null>(null)
   const secondsConnectedRef = useRef<number>(0)
-  const audioElementsRef = useRef<HTMLMediaElement[]>([])
+  
+  // Dedicated, managed single audio element for playback to eliminate phaser/comb-filtering distortion
+  const dedicatedAudioElRef = useRef<HTMLAudioElement | null>(null)
 
   // Recording pipeline refs
   const audioContextRef = useRef<AudioContext | null>(null)
@@ -65,17 +67,42 @@ export function useVoiceAgent() {
     setTranscripts([])
   }, [])
 
+  // Comprehensive resource cleanup that resets WebRTC and Web Audio without leaving dangling nodes
+  const cleanupCallResources = useCallback(() => {
+    stopTimer()
+
+    // Stop and clear dedicated playback audio element
+    if (dedicatedAudioElRef.current) {
+      try {
+        dedicatedAudioElRef.current.pause()
+        dedicatedAudioElRef.current.srcObject = null
+      } catch {}
+    }
+
+    // Disconnect room
+    if (roomRef.current) {
+      try {
+        roomRef.current.disconnect()
+      } catch (err) {
+        console.warn('[useVoiceAgent] Disconnect warning:', err)
+      }
+      roomRef.current = null
+    }
+  }, [stopTimer])
+
   const disconnect = useCallback(() => {
-    // 1. Finalize and upload real call recording
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-      const rec = mediaRecorderRef.current
-      const callMeta = activeCallMetaRef.current
-      const dur = secondsConnectedRef.current
+    const rec = mediaRecorderRef.current
+    const callMeta = activeCallMetaRef.current
+    const dur = secondsConnectedRef.current
+    const activeCtx = audioContextRef.current
+
+    // Finalize recording and upload
+    if (rec && rec.state !== 'inactive') {
       rec.onstop = async () => {
         const chunks = recordedChunksRef.current
         if (chunks.length > 0) {
           const audioBlob = new Blob(chunks, { type: rec.mimeType || 'audio/webm' })
-          if (audioBlob.size > 500) {
+          if (audioBlob.size > 200) {
             try {
               const formData = new FormData()
               formData.append('file', audioBlob, `call_${callMeta?.roomName || 'web'}_${Date.now()}.webm`)
@@ -85,18 +112,46 @@ export function useVoiceAgent() {
               }
               formData.append('duration_seconds', String(dur))
 
-              const apiUrl = (process.env.NEXT_PUBLIC_BACKEND_URL || process.env.NEXT_PUBLIC_FASTAPI_URL || 'https://trinetra-ai-1-6f2n.onrender.com').replace(/\/$/, '')
-              await fetch(`${apiUrl}/api/voice/recordings/upload`, {
-                method: 'POST',
-                body: formData,
-              })
-              console.log('[useVoiceAgent] Real call recording successfully uploaded to backend')
+              // 1. Primary: Upload via internal Next.js API route
+              let uploadSuccess = false
+              try {
+                const internalRes = await fetch('/api/voice/recordings/upload', {
+                  method: 'POST',
+                  body: formData,
+                })
+                if (internalRes.ok) {
+                  uploadSuccess = true
+                  console.log('[useVoiceAgent] Call recording uploaded via Next.js route')
+                }
+              } catch (intErr) {
+                console.warn('[useVoiceAgent] Internal recording upload notice:', intErr)
+              }
+
+              // 2. Fallback: Upload to backend FastAPI server directly
+              if (!uploadSuccess) {
+                const isProd = typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1'
+                const fallbackUrl = isProd ? 'https://trinetra-ai-1-6f2n.onrender.com' : 'http://127.0.0.1:8000'
+                const apiUrl = (process.env.NEXT_PUBLIC_BACKEND_URL || process.env.NEXT_PUBLIC_FASTAPI_URL || fallbackUrl).replace(/\/$/, '')
+                await fetch(`${apiUrl}/api/voice/recordings/upload`, {
+                  method: 'POST',
+                  body: formData,
+                })
+                console.log('[useVoiceAgent] Call recording uploaded to backend fallback')
+              }
             } catch (upErr) {
               console.warn('[useVoiceAgent] Upload recording notice:', upErr)
             }
           }
         }
+
+        // Close AudioContext only after onstop finishes packaging audio
+        if (activeCtx) {
+          try {
+            activeCtx.close()
+          } catch {}
+        }
       }
+
       try {
         if (rec.state === 'recording') {
           rec.requestData()
@@ -104,60 +159,61 @@ export function useVoiceAgent() {
         rec.stop()
       } catch {}
       mediaRecorderRef.current = null
-    }
-
-    if (audioContextRef.current) {
+    } else if (activeCtx) {
       try {
-        audioContextRef.current.close()
+        activeCtx.close()
       } catch {}
-      audioContextRef.current = null
-      mediaStreamDestRef.current = null
     }
 
-    // Detach and clean up all audio elements to prevent audio leaks/conflicts
-    audioElementsRef.current.forEach(el => {
-      try {
-        el.pause()
-        el.srcObject = null
-        el.remove()
-      } catch {}
-    })
-    audioElementsRef.current = []
+    audioContextRef.current = null
+    mediaStreamDestRef.current = null
 
-    if (roomRef.current) {
-      try {
-        roomRef.current.disconnect()
-      } catch (err) {
-        console.warn('[useVoiceAgent] Disconnect error:', err)
-      }
-      roomRef.current = null
-    }
-    stopTimer()
+    cleanupCallResources()
+
     setConnectionState('ended')
     setTimeout(() => {
       setConnectionState('idle')
       setTranscripts([])
-    }, 1500)
-  }, [stopTimer])
+    }, 1000)
+  }, [cleanupCallResources])
 
   const startCall = useCallback(async (
     roomName: string = 'trinetra-demo-room',
     participantName?: string,
     agentId?: string
   ) => {
+    // Prevent overlapping calls
     if (connectionState !== 'idle' && connectionState !== 'ended') return
 
+    // Clean up any residual resources from previous calls first
+    cleanupCallResources()
+
     setConnectionState('connecting')
-    setTranscripts([]) // Clear transcripts on new call start
+    setTranscripts([])
     activeCallMetaRef.current = { roomName, agentId }
     recordedChunksRef.current = []
 
-    // Initialize Web Audio mixer for call recording
+    // 1. Synchronously prepare dedicated audio element and unlock browser playback in user gesture
+    if (!dedicatedAudioElRef.current && typeof document !== 'undefined') {
+      const el = document.createElement('audio')
+      el.autoplay = true
+      el.muted = false
+      el.volume = 1.0
+      el.style.display = 'none'
+      document.body.appendChild(el)
+      dedicatedAudioElRef.current = el
+    }
+
+    // 2. Initialize Web Audio mixer for call recording at 48kHz native rate
+    let ctx: AudioContext | null = null
     try {
       if (typeof window !== 'undefined') {
         const AudioCtx = window.AudioContext || (window as any).webkitAudioContext
         if (AudioCtx) {
-          const ctx = new AudioCtx()
+          ctx = new AudioCtx({ sampleRate: 48000, latencyHint: 'playback' })
+          if (ctx.state === 'suspended') {
+            await ctx.resume()
+          }
           const dest = ctx.createMediaStreamDestination()
           audioContextRef.current = ctx
           mediaStreamDestRef.current = dest
@@ -167,6 +223,7 @@ export function useVoiceAgent() {
             : typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported('audio/webm')
             ? 'audio/webm'
             : ''
+
           if (typeof MediaRecorder !== 'undefined') {
             const recorder = mimeType ? new MediaRecorder(dest.stream, { mimeType }) : new MediaRecorder(dest.stream)
             recorder.ondataavailable = (e) => {
@@ -180,51 +237,60 @@ export function useVoiceAgent() {
         }
       }
     } catch (ctxErr) {
-      console.warn('[useVoiceAgent] Audio mixer setup warning:', ctxErr)
+      console.warn('[useVoiceAgent] Audio mixer setup notice:', ctxErr)
     }
 
     try {
-      // 1. Get LiveKit Room Token
+      // 3. Fetch LiveKit room token (with graceful cold-start retries)
       const tokenData = await getLiveKitToken(roomName, participantName, agentId)
       const wsUrl = tokenData.url || LIVEKIT_URL
 
-      // 2. Instantiate LiveKit Room
+      // 4. Instantiate LiveKit Room
       const room = new Room({
         adaptiveStream: true,
         dynacast: true,
+        audioCaptureDefaults: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
       })
       roomRef.current = room
 
-      // 3. Attach Event Listeners
+      // 5. Attach Room Event Listeners
       room.on(RoomEvent.Connected, async () => {
         setConnectionState('active')
         startTimer()
-        toast.success('Connected to LiveKit voice agent session')
+        toast.success('Connected to voice session')
 
-        // Ensure browser audio playback is unlocked
+        // Ensure browser audio playback is fully unlocked
         try {
-          await room.startAudio()
-        } catch (audioErr) {
-          console.warn('[LiveKit] startAudio on connected warning:', audioErr)
-        }
+          if (typeof (room as any).startAudio === 'function') {
+            await (room as any).startAudio()
+          }
+        } catch {}
 
         // Publish local microphone track
         try {
-          const micTrack = await createLocalAudioTrack({ echoCancellation: true, noiseSuppression: true })
+          const micTrack = await createLocalAudioTrack({ 
+            echoCancellation: true, 
+            noiseSuppression: true,
+            autoGainControl: true
+          })
           await room.localParticipant.publishTrack(micTrack)
 
-          // Connect local mic to mixer recorder
+          // Connect mic to recording mixer destination
           if (audioContextRef.current && mediaStreamDestRef.current && micTrack.mediaStreamTrack) {
             try {
               const micStream = new MediaStream([micTrack.mediaStreamTrack])
               const micSource = audioContextRef.current.createMediaStreamSource(micStream)
               micSource.connect(mediaStreamDestRef.current)
             } catch (micMixErr) {
-              console.warn('[useVoiceAgent] Mic mixer connect error:', micMixErr)
+              console.warn('[useVoiceAgent] Mic mixer connect notice:', micMixErr)
             }
           }
         } catch (micErr) {
-          console.error('[LiveKit] Failed to publish mic track:', micErr)
+          console.error('[LiveKit] Failed to publish microphone:', micErr)
           toast.error('Could not access microphone')
         }
       })
@@ -236,77 +302,74 @@ export function useVoiceAgent() {
       room.on(RoomEvent.AudioPlaybackStatusChanged, async () => {
         if (!room.canPlaybackAudio) {
           try {
-            await room.startAudio()
-          } catch (e) {
-            console.warn('[LiveKit] Auto-resume audio failed:', e)
-          }
+            if (typeof (room as any).startAudio === 'function') {
+              await (room as any).startAudio()
+            }
+          } catch {}
         }
       })
 
+      // Handle incoming agent voice track with dedicated clean playback
       room.on(RoomEvent.TrackSubscribed, (track: RemoteTrack, publication: RemoteTrackPublication, participant: RemoteParticipant) => {
         if (track.kind === Track.Kind.Audio) {
-          // Detach any existing elements for this track to prevent phase distortion/duplicate playback
-          try {
-            track.detach().forEach((el) => {
-              try {
-                el.pause()
-                el.srcObject = null
-                el.remove()
-              } catch {}
-            })
-          } catch {}
+          const audioEl = dedicatedAudioElRef.current || document.createElement('audio')
+          if (!dedicatedAudioElRef.current) {
+            audioEl.style.display = 'none'
+            document.body.appendChild(audioEl)
+            dedicatedAudioElRef.current = audioEl
+          }
 
-          const element = track.attach()
-          element.autoplay = true
-          element.muted = false
-          element.volume = 1.0
-          audioElementsRef.current.push(element)
-          document.body.appendChild(element)
-          element.play().catch(err => {
-            console.warn('[LiveKit] Audio element play error (autoplay blocked?):', err)
+          // Attach track to single dedicated audio element (guarantees zero echo/phaser artifact)
+          track.attach(audioEl)
+          audioEl.muted = false
+          audioEl.volume = 1.0
+          audioEl.play().catch(err => {
+            console.warn('[LiveKit] Play error, attempting unlock:', err)
+            // Fallback retry on click/touch if policy temporarily blocked
+            const unlockHandler = () => {
+              audioEl.play().catch(() => {})
+              window.removeEventListener('click', unlockHandler)
+              window.removeEventListener('touchstart', unlockHandler)
+            }
+            window.addEventListener('click', unlockHandler, { once: true })
+            window.addEventListener('touchstart', unlockHandler, { once: true })
           })
 
-          // Connect agent audio track to mixer recorder
+          // Connect agent audio stream to the recording mixer
           if (audioContextRef.current && mediaStreamDestRef.current && track.mediaStreamTrack) {
             try {
               const agentStream = new MediaStream([track.mediaStreamTrack])
               const agentSource = audioContextRef.current.createMediaStreamSource(agentStream)
               agentSource.connect(mediaStreamDestRef.current)
             } catch (agentMixErr) {
-              console.warn('[useVoiceAgent] Agent track mixer connect error:', agentMixErr)
+              console.warn('[useVoiceAgent] Agent mixer connect notice:', agentMixErr)
             }
           }
         }
       })
 
       room.on(RoomEvent.TrackUnsubscribed, (track: RemoteTrack) => {
-        if (track.kind === Track.Kind.Audio) {
-          const detached = track.detach()
-          detached.forEach(el => {
-            try {
-              el.pause()
-              el.srcObject = null
-              el.remove()
-            } catch {}
-          })
-          audioElementsRef.current = audioElementsRef.current.filter(el => !detached.includes(el))
+        if (track.kind === Track.Kind.Audio && dedicatedAudioElRef.current) {
+          try {
+            track.detach(dedicatedAudioElRef.current)
+          } catch {}
         }
       })
 
-      room.on(RoomEvent.DataReceived, (payload: Uint8Array, participant?: RemoteParticipant) => {
+      room.on(RoomEvent.DataReceived, (payload: Uint8Array) => {
         try {
           const decoder = new TextDecoder()
           const str = decoder.decode(payload)
           const data = JSON.parse(str)
 
-          // 1. Handle intent-based automatic call cut
+          // Intent-based automatic call disconnect
           if (data.type === 'call_ended') {
             console.log('[useVoiceAgent] Received call_ended signal from server')
             disconnect()
             return
           }
 
-          // 2. Handle transcript message with client-side SSML/tag sanitization
+          // Transcript message processing
           if (data.type === 'transcript') {
             const rawText = data.text || ''
             const cleaned = rawText
@@ -321,7 +384,6 @@ export function useVoiceAgent() {
             if (cleaned) {
               const speakerRole = data.speaker === 'customer' || data.speaker === 'user' ? 'Customer' : 'Agent'
               setTranscripts((prev) => {
-                // Deduplicate: skip if last 5 entries already have same speaker+text
                 const isDuplicate = prev.slice(-5).some(
                   (t) => t.speaker === speakerRole && t.text === cleaned
                 )
@@ -339,27 +401,36 @@ export function useVoiceAgent() {
               })
             }
           }
-        } catch (e) {
-          console.warn('[LiveKit] Non-JSON data received')
-        }
+        } catch {}
       })
 
-      // 4. Connect to Room
+      // 6. Connect to LiveKit Room
       await room.connect(wsUrl, tokenData.token)
 
-      // Unlock AudioContext immediately after connection
       try {
-        await room.startAudio()
-      } catch (audioUnlockErr) {
-        console.warn('[LiveKit] startAudio post-connect warning:', audioUnlockErr)
-      }
+        if (typeof (room as any).startAudio === 'function') {
+          await (room as any).startAudio()
+        }
+      } catch {}
+
     } catch (err: any) {
       console.error('[useVoiceAgent Error]', err)
-      toast.error('Failed to establish LiveKit voice connection: ' + err.message)
+      toast.error('Voice connection issue: ' + (err.message || 'Server initializing'))
+      
+      // Immediately perform full resource cleanup so subsequent clicks work without website refresh
+      cleanupCallResources()
+      if (audioContextRef.current) {
+        try { audioContextRef.current.close() } catch {}
+        audioContextRef.current = null
+      }
+      mediaRecorderRef.current = null
+      mediaStreamDestRef.current = null
+
       setConnectionState('error')
-      setTimeout(() => setConnectionState('idle'), 4000)
+      // Reset immediately to idle after brief pause
+      setTimeout(() => setConnectionState('idle'), 1200)
     }
-  }, [connectionState, disconnect, startTimer])
+  }, [connectionState, cleanupCallResources, disconnect, startTimer])
 
   const toggleMute = useCallback(() => {
     if (roomRef.current) {
@@ -379,9 +450,15 @@ export function useVoiceAgent() {
 
   useEffect(() => {
     return () => {
-      disconnect()
+      cleanupCallResources()
+      if (dedicatedAudioElRef.current) {
+        try {
+          dedicatedAudioElRef.current.remove()
+          dedicatedAudioElRef.current = null
+        } catch {}
+      }
     }
-  }, [disconnect])
+  }, [cleanupCallResources])
 
   return {
     connectionState,
