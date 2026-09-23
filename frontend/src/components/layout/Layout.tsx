@@ -8,7 +8,7 @@ interface LayoutProps {
 
 export function Layout({ children }: LayoutProps) {
     return (
-        <div className="min-h-screen flex flex-col">
+        <div className="min-h-screen flex flex-col bg-[#080010] text-[#E2E0FD] dark">
             <Navbar />
             <main className="flex-grow" style={{ paddingTop: 72 }}>
                 {children}

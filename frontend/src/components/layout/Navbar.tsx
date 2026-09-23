@@ -153,7 +153,7 @@ export function Navbar() {
               alt={companyName}
               width={320}
               height={90}
-              className="h-19 w-auto object-contain"
+              className="h-14 w-auto object-contain"
               priority
               suppressHydrationWarning={true}
             />
