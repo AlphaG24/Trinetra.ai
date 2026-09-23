@@ -89,3 +89,6 @@ backend/recordings/
 *.mp3
 *.wav
 
+# Next.js auto-generated agent rules files
+AGENTS.md
+CLAUDE.md
