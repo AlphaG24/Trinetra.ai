@@ -1,0 +1,19 @@
+# Backend Specific GitIgnore
+.env
+.env.*
+*.env
+*.env.*
+*.local
+.venv/
+env/
+Venv/
+__pycache__/
+*.py[cod]
+*$py.class
+recordings/
+*.mp3
+*.wav
+test_*.py
+test_*.json
+mock_*.json
+!.env.example

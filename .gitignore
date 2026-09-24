@@ -65,18 +65,43 @@ out/
 *.swo
 .DS_Store
 Thumbs.db
-serviceAccount.json
+
+# Comprehensive Secret & Private File Protection
+serviceAccount*.json
+*credentials*.json
 credentials.json
+*secret*.json
+*token*.json
 *.db
 *.sqlite
 *.sql.bak
 *.key
 *.pem
+*.cert
+*.crt
+*.pfx
+*.p12
+id_rsa*
 .gemini/
 .vercel
-.env*
+
+# Environment file rules (all directories, all extensions)
+.env
+.env.*
+*.env
+*.env.*
+*.local
+**/.env
+**/.env.*
+**/*.env
+**/*.env.*
+**/*.local
+# Explicitly whitelist only benign example templates
+!frontend/.env.example
+!backend/.env.example
 
 # Vercel & testing artifacts
+*vercel-env*
 frontend/vercel-env.txt
 frontend/test_pdf.js
 

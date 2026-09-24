@@ -1,4 +1,16 @@
+# Frontend Specific GitIgnore
 .vercel
-.env*
+.env
+.env.*
+*.env
+*.env.*
+*.local
+vercel-env*
 AGENTS.md
 CLAUDE.md
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+!src/
+!.env.example
