@@ -38,6 +38,9 @@ const cspHeader = `
 
 const nextConfig: NextConfig = {
   output: 'standalone',
+  env: {
+    NEXT_PUBLIC_SITE_URL: process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000',
+  },
 
   // SECURITY: Remove X-Powered-By header (information disclosure)
   poweredByHeader: false,
