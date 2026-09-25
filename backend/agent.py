@@ -3404,6 +3404,10 @@ async def run_agent(room_name: str, agent_id: str | None = None, contact_id: str
     pitch = 1.0
     system_prompt = load_system_prompt()
     greeting_message = None
+    bot_name = "Vikram"
+    gender_tag = "female"
+    is_female = True
+    business_name_val = ""
 
     if not agent_id and room_name.startswith("room-"):
         parts = room_name.split("-")
@@ -3457,7 +3461,10 @@ async def run_agent(room_name: str, agent_id: str | None = None, contact_id: str
                 system_prompt += personality_prompts.get(personality.lower(), personality_prompts["friendly"])
                 
                 # Append expressiveness rules
-                expressive_instructions = build_agent_expressive_rules(bot_name=bot_name, gender_tag=gender_tag, business_name=business_name_val)
+                cur_bot = locals().get('bot_name') or (agent_data.get('bot_name') if agent_data else None) or (agent_data.get('name') if agent_data else None) or 'Vikram'
+                cur_gen = locals().get('gender_tag') or (agent_data.get('gender') if agent_data else None) or 'female'
+                cur_biz = locals().get('business_name_val') or (agent_data.get('business_name') if agent_data else None) or ''
+                expressive_instructions = build_agent_expressive_rules(bot_name=cur_bot, gender_tag=cur_gen, business_name=cur_biz)
                 if "## TRINETRA AGENT BEHAVIOR" not in system_prompt and "## HUMAN EXPRESSIVENESS RULES" not in system_prompt:
                     system_prompt += expressive_instructions
 
@@ -3820,27 +3827,49 @@ async def run_agent(room_name: str, agent_id: str | None = None, contact_id: str
     token = generate_agent_token(room_name)
 
     agent_instance = None
-    sarvam_pitch = (pitch - 1.0) if provider == 'sarvam' else pitch
+    safe_provider = locals().get('provider') or (agent_data.get('voice_provider') if agent_data else None) or 'sarvam'
+    safe_voice_id = locals().get('voice_id') or (agent_data.get('voice_id') if agent_data else None) or 'shubh'
+    safe_speed = locals().get('speed') if locals().get('speed') is not None else 1.0
+    safe_pitch = locals().get('pitch') if locals().get('pitch') is not None else 1.0
+    safe_sarvam_pitch = (safe_pitch - 1.0) if safe_provider == 'sarvam' else safe_pitch
+    safe_language = locals().get('language') or (agent_data.get('primary_language') if agent_data else None) or 'hinglish'
+    safe_system_prompt = locals().get('system_prompt') or load_system_prompt()
+
     from livekit.agents import utils
     async with utils.http_context.open():
         agent_instance = VikramAgent(
-            instructions=system_prompt,
-            voice_provider=provider,
-            voice_id=voice_id,
-            voice_speed=speed,
-            voice_pitch=sarvam_pitch,
-            language=language,
+            instructions=safe_system_prompt,
+            voice_provider=safe_provider,
+            voice_id=safe_voice_id,
+            voice_speed=safe_speed,
+            voice_pitch=safe_sarvam_pitch,
+            language=safe_language,
             llm_provider=agent_data.get('llm_provider') if agent_data else None,
             llm_model=agent_data.get('llm_model') if agent_data else None,
             temperature=agent_data.get('temperature') if agent_data else None,
         )
 
-        if greeting_message:
-            agent_instance.greeting_message = greeting_message
+        if locals().get('greeting_message'):
+            agent_instance.greeting_message = locals().get('greeting_message')
         agent_instance.room = room
-        agent_instance.bot_name = bot_name
-        agent_instance.business_name = business_name_val if 'business_name_val' in dir() else (agent_data.get('business_name', '') if agent_data else '')
-        agent_instance.gender = gender_tag
+
+        # Defensive fallbacks prevent UnboundLocalError when joining LiveKit rooms
+        agent_instance.bot_name = (
+            locals().get('bot_name')
+            or (agent_data.get('bot_name') if agent_data else None)
+            or (agent_data.get('name') if agent_data else None)
+            or 'Vikram'
+        )
+        agent_instance.business_name = (
+            locals().get('business_name_val')
+            or (agent_data.get('business_name') if agent_data else '')
+            or ''
+        )
+        agent_instance.gender = (
+            locals().get('gender_tag')
+            or (agent_data.get('gender') if agent_data else None)
+            or 'female'
+        )
         agent_instance.prospect_name = c_name if ('campaign_contact' in locals() and campaign_contact and locals().get('is_name_valid')) else (locals().get('cust_name') or "")
         agent_instance.campaign_goal = locals().get('notes_summary') if ('campaign_contact' in locals() and campaign_contact) else ""
         agent_instance.ending_message = agent_data.get("ending_message", "") if agent_data else ""
@@ -4008,7 +4037,9 @@ async def run_agent(room_name: str, agent_id: str | None = None, contact_id: str
                 clean_txt = clean_ssml(text, is_transcript=True)
                 clean_txt = re.sub(r'\[(?:CRITICAL|FLOW NOTE|OBJECTION|CONVERSATION GUIDANCE)[^\]]*\]', '', clean_txt, flags=re.IGNORECASE).strip()
                 if role == "user" and clean_txt:
-                    clean_txt = normalize_user_transcript(clean_txt, agent_name=bot_name, is_female=is_female)
+                    agent_nm = getattr(agent_instance, 'bot_name', None) or locals().get('bot_name') or 'Vikram'
+                    fem_flag = (getattr(agent_instance, 'gender', 'female') == 'female') if agent_instance else locals().get('is_female', True)
+                    clean_txt = normalize_user_transcript(clean_txt, agent_name=agent_nm, is_female=fem_flag)
 
                 if clean_txt:
                     turn_label = f"{speaker}: {clean_txt}"
