@@ -5,7 +5,8 @@ import { type CookieOptions, createServerClient } from '@supabase/ssr'
 import { safeApiHandler } from '@/utils/apiAuth'
 
 export const GET = safeApiHandler(async (request: Request) => {
-    const { searchParams, origin } = new URL(request.url)
+    const { searchParams } = new URL(request.url)
+    const origin = process.env.NEXT_PUBLIC_SITE_URL || new URL(request.url).origin
     const host = request.headers.get('host') || ''
     const cleanHost = host.split(':')[0]
     const code = searchParams.get('code')
