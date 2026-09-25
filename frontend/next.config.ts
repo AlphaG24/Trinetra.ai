@@ -9,14 +9,18 @@ import type { NextConfig } from "next";
 // ============================================================================
 const isProd = process.env.NODE_ENV === 'production';
 const enableHsts = process.env.ENABLE_HSTS === 'true';
+const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || '';
+const fastapiUrl = process.env.NEXT_PUBLIC_FASTAPI_URL || '';
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || '';
+
 const cspHeader = `
     default-src 'self';
     script-src 'self' 'unsafe-eval' 'unsafe-inline' https://cdnjs.cloudflare.com https://apis.google.com https://accounts.google.com https://*.razorpay.com https://*.daily.co blob:;
     style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
-    img-src 'self' blob: data: https://lh3.googleusercontent.com https://*.supabase.co https://i.postimg.cc https://assets.trinetraedu-ai.com https://*.trinetraedu-ai.com https://*.trinetra.ai;
+    img-src 'self' ${backendUrl} blob: data: https://lh3.googleusercontent.com https://*.supabase.co https://i.postimg.cc https://assets.trinetraedu-ai.com https://*.trinetraedu-ai.com https://*.trinetra.ai;
     font-src 'self' data: https://fonts.gstatic.com;
-    connect-src 'self' http://localhost:8000 http://127.0.0.1:8000 ws://localhost:7880 ws://127.0.0.1:7880 http://localhost:7880 http://127.0.0.1:7880 https://*.livekit.cloud wss://*.livekit.cloud https://*.trycloudflare.com https://*.ngrok-free.dev https://*.ngrok.app https://*.onrender.com https://*.supabase.co wss://*.supabase.co https://formspree.io https://*.googleapis.com https://*.razorpay.com https://api.sarvam.ai wss://api.sarvam.ai https://api.elevenlabs.io https://*.daily.co wss://*.daily.co https://raw.githubusercontent.com https://*.trinetraedu-ai.com https://*.trinetra.ai blob: data: stun: turn:;
-    media-src 'self' blob: https://api.sarvam.ai https://api.elevenlabs.io data: mediastream:;
+    connect-src 'self' ${backendUrl} ${fastapiUrl} ${siteUrl} http://localhost:8000 http://127.0.0.1:8000 ws://localhost:7880 ws://127.0.0.1:7880 http://localhost:7880 http://127.0.0.1:7880 https://*.livekit.cloud wss://*.livekit.cloud https://*.trycloudflare.com https://*.ngrok-free.dev https://*.ngrok.app https://*.onrender.com https://*.supabase.co wss://*.supabase.co https://formspree.io https://*.googleapis.com https://*.razorpay.com https://api.sarvam.ai wss://api.sarvam.ai https://api.elevenlabs.io https://*.daily.co wss://*.daily.co https://raw.githubusercontent.com https://*.trinetraedu-ai.com https://*.trinetra.ai blob: data: stun: turn:;
+    media-src 'self' ${backendUrl} blob: https://api.sarvam.ai https://api.elevenlabs.io data: mediastream:;
     worker-src 'self' blob:;
     child-src 'self' blob:;
     frame-src 'self' https://accounts.google.com https://*.razorpay.com https://www.youtube-nocookie.com https://www.youtube.com https://*.trinetraedu-ai.com https://*.trinetra.ai;
