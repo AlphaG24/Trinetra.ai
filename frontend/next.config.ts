@@ -37,6 +37,8 @@ const cspHeader = `
 `;
 
 const nextConfig: NextConfig = {
+  output: 'standalone',
+
   // SECURITY: Remove X-Powered-By header (information disclosure)
   poweredByHeader: false,
 
