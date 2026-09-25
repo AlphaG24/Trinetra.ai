@@ -14,6 +14,7 @@ import json
 import time
 import logging
 import asyncio
+from typing import AsyncIterable, AsyncGenerator, Any
 import jwt
 from dotenv import load_dotenv
 from livekit.agents import AutoSubscribe, JobContext, WorkerOptions, JobExecutorType, cli, tts, llm
@@ -461,6 +462,11 @@ class ExpressiveTTSWrapper(tts.TTS):
         underlying_stream = self._underlying.stream(*args, **kwargs)
         caller_g = self._caller_gender_fn() if callable(self._caller_gender_fn) else "male"
         return ExpressiveTTSStream(self, underlying_stream, provider=self._provider, gender=self._gender, caller_gender=caller_g)
+
+    def update_options(self, *args, **kwargs):
+        """Pass through dynamic TTS option updates (e.g. target_language_code, speaker) to underlying engine."""
+        if hasattr(self._underlying, "update_options"):
+            return self._underlying.update_options(*args, **kwargs)
 
 def generate_personalized_greeting(name: str, tags: list, last_call: str | None, notes: str | None, language: str, gender: str, company_name: str = "") -> str:
     """Generate a warm, natural personalized greeting based on customer history"""
@@ -1005,6 +1011,18 @@ SARVAM_FEMALE_VOICES = [
 sarvam_male = SARVAM_MALE_VOICES
 sarvam_female = SARVAM_FEMALE_VOICES
 
+# Task 2: Language to Sarvam voice mapping for dynamic mid-conversation language switching.
+# Maps ISO language codes ('en' for English, 'hi' for Hindi/Hinglish) to appropriate Sarvam Bulbul v3 voice IDs.
+LANGUAGE_VOICE_MAPPING = {
+    'en': 'aditya',   # Clear, natural Indian-accented English voice (male)
+    'hi': 'shubh',    # Fluent Hindi/Hinglish voice (male)
+}
+
+LANGUAGE_FEMALE_VOICE_MAPPING = {
+    'en': 'amelia',   # Crisp, natural English voice for female agents (Anika)
+    'hi': 'ritu',     # Fluent Hindi/Hinglish voice for female agents (Anika)
+}
+
 class VikramAgent(Agent):
     def __init__(
         self,
@@ -1023,6 +1041,8 @@ class VikramAgent(Agent):
         logger.info(f"Using voice: {voice_id}")
         
         self.language = language
+        # Track active TTS language state for dynamic language switching ('hi' or 'en')
+        self._active_tts_language = "hi" if language in ['hinglish', 'hi-IN'] else "en"
         
         elevenlabs_male = ['pNInz6obpgDQGcFmaJgB', 'TxGEqnHWrfWFTfGW9XjX']
         self.gender = 'male' if voice_id in SARVAM_MALE_VOICES or voice_id in elevenlabs_male else 'female'
@@ -1082,6 +1102,15 @@ class VikramAgent(Agent):
             # WebRTC native sample rate: 24000 Hz (exact integer divisor of WebRTC 48kHz Opus)
             # linear16 sends raw uncompressed PCM, eliminating MP3 decode chunking jitter, clicks and voice breakages
             sarvam_sample_rate = int(os.getenv("SARVAM_SAMPLE_RATE", "24000"))
+
+            # Anika voice crackling fix: Female voices (e.g. Ritu/Anika) have higher frequency formants.
+            # Loudness > 1.0 pushes 16-bit linear16 PCM beyond 0 dBFS, resulting in digital clipping crackle
+            # that Shubh's deeper baritone voice didn't trigger. Setting loudness=1.0 for female voices ensures
+            # clean headroom without digital waveform clipping distortion.
+            sarvam_loudness = 1.0 if self.gender == 'female' else 1.1
+
+            # Task 1: Setting max_session_duration=0 forces a fresh WebSocket connection per TTS request,
+            # eliminating audio degradation, packet jitter, and crackling caused by long-lived WebSockets.
             try:
                 tts_plugin = sarvam.TTS(
                     target_language_code=target_lang,
@@ -1089,20 +1118,54 @@ class VikramAgent(Agent):
                     speaker=sarvam_speaker,
                     pace=sarvam_pace,
                     pitch=sarvam_pitch,
-                    loudness=1.3,
+                    loudness=sarvam_loudness,
                     speech_sample_rate=sarvam_sample_rate,
                     output_audio_codec="linear16",
+                    max_session_duration=0,  # type: ignore # Fresh WebSocket per request prevents connection degradation & crackling
                 )
-            except Exception as sarvam_err:
-                logger.warning(f"[VikramAgent] Sarvam TTS custom init error ({sarvam_err}), falling back to safe linear16 defaults")
+            except TypeError:
+                # Fallback if installed sarvam plugin version manages max_session_duration via connection pool
                 tts_plugin = sarvam.TTS(
                     target_language_code=target_lang,
                     model=model_name,
                     speaker=sarvam_speaker,
-                    loudness=1.3,
+                    pace=sarvam_pace,
+                    pitch=sarvam_pitch,
+                    loudness=sarvam_loudness,
                     speech_sample_rate=sarvam_sample_rate,
                     output_audio_codec="linear16",
                 )
+                if hasattr(tts_plugin, "_pool"):
+                    try:
+                        tts_plugin._pool._max_session_duration = 0
+                    except Exception:
+                        pass
+            except Exception as sarvam_err:
+                logger.warning(f"[VikramAgent] Sarvam TTS custom init error ({sarvam_err}), falling back to safe linear16 defaults")
+                try:
+                    tts_plugin = sarvam.TTS(
+                        target_language_code=target_lang,
+                        model=model_name,
+                        speaker=sarvam_speaker,
+                        loudness=sarvam_loudness,
+                        speech_sample_rate=sarvam_sample_rate,
+                        output_audio_codec="linear16",
+                        max_session_duration=0,  # type: ignore # Fresh WebSocket per request prevents degradation & crackling
+                    )
+                except TypeError:
+                    tts_plugin = sarvam.TTS(
+                        target_language_code=target_lang,
+                        model=model_name,
+                        speaker=sarvam_speaker,
+                        loudness=sarvam_loudness,
+                        speech_sample_rate=sarvam_sample_rate,
+                        output_audio_codec="linear16",
+                    )
+                    if hasattr(tts_plugin, "_pool"):
+                        try:
+                            tts_plugin._pool._max_session_duration = 0
+                        except Exception:
+                            pass
         else:
             tts_plugin = elevenlabs.TTS(voice_id=voice_id)
 
@@ -1262,6 +1325,109 @@ class VikramAgent(Agent):
             min_consecutive_speech_delay=0.4,
             use_tts_aligned_transcript=True,
         )
+
+    def _detect_language(self, sample_text: str) -> str | None:
+        """
+        Lightweight language detector using langdetect with robust regex fallback for Hinglish vs English.
+        Returns 'en' for English or 'hi' for Hindi/Hinglish.
+        """
+        if not sample_text or len(sample_text.strip()) < 5:
+            return None
+
+        # 1. Pure Devanagari script is definitely Hindi
+        if re.search(r'[\u0900-\u097f]', sample_text):
+            return 'hi'
+
+        # 2. Characteristic Romanized Hindi (Hinglish) marker words
+        hinglish_markers = r'\b(haan|haa|haanji|nahi|nhi|kaise|kya|aap|aapka|aapke|aapki|main|mera|meri|mere|batao|bataiye|baat|bolo|shukriya|namaste|theek|dhanyavad|karna|hoga|raha|rahi|hain|kuch|chahiye)\b'
+        if re.search(hinglish_markers, sample_text, re.IGNORECASE):
+            return 'hi'
+
+        # 3. Use langdetect library for probabilistic detection
+        try:
+            from langdetect import detect  # type: ignore
+            code = detect(sample_text)
+            if code == 'en':
+                return 'en'
+            elif code in ('hi', 'mr', 'ne', 'gu', 'bn', 'pa'):
+                return 'hi'
+            elif any(w in sample_text.lower().split() for w in ['hello', 'hi', 'thank', 'thanks', 'sure', 'yes', 'welcome', 'pricing', 'service', 'demo', 'call', 'appointment', 'schedule', 'details', 'interested', 'free', 'help']):
+                return 'en'
+        except Exception:
+            pass
+
+        # 4. English word frequency fallback heuristic
+        english_words = {'the', 'is', 'are', 'you', 'your', 'how', 'can', 'help', 'today', 'call', 'we', 'our', 'what', 'would', 'like', 'to', 'for', 'about', 'thank', 'please'}
+        words = set(re.findall(r'[a-zA-Z]+', sample_text.lower()))
+        if len(words.intersection(english_words)) >= 2:
+            return 'en'
+
+        return None
+
+    async def tts_node(
+        self, text: AsyncIterable[str], model_settings: ModelSettings
+    ) -> AsyncGenerator[Any, None]:
+        """
+        Task 2: Dynamic mid-conversation language switching node.
+        Overrides Agent.tts_node to accumulate the incoming text stream.
+        Once >= 20 characters are gathered, runs language detection.
+        If the detected language is different from active language, calls self.tts.update_options()
+        with the new language code and corresponding Sarvam voice ID.
+        """
+        buffered_chunks: list[str] = []
+        total_len = 0
+        text_iter = text.__aiter__()
+
+        # Step 1: Accumulate incoming text stream chunks until we have at least 20 characters
+        while total_len < 20:
+            try:
+                chunk = await text_iter.__anext__()
+                buffered_chunks.append(chunk)
+                total_len += len(chunk)
+            except StopAsyncIteration:
+                break
+
+        accumulated_text = "".join(buffered_chunks).strip()
+
+        # Step 2: Run language detection once at least 20 characters are accumulated
+        if accumulated_text:
+            clean_text_sample = clean_ssml(accumulated_text)
+            detected_lang = self._detect_language(clean_text_sample)
+
+            if detected_lang:
+                current_active_lang = getattr(self, '_active_tts_language', 'hi')
+
+                # Step 3: If detected language differs from currently active language, switch voice dynamically
+                if detected_lang != current_active_lang:
+                    is_female = getattr(self, 'gender', 'male') == 'female'
+                    voice_map = LANGUAGE_FEMALE_VOICE_MAPPING if is_female else LANGUAGE_VOICE_MAPPING
+                    new_voice_id = voice_map.get(detected_lang, 'shubh' if not is_female else 'ritu')
+                    new_target_lang = "en-IN" if detected_lang == "en" else "hi-IN"
+
+                    logger.info(
+                        f"[VikramAgent] Dynamic language switch triggered: {current_active_lang} -> {detected_lang}. "
+                        f"Updating Sarvam TTS: speaker={new_voice_id}, target_lang={new_target_lang}"
+                    )
+
+                    try:
+                        if hasattr(self.tts, "update_options"):
+                            self.tts.update_options(
+                                target_language_code=new_target_lang,
+                                speaker=new_voice_id
+                            )
+                        self._active_tts_language = detected_lang
+                    except Exception as switch_err:
+                        logger.warning(f"[VikramAgent] Failed to update TTS options dynamically: {switch_err}")
+
+        # Step 4: Forward the buffered chunks and subsequent streaming chunks to the underlying TTS node
+        async def _forward_text_stream() -> AsyncIterable[str]:
+            for chunk in buffered_chunks:
+                yield chunk
+            async for chunk in text_iter:
+                yield chunk
+
+        async for frame in Agent.default.tts_node(self, _forward_text_stream(), model_settings):
+            yield frame
 
     async def on_user_turn_completed(
         self, turn_ctx: llm.ChatContext, new_message: llm.ChatMessage
@@ -1585,7 +1751,7 @@ async def extract_and_save_lead(transcript: str, agent_id: str, user_id: str, or
     if room_name:
         try:
             res_room = await asyncio.to_thread(
-                supabase_admin.table("voice_calls").select("id, caller_phone, caller_name, metadata")
+                supabase_admin.table("voice_calls").select("id, user_id, agent_id, caller_phone, caller_name, metadata")
                 .filter("metadata->>room_name", "eq", room_name)
                 .order("created_at", desc=True)
                 .limit(1)
@@ -1601,7 +1767,7 @@ async def extract_and_save_lead(transcript: str, agent_id: str, user_id: str, or
     if not existing_call and call_sid:
         try:
             res = await asyncio.to_thread(
-                supabase_admin.table("voice_calls").select("id, caller_phone, caller_name, metadata")
+                supabase_admin.table("voice_calls").select("id, user_id, agent_id, caller_phone, caller_name, metadata")
                 .or_(f"metadata->>provider_call_id.eq.{call_sid},metadata->>session_id.eq.{call_sid},id.eq.{call_sid}")
                 .order("created_at", desc=True)
                 .limit(1).execute
@@ -1611,6 +1777,23 @@ async def extract_and_save_lead(transcript: str, agent_id: str, user_id: str, or
                 logger.info(f"[extract_and_save_lead] Matched existing voice_call {existing_call['id']} by call_sid '{call_sid}'")
         except Exception as e:
             logger.error(f"Failed to lookup existing call by call_sid {call_sid}: {e}")
+
+    # Resolve user_id and agent_id if missing to guarantee post-call notification delivery
+    if not user_id and existing_call and existing_call.get("user_id"):
+        user_id = existing_call.get("user_id")
+    if not agent_id and existing_call and existing_call.get("agent_id"):
+        agent_id = existing_call.get("agent_id")
+    if not user_id and agent_id:
+        try:
+            ag_lookup = await asyncio.to_thread(
+                supabase_admin.table("agents").select("user_id, organization_id").eq("id", agent_id).maybe_single().execute
+            )
+            if ag_lookup and ag_lookup.data:
+                user_id = ag_lookup.data.get("user_id")
+                if not organization_id:
+                    organization_id = ag_lookup.data.get("organization_id")
+        except Exception as lookup_err:
+            logger.warning(f"[extract_and_save_lead] Failed to lookup user_id from agents table: {lookup_err}")
 
     # Resolve contact_id from existing metadata if not already passed
     if not contact_id and existing_call and existing_call.get("metadata"):

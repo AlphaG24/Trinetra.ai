@@ -18,6 +18,7 @@ backend/Venv/
 .env.local
 .env
 backend/.env
+frontend/.env
 frontend/.env.local
 
 # ====================================================================

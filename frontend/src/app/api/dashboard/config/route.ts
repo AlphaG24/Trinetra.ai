@@ -41,6 +41,31 @@ export async function GET() {
         .update({ status: 'paused' })
         .eq('user_id', user.id)
         .eq('status', 'active')
+
+      // Ensure user is notified of plan/trial expiration (check last 7 days to avoid duplicate spam)
+      const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
+      const { data: existingNotif } = await supabaseAdmin
+        .from('notifications')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('type', 'plan_expired')
+        .gte('created_at', sevenDaysAgo)
+        .limit(1)
+
+      if (!existingNotif || existingNotif.length === 0) {
+        await supabaseAdmin
+          .from('notifications')
+          .insert({
+            user_id: user.id,
+            organization_id: profile.organization_id || null,
+            title: '🛑 Agent Plan / Trial Expired',
+            message: 'Your free trial or agent plan has expired. Your active agents have been safely paused. Upgrade your plan to continue uninterrupted.',
+            type: 'plan_expired',
+            action_url: '/dashboard/billing',
+            action_text: 'Upgrade Plan',
+            is_read: false
+          })
+      }
     }
 
     // 3. Fetch system configurations
