@@ -67,8 +67,20 @@ deploy_backend() {
 deploy_frontend() {
     echo "----------------------------------------------------------"
     echo ">>> Rebuilding frontend image (trinetra-frontend)..."
-    echo "----------------------------------------------------------"
-    docker build -t trinetra-frontend ./frontend
+    FRONTEND_ENV_FILE="./frontend/.env"
+    if [ ! -f "$FRONTEND_ENV_FILE" ] && [ -f "./frontend/.env.local" ]; then
+        FRONTEND_ENV_FILE="./frontend/.env.local"
+    fi
+
+    docker build -t trinetra-frontend \
+        --build-arg NEXT_PUBLIC_SUPABASE_URL="$(grep '^NEXT_PUBLIC_SUPABASE_URL=' "$FRONTEND_ENV_FILE" 2>/dev/null | cut -d '=' -f2-)" \
+        --build-arg NEXT_PUBLIC_SUPABASE_ANON_KEY="$(grep '^NEXT_PUBLIC_SUPABASE_ANON_KEY=' "$FRONTEND_ENV_FILE" 2>/dev/null | cut -d '=' -f2-)" \
+        --build-arg NEXT_PUBLIC_BACKEND_URL="$(grep '^NEXT_PUBLIC_BACKEND_URL=' "$FRONTEND_ENV_FILE" 2>/dev/null | cut -d '=' -f2-)" \
+        --build-arg NEXT_PUBLIC_FASTAPI_URL="$(grep '^NEXT_PUBLIC_FASTAPI_URL=' "$FRONTEND_ENV_FILE" 2>/dev/null | cut -d '=' -f2-)" \
+        --build-arg NEXT_PUBLIC_SITE_URL="$(grep '^NEXT_PUBLIC_SITE_URL=' "$FRONTEND_ENV_FILE" 2>/dev/null | cut -d '=' -f2-)" \
+        --build-arg NEXT_PUBLIC_LIVEKIT_URL="$(grep '^NEXT_PUBLIC_LIVEKIT_URL=' "$FRONTEND_ENV_FILE" 2>/dev/null | cut -d '=' -f2-)" \
+        --build-arg ENABLE_HSTS="$(grep '^ENABLE_HSTS=' "$FRONTEND_ENV_FILE" 2>/dev/null | cut -d '=' -f2-)" \
+        ./frontend
 
     echo ">>> Stopping existing trinetra-frontend container (if running)..."
     docker stop trinetra-frontend 2>/dev/null || true
