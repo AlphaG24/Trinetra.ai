@@ -49,7 +49,7 @@ export async function GET() {
         const { data: existing } = await adminClient
           .from('notifications')
           .select('id')
-          .eq('organization_id', profile.organization_id)
+          .eq('user_id', profile.id)
           .eq('type', 'quota_exceeded')
           .gte('created_at', startOfMonthIso)
 
@@ -75,9 +75,13 @@ export async function GET() {
           emailsSent++
           // Save notification
           await adminClient.from('notifications').insert({
+            user_id: profile.id,
+            organization_id: profile.organization_id || null,
             title: '🛑 Calls Quota Exceeded - Agents Paused',
             message: `Your voice agents have been paused because your call minutes quota (${used}/${limit} mins) has been fully exhausted.`,
-            type: 'quota_exceeded'
+            type: 'quota_exceeded',
+            action_url: '/dashboard/billing',
+            action_text: 'Upgrade Plan'
           })
         }
 
@@ -86,7 +90,7 @@ export async function GET() {
         const { data: existing } = await adminClient
           .from('notifications')
           .select('id')
-          .eq('organization_id', profile.organization_id)
+          .eq('user_id', profile.id)
           .eq('type', 'usage_warning')
           .gte('created_at', startOfMonthIso)
 
@@ -113,9 +117,13 @@ export async function GET() {
           emailsSent++
           // Save notification
           await adminClient.from('notifications').insert({
+            user_id: profile.id,
+            organization_id: profile.organization_id || null,
             title: '⚠️ Calls Quota Running Low (80% Used)',
             message: `Your voice agents have consumed ${percent.toFixed(1)}% of your call minutes quota (${used}/${limit} mins). Consider upgrading to avoid service interruption.`,
-            type: 'usage_warning'
+            type: 'usage_warning',
+            action_url: '/dashboard/billing',
+            action_text: 'Upgrade Plan'
           })
         }
       }

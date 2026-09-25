@@ -71,11 +71,21 @@ async def run_agent(room_name: str):
 
     room = rtc.Room()
 
+    try:
+        sarvam_tts = sarvam.TTS(target_language_code="hi-IN", model="bulbul:v3", speaker="shubh", speech_sample_rate=8000, output_audio_codec="linear16", max_session_duration=0)  # type: ignore
+    except TypeError:
+        sarvam_tts = sarvam.TTS(target_language_code="hi-IN", model="bulbul:v3", speaker="shubh", speech_sample_rate=8000, output_audio_codec="linear16")
+        if hasattr(sarvam_tts, "_pool"):
+            try:
+                sarvam_tts._pool._max_session_duration = 0
+            except Exception:
+                pass
+
     agent = Agent(
         instructions=system_prompt,
         stt=sarvam.STT(language="unknown", model="saaras:v3", flush_signal=True),
         llm=sarvam.LLM(model="sarvam-30b"),
-        tts=sarvam.TTS(target_language_code="hi-IN", model="bulbul:v3", speaker="shubh", speech_sample_rate=8000, output_audio_codec="linear16"),
+        tts=sarvam_tts,
     )
 
     session = AgentSession(vad=silero.VAD.load())

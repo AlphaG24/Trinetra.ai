@@ -6,15 +6,23 @@ try:
     from zoneinfo import ZoneInfo
 except ImportError:
     ZoneInfo = None
+
+try:
+    import pytz
+except ImportError:
+    pytz = None
+
 from datetime import datetime
 from database import supabase_admin as supabase
 
 # Default fallback preferences schema
 DEFAULT_PREFERENCES = {
     "events": {
+        "call_completed": { "email": False, "telegram": True, "dashboard": True },
         "new_lead": { "email": True, "telegram": True, "dashboard": True },
         "payment_confirmed": { "email": True, "telegram": False, "dashboard": True },
         "usage_warning": { "email": True, "telegram": True, "dashboard": True },
+        "plan_expired": { "email": True, "telegram": True, "dashboard": True },
         "callback_scheduled": { "email": True, "telegram": True, "dashboard": True },
         "agent_paused": { "email": True, "telegram": False, "dashboard": True },
         "weekly_report": { "email": True, "telegram": False, "dashboard": False }
@@ -97,6 +105,7 @@ class NotificationService:
                         "call_completed": "info",
                         "callback_scheduled": "info",
                         "usage_warning": "warning",
+                        "plan_expired": "warning",
                         "agent_paused": "warning",
                         "weekly_report": "info"
                     }
@@ -106,16 +115,29 @@ class NotificationService:
                         "title": title,
                         "message": message,
                         "type": db_type,
-                        "is_read": False
+                        "is_read": False,
+                        "metadata": payload or {}
                     }
-                    if payload:
-                        insert_data["payload"] = payload
+                    if payload and isinstance(payload, dict):
+                        if payload.get("action_url"):
+                            insert_data["action_url"] = payload["action_url"]
+                        if payload.get("action_label") or payload.get("action_text"):
+                            insert_data["action_label"] = payload.get("action_label") or payload.get("action_text")
+                    
                     try:
                         supabase.table("notifications").insert(insert_data).execute()
-                    except Exception:
-                        insert_data.pop("payload", None)
-                        supabase.table("notifications").insert(insert_data).execute()
-                    print(f"[NotificationService] In-App dashboard alert created for user {user_id}", flush=True)
+                        print(f"[NotificationService] In-App dashboard alert created for user {user_id}", flush=True)
+                    except Exception as ins_err:
+                        # Fallback with minimal fields if table schema differs
+                        minimal_data = {
+                            "user_id": user_id,
+                            "title": title,
+                            "message": message,
+                            "type": db_type,
+                            "is_read": False
+                        }
+                        supabase.table("notifications").insert(minimal_data).execute()
+                        print(f"[NotificationService] In-App dashboard alert created (minimal fallback) for user {user_id}", flush=True)
                 except Exception as e:
                     print(f"[NotificationService] Failed to write in-app notification: {str(e)}", flush=True)
             
@@ -283,11 +305,21 @@ class NotificationService:
                 
                 if digest_mode:
                     # Send digest summary if current user time matches delivery hour
+                    tz = None
                     try:
-                        tz = pytz.timezone(user_tz)
+                        if ZoneInfo:
+                            tz = ZoneInfo(user_tz)
+                        elif pytz:
+                            tz = pytz.timezone(user_tz)
                     except Exception:
-                        tz = pytz.timezone('UTC')
-                    local_now = datetime.now(tz)
+                        try:
+                            if ZoneInfo:
+                                tz = ZoneInfo('UTC')
+                            elif pytz:
+                                tz = pytz.timezone('UTC')
+                        except Exception:
+                            tz = None
+                    local_now = datetime.now(tz) if tz else datetime.utcnow()
                     
                     digest_time_str = prefs["digest_mode"].get("time", "18:00")
                     try:

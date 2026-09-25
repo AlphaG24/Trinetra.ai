@@ -242,7 +242,7 @@ class UsageService:
         await self.check_agent_minutes(agent_id)
     
     async def _pause_agent(self, agent_id: str):
-        """Pause an agent that exceeded limits"""
+        """Pause an agent that exceeded limits and dispatch alert to user"""
         await asyncio.to_thread(
             self.supabase.table("agents").update({
                 "status": "paused"
@@ -251,19 +251,49 @@ class UsageService:
         
         org_id = await self._get_org_id(agent_id)
         
+        # Resolve user_id and agent name
+        agent_name = "Agent"
+        user_id = None
+        try:
+            agent_res = await asyncio.to_thread(
+                self.supabase.table("agents").select("name, user_id").eq("id", agent_id).maybe_single().execute
+            )
+            if agent_res.data:
+                agent_name = agent_res.data.get("name") or "Agent"
+                user_id = agent_res.data.get("user_id")
+        except Exception:
+            pass
+
         if org_id:
             # Log activity
             await asyncio.to_thread(
                 self.supabase.table("activity_log").insert({
                     "organization_id": org_id,
-                    "user_id": None,
+                    "user_id": user_id,
                     "activity_type": "agent_paused",
                     "title": "Agent Paused - Limit Exceeded",
-                    "description": f"Agent has exceeded its minutes limit and has been paused. Upgrade to resume."
+                    "description": f"Agent '{agent_name}' has exceeded its minutes limit and has been paused. Upgrade to resume."
                 }).execute
             )
         
-        logger.warning(f"Agent {agent_id} paused - minutes limit exceeded")
+        if user_id:
+            try:
+                from app.services.notification_service import NotificationService
+                await NotificationService.dispatch(
+                    user_id=user_id,
+                    event_type="agent_paused",
+                    title=f"🛑 {agent_name} Paused - Limit Exceeded",
+                    message=f"Your agent '{agent_name}' has consumed 100% of its call minutes quota and is currently paused. Upgrade your plan at /dashboard/billing to resume calling immediately.",
+                    payload={
+                        "agent_id": agent_id,
+                        "action_url": "/dashboard/billing",
+                        "action_label": "Upgrade Plan"
+                    }
+                )
+            except Exception as notif_err:
+                logger.warning(f"Failed to dispatch agent_paused notification: {notif_err}")
+
+        logger.warning(f"Agent {agent_id} ({agent_name}) paused - minutes limit exceeded")
     
     async def _send_usage_warning(self, org_id: str, agent_id: str, agent_name: str, percent: float):
         """Send warning notification at 80% usage"""
