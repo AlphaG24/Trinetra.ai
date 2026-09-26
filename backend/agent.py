@@ -2986,9 +2986,9 @@ async def entrypoint(ctx: JobContext):
     if greeting_message:
         agent_instance.greeting_message = greeting_message
 
-    agent_instance.bot_name = bot_name
+    agent_instance.bot_name = locals().get('bot_name') or (agent_data.get('bot_name') if agent_data else None) or (agent_data.get('name') if agent_data else None) or 'Vikram'
     agent_instance.business_name = business_name_val if 'business_name_val' in dir() else (agent_data.get('business_name', '') if agent_data else '')
-    agent_instance.gender = gender_tag
+    agent_instance.gender = locals().get('gender_tag') or (agent_data.get('gender') if agent_data else None) or 'female'
     agent_instance.prospect_name = c_name if ('campaign_contact' in locals() and campaign_contact and locals().get('is_name_valid')) else (locals().get('cust_name') or "")
     agent_instance.campaign_goal = locals().get('notes_summary') if ('campaign_contact' in locals() and campaign_contact) else ""
     agent_instance.ending_message = agent_data.get("ending_message", "") if agent_data else ""
@@ -3854,22 +3854,13 @@ async def run_agent(room_name: str, agent_id: str | None = None, contact_id: str
         agent_instance.room = room
 
         # Defensive fallbacks prevent UnboundLocalError when joining LiveKit rooms
-        agent_instance.bot_name = (
-            locals().get('bot_name')
-            or (agent_data.get('bot_name') if agent_data else None)
-            or (agent_data.get('name') if agent_data else None)
-            or 'Vikram'
-        )
+        agent_instance.bot_name = locals().get('bot_name') or (agent_data.get('bot_name') if agent_data else None) or (agent_data.get('name') if agent_data else None) or 'Vikram'
         agent_instance.business_name = (
             locals().get('business_name_val')
             or (agent_data.get('business_name') if agent_data else '')
             or ''
         )
-        agent_instance.gender = (
-            locals().get('gender_tag')
-            or (agent_data.get('gender') if agent_data else None)
-            or 'female'
-        )
+        agent_instance.gender = locals().get('gender_tag') or (agent_data.get('gender') if agent_data else None) or 'female'
         agent_instance.prospect_name = c_name if ('campaign_contact' in locals() and campaign_contact and locals().get('is_name_valid')) else (locals().get('cust_name') or "")
         agent_instance.campaign_goal = locals().get('notes_summary') if ('campaign_contact' in locals() and campaign_contact) else ""
         agent_instance.ending_message = agent_data.get("ending_message", "") if agent_data else ""
