@@ -87,6 +87,9 @@ inbound_call_guard = InboundCallGuard()
 
 router = APIRouter(prefix="/api/voice", tags=["Voice Agent"])
 
+# Retain strong references to running background agent tasks to prevent GC
+_active_agent_tasks: set[asyncio.Task] = set()
+
 # Initialize Gemini Client
 genai_client = genai.Client()
 
@@ -368,9 +371,9 @@ async def generate_livekit_token(req: LiveKitTokenRequest):
         try:
             async def safe_run_agent(r_name: str, a_id: str):
                 try:
-                    # Optimized sleep guard: 0.3s for outbound telephony, 0.2s for web calls
+                    # Minimal sleep guard: 0.3s for outbound telephony (SIP needs setup time), 0.05s for web calls
                     is_outbound = r_name.startswith(("twilio--", "exotel--", "sip-"))
-                    await asyncio.sleep(0.3 if is_outbound else 0.2)
+                    await asyncio.sleep(0.3 if is_outbound else 0.05)
 
                     # Check if an external worker already joined the room
                     lk_url = os.getenv("LIVEKIT_URL")
@@ -415,7 +418,9 @@ async def generate_livekit_token(req: LiveKitTokenRequest):
                     print(f"[LIVEKIT AGENT RUN ERROR] Exception in run_agent: {run_err}", flush=True)
                     traceback.print_exc()
 
-            asyncio.create_task(safe_run_agent(room_name, req.agent_id))
+            agent_task = asyncio.create_task(safe_run_agent(room_name, req.agent_id))
+            _active_agent_tasks.add(agent_task)
+            agent_task.add_done_callback(_active_agent_tasks.discard)
         except Exception as spawn_err:
             print(f"[LIVEKIT AGENT SPAWN ERROR] Failed to spawn agent task: {spawn_err}", flush=True)
     else:

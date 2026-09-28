@@ -95,33 +95,32 @@ export function ToolHealthCards({ tools, loading = false, error = null, onRetry 
       {tools.map((tool, idx) => (
         <div
           key={tool.id}
-          data-tour={idx === 0 ? 'agent-card' : undefined}
-          className="flex flex-col justify-between p-5 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-2xl hover:scale-[1.01] hover:shadow-lg dark:hover:shadow-violet-500/5 transition duration-200"
+          className="flex flex-col justify-between p-5 bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl hover:scale-[1.01] hover:shadow-lg transition duration-200"
         >
           <div className="flex justify-between items-start">
             <div className="space-y-1 min-w-0">
-              <h4 className="text-sm font-bold text-zinc-900 dark:text-white truncate font-display">
+              <h4 className="text-sm font-bold text-[var(--heading)] truncate font-display">
                 {tool.name
                   .replace(/^\[[^\]]+\]\s*/, '')
                   .replace(/\s*-\s*Demo\s*$/i, ' (Demo)')
                   .replace(/\s*-\s*Trial\s*$/i, ' (Trial)')}
               </h4>
-              <span className="text-[10px] text-zinc-500 dark:text-zinc-400 font-mono font-medium uppercase tracking-wider">{tool.agent_type} agent</span>
+              <span className="text-[10px] text-[var(--muted)] font-mono font-medium uppercase tracking-wider">{tool.agent_type} agent</span>
             </div>
             <span className={`text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full border ${getStatusStyle(tool.status)}`}>
               {tool.status.replace('_', ' ')}
             </span>
           </div>
 
-          <div className="grid grid-cols-2 gap-4 mt-5 pt-4 border-t border-zinc-100 dark:border-zinc-800 text-[10px]">
+          <div className="grid grid-cols-2 gap-4 mt-5 pt-4 border-t border-[var(--border)] text-[10px]">
             <div>
-              <span className="text-zinc-500 dark:text-zinc-400 block font-semibold">Calls Today</span>
-              <span className="text-xs font-extrabold text-zinc-800 dark:text-zinc-200 font-mono mt-0.5 block">{tool.calls_today}</span>
+              <span className="text-[var(--muted)] block font-semibold">Calls Today</span>
+              <span className="text-xs font-extrabold text-[var(--heading)] font-mono mt-0.5 block">{tool.calls_today}</span>
             </div>
             <div>
-              <span className="text-zinc-500 dark:text-zinc-400 block font-semibold">Health Score</span>
+              <span className="text-[var(--muted)] block font-semibold">Health Score</span>
               <span className={`text-xs font-black font-mono mt-0.5 block flex items-center gap-1 ${
-                tool.health_score >= 90 ? 'text-emerald-600' : tool.health_score >= 70 ? 'text-amber-600' : 'text-red-650'
+                tool.health_score >= 90 ? 'text-emerald-500' : tool.health_score >= 70 ? 'text-amber-500' : 'text-red-500'
               }`}>
                 {tool.health_score >= 90 ? (
                   <CheckCircle className="w-3.5 h-3.5 text-emerald-500" />
@@ -133,11 +132,11 @@ export function ToolHealthCards({ tools, loading = false, error = null, onRetry 
             </div>
           </div>
 
-          <div className="flex items-center justify-between mt-5 pt-3 border-t border-zinc-100 dark:border-zinc-800">
-            <span className="text-[9px] text-zinc-500 dark:text-zinc-400 font-medium">Last Active: {formatDate(tool.last_active_at)}</span>
+          <div className="flex items-center justify-between mt-5 pt-3 border-t border-[var(--border)]">
+            <span className="text-[9px] text-[var(--muted)] font-medium">Last Active: {formatDate(tool.last_active_at)}</span>
             <Link
               href={`/dashboard/agents/${tool.id}`}
-              className="flex items-center gap-0.5 text-[10px] text-violet-600 dark:text-violet-400 font-extrabold uppercase tracking-wider hover:underline"
+              className="flex items-center gap-0.5 text-[10px] text-violet-500 font-extrabold uppercase tracking-wider hover:underline"
             >
               <span>Manage</span>
               <ArrowRight className="w-3.5 h-3.5" />

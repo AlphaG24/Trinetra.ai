@@ -42,6 +42,8 @@ export function useVoiceAgent() {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const recordedChunksRef = useRef<Blob[]>([])
   const activeCallMetaRef = useRef<{ roomName: string; agentId?: string } | null>(null)
+  // Guard against double-disconnect
+  const disconnectingRef = useRef(false)
 
   const startTimer = useCallback(() => {
     if (timerRef.current) clearInterval(timerRef.current)
@@ -90,67 +92,104 @@ export function useVoiceAgent() {
     }
   }, [stopTimer])
 
-  const disconnect = useCallback(() => {
+  /**
+   * Upload the recorded audio blob to the server.
+   * Returns true if upload succeeded, false otherwise.
+   */
+  const uploadRecording = useCallback(async (
+    chunks: Blob[],
+    mimeType: string,
+    callMeta: { roomName: string; agentId?: string } | null,
+    duration: number
+  ): Promise<boolean> => {
+    if (chunks.length === 0) return false
+    const audioBlob = new Blob(chunks, { type: mimeType || 'audio/webm' })
+    if (audioBlob.size < 200) return false
+
+    const formData = new FormData()
+    formData.append('file', audioBlob, `call_${callMeta?.roomName || 'web'}_${Date.now()}.webm`)
+    formData.append('room_name', callMeta?.roomName || 'trinetra-web-call')
+    if (callMeta?.agentId) {
+      formData.append('agent_id', callMeta.agentId)
+    }
+    formData.append('duration_seconds', String(duration))
+
+    // 1. Primary: Upload via internal Next.js API route
+    try {
+      const internalRes = await fetch('/api/voice/recordings/upload', {
+        method: 'POST',
+        body: formData,
+      })
+      if (internalRes.ok) {
+        console.log('[useVoiceAgent] Call recording uploaded via Next.js route')
+        return true
+      }
+    } catch (intErr) {
+      console.warn('[useVoiceAgent] Internal recording upload notice:', intErr)
+    }
+
+    // 2. Fallback: Upload to backend FastAPI server directly
+    try {
+      const isProd = typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1'
+      const fallbackUrl = isProd ? 'https://trinetra-ai-1-6f2n.onrender.com' : 'http://127.0.0.1:8000'
+      const apiUrl = (process.env.NEXT_PUBLIC_BACKEND_URL || process.env.NEXT_PUBLIC_FASTAPI_URL || fallbackUrl).replace(/\/$/, '')
+      const fallbackRes = await fetch(`${apiUrl}/api/voice/recordings/upload`, {
+        method: 'POST',
+        body: formData,
+      })
+      if (fallbackRes.ok) {
+        console.log('[useVoiceAgent] Call recording uploaded to backend fallback')
+        return true
+      }
+    } catch (upErr) {
+      console.warn('[useVoiceAgent] Upload recording notice:', upErr)
+    }
+
+    return false
+  }, [])
+
+  const disconnect = useCallback(async () => {
+    // Guard against double-disconnect race conditions
+    if (disconnectingRef.current) return
+    disconnectingRef.current = true
+
     const rec = mediaRecorderRef.current
     const callMeta = activeCallMetaRef.current
     const dur = secondsConnectedRef.current
     const activeCtx = audioContextRef.current
 
-    // Finalize recording and upload
+    stopTimer()
+    // 1. Immediately transition UI state to 'ended' for instant user feedback
+    setConnectionState('ended')
+
+    // 2. Immediately disconnect room and audio element so mic and speaker stop immediately
+    cleanupCallResources()
+
+    // 3. Finalize recording: wait for all data to be flushed, then upload
     if (rec && rec.state !== 'inactive') {
-      rec.onstop = async () => {
-        const chunks = recordedChunksRef.current
-        if (chunks.length > 0) {
-          const audioBlob = new Blob(chunks, { type: rec.mimeType || 'audio/webm' })
-          if (audioBlob.size > 200) {
-            try {
-              const formData = new FormData()
-              formData.append('file', audioBlob, `call_${callMeta?.roomName || 'web'}_${Date.now()}.webm`)
-              formData.append('room_name', callMeta?.roomName || 'trinetra-web-call')
-              if (callMeta?.agentId) {
-                formData.append('agent_id', callMeta.agentId)
-              }
-              formData.append('duration_seconds', String(dur))
-
-              // 1. Primary: Upload via internal Next.js API route
-              let uploadSuccess = false
-              try {
-                const internalRes = await fetch('/api/voice/recordings/upload', {
-                  method: 'POST',
-                  body: formData,
-                })
-                if (internalRes.ok) {
-                  uploadSuccess = true
-                  console.log('[useVoiceAgent] Call recording uploaded via Next.js route')
-                }
-              } catch (intErr) {
-                console.warn('[useVoiceAgent] Internal recording upload notice:', intErr)
-              }
-
-              // 2. Fallback: Upload to backend FastAPI server directly
-              if (!uploadSuccess) {
-                const isProd = typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1'
-                const fallbackUrl = isProd ? 'https://trinetra-ai-1-6f2n.onrender.com' : 'http://127.0.0.1:8000'
-                const apiUrl = (process.env.NEXT_PUBLIC_BACKEND_URL || process.env.NEXT_PUBLIC_FASTAPI_URL || fallbackUrl).replace(/\/$/, '')
-                await fetch(`${apiUrl}/api/voice/recordings/upload`, {
-                  method: 'POST',
-                  body: formData,
-                })
-                console.log('[useVoiceAgent] Call recording uploaded to backend fallback')
-              }
-            } catch (upErr) {
-              console.warn('[useVoiceAgent] Upload recording notice:', upErr)
-            }
-          }
-        }
-
-        // Close AudioContext only after onstop finishes packaging audio
-        if (activeCtx) {
+      const recordingDone = new Promise<void>((resolve) => {
+        rec.onstop = async () => {
+          const chunks = [...recordedChunksRef.current]
+          const mimeType = rec.mimeType || 'audio/webm'
+          
           try {
-            activeCtx.close()
-          } catch {}
+            const uploaded = await uploadRecording(chunks, mimeType, callMeta, dur)
+            if (uploaded) {
+              window.dispatchEvent(new CustomEvent('trinetra:call_completed', {
+                detail: { roomName: callMeta?.roomName, agentId: callMeta?.agentId, duration: dur }
+              }))
+              toast.success('Call recording saved successfully')
+            }
+          } catch (err) {
+            console.warn('[useVoiceAgent] Recording upload error:', err)
+          }
+
+          if (activeCtx) {
+            try { activeCtx.close() } catch {}
+          }
+          resolve()
         }
-      }
+      })
 
       try {
         if (rec.state === 'recording') {
@@ -159,23 +198,24 @@ export function useVoiceAgent() {
         rec.stop()
       } catch {}
       mediaRecorderRef.current = null
-    } else if (activeCtx) {
+
       try {
-        activeCtx.close()
+        await Promise.race([
+          recordingDone,
+          new Promise<void>((resolve) => setTimeout(resolve, 8000))
+        ])
       } catch {}
+    } else if (activeCtx) {
+      try { activeCtx.close() } catch {}
     }
 
     audioContextRef.current = null
     mediaStreamDestRef.current = null
 
-    cleanupCallResources()
-
-    setConnectionState('ended')
-    setTimeout(() => {
-      setConnectionState('idle')
-      setTranscripts([])
-    }, 1000)
-  }, [cleanupCallResources])
+    // Reset disconnectingRef so new calls can be started without refresh
+    disconnectingRef.current = false
+    // Transcripts are preserved for review and cleared only when startCall is initiated or modal is closed
+  }, [cleanupCallResources, stopTimer, uploadRecording])
 
   const startCall = useCallback(async (
     roomName: string = 'trinetra-demo-room',
@@ -187,6 +227,7 @@ export function useVoiceAgent() {
 
     // Clean up any residual resources from previous calls first
     cleanupCallResources()
+    disconnectingRef.current = false
 
     setConnectionState('connecting')
     setTranscripts([])
@@ -203,14 +244,22 @@ export function useVoiceAgent() {
       document.body.appendChild(el)
       dedicatedAudioElRef.current = el
     }
+    // Pre-warm audio element with a silent buffer to ensure autoplay policy is satisfied
+    if (dedicatedAudioElRef.current) {
+      try {
+        dedicatedAudioElRef.current.play().catch(() => {})
+      } catch {}
+    }
 
-    // 2. Initialize Web Audio mixer for call recording at 48kHz native rate
+    // 2. Initialize Web Audio mixer for call recording
+    // Use browser-default sample rate (typically 48kHz) — this avoids sample rate conversion
+    // artifacts and lets the AudioContext handle resampling natively
     let ctx: AudioContext | null = null
     try {
       if (typeof window !== 'undefined') {
         const AudioCtx = window.AudioContext || (window as any).webkitAudioContext
         if (AudioCtx) {
-          ctx = new AudioCtx({ sampleRate: 48000, latencyHint: 'playback' })
+          ctx = new AudioCtx({ latencyHint: 'interactive' })
           if (ctx.state === 'suspended') {
             await ctx.resume()
           }
@@ -245,7 +294,7 @@ export function useVoiceAgent() {
       const tokenData = await getLiveKitToken(roomName, participantName, agentId)
       const wsUrl = tokenData.url || LIVEKIT_URL
 
-      // 4. Instantiate LiveKit Room
+      // 4. Instantiate LiveKit Room with optimized audio settings
       const room = new Room({
         adaptiveStream: true,
         dynacast: true,
@@ -259,18 +308,21 @@ export function useVoiceAgent() {
 
       // 5. Attach Room Event Listeners
       room.on(RoomEvent.Connected, async () => {
-        setConnectionState('active')
-        startTimer()
-        toast.success('Connected to voice session')
-
-        // Ensure browser audio playback is fully unlocked
+        // Unlock browser audio playback
         try {
           if (typeof (room as any).startAudio === 'function') {
             await (room as any).startAudio()
           }
         } catch {}
 
-        // Publish local microphone track
+        // Check if agent is already connected in the room
+        const remoteCount = room.remoteParticipants ? room.remoteParticipants.size : 0;
+        if (remoteCount > 0) {
+          setConnectionState('active')
+          startTimer()
+        }
+
+        // Publish local microphone track immediately for lowest latency
         try {
           const micTrack = await createLocalAudioTrack({ 
             echoCancellation: true, 
@@ -295,6 +347,12 @@ export function useVoiceAgent() {
         }
       })
 
+      room.on(RoomEvent.ParticipantConnected, (participant: RemoteParticipant) => {
+        console.log('[useVoiceAgent] Remote agent participant joined:', participant.identity)
+        setConnectionState('active')
+        if (!timerRef.current) startTimer()
+      })
+
       room.on(RoomEvent.Disconnected, () => {
         disconnect()
       })
@@ -312,6 +370,9 @@ export function useVoiceAgent() {
       // Handle incoming agent voice track with dedicated clean playback
       room.on(RoomEvent.TrackSubscribed, (track: RemoteTrack, publication: RemoteTrackPublication, participant: RemoteParticipant) => {
         if (track.kind === Track.Kind.Audio) {
+          setConnectionState('active')
+          if (!timerRef.current) startTimer()
+
           const audioEl = dedicatedAudioElRef.current || document.createElement('audio')
           if (!dedicatedAudioElRef.current) {
             audioEl.style.display = 'none'
@@ -427,6 +488,7 @@ export function useVoiceAgent() {
       mediaStreamDestRef.current = null
 
       setConnectionState('error')
+      disconnectingRef.current = false
       // Reset immediately to idle after brief pause
       setTimeout(() => setConnectionState('idle'), 1200)
     }
@@ -471,3 +533,4 @@ export function useVoiceAgent() {
     clearTranscripts,
   }
 }
+

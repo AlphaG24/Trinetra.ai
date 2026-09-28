@@ -67,8 +67,8 @@ export async function GET() {
         return {
           ...profile,
           region: profile.state,
-          theme: profile.theme || 'dark',
-          theme_preference: profile.theme || 'dark'
+          theme: profile.theme || 'light',
+          theme_preference: profile.theme || 'light'
         }
       },
       120
@@ -220,8 +220,8 @@ export async function PATCH(request: NextRequest) {
     const clientProfile = {
       ...profile,
       region: profile.state,
-      theme: profile.theme || 'dark',
-      theme_preference: profile.theme || 'dark'
+      theme: profile.theme || 'light',
+      theme_preference: profile.theme || 'light'
     }
 
     return NextResponse.json({ success: true, profile: clientProfile })

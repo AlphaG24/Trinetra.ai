@@ -25,46 +25,48 @@ export async function GET(request: Request) {
 
     const isSuperAdmin = profile.role === "super_admin" || profile.role === "admin";
     const orgId = profile.organization_id;
+    const forceRefresh = searchParams.get("refresh") === "true" || searchParams.get("nocache") === "true";
 
-    // Only cache when there's no text search (search is done client-side on cached data)
-    const cacheKey = `customers:${orgId || 'all'}:${tag || 'all'}`;
-    
-    const customers = await cached(
-      cacheKey,
-      async () => {
-        const supabaseAdmin = getAdminClient();
+    const fetchFreshCustomers = async () => {
+      const supabaseAdmin = getAdminClient();
 
-        let query = supabaseAdmin
-          .from("customer_contacts")
-          .select("*");
+      let query = supabaseAdmin
+        .from("customer_contacts")
+        .select("*");
 
-        // Regular users are strictly scoped to their own organization.
-        // Super admins can see all contacts, or optionally filter by requested organization_id.
-        if (!isSuperAdmin) {
-          if (!orgId) {
-            return [];
-          }
-          query = query.eq("organization_id", orgId);
-        } else if (searchParams.get("organization_id")) {
-          query = query.eq("organization_id", searchParams.get("organization_id")!);
+      // Regular users are strictly scoped to their own organization.
+      // Super admins can see all contacts, or optionally filter by requested organization_id.
+      if (!isSuperAdmin) {
+        if (!orgId) {
+          return [];
         }
+        query = query.eq("organization_id", orgId);
+      } else if (searchParams.get("organization_id")) {
+        query = query.eq("organization_id", searchParams.get("organization_id")!);
+      }
 
-        if (tag && tag !== "all") {
-          query = query.contains("tags", [tag]);
-        }
+      if (tag && tag !== "all") {
+        query = query.contains("tags", [tag]);
+      }
 
-        const { data, error: dbError } = await query
-          .order("created_at", { ascending: false });
+      const { data, error: dbError } = await query
+        .order("created_at", { ascending: false });
 
-        if (dbError) {
-          console.error('[API] Database Error fetching customers:', dbError);
-          throw new Error("Database error");
-        }
+      if (dbError) {
+        console.error('[API] Database Error fetching customers:', dbError);
+        throw new Error("Database error");
+      }
 
-        return data || [];
-      },
-      60 // 60 second TTL
-    );
+      return data || [];
+    };
+
+    let customers;
+    if (forceRefresh) {
+      customers = await fetchFreshCustomers();
+    } else {
+      const cacheKey = `customers:${orgId || 'all'}:${tag || 'all'}`;
+      customers = await cached(cacheKey, fetchFreshCustomers, 5); // Short 5 second TTL for real-time contact visibility
+    }
 
     // Client-side text search on cached results
     let filtered = customers;

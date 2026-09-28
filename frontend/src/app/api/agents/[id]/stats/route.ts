@@ -26,9 +26,14 @@ export async function GET(
       return NextResponse.json({ error: "Organization not found" }, { status: 404 });
     }
 
-    // 3. Query Calls Today
-    const todayStart = new Date();
-    todayStart.setHours(0, 0, 0, 0);
+    // 3. Query Calls Today — use IST midnight (UTC+5:30) for Indian users
+    // Server runs in UTC; IST midnight = 18:30 UTC previous day
+    const nowUtc = new Date();
+    const istOffsetMs = 5.5 * 60 * 60 * 1000; // +5:30
+    const nowIst = new Date(nowUtc.getTime() + istOffsetMs);
+    const todayStart = new Date(
+      Date.UTC(nowIst.getUTCFullYear(), nowIst.getUTCMonth(), nowIst.getUTCDate()) - istOffsetMs
+    );
 
     const { count: callsToday, error: errCallsToday } = await supabase
       .from('voice_calls')

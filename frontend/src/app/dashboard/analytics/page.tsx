@@ -12,7 +12,6 @@ import { CallVolumeChart } from '@/src/components/analytics/CallVolumeChart'
 import { SentimentChart } from '@/src/components/analytics/SentimentChart'
 import { LeadFunnelChart } from '@/src/components/analytics/LeadFunnelChart'
 import { CallsByAgentChart } from '@/src/components/analytics/CallsByAgentChart'
-import { RecentCallsTable } from '@/src/components/analytics/RecentCallsTable'
 
 interface AgentOption {
   id: string
@@ -152,8 +151,8 @@ export default function AnalyticsDashboardPage() {
               <div key={i} className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl h-80 animate-pulse" />
             ))}
           </div>
-          {/* Table Loader */}
-          <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl h-64 animate-pulse" />
+          {/* CTA Card Loader */}
+          <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl h-24 animate-pulse" />
         </div>
       )}
 
@@ -203,9 +202,6 @@ export default function AnalyticsDashboardPage() {
             <LeadFunnelChart data={data.leadFunnel} />
             {data.callsByAgent.length > 1 && <CallsByAgentChart data={data.callsByAgent} />}
           </div>
-
-          {/* Recent Activity Table */}
-          <RecentCallsTable calls={data.recentCalls} />
         </div>
       )}
     </div>

@@ -35,8 +35,13 @@ export async function GET() {
       startOfMonth.setDate(1)
       startOfMonth.setHours(0, 0, 0, 0)
       
-      const today = new Date()
-      today.setHours(0, 0, 0, 0)
+      // IST midnight for "today" boundary (UTC+5:30)
+      const nowUtc = new Date()
+      const istOffsetMs = 5.5 * 60 * 60 * 1000
+      const nowIst = new Date(nowUtc.getTime() + istOffsetMs)
+      const today = new Date(
+        Date.UTC(nowIst.getUTCFullYear(), nowIst.getUTCMonth(), nowIst.getUTCDate()) - istOffsetMs
+      )
 
       // Build Queries
       let callsQuery = supabase
@@ -67,7 +72,7 @@ export async function GET() {
       let activeToolsQuery = supabase
         .from('agents')
         .select('id', { count: 'exact', head: true })
-        .eq('status', 'live')
+        .in('status', ['live', 'active'])
         
       if (orgId) {
         activeToolsQuery = activeToolsQuery.eq('organization_id', orgId)
@@ -84,15 +89,17 @@ export async function GET() {
         .from('leads')
         .select('id', { count: 'exact', head: true })
         .eq('user_id', user.id)
-        .eq('status', 'converted')
+        .or('status.in.(converted,won,qualified),stage.in.(converted,won,qualified)')
 
-      // 2. Activity Query
+      // 2. Activity Query (Strictly live activities from the last 6 hours, max 10)
+      const sixHoursAgo = new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString()
       const activityQuery = supabase
         .from('activity_log')
         .select('id, activity_type, channel, title, description, reference_id, reference_type, metadata, created_at')
         .eq('user_id', user.id)
+        .gte('created_at', sixHoursAgo)
         .order('created_at', { ascending: false })
-        .limit(20)
+        .limit(10)
 
       // 3. Tools calls for today
       const toolsCallsQuery = supabase

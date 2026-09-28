@@ -36,7 +36,7 @@ export function CallsPageClient({ agents }: { agents: any[] }) {
       setIsLoading(true)
       let query = supabase
         .from('voice_calls')
-        .select('id, created_at, duration_seconds, sentiment, outcome, caller_name, caller_phone, recording_url, agent_id', { count: 'exact' })
+        .select('id, created_at, duration_seconds, sentiment, outcome, caller_name, caller_phone, recording_url, agent_id, transcript, call_summary', { count: 'exact' })
         .order('created_at', { ascending: false })
         .range((page - 1) * perPage, page * perPage - 1)
 
@@ -58,11 +58,11 @@ export function CallsPageClient({ agents }: { agents: any[] }) {
   const handleOpenCall = async (call: any, autoPlay: boolean = false) => {
     setAutoPlayAudio(autoPlay)
     setSelectedCall(call)
-    if (!call.transcript_text && !call.transcript) {
+    if (!call.transcript) {
       try {
         const { data } = await supabase
           .from('voice_calls')
-          .select('transcript_text, transcript')
+          .select('transcript, call_summary, recording_url')
           .eq('id', call.id)
           .single()
         if (data) {
@@ -234,7 +234,7 @@ export function CallsPageClient({ agents }: { agents: any[] }) {
           setAutoPlayAudio(false)
         }}
         log={selectedCall}
-        transcript={selectedCall?.transcript_text || selectedCall?.transcript || null}
+        transcript={selectedCall?.transcript || null}
         recordingUrl={selectedCall?.recording_url || null}
         callerName={selectedCall?.caller_name || 'Customer'}
         autoPlay={autoPlayAudio}

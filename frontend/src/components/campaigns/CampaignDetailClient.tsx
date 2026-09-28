@@ -92,7 +92,7 @@ export function CampaignDetailClient({ campaignId }: CampaignDetailClientProps) 
       const supabase = createClient()
       let query = supabase
         .from('voice_calls')
-        .select('transcript_text, transcript, recording_url, duration_seconds')
+        .select('transcript, recording_url, duration_seconds')
 
       if (callId && contactId) {
         query = query.or(`id.eq.${callId},metadata->>provider_call_id.eq.${callId},metadata->>session_id.eq.${callId},metadata->>contact_id.eq.${contactId}`)
@@ -111,8 +111,8 @@ export function CampaignDetailClient({ campaignId }: CampaignDetailClientProps) 
         setSelectedDuration(data.duration_seconds)
       }
 
-      if (data?.transcript_text || data?.transcript) {
-        setSelectedTranscript(data.transcript_text || data.transcript)
+      if (data?.transcript) {
+        setSelectedTranscript(data.transcript)
       } else {
         setSelectedTranscript('No transcript registered for this call yet.')
       }
@@ -240,7 +240,7 @@ export function CampaignDetailClient({ campaignId }: CampaignDetailClientProps) 
           table: 'campaigns',
           filter: `id=eq.${campaignId}`
         },
-        (payload) => {
+        (payload: any) => {
           setCampaign(payload.new as CampaignDetail)
         }
       )

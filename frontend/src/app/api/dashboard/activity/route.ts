@@ -10,10 +10,12 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const fiveHoursAgo = new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString()
     const { data: activities, error } = await supabase
       .from('activity_log')
       .select('id, activity_type, channel, title, description, reference_id, reference_type, metadata, created_at')
       .eq('user_id', user.id)
+      .gte('created_at', fiveHoursAgo)
       .order('created_at', { ascending: false })
       .limit(20)
 

@@ -264,11 +264,17 @@ class IntegrationExecutor:
 
     async def dispatch_interested_followup(self, agent_id: str, prospect_data: dict) -> bool:
         """
-        Sends an automated welcome & next-step message to interested prospects via WhatsApp (or SMS fallback).
+        Sends an automated welcome, appointment & next-step message to interested prospects
+        via WhatsApp and/or Email (Rule 52, 53) with dynamic, conversation-related subjects.
         """
-        prospect_phone = prospect_data.get("contact_phone") or prospect_data.get("prospect_phone")
-        if not prospect_phone or str(prospect_phone).strip().lower() in ("unknown", "none", "", "null"):
-            logger.info("[Interested Followup] Skipped: no valid prospect phone provided.")
+        prospect_phone = prospect_data.get("contact_phone") or prospect_data.get("prospect_phone") or ""
+        prospect_email = prospect_data.get("contact_email") or prospect_data.get("prospect_email") or ""
+        
+        has_phone = bool(prospect_phone and str(prospect_phone).strip().lower() not in ("unknown", "none", "", "null"))
+        has_email = bool(prospect_email and str(prospect_email).strip().lower() not in ("unknown", "none", "", "null") and "@" in str(prospect_email))
+
+        if not has_phone and not has_email:
+            logger.info("[Interested Followup] Skipped: neither valid phone nor email provided.")
             return False
 
         org_id = prospect_data.get("organization_id")
@@ -282,6 +288,14 @@ class IntegrationExecutor:
         if len(clean_sum) > 350:
             clean_sum = clean_sum[:347] + "..."
 
+        # Generate conversation-related subject line (Rule 52)
+        if cb_time or prospect_data.get("callback_scheduled"):
+            dynamic_subject = f"{business_name} - Appointment Confirmation & Details"
+        elif "logistics" in clean_sum.lower() or "tracking" in clean_sum.lower():
+            dynamic_subject = f"{business_name} - Logistics & Tracking Solutions Follow-up"
+        else:
+            dynamic_subject = f"{business_name} - Discussion Summary & Next Steps"
+
         msg_lines = [
             f"Hello {prospect_name},",
             f"\nThank you for speaking with our team today on behalf of *{business_name}*.",
@@ -291,47 +305,132 @@ class IntegrationExecutor:
             "━━━━━━━━━━━━━━━━━━━━━━━━"
         ]
         if cb_time:
-            msg_lines.append(f"\n⏰ *Scheduled Next Step*\nYour callback has been scheduled for *{cb_time}*. Our specialist will connect with you then.")
+            msg_lines.append(f"\n⏰ *Scheduled Next Step*\nYour appointment has been scheduled for *{cb_time}*. Our specialist will connect with you then.")
         else:
             msg_lines.append("\n🚀 *Scheduled Next Step*\nOur advisory team is reviewing your requirements and will reach out with the requested details shortly.")
 
         msg_lines.append(f"\nIf you have any questions or need to make changes, feel free to reply directly to this message.\n\nWarm regards,\n*{business_name} Client Team*")
-        message = "\n".join(msg_lines)
+        message_wa = "\n".join(msg_lines)
+
+        # HTML Email representation (Rule 52 & 53)
+        cb_block = f"<p><strong>Scheduled Appointment:</strong> <span style='color: #4f46e5; font-weight: 600;'>{cb_time}</span></p>" if cb_time else "<p>Our specialist will connect with you shortly with complete details.</p>"
+        html_email = (
+            f"<div style='font-family: Arial, sans-serif; line-height: 1.6; color: #1e293b; max-width: 600px; border: 1px solid #e2e8f0; border-radius: 8px; padding: 24px;'>"
+            f"<div style='font-size: 12px; font-weight: 700; color: #4f46e5; text-transform: uppercase; letter-spacing: 0.5px;'>{business_name} Confirmation</div>"
+            f"<h2 style='margin-top: 6px; color: #0f172a;'>Hello {prospect_name},</h2>"
+            f"<p>Thank you for speaking with our team today regarding <strong>{business_name}</strong> solutions.</p>"
+            f"<div style='background-color: #f8fafc; border-left: 4px solid #4f46e5; padding: 14px; border-radius: 6px; margin: 18px 0;'>"
+            f"<div style='font-weight: 600; color: #334155; margin-bottom: 4px;'>Discussion Summary:</div>"
+            f"<div style='color: #475569;'>{clean_sum}</div>"
+            f"</div>"
+            f"{cb_block}"
+            f"<div style='height: 1px; background-color: #e2e8f0; margin: 20px 0;'></div>"
+            f"<p style='font-size: 13px; color: #64748b; margin: 0;'>If you have any questions, feel free to reply directly to this email.<br/>Warm regards,<br/><strong>{business_name} Client Operations</strong></p>"
+            f"</div>"
+        )
 
         integrations = await self._get_agent_integrations(agent_id, org_id, user_id)
+        email_sent = False
+        phone_sent = False
 
-        # 1. Attempt WhatsApp first
-        sent = False
-        for itg in integrations:
-            itype = (itg.get("integration_types") or {}).get("slug")
-            config = itg.get("config") or {}
-            if itype == "whatsapp":
-                wa_ok = await self._send_whatsapp(config, message, {"contact_phone": prospect_phone})
-                if wa_ok:
-                    sent = True
-                    break
-
-        # 2. If WhatsApp is not configured or failed, attempt SMS
-        if not sent:
+        # 1. Send Email if prospect provided email
+        if has_email:
             for itg in integrations:
+                itype = (itg.get("integration_types") or {}).get("slug")
                 config = itg.get("config") or {}
-                if config.get("twilio_sid") or os.getenv("TWILIO_ACCOUNT_SID"):
-                    sms_ok = await self._send_sms(config, message, {"contact_phone": prospect_phone})
-                    if sms_ok:
-                        sent = True
+                if itype == "smtp-email":
+                    try:
+                        await self._send_email(
+                            config,
+                            "fulfillment",
+                            html_email,
+                            {
+                                "contact_email": prospect_email,
+                                "subject": dynamic_subject,
+                                "business_name": business_name,
+                            }
+                        )
+                        email_sent = True
+                        logger.info(f"[Interested Followup] Email confirmation sent successfully to {prospect_email}")
+                        break
+                    except Exception as em_err:
+                        logger.warning(f"[Interested Followup] Failed sending email to {prospect_email}: {em_err}")
+
+            # Fallback to Resend API if no custom SMTP integration or if SMTP failed
+            if not email_sent:
+                resend_key = os.getenv("RESEND_PRIVATE_KEY") or os.getenv("RESEND_API_KEY")
+                if resend_key:
+                    try:
+                        async with httpx.AsyncClient() as client:
+                            from_sender = f"{business_name} <alerts@trinetraedu-ai.com>"
+                            res = await client.post(
+                                "https://api.resend.com/emails",
+                                headers={"Authorization": f"Bearer {resend_key}", "Content-Type": "application/json"},
+                                json={
+                                    "from": from_sender,
+                                    "to": [prospect_email],
+                                    "subject": dynamic_subject,
+                                    "html": html_email
+                                },
+                                timeout=10.0
+                            )
+                            if res.status_code in (200, 201):
+                                email_sent = True
+                                logger.info(f"[Interested Followup] Email confirmation sent successfully via Resend API to {prospect_email}")
+                            elif res.status_code == 403 and "testing emails" in res.text:
+                                logger.warning(f"[Interested Followup] Resend testing domain restricted delivery to {prospect_email}. Forwarding fulfillment email to verified account owner...")
+                                owner_res = await client.post(
+                                    "https://api.resend.com/emails",
+                                    headers={"Authorization": f"Bearer {resend_key}", "Content-Type": "application/json"},
+                                    json={
+                                        "from": from_sender,
+                                        "to": ["support@trinetraedu-ai.com"],
+                                        "subject": f"[Prospect Target: {prospect_email}] {dynamic_subject}",
+                                        "html": f"<p style='color:#ef4444;font-weight:bold;'>Notice: Delivered to account owner because custom domain is not yet verified in Resend for external recipient {prospect_email}.</p>" + html_email
+                                    },
+                                    timeout=10.0
+                                )
+                                if owner_res.status_code in (200, 201):
+                                    email_sent = True
+                                    logger.info(f"[Interested Followup] Delivered prospect fulfillment fallback to support@trinetraedu-ai.com")
+                            else:
+                                logger.warning(f"[Interested Followup] Resend API error: {res.status_code} {res.text}")
+                    except Exception as resend_err:
+                        logger.warning(f"[Interested Followup] Failed sending email via Resend: {resend_err}")
+
+        # 2. Attempt WhatsApp first if prospect has phone
+        if has_phone:
+            for itg in integrations:
+                itype = (itg.get("integration_types") or {}).get("slug")
+                config = itg.get("config") or {}
+                if itype == "whatsapp":
+                    wa_ok = await self._send_whatsapp(config, message_wa, {"contact_phone": prospect_phone})
+                    if wa_ok:
+                        phone_sent = True
                         break
 
-        # 3. Global Twilio fallback if env vars are present
-        if not sent and os.getenv("TWILIO_ACCOUNT_SID") and os.getenv("TWILIO_PHONE_NUMBER"):
-            sms_ok = await self._send_sms({}, message, {"contact_phone": prospect_phone})
-            if sms_ok:
-                sent = True
+            # 3. If WhatsApp failed or unconfigured, attempt SMS fallback
+            if not phone_sent:
+                for itg in integrations:
+                    config = itg.get("config") or {}
+                    if config.get("twilio_sid") or os.getenv("TWILIO_ACCOUNT_SID"):
+                        sms_ok = await self._send_sms(config, message_wa, {"contact_phone": prospect_phone})
+                        if sms_ok:
+                            phone_sent = True
+                            break
 
-        if sent:
-            logger.info(f"[Interested Followup] Successfully dispatched welcome message to {prospect_phone}")
+            # 4. Global Twilio SMS fallback
+            if not phone_sent and os.getenv("TWILIO_ACCOUNT_SID") and os.getenv("TWILIO_PHONE_NUMBER"):
+                sms_ok = await self._send_sms({}, message_wa, {"contact_phone": prospect_phone})
+                if sms_ok:
+                    phone_sent = True
+
+        total_sent = email_sent or phone_sent
+        if total_sent:
+            logger.info(f"[Interested Followup] Successfully dispatched fulfillment (email={email_sent}, phone={phone_sent})")
         else:
-            logger.warning(f"[Interested Followup] No active messaging provider reached for {prospect_phone}")
-        return sent
+            logger.warning(f"[Interested Followup] No active messaging provider reached for phone={prospect_phone}, email={prospect_email}")
+        return total_sent
 
     async def _dispatch(self, slug: str, event_type: str, config: dict, data: dict):
         try:
@@ -558,7 +657,34 @@ class IntegrationExecutor:
                         logger.error(f"Twilio WhatsApp API error: status={res.status_code} response={res.text}")
                         return False
                     else:
-                        logger.info(f"Twilio WhatsApp message sent successfully to {to_whatsapp}")
+                        msg_data = res.json()
+                        msg_sid = msg_data.get("sid")
+                        # Inspect downstream delivery status to detect sandbox opt-in expiration (error 63015)
+                        if msg_sid:
+                            await asyncio.sleep(1.0)
+                            try:
+                                status_res = await client.get(
+                                    f"https://api.twilio.com/2010-04-01/Accounts/{twilio_sid}/Messages/{msg_sid}.json",
+                                    auth=(twilio_sid, auth_token),
+                                    timeout=5.0
+                                )
+                                if status_res.status_code == 200:
+                                    s_data = status_res.json()
+                                    s_status = s_data.get("status")
+                                    s_err = s_data.get("error_code")
+                                    if s_status in ("failed", "undelivered") or s_err:
+                                        if s_err == 63015:
+                                            logger.error(
+                                                f"[Twilio WhatsApp] Sandbox session expired (Error 63015) for {to_whatsapp}. "
+                                                f"To receive messages, send 'join happen-entire' to +1 415 523 8886 on WhatsApp."
+                                            )
+                                        else:
+                                            logger.error(f"[Twilio WhatsApp] Delivery failed for {to_whatsapp}: status={s_status}, error_code={s_err}")
+                                        return False
+                            except Exception as poll_err:
+                                logger.warning(f"Error checking message delivery status: {poll_err}")
+
+                        logger.info(f"Twilio WhatsApp message sent successfully to {to_whatsapp} (SID: {msg_sid})")
                         return True
             except Exception as exc:
                 logger.error(f"Twilio WhatsApp request failed: {exc}")
@@ -668,10 +794,10 @@ class IntegrationExecutor:
             logger.warning("SMTP configuration is incomplete. Skipping email send.")
             return
             
-        sender_name = config.get("sender_display_name", "Trinetra AI Alerts")
+        sender_name = data.get("business_name") or config.get("sender_display_name", "Trinetra AI Alerts")
         reply_to = config.get("reply_to")
         
-        subject = f"Trinetra AI: New {event_type.replace('_', ' ').title()}"
+        subject = data.get("subject") or config.get("subject") or f"{sender_name}: New {event_type.replace('_', ' ').title()}"
         
         msg = MIMEMultipart("alternative")
         msg["Subject"] = subject

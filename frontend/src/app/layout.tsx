@@ -107,7 +107,7 @@ export default async function RootLayout({
 }>) {
   const cookieStore = await cookies();
   const themeCookie = cookieStore.get('trinetra-theme')?.value;
-  const initialTheme = themeCookie === 'light' ? 'light' : 'dark';
+  const initialTheme = themeCookie === 'dark' ? 'dark' : 'light';
 
   const jsonLd = {
     "@context": "https://schema.org",
@@ -157,21 +157,21 @@ export default async function RootLayout({
             __html: `
               (function() {
                 try {
-                  var match = document.cookie.match(/(?:^|;\\s*)trinetra-theme=([^;]*)/);
-                  var cookieTheme = match ? match[1] : null;
-                  var localTheme = localStorage.getItem('trinetra-theme') || localStorage.getItem('theme');
-                  var activeTheme = localTheme || cookieTheme || document.documentElement.getAttribute('data-theme') || 'dark';
+                  var explicit = localStorage.getItem('trinetra-theme-explicit');
+                  var activeTheme = 'light';
+                  if (explicit === 'true') {
+                    var saved = localStorage.getItem('trinetra-theme');
+                    if (saved === 'dark' || saved === 'light') {
+                      activeTheme = saved;
+                    }
+                  } else {
+                    localStorage.setItem('trinetra-theme', 'light');
+                    document.cookie = 'trinetra-theme=light; path=/; max-age=31536000; SameSite=Lax';
+                  }
                   
                   document.documentElement.setAttribute('data-theme', activeTheme);
                   document.documentElement.classList.remove('light', 'dark');
                   document.documentElement.classList.add(activeTheme);
-                  
-                  if (!cookieTheme || cookieTheme !== activeTheme) {
-                    document.cookie = 'trinetra-theme=' + activeTheme + '; path=/; max-age=31536000; SameSite=Lax';
-                  }
-                  if (!localTheme) {
-                    localStorage.setItem('trinetra-theme', activeTheme);
-                  }
                 } catch (e) {}
               })();
             `,

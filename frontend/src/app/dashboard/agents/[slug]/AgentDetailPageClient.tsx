@@ -25,8 +25,7 @@ import { AgentLeadsTab } from '@/src/components/agents/AgentLeadsTab'
 import { AgentAnalyticsTab } from '@/src/components/agents/AgentAnalyticsTab'
 import { AgentSettingsTab } from '../../../../components/agents/AgentSettingsTab'
 import { AgentSetupGuide } from '@/src/components/agents/AgentSetupGuide'
-import { AgentCallingStatus } from '@/src/components/agents/AgentCallingStatus'
-import { ProductTour } from '@/src/components/onboarding/ProductTour'
+// ProductTour removed
 
 interface CallLog {
   id: string
@@ -152,13 +151,7 @@ export function AgentDetailPageClient({
     setTimeout(() => setCopied(false), 2000)
   }
 
-  const { agents, setAgents, runProductTour, setRunProductTour } = useDashboardStore()
-
-  useEffect(() => {
-    if (profile && profile.tour_completed === false) {
-      setRunProductTour(true)
-    }
-  }, [profile, setRunProductTour])
+  const { agents, setAgents } = useDashboardStore()
 
   const handleDeleteAgent = async () => {
     if (!window.confirm("Are you sure you want to delete this agent? All logs and configurations will be permanently removed.")) {
@@ -751,7 +744,6 @@ export function AgentDetailPageClient({
               return (
                 <button
                   key={tab.id}
-                  data-tour={`tab-${tab.id}`}
                   onClick={() => {
                     if (isTabLocked) {
                       toast.error((tab as any).lockedMessage || 'Upgrade to a paid plan to access this feature')
@@ -894,11 +886,6 @@ export function AgentDetailPageClient({
       </div>
         </>
       )}
-      <ProductTour 
-        page="detail" 
-        run={runProductTour} 
-        onTourComplete={() => setRunProductTour(false)} 
-      />
     </div>
   )
 }

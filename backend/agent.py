@@ -79,12 +79,16 @@ logger.setLevel(logging.INFO)
 _vad_model = None
 
 def get_vad_model():
-    """Lazy-load Silero VAD model on first use to conserve startup memory on 512MB tiers."""
+    """Lazy-load Silero VAD model on first use with noise-resistant activation threshold to filter background chatter."""
     global _vad_model
     if _vad_model is None:
         logger.info("Loading Silero VAD model on-demand...")
-        _vad_model = silero.VAD.load()
-        logger.info("Silero VAD model loaded successfully!")
+        _vad_model = silero.VAD.load(
+            min_speech_duration=0.25,
+            min_silence_duration=0.55,
+            activation_threshold=0.6,
+        )
+        logger.info("Silero VAD model loaded successfully with noise-resistant activation threshold (0.6)!")
     return _vad_model
 PROMPTS_DIR = os.path.join(os.path.dirname(__file__), "prompts")
 
@@ -245,6 +249,9 @@ def clean_ssml(text: str, is_transcript: bool = False) -> str:
     # Normalize 24/7 so Indian TTS speaks naturally instead of "chaubis by saat"
     text = re.sub(r'\b24/7\b', 'twenty-four seven', text)
     text = re.sub(r'24/7', 'twenty-four seven', text)
+    # Eliminate accidental double AI acronyms (e.g. "Trinetra AI AI voice agents" -> "Trinetra AI voice agents")
+    text = re.sub(r'\b(Trinetra\s+AI)\s+AI\b', r'\1', text, flags=re.IGNORECASE)
+    text = re.sub(r'\bAI\s+AI\b', 'AI', text, flags=re.IGNORECASE)
     # Clean whitespace and strip stray enclosing quotes
     text = re.sub(r'\s+', ' ', text).strip()
     text = text.strip('"\'`“”‘’').strip()
@@ -260,10 +267,36 @@ DEVA_DIGITS_MAP = {
     '५': '5', '६': '6', '७': '7', '८': '8', '९': '9'
 }
 
+ENGLISH_CARDINAL_WORDS = {
+    0: 'zero', 1: 'one', 2: 'two', 3: 'three', 4: 'four', 5: 'five',
+    6: 'six', 7: 'seven', 8: 'eight', 9: 'nine', 10: 'ten',
+    11: 'eleven', 12: 'twelve', 13: 'thirteen', 14: 'fourteen', 15: 'fifteen',
+    16: 'sixteen', 17: 'seventeen', 18: 'eighteen', 19: 'nineteen', 20: 'twenty',
+    21: 'twenty-one', 22: 'twenty-two', 23: 'twenty-three', 24: 'twenty-four', 25: 'twenty-five',
+    26: 'twenty-six', 27: 'twenty-seven', 28: 'twenty-eight', 29: 'twenty-nine', 30: 'thirty',
+    31: 'thirty-one', 32: 'thirty-two', 33: 'thirty-three', 34: 'thirty-four', 35: 'thirty-five',
+    36: 'thirty-six', 37: 'thirty-seven', 38: 'thirty-eight', 39: 'thirty-nine', 40: 'forty',
+    41: 'forty-one', 42: 'forty-two', 43: 'forty-three', 44: 'forty-four', 45: 'forty-five',
+    46: 'forty-six', 47: 'forty-seven', 48: 'forty-eight', 49: 'forty-nine', 50: 'fifty',
+    55: 'fifty-five', 60: 'sixty', 70: 'seventy', 80: 'eighty', 90: 'ninety', 100: 'one hundred'
+}
+
+def number_to_english_words(n: int) -> str:
+    if n in ENGLISH_CARDINAL_WORDS:
+        return ENGLISH_CARDINAL_WORDS[n]
+    if 20 < n < 100:
+        tens = (n // 10) * 10
+        ones = n % 10
+        return f"{ENGLISH_CARDINAL_WORDS.get(tens, '')}-{ENGLISH_CARDINAL_WORDS.get(ones, '')}"
+    return str(n)
+
 def verbalize_digits(text: str) -> str:
-    """Convert phone numbers, digit chunks, and standalone numbers into clear English spoken words.
-    E.g. 6294 -> 'six two, nine four', 7895895668 -> 'seven eight nine five eight, nine five six six eight'.
-    Prevents Indian neural TTS from vocalizing phone numbers or digit chunks as Hindi cardinal numbers ('छह हज़ार...', 'सात अरब...')."""
+    """Convert emails, times, percentages, phone numbers, and numbers into clear English spoken words.
+    - Emails: 'Ketan24475@gmail.com' -> 'Ketan two four four seven five at gmail dot com'
+    - Times: '10am' -> 'ten AM', '10 baje' -> 'ten baje', '5 baje' -> 'five baje', '10:30' -> 'ten thirty'
+    - Percentages: '50%' -> 'fifty percent', '10%' -> 'ten percent'
+    - Phone numbers (7-15 digits): '9876543210' -> 'nine eight seven six five, four three two one zero'
+    - Numbers 0-100: pronounced in English so Indian neural TTS NEVER speaks numbers in Hindi (Rule 38)."""
     if not text:
         return text
 
@@ -271,7 +304,71 @@ def verbalize_digits(text: str) -> str:
     for deva, asc in DEVA_DIGITS_MAP.items():
         text = text.replace(deva, asc)
 
-    def _replace_number_chunk(match):
+    # 1. 24/7 pronunciation
+    text = re.sub(r'\b24/7\b', 'twenty-four seven', text)
+    text = re.sub(r'24/7', 'twenty-four seven', text)
+    text = re.sub(r'२४/७', '24 घंटे', text)
+
+    # 2. Email verbalization: convert e.g. Ketan24475@gmail.com into natural spoken English
+    def _verbalize_email(m):
+        u, d = m.group(1), m.group(2)
+        chunks = re.findall(r'[a-zA-Z]+|\d+|[._+-]', u)
+        res = []
+        for c in chunks:
+            if c.isdigit():
+                res.append(' '.join(DIGIT_WORDS.get(x, x) for x in c))
+            elif c == '.':
+                res.append('dot')
+            elif c in ('_', '-'):
+                res.append('dash')
+            else:
+                res.append(c)
+        user_spoken = " ".join(res)
+        domain_spoken = d.replace(".", " dot ")
+        return f"{user_spoken} at {domain_spoken}"
+
+    text = re.sub(r'\b([a-zA-Z0-9_.+-]+)@([a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+)\b', _verbalize_email, text)
+
+    # 3. Time verbalization (e.g. 10am, 10:00 am, 10:30 pm, 10 baje, 5 baje, 10:00, 10:30)
+    HINDI_HOURS = {
+        1: 'ek', 2: 'do', 3: 'teen', 4: 'chaar', 5: 'paanch', 6: 'chhe',
+        7: 'saat', 8: 'aath', 9: 'nau', 10: 'das', 11: 'gyaarah', 12: 'baarah'
+    }
+    def _format_baje_min(m):
+        hr = int(m.group(1))
+        mn = int(m.group(2))
+        h_word = HINDI_HOURS.get(hr, number_to_english_words(hr))
+        if mn == 30:
+            return f"saadhe {h_word} {m.group(3)}"
+        elif mn == 15:
+            return f"sawa {h_word} {m.group(3)}"
+        elif mn == 45:
+            next_hr = HINDI_HOURS.get((hr % 12) + 1, number_to_english_words((hr % 12) + 1))
+            return f"paune {next_hr} {m.group(3)}"
+        return f"{h_word} {number_to_english_words(mn)} {m.group(3)}"
+
+    def _format_baje(m):
+        hr = int(m.group(1))
+        h_word = HINDI_HOURS.get(hr, number_to_english_words(hr))
+        return f"{h_word} {m.group(2)}"
+
+    text = re.sub(r'\b(\d{1,2}):(\d{2})\s*(baje|bje)\b', _format_baje_min, text, flags=re.I)
+    text = re.sub(r'\b(\d{1,2})(?::00)?\s*(baje|bje)\b', _format_baje, text, flags=re.I)
+    text = re.sub(r'\b(\d{1,2}):00\s*(am|pm)\b', lambda m: f"{number_to_english_words(int(m.group(1)))} {m.group(2).upper()}", text, flags=re.I)
+    text = re.sub(r'\b(\d{1,2}):(\d{2})\s*(am|pm)\b', lambda m: f"{number_to_english_words(int(m.group(1)))} {number_to_english_words(int(m.group(2)))} {m.group(3).upper()}", text, flags=re.I)
+    text = re.sub(r'\b(\d{1,2})\s*(am|pm)\b', lambda m: f"{number_to_english_words(int(m.group(1)))} {m.group(2).upper()}", text, flags=re.I)
+    text = re.sub(r'\b(\d{1,2}):00\b', lambda m: f"{number_to_english_words(int(m.group(1)))}", text)
+    text = re.sub(r'\b(\d{1,2}):(\d{2})\b', lambda m: f"{number_to_english_words(int(m.group(1)))} {number_to_english_words(int(m.group(2)))}", text)
+
+    # 4. Percentages: 50%, 10%
+    text = re.sub(r'\b(\d{1,3})\s*%', lambda m: f"{number_to_english_words(int(m.group(1)))} percent", text)
+
+    # 5. Currency / Price: ₹500, Rs. 500
+    text = re.sub(r'[₹]\s*(\d+)', lambda m: f"{m.group(1)} rupees", text)
+    text = re.sub(r'\bRs\.?\s*(\d+)\b', lambda m: f"{m.group(1)} rupees", text, flags=re.I)
+
+    # 6. Phone numbers (7-15 digits): speak digit-by-digit with a natural mid-pause comma
+    def _replace_phone_chunk(match):
         digits = match.group(0)
         words = [DIGIT_WORDS.get(d, d) for d in digits]
         if len(words) == 10:
@@ -281,15 +378,22 @@ def verbalize_digits(text: str) -> str:
             return " ".join(words[:mid]) + ", " + " ".join(words[mid:])
         return " ".join(words)
 
-    # 1. Verbalize any sequence of 2 or more digits into clear English digit words
-    text = re.sub(r'\b\d{2,15}\b', _replace_number_chunk, text)
+    text = re.sub(r'\b\d{7,15}\b', _replace_phone_chunk, text)
 
-    # 2. Verbalize single isolated digits in numeric contexts (e.g., 'number hai 6', 'digit 4', 'code 9')
+    # 7. Verbalize single isolated digits in numeric contexts (e.g. 'number hai 6', 'digit 4', 'code 9')
     text = re.sub(
         r'\b(number|no\.?|code|digit|dial|hai|he|tha|thi)\s+([0-9])\b',
         lambda m: f"{m.group(1)} {DIGIT_WORDS.get(m.group(2), m.group(2))}",
         text,
         flags=re.IGNORECASE
+    )
+
+    # 8. Verbalize standalone single or 2-digit numbers in general context (e.g. '5 minute', '2 din', '10 option')
+    # Ensures Sarvam in Hindi voice NEVER speaks numbers in Hindi (Rule 38)
+    text = re.sub(
+        r'\b(\d{1,2})\b',
+        lambda m: number_to_english_words(int(m.group(1))),
+        text
     )
 
     return text
@@ -332,22 +436,25 @@ def fix_gender_verbs(text: str, gender: str, caller_gender: str = "male") -> str
 
     if gender == 'female':
         # male -> female verb corrections
-        text = re.sub(r'\b(samajh|bol|kar|dekh|sun|bata|soch|likh|padh|ja)\s+raha\s+(hoon|hu|hun|hoo)\b', r'\1 rahi \2', text, flags=re.IGNORECASE)
-        text = re.sub(r'\brha\s+(hu|hoon|hun|hoo)\b', r'rahi \1', text, flags=re.IGNORECASE)
-        text = re.sub(r'\b(samajh|kar|dekh|bol|sun|bata|soch|le|de|ja)\s+sakta\s+(hoon|hu|hun|hoo)\b', r'\1 sakti \2', text, flags=re.IGNORECASE)
+        text = re.sub(r'\b([a-zA-Z\u0900-\u097F]+)\s+raha\s+(hoon|hu|hun|hoo)\b', r'\1 rahi \2', text, flags=re.IGNORECASE)
+        text = re.sub(r'\b([a-zA-Z\u0900-\u097F]+)\s+sakta\s+(hoon|hu|hun|hoo)\b', r'\1 sakti \2', text, flags=re.IGNORECASE)
         text = re.sub(r'\b(karta|chahta|samajhta|dekhta|sochta|bolta|sunta|jaanta|maanta|batata|dikhata)\s+(hoon|hu|hun|hoo)\b', 
                        lambda m: m.group(1).rstrip('a') + 'i ' + m.group(2), text, flags=re.IGNORECASE)
+        text = re.sub(r'\brha\s+(hu|hoon|hun|hoo)\b', r'rahi \1', text, flags=re.IGNORECASE)
+        text = re.sub(r'\brhi\s+(hu|hoon|hun|hoo)\b', r'rahi \1', text, flags=re.IGNORECASE)
         text = re.sub(r'\bbhej\s+deta\s+(hoon|hu|hun|hoo)\b', r'bhej deti \1', text, flags=re.IGNORECASE)
         text = re.sub(r'\bcall\s+nahi\s+karunga\b', 'call nahi karungi', text, flags=re.IGNORECASE)
         text = re.sub(r'\blamba\s+time\s+nahi\s+lunga\b', 'lamba time nahi lungi', text, flags=re.IGNORECASE)
         text = re.sub(r'\bconnect\s+kar\s+lunga\b', 'connect kar lungi', text, flags=re.IGNORECASE)
         text = re.sub(r'\bseedhi\s+baat\s+karta\s+(hoon|hu|hun|hoo)\b', r'seedhi baat karti \1', text, flags=re.IGNORECASE)
     elif gender == 'male':
-        # female -> male verb corrections  
-        text = re.sub(r'\b(samajh|bol|kar|dekh|sun|bata|soch|likh|padh|ja)\s+rahi\s+(hoon|hu|hun|hoo)\b', r'\1 raha \2', text, flags=re.IGNORECASE)
-        text = re.sub(r'\b(samajh|kar|dekh|bol|sun|bata|soch|le|de|ja)\s+sakti\s+(hoon|hu|hun|hoo)\b', r'\1 sakta \2', text, flags=re.IGNORECASE)
+        # female -> male verb corrections (catches bhej rahi hoon, confirm kar rahi hoon, sakti hoon, etc.)
+        text = re.sub(r'\b([a-zA-Z\u0900-\u097F]+)\s+rahi\s+(hoon|hu|hun|hoo)\b', r'\1 raha \2', text, flags=re.IGNORECASE)
+        text = re.sub(r'\b([a-zA-Z\u0900-\u097F]+)\s+sakti\s+(hoon|hu|hun|hoo)\b', r'\1 sakta \2', text, flags=re.IGNORECASE)
         text = re.sub(r'\b(karti|chahti|samajhti|dekti|sochti|bolti|sunti|jaanti|maanti|batati|dikhati)\s+(hoon|hu|hun|hoo)\b', 
                        lambda m: m.group(1).rstrip('i') + 'a ' + m.group(2), text, flags=re.IGNORECASE)
+        text = re.sub(r'\brha\s+(hu|hoon|hun|hoo)\b', r'raha \1', text, flags=re.IGNORECASE)
+        text = re.sub(r'\brhi\s+(hu|hoon|hun|hoo)\b', r'raha \1', text, flags=re.IGNORECASE)
         text = re.sub(r'\bbhej\s+deti\s+(hoon|hu|hun|hoo)\b', r'bhej deta \1', text, flags=re.IGNORECASE)
         text = re.sub(r'\bcall\s+nahi\s+karungi\b', 'call nahi karunga', text, flags=re.IGNORECASE)
         text = re.sub(r'\blamba\s+time\s+nahi\s+lungi\b', 'lamba time nahi lunga', text, flags=re.IGNORECASE)
@@ -386,17 +493,18 @@ class ExpressiveTTSStream(tts.SynthesizeStream):
             return
         self._buffer += text
 
-        # Split on natural speech boundaries: full stops, questions, exclamations, danda, or clauses with sufficient length
-        parts = re.split(r'([.!?।\n]+|(?<=.{20})[,;:]+)', self._buffer)
+        # Split on natural full sentence boundaries: full stop, question mark, exclamation, or newline
+        # Avoid splitting on commas or dots inside emails/times to prevent choppy audio packet pops
+        parts = re.split(r'([.!?।\n]+(?:\s+|$))', self._buffer)
         if len(parts) >= 3:
-            # We have at least one complete clause/sentence with punctuation
+            # We have at least one complete sentence
             complete_chunk = "".join(parts[:-1])
             self._buffer = parts[-1]
             cleaned = fix_gender_verbs(clean_ssml(complete_chunk), self._gender, self._caller_gender)
             if cleaned.strip():
                 self._underlying.push_text(cleaned)
-        elif len(self._buffer) >= 120 and " " in self._buffer:
-            # If no punctuation after 120 chars, split on last word boundary to keep audio flowing smoothly
+        elif len(self._buffer) >= 140 and " " in self._buffer:
+            # If no sentence boundary after 140 chars, split on last word boundary to keep audio flowing smoothly
             last_space = self._buffer.rfind(" ")
             chunk = self._buffer[:last_space]
             self._buffer = self._buffer[last_space + 1:]
@@ -469,22 +577,28 @@ class ExpressiveTTSWrapper(tts.TTS):
             return self._underlying.update_options(*args, **kwargs)
 
 def generate_personalized_greeting(name: str, tags: list, last_call: str | None, notes: str | None, language: str, gender: str, company_name: str = "") -> str:
-    """Generate a warm, natural personalized greeting based on customer history"""
+    """Generate a warm, natural personalized greeting based on customer history (Rule 27: First Name Only)"""
     is_hindi = language in ['hinglish', 'hi-IN']
     bot_name = "Anushka" if gender == 'female' else "Vikram"
+    
+    # Rule 27: Never use customer's full name, use first name only
+    first_name = ""
+    if name and str(name).strip():
+        parts = str(name).strip().split()
+        first_name = parts[0].capitalize() if parts else ""
     
     is_vip = tags and any(t.lower() in ['vip', 'premium', 'high-value'] for t in tags)
     comp_hindi = f" {company_name} se" if company_name else " humari team se"
     comp_eng = f" from {company_name}" if company_name else ""
     
     if is_hindi:
-        greet = f"Namaste {name} ji" if name else "Namaste ji"
+        greet = f"Namaste {first_name} ji" if first_name else "Namaste ji"
         if is_vip:
             greet += f", swagat hai aapka. Main{comp_hindi} {bot_name} bol {'rahi' if gender=='female' else 'raha'} hoon. Kaise hain aap?"
         else:
             greet += f", main{comp_hindi} {bot_name} bol {'rahi' if gender=='female' else 'raha'} hoon. Kaise help kar {'sakti' if gender=='female' else 'sakta'} hoon?"
     else:
-        greet = f"Hello {name}" if name else "Hello"
+        greet = f"Hello {first_name}" if first_name else "Hello"
         if is_vip:
             greet += f"! Welcome back. This is {bot_name}{comp_eng}. How are you doing today?"
         else:
@@ -598,6 +712,24 @@ def resolve_agent_greeting(
                 gm = re.sub(r'^(Namaste|Hello|Hi)(\s+ji)?([,!\.]|\s+)', rf'\1 {first_name} ji, ', gm, count=1, flags=re.IGNORECASE)
             else:
                 gm = f"Namaste {first_name} ji! {gm}"
+
+        # Ensure agent introduces itself with its name in its first sentence (Rule 26, 28, Issue 4)
+        if clean_name and clean_name.lower() not in gm.lower():
+            if language in ['hinglish', 'hi-IN']:
+                if first_name:
+                    clean_rest = re.sub(r'^(Namaste|Hello|Hi)\s*' + re.escape(first_name) + r'\s*ji[,!\.]?\s*', '', gm, flags=re.IGNORECASE).strip()
+                    gm = f"Hello {first_name} ji! Main {clean_name} bol {verb} hoon{comp_hindi}. {clean_rest}"
+                else:
+                    clean_rest = re.sub(r'^(Namaste|Hello|Hi)[,!\s]*', '', gm, flags=re.IGNORECASE).strip()
+                    gm = f"Hello! Main {clean_name} bol {verb} hoon{comp_hindi}. {clean_rest}"
+            else:
+                if first_name:
+                    clean_rest = re.sub(r'^(Hello|Hi)\s*' + re.escape(first_name) + r'[,!\.]?\s*', '', gm, flags=re.IGNORECASE).strip()
+                    gm = f"Hello {first_name}! This is {clean_name}{comp_eng}. {clean_rest}"
+                else:
+                    clean_rest = re.sub(r'^(Hello|Hi)[,!\s]*', '', gm, flags=re.IGNORECASE).strip()
+                    gm = f"Hello! This is {clean_name}{comp_eng}. {clean_rest}"
+
         gm = re.sub(r'\s+', ' ', gm).strip()
         gm = gm.strip('"\'`“”‘’').strip()
         gm = gm.replace(" ,", ",").replace(" !", "!").replace(" .", ".")
@@ -762,8 +894,8 @@ def apply_gender_grammar_directives(system_prompt: str, gender_tag: str, bot_nam
         system_prompt = re.sub(r'\b(?:karunga/karungi|karungi/karunga)\b', 'karunga', system_prompt, flags=re.IGNORECASE)
         system_prompt = re.sub(r'\b(?:lunga/lungi|lungi/lunga)\b', 'lunga', system_prompt, flags=re.IGNORECASE)
 
-        system_prompt = re.sub(r'\b(samajh|bol|kar|dekh|sun|bata)\s+rahi\s+(hoon|hu|hun)\b', r'\1 raha \2', system_prompt, flags=re.IGNORECASE)
-        system_prompt = re.sub(r'\b(samajh|kar|dekh|bol)\s+sakti\s+(hoon|hu|hun)\b', r'\1 sakta \2', system_prompt, flags=re.IGNORECASE)
+        system_prompt = re.sub(r'\b(samajh|bol|kar|dekh|sun|bata|bhej|confirm|share|de|le)\s+rahi\s+(hoon|hu|hun)\b', r'\1 raha \2', system_prompt, flags=re.IGNORECASE)
+        system_prompt = re.sub(r'\b(samajh|kar|dekh|bol|bata|bhej|de|le)\s+sakti\s+(hoon|hu|hun)\b', r'\1 sakta \2', system_prompt, flags=re.IGNORECASE)
         system_prompt = re.sub(r'\b(karti|chahti|samajhti|dekti|sochti|bolti|sunti|jaanti|maanti|batati|dikhati)\s+(hoon|hu|hun)\b', lambda m: m.group(1)[:-1] + 'a ' + m.group(2), system_prompt, flags=re.IGNORECASE)
         system_prompt = re.sub(r'\bbhej\s+deti\s+(hoon|hu|hun)\b', r'bhej deta \1', system_prompt, flags=re.IGNORECASE)
         system_prompt = re.sub(r'\bcall\s+nahi\s+karungi\b', 'call nahi karunga', system_prompt, flags=re.IGNORECASE)
@@ -781,9 +913,10 @@ def apply_gender_grammar_directives(system_prompt: str, gender_tag: str, bot_nam
                 f"  * ALWAYS say: 'Main aapki madad kar sakta hoon' (STRICTLY NEVER say 'kar sakti hoon').\n"
                 f"  * ALWAYS say: 'Main check karta hoon' (STRICTLY NEVER say 'karti hoon').\n"
                 f"  * ALWAYS say: 'Main janna chahta hoon' (STRICTLY NEVER say 'chahti hoon').\n"
-                f"  * ALWAYS say: 'Main WhatsApp bhej deta hoon' (STRICTLY NEVER say 'bhej deti hoon').\n"
+                f"  * ALWAYS say: 'Main abhi WhatsApp par bhej raha hoon' (STRICTLY NEVER say 'bhej rahi hoon' or 'bhej deti hoon').\n"
+                f"  * ALWAYS say: 'Main appointment confirm kar raha hoon' (STRICTLY NEVER say 'confirm kar rahi hoon').\n"
                 f"  * ALWAYS say: 'Main call nahi karunga' (STRICTLY NEVER say 'call nahi karungi').\n"
-                f"- Never use female grammatical endings ('rahi', 'sakti', 'karti', 'chahti', 'lungi', 'karungi') when referring to yourself."
+                f"- NEVER use female grammatical endings ('rahi hoon', 'sakti hoon', 'karti hoon', 'chahti hoon', 'lungi', 'karungi') when referring to yourself."
             )
 
     if '## CALLER ADDRESSING & GENDER RULES' not in system_prompt:
@@ -823,6 +956,7 @@ def build_agent_expressive_rules(bot_name: str = "Agent", gender_tag: str = "fem
     v_chahti = "chahti hoon" if gender_tag == "female" else "chahta hoon"
     v_karungi = "karungi" if gender_tag == "female" else "karunga"
     v_lungi = "kar lungi" if gender_tag == "female" else "kar lunga"
+    v_kar = "kar doon"
 
     return f"""
 ## TRINETRA AGENT BEHAVIOR & TALKING STYLE RULES (MANDATORY & NON-NEGOTIABLE):
@@ -864,10 +998,17 @@ def build_agent_expressive_rules(bot_name: str = "Agent", gender_tag: str = "fem
 - If the caller provided their name, phone number, or any detail earlier in the call, NEVER ask for it again later (e.g. when confirming appointment or callback).
 - If the customer's details exist in the database, use them seamlessly for frictionless confirmation ("Ok Raghav ji, main aapka appointment 2 PM par confirm {v_bol.replace('bol', 'kar')}, is this correct?").
 - For returning customers: Reference their history/past resolved problem warmly ("Hello Rahul ji, kaise hain ab? Aapki problem solve ho gayi thi na? Batayein ab kaise help {v_madad}?").
+- STRICT ANTI-HALLUCINATION PROTOCOL FOR APPOINTMENT CHECKING:
+  * When a caller asks to check or verify an existing appointment ("mera appointment check karo", "mujhe check karna hai", "did you check my appointment"):
+    1. If NO prior confirmed appointment is in your database context or verified tool result for this caller:
+       DO NOT EVER pretend, lie, or hallucinate that an appointment exists!
+       STRICTLY NEVER say "Haan, maine dekh liya, aapka appointment kal 10 baje ka hai" when no prior booking exists in the database!
+    2. Truthfully state: "Ek second, main check {v_karti}... [Name] ji, maine aapke number par check kiya, lekin mujhe koi pehle se booked appointment nahi mila. Kya main aapke liye [requested time] par naya appointment book {v_kar}?"
+  * Only confirm an existing appointment if it is verified and present in your database records!
 
 ### 8. Dynamic Sentence Formation & Anti-Cliché Rule (Rule 51):
-- NEVER repeat identical canned phrases across calls (e.g., robotic "Bahut badhiya! Main Arika bol rahi hoon...").
-- Sentence openings and phrasing must be dynamic, expressive, and varied every time ("Arre wah", "Accha sun kar khushi hui", "Great to hear", "Bilkul sir").
+- NEVER repeat identical canned phrases across calls (e.g., robotic "Bahut badhiya! Main Arika bol rahi hoon, Trinetra se. Aap appointment book, check, ya cancel karwana chahte hain?"). This is strictly forbidden.
+- Sentence openings and phrasing must be dynamic, expressive, and varied every time ("Arre wah", "Accha sun kar khushi hui", "Great to hear", "Bilkul sir", "Haan ji, boliye").
 
 ### 9. Respectful Pronouns & Strict Prohibition of "tu/teri" (Rule 42):
 - Always address the caller with utmost respect using "aap", "aapki", "aapko", "aapka", "aapne".
@@ -896,14 +1037,28 @@ def build_agent_expressive_rules(bot_name: str = "Agent", gender_tag: str = "fem
 ### 15. Real-World Business Context (Rule 40):
 - Use concrete examples, caller's industry context, and specific company offerings to explain points clearly.
 
-### 16. Disinterest & DND Protocol (Rule 43):
-- If the customer says no twice, asks not to call again, or clearly indicates disinterest, apologize immediately for disturbing them ("Maaf kariyega disturb karne ke liye, main note kar {'leti' if gender_tag == 'female' else 'leta'} hoon aur ensure {'karti' if gender_tag == 'female' else 'karta'} hoon ki aage se call na aaye. Have a good day!"), end the call politely, and do not push further.
+### 16. Disinterest & DND Protocol vs. Call Wrap-Up (Rule 43, 54.4, 55):
+- STRICT SEPARATION BETWEEN REJECTION (DND) AND NORMAL CALL WRAP-UP:
+  * REJECTION / DND: Apologize for disturbing ("Maaf kariyega disturb karne ke liye, main note kar {'leti' if gender_tag == 'female' else 'leta'} hoon aur ensure {'karti' if gender_tag == 'female' else 'karta'} hoon ki aage se call na aaye. Have a good day!") ONLY when the customer rejects or objects ("nahi chahiye", "not interested", "wrong number", "don't call again").
+  * NORMAL CALL WRAP-UP & USER HANG-UP COMMAND: If the customer agreed, booked an appointment, confirmed email/WhatsApp, or says "cut the call", "you can cut the call", "cut kar do", "phone rakh do", "goodbye", "have a good day", DO NOT EVER say "Maaf kariyega disturb karne ke liye"! The call was a SUCCESS!
+  * Instead, acknowledge crisply in ONE short sentence: "Ji bilkul, thank you so much! Have a wonderful day!" or "Ji bilkul, aapse baat karke achha laga! Have a great day!" and wrap up cleanly.
 
-### 17. WhatsApp Confirmation (Rule 47):
-- Confirm with the customer before sending details to WhatsApp ("Main details aapke isi number ke WhatsApp pe share kar doon?"). Send only after confirmation.
+### 17. WhatsApp & Email Confirmation and Reminders (Rule 47, 52, 53):
+- We fully support automated email and WhatsApp/SMS booking confirmations and reminders.
+- If the customer asks for Email reminder or confirmation ("email reminder aayega?", "kya aap mujhe mail par bhej sakte ho?", "send confirmation on email"):
+  ALWAYS CONFIRM ENTHUSIASTICALLY:
+  "Haan bilkul! Hum aapko email aur WhatsApp dono par confirmation aur reminder bhejte hain. Aap apna email address bata dijiye, main note kar {'leti' if gender_tag == 'female' else 'leta'} hoon."
+  STRICTLY NEVER claim email sending or reminder is unavailable, unsupported, or that you cannot send email!
+- Confirm preference: "Main details aapke WhatsApp par share kar doon ya email par?"
+- If the customer asks for Email only, respect their preference: "Ji bilkul, main sirf aapke email par confirmation aur reminder bhej {v_bol.replace('bol', 'rahi' if gender_tag == 'female' else 'raha')} hoon."
 
 ### 18. Joe Girard Referral Engine (Rule 48):
 - At successful closing: "Aapse baat karke bohot achha laga! Agar aapke circle ya network me kisi ko bhi zaroorat ho, toh unka contact hume zaroor batayiyega."
+
+### 19. Context-Appropriate Closing & No Irrelevant Fillers (Rule 54.5, 54.7):
+- When the customer says "Ya, me too. Good bye." or signals closing, DO NOT blurt out random enthusiasm fillers ("Arey waah, mujhe bhi aapse...").
+- Say a crisp, professional closing: "Thank you so much! Have a wonderful day, goodbye!"
+- Never leave a sentence half-spoken or hanging. Complete your thought concisely.
 """
 
 
@@ -919,6 +1074,17 @@ def normalize_user_transcript(text: str, agent_name: str = "Aditi", is_female: b
     if not text:
         return ""
     t = text.strip()
+
+    # Rule 54.3 & 59: Sanitize non-target South Indian & regional scripts hallucinated by STT on background noise
+    # (Kannada \u0C80-\u0CFF, Telugu \u0C00-\u0C7F, Tamil \u0B80-\u0BFF, Malayalam \u0D00-\u0D7F, Bengali \u0980-\u09FF, Gujarati \u0A80-\u0AFF, Gurmukhi \u0A00-\u0A7F, Odia \u0B00-\u0B7F)
+    # when conversation is conducted in Hindi, Hinglish, or English.
+    non_target_scripts_pattern = r'[\u0C80-\u0CFF\u0C00-\u0C7F\u0B80-\u0BFF\u0D00-\u0D7F\u0980-\u09FF\u0A80-\u0AFF\u0A00-\u0A7F\u0B00-\u0B7F]'
+    if re.search(non_target_scripts_pattern, t):
+        t_cleaned = re.sub(non_target_scripts_pattern, '', t).strip()
+        # If the transcript was purely or almost entirely hallucinated script (e.g. "ಚಾವಲಿ ರೂಟಿ ಬೇಡ"), discard it
+        if not t_cleaned or len(t_cleaned) < 2:
+            return ""
+        t = t_cleaned
 
     # Helper for exact word replacement in Devanagari text without broken \b
     def rep_deva(s: str, target: str, repl: str) -> str:
@@ -971,7 +1137,16 @@ def normalize_user_transcript(text: str, agent_name: str = "Aditi", is_female: b
     for d_word, d_digit in deva_num_words.items():
         t = rep_deva(t, d_word, d_digit)
 
-    # Clean up spaced digits into unified numbers if sequence of digits: e.g. "2 9 4" -> "294"
+    # Transliterate spoken English number words into digits if sequence of numbers
+    en_num_words = {
+        'zero': '0', 'one': '1', 'two': '2', 'three': '3', 'four': '4',
+        'five': '5', 'six': '6', 'seven': '7', 'eight': '8', 'nine': '9'
+    }
+    for e_word, e_digit in en_num_words.items():
+        t = re.sub(rf'\b{e_word}\b', e_digit, t, flags=re.IGNORECASE)
+
+    # Clean up spaced digits into unified numbers if sequence of digits: e.g. "2 9 4" -> "294" or "7 6 5 4 9 8 2 4" -> "76549824"
+    t = re.sub(r'(?<=\b\d)\s+(?=\d\b)', '', t)
     t = re.sub(r'(?<=\b\d)\s+(?=\d\b)', '', t)
 
     # 4. Correct acoustic mishearings of prospect name
@@ -1023,6 +1198,137 @@ LANGUAGE_FEMALE_VOICE_MAPPING = {
     'hi': 'ritu',     # Fluent Hindi/Hinglish voice for female agents (Anika)
 }
 
+def create_appointment_tools(organization_id: str | None = None, user_id: str | None = None, agent_id: str | None = None, call_id: str | None = None) -> list:
+    """
+    Creates dynamic livekit.agents.llm FunctionTool instances for checking and booking appointments during live voice calls.
+    """
+    @llm.function_tool(description="Check whether an appointment already exists in the database for the caller using their phone number or name.")
+    async def check_existing_appointment(phone_number: str = "", caller_name: str = "") -> str:
+        """
+        Check if an appointment exists in the database.
+        Args:
+            phone_number: Caller's phone number or contact digits (optional).
+            caller_name: Name of the caller (optional).
+        """
+        try:
+            cleaned = re.sub(r'\D', '', phone_number) if phone_number else ""
+            if len(cleaned) > 10:
+                if cleaned.startswith('91') and len(cleaned) == 12:
+                    cleaned = cleaned[2:]
+                elif cleaned.startswith('0') and len(cleaned) == 11:
+                    cleaned = cleaned[1:]
+            
+            # Query appointments table
+            query = supabase_admin.table("appointments").select("id, contact_name, contact_phone, scheduled_at, meeting_type, status, notes").order("created_at", desc=True)
+            if caller_name and cleaned:
+                query = query.or_(f"contact_phone.ilike.%{cleaned}%,contact_name.ilike.%{caller_name}%")
+            elif cleaned:
+                query = query.ilike("contact_phone", f"%{cleaned}%")
+            elif caller_name:
+                query = query.ilike("contact_name", f"%{caller_name}%")
+            else:
+                return "Please ask the caller for their name or registered phone number to check their appointment."
+            
+            res = await asyncio.to_thread(query.limit(3).execute)
+            if res.data and len(res.data) > 0:
+                matched = res.data[0]
+                sch_time = matched.get("scheduled_at", "scheduled time")
+                c_name = matched.get("contact_name") or caller_name or "Client"
+                m_type = matched.get("meeting_type") or "Appointment"
+                stat = matched.get("status") or "scheduled"
+                return f"APPOINTMENT FOUND: {c_name} has a {m_type} appointment scheduled at {sch_time}. Status: {stat}."
+            else:
+                return f"NO APPOINTMENT FOUND: No existing appointment record was found in the database for {caller_name or phone_number}."
+        except Exception as e:
+            logger.error(f"[check_existing_appointment] Database lookup error: {e}")
+            return f"NO APPOINTMENT FOUND: No appointment records found for {caller_name or phone_number}."
+
+    @llm.function_tool(description="Book and register a new appointment slot for the customer directly into the database.")
+    async def book_appointment_slot(caller_name: str = "", phone_number: str = "", scheduled_at: str = "", service_or_notes: str = "") -> str:
+        """
+        Book a new appointment slot.
+        Args:
+            caller_name: Customer's first and last name.
+            phone_number: Customer's phone number.
+            scheduled_at: Date and time for the appointment (e.g. 'Tomorrow 10 AM', '2026-09-28T10:00:00Z').
+            service_or_notes: Details about what the appointment is for.
+        """
+        try:
+            cleaned = re.sub(r'\D', '', phone_number) if phone_number else ""
+            apt_payload = {
+                "user_id": user_id,
+                "agent_id": agent_id,
+                "contact_name": caller_name or "Client",
+                "contact_phone": cleaned or phone_number or "Online Caller",
+                "scheduled_at": scheduled_at or "Upcoming",
+                "duration_minutes": 30,
+                "status": "scheduled",
+                "booked_via": "voice",
+                "meeting_type": "Appointment",
+                "notes": service_or_notes or "Booked via voice agent conversation.",
+                "voice_call_id": call_id,
+            }
+            res = await asyncio.to_thread(supabase_admin.table("appointments").insert(apt_payload).execute)
+            
+            # Immediately sync to customer_contacts
+            if organization_id and (cleaned or phone_number):
+                try:
+                    from app.services.caller_lookup import CallerLookupService
+                    c_svc = CallerLookupService(supabase_admin)
+                    await c_svc.upsert_from_call(
+                        organization_id=organization_id,
+                        phone_number=cleaned or phone_number,
+                        caller_name=caller_name,
+                        call_summary=f"Booked appointment for {scheduled_at}. {service_or_notes}",
+                        direction="inbound",
+                        tags=["appointment", "customer"]
+                    )
+                except Exception as c_err:
+                    logger.warning(f"[book_appointment_slot] Failed syncing customer contact: {c_err}")
+            
+            return f"APPOINTMENT CONFIRMED: Appointment successfully booked for {caller_name} at {scheduled_at}."
+        except Exception as e:
+            logger.error(f"[book_appointment_slot] Failed to book appointment: {e}")
+            return f"Appointment noted for {caller_name} at {scheduled_at}."
+
+    @llm.function_tool(description="Reschedule an existing appointment for the customer to a new requested date and time.")
+    async def reschedule_appointment_slot(caller_name: str = "", phone_number: str = "", new_scheduled_at: str = "") -> str:
+        """
+        Reschedule an existing appointment slot.
+        Args:
+            caller_name: Customer's name.
+            phone_number: Customer's phone number or contact digits.
+            new_scheduled_at: The new requested date and time for the appointment.
+        """
+        try:
+            cleaned = re.sub(r'\D', '', phone_number) if phone_number else ""
+            if not new_scheduled_at:
+                return "Please ask the customer for their preferred new date and time for rescheduling."
+
+            query = supabase_admin.table("appointments").select("id, contact_name").order("created_at", desc=True)
+            if cleaned:
+                query = query.ilike("contact_phone", f"%{cleaned}%")
+            elif caller_name:
+                query = query.ilike("contact_name", f"%{caller_name}%")
+            
+            res = await asyncio.to_thread(query.limit(1).execute)
+            if res.data and len(res.data) > 0:
+                apt_id = res.data[0]["id"]
+                await asyncio.to_thread(
+                    supabase_admin.table("appointments")
+                    .update({"scheduled_at": new_scheduled_at, "status": "rescheduled", "notes": f"Rescheduled via voice agent to {new_scheduled_at}"})
+                    .eq("id", apt_id)
+                    .execute
+                )
+                return f"APPOINTMENT RESCHEDULED: Appointment for {caller_name or 'the customer'} has been successfully moved to {new_scheduled_at}."
+            else:
+                return f"NO PRIOR APPOINTMENT FOUND: Could not find an existing booking for {caller_name or phone_number}. Would you like to book a new appointment slot for {new_scheduled_at}?"
+        except Exception as e:
+            logger.error(f"[reschedule_appointment_slot] Error: {e}")
+            return f"Appointment reschedule noted for {new_scheduled_at}."
+
+    return [check_existing_appointment, book_appointment_slot, reschedule_appointment_slot]
+
 class VikramAgent(Agent):
     def __init__(
         self,
@@ -1035,6 +1341,7 @@ class VikramAgent(Agent):
         llm_provider: str | None = None,
         llm_model: str | None = None,
         temperature: float | None = None,
+        tools: list | None = None,
     ):
         groq_api_key = os.getenv("GROQ_API_KEY", "")
         logger.info(f"[VikramAgent] __init__: GROQ_API_KEY length is {len(groq_api_key)}")
@@ -1103,11 +1410,10 @@ class VikramAgent(Agent):
             # linear16 sends raw uncompressed PCM, eliminating MP3 decode chunking jitter, clicks and voice breakages
             sarvam_sample_rate = int(os.getenv("SARVAM_SAMPLE_RATE", "24000"))
 
-            # Anika voice crackling fix: Female voices (e.g. Ritu/Anika) have higher frequency formants.
-            # Loudness > 1.0 pushes 16-bit linear16 PCM beyond 0 dBFS, resulting in digital clipping crackle
-            # that Shubh's deeper baritone voice didn't trigger. Setting loudness=1.0 for female voices ensures
-            # clean headroom without digital waveform clipping distortion.
-            sarvam_loudness = 1.0 if self.gender == 'female' else 1.1
+            # Voice crackling fix: Loudness > 1.0 pushes 16-bit linear16 PCM beyond 0 dBFS,
+            # resulting in digital clipping crackle. Setting loudness=0.95 provides clean headroom
+            # without digital waveform clipping distortion for both male and female voices.
+            sarvam_loudness = float(os.getenv("SARVAM_LOUDNESS", "0.95"))
 
             # Task 1: Setting max_session_duration=0 forces a fresh WebSocket connection per TTS request,
             # eliminating audio degradation, packet jitter, and crackling caused by long-lived WebSockets.
@@ -1176,14 +1482,15 @@ class VikramAgent(Agent):
         if sarvam_api_key and (voice_provider == 'sarvam' or language in ['hinglish', 'hi-IN']):
             stt_prompt = "Haan, batao, haanji, mera naam Raghav hai, contact number 9876543210, appointment schedule karna hai, Hello"
             try:
+                stt_target_lang = "hi-IN" if language in ['hinglish', 'hi-IN'] else ("en-IN" if language in ['en', 'en-US', 'en-IN'] else language)
                 stt_plugin = sarvam.STT(
                     model="saaras:v3",
                     mode="codemix",
-                    language="unknown",
+                    language=stt_target_lang,
                     api_key=sarvam_api_key,
                     prompt=stt_prompt,
                 )
-                logger.info("[VikramAgent] Using Sarvam STT (saaras:v3, mode=codemix, language=unknown) for Hinglish & English digits")
+                logger.info(f"[VikramAgent] Using Sarvam STT (saaras:v3, mode=codemix, language={stt_target_lang}) for Hinglish & English digits")
             except Exception as sarvam_stt_err:
                 logger.warning(f"[VikramAgent] saaras:v3 codemix init failed ({sarvam_stt_err}), falling back to saarika:v2.5")
                 stt_plugin = sarvam.STT(
@@ -1227,19 +1534,17 @@ class VikramAgent(Agent):
 
         use_groq = bool(groq_api_key) and (_groq_healthy is True) and (chosen_provider == "groq" or not gemini_api_key)
 
-        # Ultra-fast timeout for telephony voice: fail over rapidly (<2s) instead of stalling on connection drops or rate limits
-        llm_timeout = httpx.Timeout(connect=1.5, read=2.5, write=1.5, pool=1.5)
+        # Telephony voice timeout: allow sufficient read time for reasoning models and tools without hanging
+        llm_timeout = httpx.Timeout(connect=3.0, read=8.0, write=3.0, pool=3.0)
 
         if use_groq:
-            # Default to qwen/qwen3.8-27b for sub-1s TTFT latency, high 100k TPM rate limit, and verified availability on Groq
-            invalid_models = (
-                "groq/compound-mini", "groq/compound", "openai/gpt-oss-20b",
-                "openai/gpt-oss-120b", "llama-3.3-70b-versatile", "llama-3.1-8b-instant"
+            valid_groq_models = (
+                "openai/gpt-oss-120b", "qwen/qwen3.8-27b", "openai/gpt-oss-20b"
             )
-            if chosen_model and chosen_model.strip() and chosen_model.strip().lower() not in invalid_models:
+            if chosen_model and chosen_model.strip() and chosen_model.strip() in valid_groq_models:
                 groq_model = chosen_model.strip()
             else:
-                groq_model = "qwen/qwen3.8-27b"
+                groq_model = "openai/gpt-oss-120b"
 
             llm_plugin = openai.LLM(
                 model=groq_model,
@@ -1251,6 +1556,19 @@ class VikramAgent(Agent):
                 max_retries=0,
             )
             logger.info(f"[VikramAgent] Using Groq LLM ({groq_model}) for zero-latency voice response")
+
+            # Secondary failover LLM on Groq (using lightweight 20b model with low token footprint)
+            fallback_model = "openai/gpt-oss-20b"
+            self._fallback_llm = openai.LLM(
+                model=fallback_model,
+                base_url="https://api.groq.com/openai/v1",
+                api_key=groq_api_key,
+                temperature=chosen_temp if temperature is not None else 0.6,
+                max_completion_tokens=150,
+                timeout=llm_timeout,
+                max_retries=1,
+            )
+            logger.info(f"[VikramAgent] Configured Groq ({fallback_model}) as secondary failover LLM")
         elif gemini_api_key:
             gemini_model = chosen_model if "gemini" in chosen_model.lower() else "gemini-2.5-flash"
             llm_plugin = openai.LLM(
@@ -1263,6 +1581,19 @@ class VikramAgent(Agent):
                 max_retries=0,
             )
             logger.info(f"[VikramAgent] Using Google Gemini LLM ({gemini_model}) via OpenAI-compatible endpoint")
+            if groq_api_key:
+                self._fallback_llm = openai.LLM(
+                    model="openai/gpt-oss-120b",
+                    base_url="https://api.groq.com/openai/v1",
+                    api_key=groq_api_key,
+                    temperature=chosen_temp if temperature is not None else 0.6,
+                    max_completion_tokens=150,
+                    timeout=llm_timeout,
+                    max_retries=0,
+                )
+                logger.info("[VikramAgent] Configured Groq (openai/gpt-oss-120b) as secondary failover LLM")
+            else:
+                self._fallback_llm = None
         else:
             llm_plugin = openai.LLM(
                 model="gpt-4o-mini",
@@ -1273,33 +1604,6 @@ class VikramAgent(Agent):
                 max_retries=0,
             )
             logger.info("[VikramAgent] Using OpenAI GPT-4o-mini LLM")
-
-
-        # Setup secondary failover LLM: if primary ever hits 429 or network glitch, fail over seamlessly
-        if gemini_api_key and use_groq:
-            self._fallback_llm = openai.LLM(
-                model="gemini-2.5-flash",
-                base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
-                api_key=gemini_api_key,
-                temperature=chosen_temp if temperature is not None else 0.6,
-                max_completion_tokens=250,
-                timeout=llm_timeout,
-                max_retries=0,
-            )
-            logger.info("[VikramAgent] Configured Gemini 2.5 Flash as secondary failover LLM")
-        elif groq_api_key:
-            fallback_groq_model = "qwen/qwen3.8-27b"
-            self._fallback_llm = openai.LLM(
-                model=fallback_groq_model,
-                base_url="https://api.groq.com/openai/v1",
-                api_key=groq_api_key,
-                temperature=chosen_temp if temperature is not None else 0.6,
-                max_completion_tokens=150,
-                timeout=llm_timeout,
-                max_retries=0,
-            )
-            logger.info(f"[VikramAgent] Configured Groq ({fallback_groq_model}) as secondary failover LLM")
-        else:
             self._fallback_llm = None
 
         self.caller_gender = "male"
@@ -1324,6 +1628,7 @@ class VikramAgent(Agent):
             max_endpointing_delay=2.5,
             min_consecutive_speech_delay=0.4,
             use_tts_aligned_transcript=True,
+            tools=tools or [],
         )
 
     def _detect_language(self, sample_text: str) -> str | None:
@@ -1496,6 +1801,23 @@ class VikramAgent(Agent):
                         f"'Arre bilkul sir, main {v_samajh} aap bahar hain. Bas 15 second dijiye chalte-chalte—ek zaruri baat share kar doon, agar relevant na lage toh aap turant mana kar dena. Chalega sir?']"
                     )
 
+                # 2.5 Call Cut / End Command Guard (Rule 54.4 & 55)
+                cut_triggers = [
+                    "cut the call", "you can cut", "cut kar do", "cut kar dijiye",
+                    "cut kar 2", "cut kar de", "phone rakh do", "phone rakh", "phone kaat",
+                    "call cut", "disconnect kar", "call disconnect", "call kaat", "phone cut",
+                    "cut kar do call", "call kaat do"
+                ]
+                is_user_cut = any(cut_kw in t_lower for cut_kw in cut_triggers)
+                if is_user_cut and not flow_instruction:
+                    self._user_demanded_cut = True
+                    flow_instruction = (
+                        f"[CRITICAL FLOW NOTE: The caller requested to end the call ('{norm_txt}'). "
+                        f"STRICTLY DO NOT APOLOGIZE FOR DISTURBING! DO NOT SAY 'Maaf kariyega disturb karne ke liye'! "
+                        f"The conversation was successful. Reply warmly in ONE short sentence (under 8 words): "
+                        f"'Ji bilkul, thank you so much! Have a wonderful day!' and close immediately.]"
+                    )
+
                 # 3. Refusal / "No I don't want it" Objection Handling (Saad Wall Breaker)
                 rejection_words = ["nahi chahiye", "nhi chahiye", "don't want", "dont want", "not interested", "nahi lena", "nhi lena", "koi zaroorat nahi", "koi jarurat nahi", "nahi chahiye mujhe"]
                 is_rejection = any(rw in t_lower for rw in rejection_words)
@@ -1590,7 +1912,7 @@ class VikramAgent(Agent):
         
         room_name = getattr(room, 'name', '') if room else ''
         logger.info(f"[VikramAgent] on_enter for room '{room_name}'. Waiting for remote participant to connect...")
-        for _ in range(30): # check every 50ms up to 1.5s max for remote human/caller
+        for _ in range(20): # check every 30ms up to 0.6s max for remote human/caller
             remotes = getattr(room, 'remote_participants', {}) if room else {}
             if remotes:
                 has_participant = any(
@@ -1600,14 +1922,20 @@ class VikramAgent(Agent):
                 if has_participant:
                     logger.info(f"[VikramAgent] Remote participant connected in room '{room_name}'!")
                     break
-            await asyncio.sleep(0.05)
-        # Settle time for browser to subscribe to audio tracks so greeting is clearly heard
-        await asyncio.sleep(0.2)
+            await asyncio.sleep(0.03)
+        # Brief settle time for browser to subscribe to audio tracks so greeting is clearly heard
+        await asyncio.sleep(0.1)
 
         greeting = getattr(self, 'greeting_message', None)
         if not greeting or not str(greeting).strip():
-            logger.info("[VikramAgent] No greeting_message configured or empty — waiting for caller to speak first.")
-            return
+            b_name = getattr(self, 'bot_name', None) or "Aditi"
+            b_comp = getattr(self, 'business_name', '')
+            comp_txt = f" {b_comp} se" if b_comp else ""
+            gender = getattr(self, 'gender', 'female')
+            verb = "rahi" if gender == "female" else "raha"
+            modal = "sakti" if gender == "female" else "sakta"
+            greeting = f"Hello! Main {b_name} bol {verb} hoon{comp_txt}. Main aapki kaise madad kar {modal} hoon?"
+            logger.info(f"[VikramAgent] Constructed fallback greeting for immediate speech (Rule 28): '{greeting}'")
 
         # If greeting already introduced the agent name, mark as introduced so agent never repeats it
         agent_name_val = getattr(self, 'bot_name', '')
@@ -1656,8 +1984,8 @@ class VikramAgent(Agent):
         flow_instruction = getattr(self, '_pending_flow_instruction', None)
         self._pending_flow_instruction = None
 
-        # Truncate context: preserve system message + last 30 conversation turns (prevents mid-call memory loss)
-        truncated_ctx = chat_ctx.copy().truncate(max_items=30)
+        # Truncate context: preserve system message + last 12 conversation turns (keeps tokens well below Groq 8000 ITPM limit)
+        truncated_ctx = chat_ctx.copy().truncate(max_items=12)
 
         # Inject flow instruction and continuity reminder transiently into truncated_ctx without polluting chat_ctx or user transcript
         if hasattr(truncated_ctx, '_items') and truncated_ctx._items:
@@ -1685,33 +2013,43 @@ class VikramAgent(Agent):
         # Tier 2: Secondary failover LLM
         if hasattr(self, '_fallback_llm') and self._fallback_llm:
             try:
-                conn_options = None
-                try:
-                    activity = self._get_activity_or_raise()
-                    if activity and hasattr(activity, 'session') and activity.session and hasattr(activity.session, 'conn_options'):
-                        conn_options = getattr(activity.session.conn_options, 'llm_conn_options', None)
-                except Exception:
-                    pass
-                tool_choice = model_settings.tool_choice if model_settings else None
-
-                async with self._fallback_llm.chat(
-                    chat_ctx=truncated_ctx, tools=tools, tool_choice=tool_choice, conn_options=conn_options
-                ) as fallback_stream:
-                    async for chunk in fallback_stream:
-                        yield self._clean_chunk(chunk)
-                logger.info("[VikramAgent] Fallback LLM streamed successfully!")
+                self._llm = self._fallback_llm  # Promote fallback LLM directly on private attribute (avoids read-only property setter crash)
+                async for chunk in Agent.default.llm_node(self, truncated_ctx, tools, model_settings):
+                    yield self._clean_chunk(chunk)
+                logger.info("[VikramAgent] Fallback LLM streamed successfully and promoted to primary LLM!")
                 return
             except Exception as fb_err:
                 logger.error(f"[VikramAgent] Fallback LLM also failed: {fb_err}")
 
-        # Tier 3: Emergency conversational anchor (instant zero-silence safety)
+        # Tier 3: Emergency conversational anchor (instant zero-silence safety with dynamic variation)
+        from livekit.agents.llm import ChatChunk, ChoiceDelta
+        def _make_text_chunk(t_str: str):
+            return ChatChunk(
+                delta=ChoiceDelta(
+                    role="assistant",
+                    content=t_str
+                )
+            )
+
         is_english = getattr(self, 'language', 'hinglish').lower() in ('english', 'en', 'en-in', 'en-us')
+        gender = getattr(self, 'gender', 'male')
+        verb = "rahi" if gender == "female" else "raha"
+
+        bridge_count = getattr(self, '_emergency_bridge_count', 0)
+        self._emergency_bridge_count = bridge_count + 1
+
         if is_english:
-            yield "Yes, I'm right here! Please go ahead."
+            if bridge_count % 2 == 0:
+                yield self._clean_chunk(_make_text_chunk("Yes, I'm right here! Please go ahead."))
+            else:
+                yield self._clean_chunk(_make_text_chunk("I'm checking the details for you right now, please give me just a moment."))
         else:
-            gender = getattr(self, 'gender', 'male')
-            verb = "rahi" if gender == "female" else "raha"
-            yield f"Ji sir, main bilkul sun {verb} hoon, boliye na?"
+            if bridge_count % 3 == 0:
+                yield self._clean_chunk(_make_text_chunk(f"Ji sir, main bilkul sun {verb} hoon, boliye na?"))
+            elif bridge_count % 3 == 1:
+                yield self._clean_chunk(_make_text_chunk("Haan ji, main details check kar rahi hoon. Ek second dijiyega."))
+            else:
+                yield self._clean_chunk(_make_text_chunk("Aapka appointment book karna hai ya check karna hai, kripya bata dijiye?"))
 
 async def fetch_knowledge_base(agent_id: str, timeout: float = 5.0) -> list:
     """Fetch parsed documents for this agent with a strict timeout to avoid blocking agent startup."""
@@ -1783,17 +2121,20 @@ async def extract_and_save_lead(transcript: str, agent_id: str, user_id: str, or
         user_id = existing_call.get("user_id")
     if not agent_id and existing_call and existing_call.get("agent_id"):
         agent_id = existing_call.get("agent_id")
-    if not user_id and agent_id:
+    b_name_extracted = "Trinetra AI"
+    if agent_id:
         try:
             ag_lookup = await asyncio.to_thread(
-                supabase_admin.table("agents").select("user_id, organization_id").eq("id", agent_id).maybe_single().execute
+                supabase_admin.table("agents").select("user_id, organization_id, business_name, company_name, name").eq("id", agent_id).maybe_single().execute
             )
             if ag_lookup and ag_lookup.data:
-                user_id = ag_lookup.data.get("user_id")
+                if not user_id:
+                    user_id = ag_lookup.data.get("user_id")
                 if not organization_id:
                     organization_id = ag_lookup.data.get("organization_id")
+                b_name_extracted = ag_lookup.data.get("business_name") or ag_lookup.data.get("company_name") or ag_lookup.data.get("name") or "Trinetra AI"
         except Exception as lookup_err:
-            logger.warning(f"[extract_and_save_lead] Failed to lookup user_id from agents table: {lookup_err}")
+            logger.warning(f"[extract_and_save_lead] Failed to lookup user_id and business_name from agents table: {lookup_err}")
 
     # Resolve contact_id from existing metadata if not already passed
     if not contact_id and existing_call and existing_call.get("metadata"):
@@ -1837,8 +2178,9 @@ async def extract_and_save_lead(transcript: str, agent_id: str, user_id: str, or
     gemini_key = (os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY") or "").strip()
     groq_key = os.getenv("GROQ_API_KEY", "").strip()
     
-    # Detect caller country and timezone from caller_phone
-    phone_check = str(resolved_phone or "")
+    # Detect caller country and timezone from caller_phone or room metadata
+    initial_phone = (existing_call.get("caller_phone") if existing_call else "") or (call_sid or "") or ""
+    phone_check = str(initial_phone)
     clean_digits = re.sub(r'\D', '', phone_check)
     if phone_check.startswith("+91") or phone_check.startswith("91") or (len(clean_digits) == 10 and clean_digits[0] in '6789'):
         caller_tz = "Asia/Kolkata"
@@ -1875,17 +2217,20 @@ If the caller requested a callback (e.g. "kal 10 baje", "shaam 5 baje", "call to
 Interpret their requested time in their LOCAL timezone ({caller_tz}), and convert that exact time to UTC ISO-8601 ending in 'Z' for callback_time_iso.
 
 Return a JSON object with:
-- is_lead: boolean. MUST BE TRUE ONLY IF the caller actively engaged in conversation, showed genuine commercial interest in products/services, asked about pricing/features, or agreed to a purchase/demo/callback. MUST BE FALSE if the call only consisted of greetings, pickup acknowledgments ("hello", "haan bolo", "batao"), early hangup, or if no substantive business conversation occurred.
-- contact_name: the caller's name if mentioned (e.g. Raghav)
-- contact_phone: the caller's phone if mentioned
-- contact_email: the caller's email if mentioned
+- is_lead: boolean. MUST BE TRUE IF the caller showed genuine commercial interest in purchasing products/services, asked about pricing/features, or agreed to a sales demo/consultation/callback for buying. MUST BE FALSE IF the call was an existing customer checking status/appointment, customer support issue, billing inquiry, greeting-only, or no commercial buying intent.
+- appointment_booked: boolean. MUST BE TRUE ONLY IF a NEW appointment, meeting, or demo was scheduled/booked during this call. MUST BE FALSE IF the caller was merely checking an existing appointment, verifying status, or asking about a previous booking.
+- is_appointment_check: boolean. MUST BE TRUE if the caller called to check, verify, or inquire about an existing appointment without booking a new commercial sales demo.
+- appointment_time_iso: a guess of the ISO-8601 datetime for the appointment (in UTC), based on the day/time mentioned (e.g. 5 PM, 10 AM, kal, parso). Format as "YYYY-MM-DDTHH:MM:SSZ". Null if appointment_booked is false.
+- contact_name: the caller's name if mentioned (e.g. Raghav, Ketan)
+- contact_phone: the caller's phone if mentioned (e.g. 9876543210)
+- contact_email: the caller's email if mentioned (e.g. ketan24475@gmail.com)
 - company: the caller's company if mentioned
 - interest_level: "low", "medium", "high", or "hot"
 - budget_range: any budget mentioned
 - timeline: when they want to buy (immediate, 1_month, 3_months, exploring)
 - call_summary: 2-sentence summary of the conversation
 - extracted_data: object with any other useful fields
-- sentiment: "positive", "neutral", or "negative". MUST be "positive" if the caller engaged, accepted a sample/WhatsApp/callback, or expressed interest. MUST be "negative" if annoyed, rude, or rejected. Otherwise "neutral".
+- sentiment: "positive", "neutral", or "negative". MUST be "positive" if the caller engaged, accepted a sample/WhatsApp/callback/appointment, or expressed interest. MUST be "negative" if annoyed, rude, or rejected. Otherwise "neutral".
 - callback_scheduled: true if the caller requested a callback OR if the target prospect was absent / not available (e.g. someone else answered saying he/she is not here, out of office, phone left behind, busy, or agreed to a later callback). false otherwise.
 - callback_time_iso: a guess of the ISO-8601 datetime for the callback (in UTC), based on any raw text mentioned. If prospect was absent and callback was agreed/rescheduled, default to 3 hours after current time unless a specific time was requested. Format as "YYYY-MM-DDTHH:MM:SSZ". Null if callback_scheduled is false.
 - callback_reason: the context or reason for callback if callback_scheduled is true (e.g. "Prospect absent: out of office / phone at home; message left with third party" or user's requested time).
@@ -1931,6 +2276,62 @@ Only return valid JSON."""
         except Exception as g_err:
             logger.warning(f"[extract_and_save_lead] Gemini extraction failed: {g_err}")
 
+    # Check if this call was an appointment check / inquiry vs a confirmation / new booking
+    t_lower = transcript.lower()
+    has_check_phrase = any(term in t_lower for term in [
+        "check karna", "check karni", "check kijiye", "check kar", "appointment check",
+        "status dekhna", "check my appointment", "mujhe check karna", "check my booking"
+    ]) or bool(lead_data.get("is_appointment_check"))
+
+    has_confirm_intent = any(term in t_lower for term in [
+        "confirm karte hain", "confirm kar", "confirm kar do", "confirm kijiye",
+        "appointment confirm", "confirm hai", "naya book", "fresh book", "naya appointment",
+        "new appointment", "book kar do", "book kar dijiye", "appointment book"
+    ]) or bool(lead_data.get("appointment_booked"))
+
+    if has_confirm_intent and any(k in t_lower for k in ["baje", "am", "pm", "kal", "tarikh", "date", "time", "10", "11", "12", "1", "2", "3", "4", "5", "6", "7", "8", "9"]):
+        lead_data["appointment_booked"] = True
+        is_check_inquiry = False
+        computed_outcome = "Appointment Booked"
+        if lead_data.get("sentiment") != "negative":
+            lead_data["sentiment"] = "positive"
+    elif has_check_phrase:
+        is_check_inquiry = True
+        lead_data["appointment_booked"] = False
+        computed_outcome = "Appointment Checked"
+        if not lead_data.get("sentiment") or lead_data.get("sentiment") not in ("negative", "positive"):
+            lead_data["sentiment"] = "positive" if any(w in t_lower for w in ["dhanyavaad", "thank", "theek", "shukriya", "accha", "goodbye"]) else "neutral"
+    else:
+        is_check_inquiry = False
+        appointment_keywords = [
+            "appointment book", "demo book", "meeting book", "schedule new", "naya book", "demo set"
+        ]
+        has_apt_intent = any(k in t_lower for k in appointment_keywords)
+        if has_apt_intent and any(k in t_lower for k in ["baje", "am", "pm", "kal", "tarikh", "date", "time"]):
+            lead_data["appointment_booked"] = True
+            lead_data["is_lead"] = True
+
+    # Fallback regex extraction for contact_email, contact_phone, and contact_name if omitted by LLM
+    if not lead_data.get("contact_email"):
+        email_match = re.search(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b', transcript)
+        if email_match:
+            lead_data["contact_email"] = email_match.group(0)
+
+    if not lead_data.get("contact_phone"):
+        phone_match = re.search(r'\b(?:(?:\+?91|0)?[6-9]\d{7,10})\b', transcript)
+        if not phone_match:
+            phone_match = re.search(r'(?:phone|number|mobile|contact|no\.?)\s*(?:hai|is|:)?\s*(\+?\d[\d\s-]{6,14}\d)', transcript, re.IGNORECASE)
+        if phone_match:
+            raw_matched = phone_match.group(1) if phone_match.lastindex else phone_match.group(0)
+            cleaned_p = re.sub(r'[^\d+]', '', raw_matched)
+            if len(cleaned_p) >= 7:
+                lead_data["contact_phone"] = cleaned_p
+
+    if not lead_data.get("contact_name") or lead_data.get("contact_name") in ("Prospect", "Unknown", "Caller", "None"):
+        name_match = re.search(r'(?:mera naam|my name is|naam hai|naam)\s*(?:hai|is|:)?\s*([A-Za-z\u0900-\u097f]+)', transcript, re.IGNORECASE)
+        if name_match:
+            lead_data["contact_name"] = name_match.group(1).strip()
+
     # Programmatic failsafe for third-party pickup & absent prospect auto-rescheduling
     absent_patterns = [
         r'\b(?:wo\s+)?(?:abhi\s+)?(?:yahan\s+)?nahi\s+(?:hai|hain)\b',
@@ -1951,7 +2352,7 @@ Only return valid JSON."""
     # Code-level qualification guard: If customer spoke fewer than 6 words or only greeting words, force is_lead to False
     customer_turns = [l.replace("customer:", "").strip() for l in transcript.split("\n") if l.strip().startswith("customer:")]
     total_customer_words = sum(len(t.split()) for t in customer_turns)
-    if total_customer_words < 6 and not lead_data.get("callback_scheduled"):
+    if total_customer_words < 6 and not lead_data.get("callback_scheduled") and not lead_data.get("appointment_booked"):
         lead_data["is_lead"] = False
         lead_data["interest_level"] = "low"
 
@@ -1964,7 +2365,13 @@ Only return valid JSON."""
         executor = None
 
     # Calculate computed outcome
-    if lead_data.get("callback_scheduled"):
+    if is_check_inquiry:
+        computed_outcome = "Appointment Checked"
+        lead_data["is_lead"] = False
+    elif lead_data.get("appointment_booked"):
+        computed_outcome = "Appointment Booked"
+        lead_data["is_lead"] = True
+    elif lead_data.get("callback_scheduled"):
         computed_outcome = "Callback Scheduled"
     elif lead_data.get("is_lead"):
         computed_outcome = "Lead Captured"
@@ -2155,14 +2562,17 @@ Only return valid JSON."""
                     except Exception as notif_l_err:
                         logger.warning(f"[extract_and_save_lead] Failed to dispatch new_lead notification: {notif_l_err}")
 
-                # Task 4.2: Automated Welcome & Next-Step Message to Interested Prospect via WhatsApp/SMS
-                if resolved_phone and resolved_phone != "Unknown":
+                # Task 4.2: Automated Welcome & Next-Step Message to Interested Prospect via WhatsApp/SMS/Email (Rule 52, 53)
+                prospect_email = lead_data.get("contact_email") or ""
+                if (resolved_phone and resolved_phone != "Unknown") or prospect_email:
                     try:
                         asyncio.create_task(executor.dispatch_interested_followup(
                             agent_id=agent_id,
                             prospect_data={
                                 "contact_name": resolved_name,
-                                "contact_phone": resolved_phone,
+                                "contact_phone": resolved_phone if resolved_phone != "Unknown" else "",
+                                "contact_email": prospect_email,
+                                "business_name": b_name_extracted,
                                 "organization_id": organization_id,
                                 "user_id": user_id,
                                 "call_summary": lead_data.get("call_summary", ""),
@@ -2171,17 +2581,125 @@ Only return valid JSON."""
                                 "interest_level": lead_data.get("interest_level", "medium")
                             }
                         ))
-                        logger.info(f"[extract_and_save_lead] Dispatched automated welcome message task for {resolved_phone}")
+                        logger.info(f"[extract_and_save_lead] Dispatched automated welcome/fulfillment task for phone={resolved_phone}, email={prospect_email}")
                     except Exception as fol_err:
                         logger.warning(f"[extract_and_save_lead] Failed to dispatch interested followup: {fol_err}")
 
             except Exception as e:
                 logger.error(f"Failed to save lead: {e}")
 
+        # 2b. Handle Appointment Booking
+        appointment_id = None
+        if lead_data.get("appointment_booked") or computed_outcome == "Appointment Booked":
+            try:
+                apt_time = lead_data.get("appointment_time_iso")
+                if not apt_time:
+                    from datetime import timedelta
+                    apt_time = (datetime.utcnow() + timedelta(days=1)).replace(hour=10, minute=0, second=0, microsecond=0).isoformat() + "Z"
+
+                prospect_email = lead_data.get("contact_email") or ""
+                apt_payload = {
+                    "user_id": user_id,
+                    "agent_id": agent_id,
+                    "contact_name": resolved_name if resolved_name not in ("Prospect", "Unknown") else "Client",
+                    "contact_phone": resolved_phone if resolved_phone != "Unknown" else "",
+                    "contact_email": prospect_email or None,
+                    "scheduled_at": apt_time,
+                    "duration_minutes": 30,
+                    "status": "scheduled",
+                    "booked_via": "voice",
+                    "meeting_type": "Appointment / Demo",
+                    "notes": lead_data.get("call_summary") or "Booked via voice agent conversation.",
+                    "extracted_data": lead_data.get("extracted_data") or {},
+                    "voice_call_id": original_call_id,
+                    "metadata": {
+                        "source": "voice_sandbox" if "sandbox" in str(room_name or "") else "voice_call",
+                        "room_name": room_name or ""
+                    }
+                }
+                for apt_attempt in range(3):
+                    try:
+                        apt_res = await asyncio.to_thread(
+                            supabase_admin.table("appointments").insert(apt_payload).execute
+                        )
+                        if apt_res.data and len(apt_res.data) > 0:
+                            appointment_id = apt_res.data[0].get("id")
+                            logger.info(f"[extract_and_save_lead] Successfully inserted appointment {appointment_id} for user {user_id}")
+                            break
+                    except Exception as ins_apt_err:
+                        logger.warning(f"[extract_and_save_lead] Appointment insert attempt {apt_attempt+1} failed: {ins_apt_err}")
+                        if apt_attempt < 2:
+                            await asyncio.sleep(0.5)
+                        else:
+                            raise ins_apt_err
+
+                    if original_call_id:
+                        try:
+                            await asyncio.to_thread(
+                                supabase_admin.table("voice_calls").update({"appointment_id": appointment_id}).eq("id", original_call_id).execute
+                            )
+                        except Exception as apt_link_err:
+                            logger.warning(f"Failed to link appointment_id to voice_call: {apt_link_err}")
+
+                    # Dispatch real-time appointment notification
+                    if user_id:
+                        try:
+                            asyncio.create_task(NotificationService.dispatch(
+                                user_id=user_id,
+                                event_type="appointment_scheduled",
+                                title=f"📅 New Appointment: {resolved_name}",
+                                message=(
+                                    f"👤 Contact: {resolved_name} ({resolved_phone})\n"
+                                    f"⏰ Slot: {apt_time}\n"
+                                    f"📝 Details: {lead_data.get('call_summary') or 'Appointment booked via voice agent'}"
+                                ),
+                                payload={
+                                    "appointment_id": appointment_id,
+                                    "agent_id": agent_id,
+                                    "call_id": original_call_id,
+                                    "contact_name": resolved_name,
+                                    "contact_phone": resolved_phone,
+                                    "scheduled_at": apt_time
+                                }
+                            ))
+                        except Exception as apt_notif_err:
+                            logger.warning(f"Failed to dispatch appointment notification: {apt_notif_err}")
+            except Exception as apt_err:
+                logger.error(f"[extract_and_save_lead] Failed to insert appointment: {apt_err}")
+
         # Sync to customer_contacts table:
-        # For outbound calls: ONLY sync if the prospect showed positive interest, requested callback, or became a lead.
-        # For inbound calls: sync regular callers for recognition.
+        # EVERY caller who gave their name, phone, or inquired should be synced for future recognition.
         try:
+            if not organization_id and user_id:
+                try:
+                    prof_org = await asyncio.to_thread(
+                        supabase_admin.table("profiles").select("organization_id").eq("id", user_id).maybe_single().execute
+                    )
+                    if prof_org and prof_org.data:
+                        organization_id = prof_org.data.get("organization_id")
+                except Exception as org_f_err:
+                    logger.warning(f"Could not resolve organization_id from user_id: {org_f_err}")
+
+            if not organization_id and agent_id:
+                try:
+                    ag_org = await asyncio.to_thread(
+                        supabase_admin.table("agents").select("organization_id").eq("id", agent_id).maybe_single().execute
+                    )
+                    if ag_org and ag_org.data:
+                        organization_id = ag_org.data.get("organization_id")
+                except Exception:
+                    pass
+
+            if not organization_id:
+                try:
+                    any_org = await asyncio.to_thread(
+                        supabase_admin.table("organizations").select("id").limit(1).execute
+                    )
+                    if any_org and any_org.data:
+                        organization_id = any_org.data[0].get("id")
+                except Exception:
+                    pass
+
             is_outbound = bool(contact_id) or (existing_call and (existing_call.get("direction") == "outbound" or existing_call.get("metadata", {}).get("direction") == "outbound"))
             has_positive_interest = bool(
                 lead_id or
@@ -2193,14 +2711,16 @@ Only return valid JSON."""
                     lead_data.get("interest_level") in ("medium", "high", "hot")
                 ))
             )
+            has_caller_info = bool(resolved_name and resolved_name != "Prospect") or bool(lead_data and (lead_data.get("contact_phone") or lead_data.get("contact_email")))
 
-            if is_outbound and not has_positive_interest:
-                logger.info(f"[extract_and_save_lead] Outbound call to prospect did not result in a positive lead/callback. Skipping customer_contacts sync to keep CRM clean.")
+            if is_outbound and not has_positive_interest and not has_caller_info:
+                logger.info(f"[extract_and_save_lead] Outbound call to prospect did not result in a positive lead/callback or contact name. Skipping customer_contacts sync to keep CRM clean.")
             else:
                 contact_phone_to_sync = (
                     (resolved_phone if resolved_phone != "Unknown" else None) or
                     (existing_call.get("caller_phone") if existing_call else None) or 
-                    (existing_call.get("metadata", {}).get("to_number") if existing_call else None)
+                    (existing_call.get("metadata", {}).get("to_number") if existing_call else None) or
+                    (lead_data.get("contact_phone") if lead_data else None)
                 )
                 if not contact_phone_to_sync and original_call_id:
                     try:
@@ -2215,6 +2735,14 @@ Only return valid JSON."""
                 if contact_phone_to_sync and contact_phone_to_sync != "Unknown" and organization_id:
                     from app.services.caller_lookup import CallerLookupService
                     c_svc = CallerLookupService(supabase_admin)
+                    sync_tags = []
+                    if lead_data and lead_data.get("is_lead"):
+                        sync_tags.append("lead")
+                    if is_check_inquiry or lead_data.get("appointment_booked"):
+                        sync_tags.append("appointment")
+                    if not sync_tags:
+                        sync_tags.append("outbound" if is_outbound else "inbound")
+
                     await c_svc.upsert_from_call(
                         organization_id=organization_id,
                         phone_number=contact_phone_to_sync,
@@ -2223,9 +2751,9 @@ Only return valid JSON."""
                         company=lead_data.get("company") if lead_data else None,
                         call_summary=lead_data.get("call_summary") if lead_data else None,
                         direction="outbound" if is_outbound else "inbound",
-                        tags=["lead"] if (lead_data and lead_data.get("is_lead")) else None
+                        tags=sync_tags
                     )
-                    logger.info(f"[extract_and_save_lead] Synced caller {contact_phone_to_sync} to customer_contacts (is_outbound={is_outbound})")
+                    logger.info(f"[extract_and_save_lead] Synced caller {contact_phone_to_sync} to customer_contacts (is_outbound={is_outbound}, tags={sync_tags})")
         except Exception as c_sync_err:
             logger.warning(f"[extract_and_save_lead] Customer contacts sync failed: {c_sync_err}")
 
@@ -2419,6 +2947,42 @@ Only return valid JSON."""
             except Exception as notif_err:
                 logger.warning(f"[extract_and_save_lead] Failed to dispatch notification: {notif_err}")
 
+        # 6.5 Write to activity_log for real-time dashboard feed (Rule 49 & 60)
+        if user_id:
+            try:
+                act_type = "lead_captured" if lead_data.get("is_lead") else ("appointment_booked" if lead_data.get("callback_scheduled") else "call_ended")
+                act_title = (
+                    f"Lead Captured: {resolved_name}" if lead_data.get("is_lead")
+                    else (f"Callback Scheduled: {resolved_name}" if lead_data.get("callback_scheduled")
+                    else f"Call Completed ({c_dir_str})")
+                )
+                act_desc = lead_data.get("call_summary") or f"{duration_seconds}s call completed with {c_sentiment} sentiment."
+                act_payload = {
+                    "user_id": user_id,
+                    "title": act_title,
+                    "description": act_desc,
+                    "activity_type": act_type
+                }
+                if organization_id:
+                    act_payload["organization_id"] = organization_id
+                
+                try:
+                    await asyncio.to_thread(
+                        supabase_admin.table("activity_log").insert(act_payload).execute
+                    )
+                except Exception:
+                    await asyncio.to_thread(
+                        supabase_admin.table("activity_log").insert({
+                            "user_id": user_id,
+                            "title": act_title,
+                            "description": act_desc,
+                            "activity_type": act_type
+                        }).execute
+                    )
+                logger.info(f"[extract_and_save_lead] Logged activity_log item '{act_title}' ({act_type}) for user {user_id}")
+            except Exception as act_err:
+                logger.warning(f"[extract_and_save_lead] Failed to write activity_log: {act_err}")
+
         # 7. Trigger Call Completed event on connected agent integrations
         if executor:
             try:
@@ -2499,6 +3063,7 @@ async def entrypoint(ctx: JobContext):
     greeting_message = None
     bot_name = "Aditi"
     gender_tag = "female"
+    is_female = True
     business_name_val = ""
 
     agent_id = ctx.job.metadata if ctx.job else None
@@ -2603,7 +3168,9 @@ async def entrypoint(ctx: JobContext):
     agent_data = None
     
     # 1. Fetch Agent settings from Supabase synchronously/concurrently before instantiation
+    kb_task = None
     if agent_id:
+        kb_task = asyncio.create_task(fetch_knowledge_base(agent_id))
         try:
             res = await asyncio.to_thread(
                 supabase_admin.table("agents").select("*, user_id, organization_id").eq("id", agent_id).execute
@@ -2626,10 +3193,97 @@ async def entrypoint(ctx: JobContext):
                 if agent_data.get("voice_speed"): speed = agent_data["voice_speed"]
                 if agent_data.get("voice_pitch"): pitch = agent_data["voice_pitch"]
                 
-                if agent_data.get("system_prompt"):
-                    system_prompt = agent_data["system_prompt"]
+                # 1. Resolve Gender and Clean Name
+                is_female = (str(voice_id).lower() in SARVAM_FEMALE_VOICES or (agent_data and (agent_data.get("gender") == "female" or agent_data.get("voice_gender") == "female")))
+                gender_tag = 'female' if is_female else 'male'
                 
-                # Parse and append personality config
+                raw_name = agent_data.get('name', 'Agent') if agent_data else 'Agent'
+                clean_name = re.sub(r'^\[[^\]]+\]\s*', '', raw_name)
+                clean_name = re.sub(r'\s*-\s*(Demo|Trial)\s*$', '', clean_name, flags=re.IGNORECASE).strip()
+                if clean_name.lower() in ('multi agent', 'multi-agent', 'agent', 'sales agent', 'appointment agent', 'appointment booker', 'appointment booking agent', 'appointment booking', 'support agent', 'lead qualifier', 'lead qualifier agent', 'sales executive', ''):
+                    v_str = str(voice_id).strip().lower()
+                    if v_str in SARVAM_FEMALE_VOICES or v_str in SARVAM_MALE_VOICES:
+                        clean_name = v_str.capitalize()
+                    elif gender_tag == 'female':
+                        clean_name = "Aditi"
+                    else:
+                        clean_name = "Vikram"
+                bot_name = clean_name
+
+                # 2. Fetch User Profile & Business Info
+                profile_data = {}
+                try:
+                    prof_res = await asyncio.to_thread(
+                        supabase_admin.table("profiles").select("company_name").eq("id", user_id).execute
+                    )
+                    if prof_res.data:
+                        profile_data = prof_res.data[0]
+                except Exception as e:
+                    logger.error(f"Failed to fetch profile for business name in entrypoint: {e}")
+
+                raw_system_prompt = agent_data.get("system_prompt") or ""
+                business_info = extract_business_info(raw_system_prompt, agent_data, profile_data)
+                business_name_val = business_info["business_name"]
+                company_display = business_name_val or 'our company'
+
+                # 3. Resolve Base Prompt (Multi-personality vs Single-personality vs Custom Prompt)
+                personalities_raw = agent_data.get("personalities")
+                enabled_count = _count_enabled_personalities(personalities_raw)
+                base_prompt = ""
+                if enabled_count == 1:
+                    agent_data["_multi_personality_enabled"] = False
+                    try:
+                        p_dict = json.loads(personalities_raw) if isinstance(personalities_raw, str) else (personalities_raw or {})
+                        active_role = next((k for k, v in p_dict.items() if v is True), None)
+                        if active_role:
+                            from app.services.prompt_service import PromptService
+                            prompt_svc = PromptService(supabase_admin)
+                            base_prompt = await prompt_svc.get_prompt(active_role)
+                            logger.info(f"[SINGLE-PERSONALITY] Resolved base prompt for active role '{active_role}' for agent {agent_id}")
+                    except Exception as sp_err:
+                        logger.warning(f"[SINGLE-PERSONALITY] Error resolving base prompt: {sp_err}")
+                elif enabled_count >= 2:
+                    try:
+                        enabled_personalities = (
+                            json.loads(personalities_raw)
+                            if isinstance(personalities_raw, str)
+                            else (personalities_raw or {})
+                        )
+                        agent_data["_multi_personality_enabled"] = True
+                        agent_data["_enabled_personalities"] = enabled_personalities
+                        from app.services.prompt_service import PromptService
+                        prompt_svc = PromptService(supabase_admin)
+                        base_prompt = prompt_svc._load_from_file("multi_agent")
+                        if not base_prompt or "You are" not in base_prompt:
+                            path_m = os.path.normpath(os.path.join(PROMPTS_DIR, "multi_agent.txt"))
+                            if os.path.exists(path_m):
+                                with open(path_m, "r", encoding="utf-8") as mf:
+                                    base_prompt = mf.read()
+                        logger.info(f"[MULTI-PERSONALITY] Loaded base prompt from multi_agent.txt for agent {agent_id}")
+                    except Exception as mp_err:
+                        logger.warning(f"[MULTI-PERSONALITY] Setup failed: {mp_err}")
+                        agent_data["_multi_personality_enabled"] = False
+                else:
+                    agent_data["_multi_personality_enabled"] = False
+
+                if not base_prompt:
+                    base_prompt = agent_data.get("system_prompt") or load_system_prompt()
+
+                # 4. Substitute placeholders and scrub generic identity
+                base_prompt = base_prompt.replace('{{agent_name}}', bot_name).replace('{agentName}', bot_name).replace('{{name}}', bot_name)
+                base_prompt = base_prompt.replace('{{company_name}}', company_display).replace('{companyName}', company_display)
+                generic_names = [
+                    r'\{\{agent_name\}\}', r'\{agentName\}', r'\{agent_name\}', r'\{name\}',
+                    r'\bMulti Agent\b', r'\bmulti agent\b', r'\bSales Agent\b', r'\bsales agent\b',
+                    r'\bAppointment Agent\b', r'\bappointment agent\b', r'\bSupport Agent\b', r'\bsupport agent\b',
+                    r'\bLead Qualifier\b', r'\blead qualifier\b'
+                ]
+                for pat in generic_names:
+                    base_prompt = re.sub(pat, bot_name, base_prompt)
+
+                system_prompt = base_prompt
+
+                # 5. Append Personality style prompt
                 personality = agent_data.get("personality", "friendly")
                 personality_prompts = {
                     "professional": "\n\n## PERSONALITY STYLE: PROFESSIONAL\n- Speak formally, politely, and professionally.\n- Be concise and business-like.\n- Avoid excessive slang or casual language.\n- Keep your focus on efficiency and clear facts.",
@@ -2638,13 +3292,13 @@ async def entrypoint(ctx: JobContext):
                     "empathetic": "\n\n## PERSONALITY STYLE: EMPATHETIC\n- Speak in a caring, patient, and understanding tone.\n- Listen attentively and validate the caller's concerns with genuine warmth.\n- Keep sentences concise, natural, and fluent. Never insert artificial hesitation, trailing pauses, or stutters."
                 }
                 system_prompt += personality_prompts.get(personality.lower(), personality_prompts["friendly"])
-                
-                # Append expressiveness rules
+
+                # 6. Append Expressiveness rules
                 expressive_instructions = build_agent_expressive_rules(bot_name=bot_name, gender_tag=gender_tag, business_name=business_name_val)
                 if "## TRINETRA AGENT BEHAVIOR" not in system_prompt and "## HUMAN EXPRESSIVENESS RULES" not in system_prompt:
                     system_prompt += expressive_instructions
 
-                # Extract default greeting from system_prompt
+                # 7. Extract default greeting from system_prompt
                 default_greeting = None
                 lines = system_prompt.split('\n')
                 for idx, line in enumerate(lines):
@@ -2663,7 +3317,7 @@ async def entrypoint(ctx: JobContext):
                 if default_greeting:
                     default_greeting = default_greeting.strip('\'"')
 
-                # Fetch Caller identity from room name, participants, or voice_calls DB if not yet known
+                # 8. Fetch Caller Identity & Campaign Contact
                 if ctx.room and caller_number == "Unknown":
                     # 1. Check room name for any 10-digit sequence
                     for part in re.split(r'[-_]', ctx.room.name):
@@ -2700,7 +3354,6 @@ async def entrypoint(ctx: JobContext):
                         except Exception as vc_err:
                             logger.warning(f"Failed to lookup caller_phone from voice_calls in EP: {vc_err}")
 
-                # If contact_id not yet resolved from room name, try fallback lookup from voice_calls
                 campaign_contact = None
                 if not contact_id and ctx.room and ctx.room.name.startswith("twilio-"):
                     call_sid = ctx.room.name.split("-")[-1]
@@ -2724,11 +3377,11 @@ async def entrypoint(ctx: JobContext):
                                 caller_number = campaign_contact["phone"]
                             if (not db_caller_name or db_caller_name == "Unknown Caller") and campaign_contact.get("full_name"):
                                 db_caller_name = campaign_contact["full_name"]
-                            logger.info(f"[Twilio Entrypoint] Successfully loaded campaign contact {contact_id}: Name='{campaign_contact.get('full_name')}', Phone='{campaign_contact.get('phone')}', Notes='{campaign_contact.get('notes')}'")
+                            logger.info(f"[Twilio Entrypoint] Successfully loaded campaign contact {contact_id}: Name='{campaign_contact.get('full_name')}', Phone='{campaign_contact.get('phone')}'")
                     except Exception as e:
                         logger.error(f"Failed to fetch campaign contact {contact_id}: {e}")
 
-                # Lookup Caller in customer_contacts
+                # 9. Lookup Returning Customer
                 customer = None
                 if not campaign_contact and organization_id and caller_number != "Unknown":
                     try:
@@ -2746,39 +3399,26 @@ async def entrypoint(ctx: JobContext):
                     except Exception as lookup_err:
                         logger.error(f"Failed to lookup caller in EP: {lookup_err}")
 
-                raw_greeting = agent_data.get('greeting_message') or default_greeting
-
-                # Fetch user profile to get company name
-                profile_data = {}
+                # 10. Lookup Existing Appointment Records in DB
                 try:
-                    prof_res = await asyncio.to_thread(
-                        supabase_admin.table("profiles").select("company_name").eq("id", user_id).execute
-                    )
-                    if prof_res.data:
-                        profile_data = prof_res.data[0]
-                except Exception as e:
-                    logger.error(f"Failed to fetch profile for greeting: {e}")
-
-                is_female = (str(voice_id).lower() in SARVAM_FEMALE_VOICES or (agent_data and (agent_data.get("gender") == "female" or agent_data.get("voice_gender") == "female")))
-                gender_tag = 'female' if is_female else 'male'
-                
-                raw_name = agent_data.get('name', 'Agent') if agent_data else 'Agent'
-                clean_name = re.sub(r'^\[[^\]]+\]\s*', '', raw_name)
-                clean_name = re.sub(r'\s*-\s*(Demo|Trial)\s*$', '', clean_name, flags=re.IGNORECASE).strip()
-                if clean_name.lower() in ('multi agent', 'multi-agent', 'agent', 'sales agent', 'appointment agent', 'appointment booker', 'appointment booking agent', 'appointment booking', 'support agent', 'lead qualifier', 'lead qualifier agent', 'sales executive', ''):
-                    v_str = str(voice_id).strip().lower()
-                    if v_str in SARVAM_FEMALE_VOICES or v_str in SARVAM_MALE_VOICES:
-                        clean_name = v_str.capitalize()
-                    elif gender_tag == 'female':
-                        clean_name = "Aditi"
+                    apt_query = supabase_admin.table("appointments").select("contact_name, contact_phone, scheduled_at, meeting_type, status").order("created_at", desc=True)
+                    if caller_number and caller_number != "Unknown":
+                        apt_query = apt_query.ilike("contact_phone", f"%{caller_number}%")
+                    elif user_id:
+                        apt_query = apt_query.eq("user_id", user_id).limit(5)
                     else:
-                        clean_name = "Vikram"
-                bot_name = clean_name
+                        apt_query = apt_query.limit(3)
+                    
+                    apt_res = await asyncio.to_thread(apt_query.execute)
+                    if apt_res.data and len(apt_res.data) > 0:
+                        apt_lines = [f"- {a.get('contact_name')}: {a.get('scheduled_at')} ({a.get('meeting_type')}, Status: {a.get('status')})" for a in apt_res.data]
+                        system_prompt += f"\n\n## EXISTING APPOINTMENT RECORDS IN DATABASE\n" + "\n".join(apt_lines) + "\n- INSTRUCTION: If caller asks to check an appointment, verify against these exact records.\n"
+                    else:
+                        system_prompt += f"\n\n## EXISTING APPOINTMENT RECORDS IN DATABASE\n- NO existing appointments found for this caller.\n- INSTRUCTION: If caller asks to check an appointment, truthfully tell them that no booking was found for their number, and offer to schedule a new appointment for their requested date/time.\n"
+                except Exception as apt_lookup_err:
+                    logger.warning(f"Could not load appointment records in EP: {apt_lookup_err}")
 
-                # Dynamic extraction of business name and offerings (never hardcoded to Trinetra)
-                business_info = extract_business_info(system_prompt, agent_data, profile_data)
-                business_name_val = business_info["business_name"]
-
+                raw_greeting = agent_data.get('greeting_message') or default_greeting
                 is_inbound_call = not bool(campaign_contact)
                 call_direction = "inbound" if is_inbound_call else "outbound"
 
@@ -2794,30 +3434,11 @@ async def entrypoint(ctx: JobContext):
                     direction=call_direction
                 )
 
-                # Substitute placeholders in system_prompt and scrub generic identity
-                company_display = business_name_val or 'our company'
-                system_prompt = system_prompt.replace('{{company_name}}', company_display).replace('{companyName}', company_display)
-                
-                # Active scrub of all generic names to enforce custom/selected bot identity
-                generic_names = [
-                    r'\{\{agent_name\}\}', r'\{agentName\}', r'\{agent_name\}', r'\{name\}',
-                    r'\bMulti Agent\b', r'\bmulti agent\b', r'\bSales Agent\b', r'\bsales agent\b',
-                    r'\bAppointment Agent\b', r'\bappointment agent\b', r'\bSupport Agent\b', r'\bsupport agent\b',
-                    r'\bLead Qualifier\b', r'\blead qualifier\b'
-                ]
-                for pat in generic_names:
-                    system_prompt = re.sub(pat, clean_name, system_prompt)
-                if greeting_message:
-                    for pat in generic_names:
-                        greeting_message = re.sub(pat, clean_name, greeting_message)
-
                 if campaign_contact:
                     c_name = campaign_contact.get("full_name") or ""
                     c_company = campaign_contact.get("company_name") or ""
                     c_notes = campaign_contact.get("notes") or ""
                     end_msg_text = agent_data.get("ending_message", "") if agent_data else ""
-                    
-                    # Universal, business-agnostic Master Outbound Sales Protocol
                     personalized_context = build_outbound_sales_protocol(
                         prospect_name=c_name,
                         prospect_company=c_company,
@@ -2828,28 +3449,8 @@ async def entrypoint(ctx: JobContext):
                         end_msg_text=end_msg_text
                     )
                     system_prompt += personalized_context
-                elif customer:
-                    cust_name = customer.get("full_name") or ""
-                    cust_tags = customer.get("tags") or []
-                    cust_notes = customer.get("notes") or ""
-                    cust_last = customer.get("last_contact_at")
-                    cust_calls = customer.get("total_calls") or 1
-                    customer_context = (
-                        f"\n\n## INBOUND CALLER RECOGNITION & CONVERSATION MEMORY:\n"
-                        f"- Recognized Caller: {cust_name or 'Returning Customer'}\n"
-                        f"- Total Previous Calls: {cust_calls}\n"
-                        f"- Tags: {', '.join(cust_tags) if cust_tags else 'None'}\n"
-                        f"- Last Contacted: {cust_last or 'Earlier'}\n"
-                        f"- Past Inquiries / History: {cust_notes or 'No previous notes recorded'}\n"
-                        f"- INSTRUCTION FOR RETURNING CALLER: This caller is a recognized returning customer. "
-                        f"Greet them warmly by name ({cust_name}). "
-                        f"If they ask about their past inquiries or requests, reference the context above."
-                    )
-                    system_prompt += customer_context
 
-                # Enforce Gender-consistent Hindi/Hinglish Grammar
-                system_prompt = apply_gender_grammar_directives(system_prompt, gender_tag, bot_name, voice_id)
-
+                # 11. Ending and Fallback Messages
                 if agent_data and agent_data.get("ending_message"):
                     end_msg = agent_data['ending_message']
                     system_prompt += (
@@ -2867,89 +3468,41 @@ async def entrypoint(ctx: JobContext):
                         f"respond naturally using your configured fallback message: '{fb_msg}'"
                     )
                 
-                # Fetch Knowledge Base
-                kb_docs = await fetch_knowledge_base(agent_id)
+                # 12. Fetch Knowledge Base (budgeted to max 1500 chars per doc to prevent 413 token limits)
+                kb_docs = (await kb_task) if kb_task else (await fetch_knowledge_base(agent_id))
                 if kb_docs:
                     kb_context = "\n\n=== BUSINESS KNOWLEDGE BASE ===\n"
                     for doc in kb_docs:
-                        kb_context += f"\n--- {doc.get('name', 'Document')} ---\n{doc.get('content_excerpt', '')}\n"
+                        excerpt = (doc.get('content_excerpt') or '').strip()
+                        if len(excerpt) > 1500:
+                            excerpt = excerpt[:1500] + "..."
+                        kb_context += f"\n--- {doc.get('name', 'Document')} ---\n{excerpt}\n"
                     system_prompt += kb_context
 
-                # --- MULTI-PERSONALITY SETUP ---
-                personalities_raw = agent_data.get("personalities")
-                enabled_count = _count_enabled_personalities(personalities_raw)
-                if enabled_count == 1:
-                    agent_data["_multi_personality_enabled"] = False
-                    try:
-                        p_dict = json.loads(personalities_raw) if isinstance(personalities_raw, str) else (personalities_raw or {})
-                        active_role = next((k for k, v in p_dict.items() if v is True), None)
-                        if active_role:
-                            role_headers = {
-                                "appointment": "Appointment Booking Agent",
-                                "sales": "Sales Agent",
-                                "support": "Customer Support Agent",
-                                "lead_qualifier": "Lead Qualifier Agent"
-                            }
-                            expected_header = role_headers.get(active_role, "")
-                            if expected_header and expected_header.lower() not in system_prompt.lower():
-                                from app.services.prompt_service import PromptService
-                                prompt_svc = PromptService(supabase_admin)
-                                resolved_prompt = await prompt_svc.get_prompt(active_role)
-                                raw_name = agent_data.get('name', 'Agent')
-                                clean_name = re.sub(r'^\[[^\]]+\]\s*', '', raw_name)
-                                clean_name = re.sub(r'\s*-\s*(Demo|Trial)\s*$', '', clean_name, flags=re.IGNORECASE)
-                                resolved_prompt = resolved_prompt.replace('{{agent_name}}', clean_name).replace('{agentName}', clean_name)
-                                company_n = business_name_val or agent_data.get('business_name') or ''
-                                resolved_prompt = resolved_prompt.replace('{{company_name}}', company_n).replace('{companyName}', company_n)
-                                system_prompt = resolved_prompt + personality_prompts.get(personality.lower(), personality_prompts["friendly"])
-                                if "## HUMAN EXPRESSIVENESS RULES" not in system_prompt:
-                                    system_prompt += expressive_instructions
-                                logger.info(f"[SINGLE-PERSONALITY AUTO-SYNC] Overrode mismatched prompt with active role '{active_role}' for agent {agent_id}")
-                    except Exception as sp_err:
-                        logger.warning(f"[SINGLE-PERSONALITY AUTO-SYNC] Error: {sp_err}")
-                elif enabled_count >= 2:
-                    try:
-                        enabled_personalities = (
-                            json.loads(personalities_raw)
-                            if isinstance(personalities_raw, str)
-                            else (personalities_raw or {})
-                        )
-                        agent_data["_multi_personality_enabled"] = True
-                        agent_data["_enabled_personalities"] = enabled_personalities
+                # 13. Critical Business Scope Grounding, 10-Digit Phone Verification, Email/WhatsApp Reminders
+                if "## STRICT BUSINESS SCOPE GROUNDING" not in system_prompt:
+                    system_prompt += (
+                        f"\n\n## STRICT BUSINESS SCOPE GROUNDING & ANTI-HALLUCINATION:\n"
+                        f"1. You represent {company_display}. You ONLY book appointments, schedule demos, and answer questions for products and services explicitly offered by {company_display} (such as AI voice agents, software automation, consultation, and technical support).\n"
+                        f"2. OUT-OF-SCOPE PROHIBITION: If a caller asks to book an appointment for an unrelated or medical service (e.g. regular health checkups, doctor consultations, clinic tests, hospital visits, dental appointments, salons), you MUST politely decline:\n"
+                        f"   'Maaf kariyega, hum regular health checkups ya doctor services provide nahi karte hain. {company_display} voice agents aur business automation solutions provide karti hai. Kya aap hamare AI automation ke baare mein demo ya consultation schedule karna chahenge?'\n"
+                        f"3. NEVER pretend to be a doctor, hospital, or clinic. NEVER accept or confirm a medical regular checkup under any circumstances!\n"
+                        f"\n## 10-DIGIT CONTACT PHONE NUMBER VALIDATION:\n"
+                        f"1. Contact phone numbers in India must have exactly 10 digits.\n"
+                        f"2. When the caller provides a phone number, count the digits: if they provide fewer than 10 digits (such as 9 digits like '654298356'), you MUST NOT accept or confirm it. Immediately ask: 'Yeh 9 digits hain, kripya apna poora 10-digit mobile number bata dijiye?'\n"
+                        f"3. Do not proceed to confirmation until all 10 digits are provided.\n"
+                        f"\n## EMAIL & WHATSAPP REMINDERS AND CONFIRMATIONS (CRITICAL RULE 52 & 53):\n"
+                        f"1. Automated delivery is 100% active. If the caller asks for email or WhatsApp confirmations or reminders (e.g., 'kya aap mujhe mail par reminder bhej sakte ho?', 'email par confirmation aayega?'), ALWAYS enthusiastically assure them:\n"
+                        f"   'Haan bilkul! Hum aapko email aur WhatsApp dono par confirmation aur reminder bhejte hain. Hum aapko mail reminder bhej denge.'\n"
+                        f"2. STRICT PROHIBITION: You must NEVER say email sending or mail reminders are unavailable ('mere paas email par reminder bhejne ka option nahi hai'). It is fully active and supported.\n"
+                    )
 
-                        # Check if base prompt is already multi-agent; if not, initialize with multi_agent.txt
-                        if "SYSTEM PROMPT: Multi-Personality Agent" not in system_prompt and "INTENT DETECTION" not in system_prompt:
-                            from app.services.prompt_service import PromptService
-                            prompt_svc = PromptService(supabase_admin)
-                            multi_base = prompt_svc._load_from_file("multi_agent")
-                            if not multi_base or "You are" not in multi_base:
-                                path_m = os.path.normpath(os.path.join(PROMPTS_DIR, "multi_agent.txt"))
-                                if os.path.exists(path_m):
-                                    with open(path_m, "r", encoding="utf-8") as mf:
-                                        multi_base = mf.read()
-                            if multi_base:
-                                raw_name = agent_data.get('name', 'Agent')
-                                clean_name = re.sub(r'^\[[^\]]+\]\s*', '', raw_name)
-                                clean_name = re.sub(r'\s*-\s*(Demo|Trial)\s*$', '', clean_name, flags=re.IGNORECASE)
-                                multi_base = multi_base.replace('{{agent_name}}', clean_name).replace('{agentName}', clean_name)
-                                company_n = business_name_val or agent_data.get('business_name') or ''
-                                multi_base = multi_base.replace('{{company_name}}', company_n).replace('{companyName}', company_n)
-                                system_prompt = multi_base + personality_prompts.get(personality.lower(), personality_prompts["friendly"])
-                                if "## HUMAN EXPRESSIVENESS RULES" not in system_prompt:
-                                    system_prompt += expressive_instructions
-                                logger.info(f"[MULTI-PERSONALITY] Initialized starting prompt with multi_agent.txt for agent {agent_id}")
+                # 14. Enforce Gender-consistent Hindi/Hinglish Grammar
+                system_prompt = apply_gender_grammar_directives(system_prompt, gender_tag, bot_name, voice_id)
 
-                        agent_data["_prompt_suffix"] = system_prompt[len(agent_data.get("system_prompt") or load_system_prompt()):]
-                        logger.info(
-                            f"[MULTI-PERSONALITY] Agent {agent_id} has {enabled_count} personalities enabled: "
-                            + str([k for k, v in enabled_personalities.items() if v])
-                        )
-                    except Exception as mp_err:
-                        logger.warning(f"[MULTI-PERSONALITY] Setup failed (non-fatal): {mp_err}")
-                        agent_data["_multi_personality_enabled"] = False
-                else:
-                    agent_data["_multi_personality_enabled"] = False
-                # --- END MULTI-PERSONALITY SETUP ---
+                # 15. Store prompt suffix for multi-personality mid-call transitions
+                if agent_data.get("_multi_personality_enabled"):
+                    agent_data["_prompt_suffix"] = system_prompt[len(base_prompt):]
 
         except Exception as e:
             logger.error(f"Failed to fetch config for agent: {e}")
@@ -2968,6 +3521,14 @@ async def entrypoint(ctx: JobContext):
         except Exception:
             sarvam_pitch = 0.0
 
+    # Create appointment tools for live verification and booking
+    appointment_tools = create_appointment_tools(
+        organization_id=organization_id,
+        user_id=user_id,
+        agent_id=agent_id,
+        call_id=call_sid
+    )
+
     # 2. Create the agent instance with actual settings
     agent_instance = VikramAgent(
         instructions=system_prompt,
@@ -2979,6 +3540,7 @@ async def entrypoint(ctx: JobContext):
         llm_provider=agent_data.get('llm_provider') if agent_data else None,
         llm_model=agent_data.get('llm_model') if agent_data else None,
         temperature=agent_data.get('temperature') if agent_data else None,
+        tools=appointment_tools,
     )
 
     agent_instance.room = ctx.room
@@ -2986,9 +3548,23 @@ async def entrypoint(ctx: JobContext):
     if greeting_message:
         agent_instance.greeting_message = greeting_message
 
-    agent_instance.bot_name = locals().get('bot_name') or (agent_data.get('bot_name') if agent_data else None) or (agent_data.get('name') if agent_data else None) or 'Vikram'
+    male_names = {'vikram', 'shubh', 'aditya', 'rahul', 'rohan', 'amit', 'dev', 'ratan', 'varun', 'manan', 'sumit', 'kabir', 'aayan', 'ashutosh', 'advait', 'anand', 'tarun', 'sunny', 'mani', 'gokul', 'vijay', 'mohit', 'rehan', 'soham', 'arvind', 'neel', 'arjun', 'amol', 'raghav'}
+    resolved_bot_name = locals().get('bot_name') or (agent_data.get('bot_name') if agent_data else None) or (agent_data.get('name') if agent_data else None) or 'Vikram'
+    voice_is_male = (str(voice_id).lower() in SARVAM_MALE_VOICES) or (voice_id in ['pNInz6obpgDQGcFmaJgB', 'TxGEqnHWrfWFTfGW9XjX'])
+    name_is_male = str(resolved_bot_name).lower() in male_names
+    explicit_gender = locals().get('gender_tag') or (agent_data.get('gender') if agent_data else None)
+    if explicit_gender in ('male', 'female'):
+        resolved_gender = explicit_gender
+    elif voice_is_male or name_is_male:
+        resolved_gender = 'male'
+    else:
+        resolved_gender = 'female'
+
+    agent_instance.bot_name = resolved_bot_name
     agent_instance.business_name = business_name_val if 'business_name_val' in dir() else (agent_data.get('business_name', '') if agent_data else '')
-    agent_instance.gender = locals().get('gender_tag') or (agent_data.get('gender') if agent_data else None) or 'female'
+    agent_instance.gender = resolved_gender
+    if hasattr(agent_instance, 'tts') and hasattr(agent_instance.tts, '_gender'):
+        agent_instance.tts._gender = resolved_gender
     agent_instance.prospect_name = c_name if ('campaign_contact' in locals() and campaign_contact and locals().get('is_name_valid')) else (locals().get('cust_name') or "")
     agent_instance.campaign_goal = locals().get('notes_summary') if ('campaign_contact' in locals() and campaign_contact) else ""
     agent_instance.ending_message = agent_data.get("ending_message", "") if agent_data else ""
@@ -3009,15 +3585,15 @@ async def entrypoint(ctx: JobContext):
         await session.start(agent=agent_instance, room=ctx.room)
         return
 
-    # Configure fast local VAD turn detection and preemptive generation for low turnaround latency
+    # Configure fast local VAD turn detection with noise-resistant interruption guards (Rule 54.2, 56, 57, 58)
     session = AgentSession(
         vad=get_vad_model(),
         turn_detection="vad",
-        min_endpointing_delay=0.5,
-        max_endpointing_delay=1.5,
+        min_endpointing_delay=0.85,
+        max_endpointing_delay=2.2,
         preemptive_generation=True,
-        min_interruption_duration=0.8,
-        min_interruption_words=3,
+        min_interruption_duration=0.6,
+        min_interruption_words=4,
         resume_false_interruption=True,
     )
     call_start_time = time.time()
@@ -3060,19 +3636,24 @@ async def entrypoint(ctx: JobContext):
         call_ending_in_progress = True
         logger.info("[Intent Call Cut - EP] Closing intent detected. Waiting for speech synthesis and playback to complete...")
 
-        # 1. Wait up to 6.0s for the agent to enter 'speaking' state if not already
-        for _ in range(60):
-            if getattr(session, 'agent_state', '') == 'speaking':
+        # 1. If agent is currently thinking or preparing reply, wait for it to start speaking (up to 3.5s)
+        for _ in range(35):
+            state = getattr(session, 'agent_state', '')
+            if state == 'speaking':
+                break
+            if state not in ('thinking', 'initializing'):
                 break
             await asyncio.sleep(0.1)
 
-        # 2. Wait until the agent finishes speaking completely
-        while getattr(session, 'agent_state', '') == 'speaking':
-            await asyncio.sleep(0.2)
+        # 2. Wait until the agent finishes speaking completely (up to 12s)
+        speech_timeout = 0
+        while getattr(session, 'agent_state', '') == 'speaking' and speech_timeout < 120:
+            await asyncio.sleep(0.1)
+            speech_timeout += 1
 
-        # 3. Grace period for audio stream buffer and carrier line to finish playing
-        logger.info("[Intent Call Cut - EP] Agent finished speaking. Waiting 1.5s playback drain before disconnect...")
-        await asyncio.sleep(1.5)
+        # 3. Grace period for audio stream buffer and carrier line to finish playing (0.8s)
+        logger.info("[Intent Call Cut - EP] Agent finished speaking. Waiting 0.8s playback drain before disconnect...")
+        await asyncio.sleep(0.8)
 
         # 1. Notify browser client to hang up immediately
         try:
@@ -3106,11 +3687,17 @@ async def entrypoint(ctx: JobContext):
                 await ctx.room.disconnect()
         except Exception:
             pass
+        session_done.set()
+
+    user_demanded_cut = False
 
     def check_closing_intent(text: str) -> bool:
         if not text:
             return False
         t = text.lower().strip()
+
+        if user_demanded_cut:
+            return True
 
         # SAFETY GUARD 1: If caller gave affirmative permission to speak, NEVER disconnect
         user_requested_cut = False
@@ -3125,11 +3712,15 @@ async def entrypoint(ctx: JobContext):
                 if user_giving_permission and len(call_transcript_turns) <= 4:
                     logger.warning(f"[check_closing_intent] BLOCKED false disconnect: caller gave permission ('{last_cust}') on turn {len(call_transcript_turns)}")
                     return False
-                if any(cut in last_cust for cut in ["call cut", "phone rakh", "phone kaat", "bye", "disconnect", "nahi chahiye", "not interested", "wrong number"]):
+                if any(cut in last_cust for cut in [
+                    "call cut", "phone rakh", "phone kaat", "bye", "disconnect", "cut the call",
+                    "cut kar", "kaat do", "nahi chahiye", "not interested", "wrong number",
+                    "thank you", "thanks", "dhanyawad", "shukriya"
+                ]):
                     user_requested_cut = True
 
-        # SAFETY GUARD 2: Early turns (<= 4) cannot trigger disconnect unless caller explicitly demanded it
-        if len(call_transcript_turns) <= 4 and not user_requested_cut:
+        # SAFETY GUARD 2: Early turns (<= 2) cannot trigger disconnect unless caller explicitly demanded it
+        if len(call_transcript_turns) <= 2 and not user_requested_cut and not user_demanded_cut:
             logger.warning(f"[check_closing_intent] Suppressing early disconnect attempt on turn {len(call_transcript_turns)}: '{text}'")
             return False
 
@@ -3139,10 +3730,19 @@ async def entrypoint(ctx: JobContext):
         
         closing_phrases = [
             "goodbye", "good bye", "bye bye", "take care", "have a nice day",
+            "have a good day", "have a great day", "have a wonderful day",
             "talk to you later", "see you later", "see you soon",
-            "alvida", "phir milenge", "baat karke achha laga", "baat karke accha laga",
+            "alvida", "phir milenge", "milte hain",
+            "baat karke achha laga", "baat karke accha laga",
+            "baat karke bohot achha laga", "baat karke bohot accha laga",
+            "baat karke bahut achha laga", "baat karke bahut accha laga",
             "call cut", "phone rakh", "phone kaat",
-            "call disconnect", "अलविदा", "गुडबाय", "गुड बाय", "बाय बाय", "फिर मिलेंगे"
+            "call disconnect", "cut the call", "you can cut", "cut kar do",
+            "cut kar dijiye", "cut kar de", "cut kar 2",
+            "you're welcome", "you are welcome", "most welcome", "welcome",
+            "koi baat nahi", "mention not", "dhanyavaad", "dhanyawad", "shukriya",
+            "अलविदा", "गुडबाय", "गुड बाय", "बाय बाय", "फिर मिलेंगे",
+            "बात करके अच्छा लगा", "बात करके बहुत अच्छा लगा", "वेलकम", "धन्यवाद", "शुक्रिया"
         ]
         if any(phrase in t for phrase in closing_phrases):
             return True
@@ -3152,6 +3752,7 @@ async def entrypoint(ctx: JobContext):
 
     @session.on("conversation_item_added")
     def _on_conversation_item_added_ep(event):
+        nonlocal user_demanded_cut
         try:
             item = getattr(event, 'item', None)
             if not item:
@@ -3168,7 +3769,9 @@ async def entrypoint(ctx: JobContext):
             clean_txt = clean_ssml(text, is_transcript=True)
             clean_txt = re.sub(r'\[(?:CRITICAL|FLOW NOTE|OBJECTION|CONVERSATION GUIDANCE)[^\]]*\]', '', clean_txt, flags=re.IGNORECASE).strip()
             if role == "user" and clean_txt:
-                clean_txt = normalize_user_transcript(clean_txt, agent_name=bot_name, is_female=is_female)
+                fem_flag = getattr(agent_instance, 'gender', 'female') == 'female' if agent_instance else locals().get('is_female', True)
+                bot_nm = getattr(agent_instance, 'bot_name', None) or locals().get('bot_name') or 'Aditi'
+                clean_txt = normalize_user_transcript(clean_txt, agent_name=bot_nm, is_female=fem_flag)
 
             if clean_txt:
                 turn_label = f"{speaker}: {clean_txt}"
@@ -3182,12 +3785,35 @@ async def entrypoint(ctx: JobContext):
                 asyncio.create_task(ctx.room.local_participant.publish_data(payload))
                 if role == "user":
                     logger.info(f"[AgentSession - EP] Customer turn transcribed: '{clean_txt}'")
+                    u_lower = clean_txt.lower()
+                    cust_count = sum(1 for t in call_transcript_turns if t.startswith("customer:"))
+                    # Check for explicit hang up / cut commands
+                    if any(k in u_lower for k in [
+                        "cut the call", "you can cut", "cut kar do", "cut kar dijiye",
+                        "cut kar 2", "call cut", "phone rakh do", "phone rakh dijiye",
+                        "kaat do", "phone kaat", "disconnect kar", "call disconnect",
+                        "call end", "end the call", "hang up", "bye bye", "alvida",
+                        "kuch nahi chahiye", "kuch nahi", "sab ho gaya", "bas itna hi",
+                        "that's all", "thats all", "all done", "no more help"
+                    ]):
+                        logger.info(f"[Intent Call Cut - EP] Customer explicitly requested call cut: '{clean_txt}' -> scheduling graceful disconnect")
+                        user_demanded_cut = True
+                        asyncio.create_task(execute_intent_disconnect())
+                    # Check for polite closing signals like "thank you" / "thanks" / "shukriya" / "dhanyawad"
+                    elif any(k in u_lower for k in [
+                        "thank you", "thanks", "thx", "shukriya", "dhanyawad", "dhanyavaad",
+                        "shukriyaa", "bahut shukriya", "bohot shukriya", "bye",
+                        "धन्यवाद", "शुक्रिया", "थैंक यू", "थैंक्स"
+                    ]):
+                        if cust_count >= 2:
+                            logger.info(f"[Intent Call Cut - EP] Customer signaled closing gratitude ('{clean_txt}') on turn {cust_count} -> scheduling graceful disconnect")
+                            user_demanded_cut = True
+                            asyncio.create_task(execute_intent_disconnect())
 
-            # Trigger intent disconnect if assistant says goodbye
-            # GUARD: Require at least 2 customer turns so the agent cannot prematurely hang up right after greeting!
+            # Trigger intent disconnect if assistant says goodbye or customer commanded cut
             customer_turn_count = sum(1 for t in call_transcript_turns if t.startswith("customer:"))
-            if role == "assistant" and check_closing_intent(text) and customer_turn_count >= 2:
-                logger.info(f"[Intent Call Cut] Closing utterance by assistant: '{text}' -> scheduling graceful disconnect after speech finishes")
+            if role == "assistant" and (check_closing_intent(text) or user_demanded_cut) and (customer_turn_count >= 2 or user_demanded_cut):
+                logger.info(f"[Intent Call Cut] Closing utterance by assistant: '{text}' (user_demanded_cut={user_demanded_cut}) -> scheduling graceful disconnect after speech finishes")
                 asyncio.create_task(execute_intent_disconnect())
         except Exception as err:
             logger.warning(f"Error in conversation_item_added hook: {err}")
@@ -3448,9 +4074,112 @@ async def run_agent(room_name: str, agent_id: str | None = None, contact_id: str
                 if agent_data.get("primary_language"): language = agent_data["primary_language"]
                 if agent_data.get("voice_speed"): speed = agent_data["voice_speed"]
                 if agent_data.get("voice_pitch"): pitch = agent_data["voice_pitch"]
-                if agent_data.get("system_prompt"): system_prompt = agent_data["system_prompt"]
-                
-                # Parse and append personality config
+                # 1. Resolve Gender and Clean Name
+                gender_tag = 'female' if str(voice_id).lower() in SARVAM_FEMALE_VOICES else 'male'
+                is_female = (gender_tag == 'female')
+
+                raw_name = agent_data.get('name', 'Agent')
+                clean_name = re.sub(r'^\[[^\]]+\]\s*', '', raw_name)
+                clean_name = re.sub(r'\s*-\s*(Demo|Trial)\s*$', '', clean_name, flags=re.IGNORECASE).strip()
+                if clean_name.lower() in ('multi agent', 'multi-agent', 'agent', 'sales agent', 'appointment agent', 'appointment booker', 'appointment booking agent', 'appointment booking', 'support agent', 'lead qualifier', 'lead qualifier agent', 'sales executive', ''):
+                    v_str = str(voice_id).strip().lower()
+                    if v_str in SARVAM_FEMALE_VOICES or v_str in SARVAM_MALE_VOICES:
+                        clean_name = v_str.capitalize()
+                    elif gender_tag == 'female':
+                        clean_name = "Aditi"
+                    else:
+                        clean_name = "Vikram"
+                bot_name = clean_name
+
+                # 2. Fetch User Profile & Business Info
+                profile_data = {}
+                try:
+                    prof_res = await asyncio.to_thread(
+                        supabase_admin.table("profiles").select("company_name, country").eq("id", user_id).execute
+                    )
+                    if prof_res.data:
+                        profile_data = prof_res.data[0]
+                except Exception as e:
+                    logger.error(f"Failed to fetch profile for business name in run_agent: {e}")
+
+                if not agent_data.get("voice_provider") and profile_data:
+                    country = profile_data.get("country", "")
+                    if country == "IN":
+                        provider = "sarvam"
+                        voice_id = "shubh"
+                        language = "hinglish"
+                    elif country == "UK":
+                        provider = "elevenlabs"
+                        voice_id = "ErXwobaYiN019PkySvjV"
+                        language = "en-GB"
+                    else:
+                        provider = "elevenlabs"
+                        voice_id = "21m00Tcm4TlvDq8ikWAM"
+                        language = "en-US"
+
+                raw_system_prompt = agent_data.get("system_prompt") or ""
+                business_info = extract_business_info(raw_system_prompt, agent_data, profile_data)
+                business_name_val = business_info["business_name"]
+                company_display = business_name_val or 'our company'
+
+                # 3. Resolve Base Prompt (Multi-personality vs Single-personality vs Custom Prompt)
+                personalities_raw = agent_data.get("personalities")
+                enabled_count = _count_enabled_personalities(personalities_raw)
+                base_prompt = ""
+                if enabled_count == 1:
+                    agent_data["_multi_personality_enabled"] = False
+                    try:
+                        p_dict = json.loads(personalities_raw) if isinstance(personalities_raw, str) else (personalities_raw or {})
+                        active_role = next((k for k, v in p_dict.items() if v is True), None)
+                        if active_role:
+                            from app.services.prompt_service import PromptService
+                            prompt_svc = PromptService(supabase_admin)
+                            base_prompt = await prompt_svc.get_prompt(active_role)
+                            logger.info(f"[SINGLE-PERSONALITY (run_agent)] Resolved base prompt for active role '{active_role}' for agent {agent_id}")
+                    except Exception as sp_err:
+                        logger.warning(f"[SINGLE-PERSONALITY (run_agent)] Error resolving base prompt: {sp_err}")
+                elif enabled_count >= 2:
+                    try:
+                        _ep = (
+                            json.loads(personalities_raw)
+                            if isinstance(personalities_raw, str)
+                            else (personalities_raw or {})
+                        )
+                        agent_data["_multi_personality_enabled"] = True
+                        agent_data["_enabled_personalities"] = _ep
+                        from app.services.prompt_service import PromptService
+                        prompt_svc = PromptService(supabase_admin)
+                        base_prompt = prompt_svc._load_from_file("multi_agent")
+                        if not base_prompt or "You are" not in base_prompt:
+                            path_m = os.path.normpath(os.path.join(PROMPTS_DIR, "multi_agent.txt"))
+                            if os.path.exists(path_m):
+                                with open(path_m, "r", encoding="utf-8") as mf:
+                                    base_prompt = mf.read()
+                        logger.info(f"[MULTI-PERSONALITY (run_agent)] Loaded base prompt from multi_agent.txt for agent {agent_id}")
+                    except Exception as mp_err:
+                        logger.warning(f"[MULTI-PERSONALITY (run_agent)] Setup failed: {mp_err}")
+                        agent_data["_multi_personality_enabled"] = False
+                else:
+                    agent_data["_multi_personality_enabled"] = False
+
+                if not base_prompt:
+                    base_prompt = agent_data.get("system_prompt") or load_system_prompt()
+
+                # 4. Substitute placeholders and scrub generic identity
+                base_prompt = base_prompt.replace('{{agent_name}}', bot_name).replace('{agentName}', bot_name).replace('{{name}}', bot_name)
+                base_prompt = base_prompt.replace('{{company_name}}', company_display).replace('{companyName}', company_display)
+                generic_names = [
+                    r'\{\{agent_name\}\}', r'\{agentName\}', r'\{agent_name\}', r'\{name\}',
+                    r'\bMulti Agent\b', r'\bmulti agent\b', r'\bSales Agent\b', r'\bsales agent\b',
+                    r'\bAppointment Agent\b', r'\bappointment agent\b', r'\bSupport Agent\b', r'\bsupport agent\b',
+                    r'\bLead Qualifier\b', r'\blead qualifier\b'
+                ]
+                for pat in generic_names:
+                    base_prompt = re.sub(pat, bot_name, base_prompt)
+
+                system_prompt = base_prompt
+
+                # 5. Append Personality style prompt
                 personality = agent_data.get("personality", "friendly")
                 personality_prompts = {
                     "professional": "\n\n## PERSONALITY STYLE: PROFESSIONAL\n- Speak formally, politely, and professionally.\n- Be concise and business-like.\n- Avoid excessive slang or casual language.\n- Keep your focus on efficiency and clear facts.",
@@ -3459,16 +4188,13 @@ async def run_agent(room_name: str, agent_id: str | None = None, contact_id: str
                     "empathetic": "\n\n## PERSONALITY STYLE: EMPATHETIC\n- Speak in a highly caring, patient, and understanding tone.\n- If the caller shares problems, show deep empathy and validate their feelings.\n- Slow down and explain things step-by-step."
                 }
                 system_prompt += personality_prompts.get(personality.lower(), personality_prompts["friendly"])
-                
-                # Append expressiveness rules
-                cur_bot = locals().get('bot_name') or (agent_data.get('bot_name') if agent_data else None) or (agent_data.get('name') if agent_data else None) or 'Vikram'
-                cur_gen = locals().get('gender_tag') or (agent_data.get('gender') if agent_data else None) or 'female'
-                cur_biz = locals().get('business_name_val') or (agent_data.get('business_name') if agent_data else None) or ''
-                expressive_instructions = build_agent_expressive_rules(bot_name=cur_bot, gender_tag=cur_gen, business_name=cur_biz)
+
+                # 6. Append Expressiveness rules
+                expressive_instructions = build_agent_expressive_rules(bot_name=bot_name, gender_tag=gender_tag, business_name=business_name_val)
                 if "## TRINETRA AGENT BEHAVIOR" not in system_prompt and "## HUMAN EXPRESSIVENESS RULES" not in system_prompt:
                     system_prompt += expressive_instructions
 
-                # Use custom greeting if set, otherwise template default
+                # 7. Extract default greeting from system_prompt
                 default_greeting = None
                 lines = system_prompt.split('\n')
                 for idx, line in enumerate(lines):
@@ -3487,7 +4213,8 @@ async def run_agent(room_name: str, agent_id: str | None = None, contact_id: str
                 if default_greeting:
                     default_greeting = default_greeting.strip('\'"')
 
-                # Structured room name format: twilio--{agent_id}--{contact_id}--{nonce_or_sid}
+                # 8. Fetch Caller Identity & Campaign Contact
+                caller_number = "Unknown"
                 if room_name and "--" in room_name:
                     parts = room_name.split("--")
                     if len(parts) >= 3:
@@ -3508,8 +4235,6 @@ async def run_agent(room_name: str, agent_id: str | None = None, contact_id: str
                             if len(cleaned) >= 10:
                                 caller_number = cleaned
 
-                # Fetch Caller identity from voice_calls metadata or room_name
-                caller_number = "Unknown"
                 if room_name:
                     try:
                         vc_res = await asyncio.to_thread(
@@ -3537,7 +4262,6 @@ async def run_agent(room_name: str, agent_id: str | None = None, contact_id: str
                             caller_number = cleaned
                             break
 
-                # Fetch contact_id from voice_calls metadata if twilio / sip room
                 campaign_contact = None
                 if not contact_id and room_name and ("twilio-" in room_name or "sip-" in room_name):
                     call_sid = room_name.split("_")[0].replace("twilio-", "").replace("sip-", "")
@@ -3564,7 +4288,6 @@ async def run_agent(room_name: str, agent_id: str | None = None, contact_id: str
                     except Exception as e:
                         logger.error(f"Failed to fetch campaign contact {contact_id} in run_agent: {e}")
 
-                # Support scheduled callbacks: populate contact context from voice_calls metadata
                 if not campaign_contact and room_name:
                     try:
                         if 'meta' in locals() and meta and meta.get("is_callback"):
@@ -3580,7 +4303,7 @@ async def run_agent(room_name: str, agent_id: str | None = None, contact_id: str
                     except Exception as cb_err:
                         logger.warning(f"Failed to parse callback metadata: {cb_err}")
 
-                # Lookup Caller in customer_contacts
+                # 9. Lookup Returning Customer
                 customer = None
                 if not campaign_contact and organization_id and caller_number != "Unknown":
                     try:
@@ -3598,40 +4321,26 @@ async def run_agent(room_name: str, agent_id: str | None = None, contact_id: str
                     except Exception as lookup_err:
                         logger.error(f"Failed to lookup caller: {lookup_err}")
 
-                raw_greeting = agent_data.get('greeting_message') or default_greeting
-
-                # Fetch user profile to get company name
-                profile_data = {}
+                # 10. Lookup Existing Appointment Records in DB
                 try:
-                    prof_res = await asyncio.to_thread(
-                        supabase_admin.table("profiles").select("company_name").eq("id", user_id).execute
-                    )
-                    if prof_res.data:
-                        profile_data = prof_res.data[0]
-                except Exception as e:
-                    logger.error(f"Failed to fetch profile for greeting in run_agent: {e}")
-
-                gender_tag = 'female' if str(voice_id).lower() in SARVAM_FEMALE_VOICES else 'male'
-                is_female = (gender_tag == 'female')
-
-                raw_name = agent_data.get('name', 'Agent')
-                clean_name = re.sub(r'^\[[^\]]+\]\s*', '', raw_name)
-                clean_name = re.sub(r'\s*-\s*(Demo|Trial)\s*$', '', clean_name, flags=re.IGNORECASE).strip()
-                if clean_name.lower() in ('multi agent', 'multi-agent', 'agent', 'sales agent', 'appointment agent', 'appointment booker', 'appointment booking agent', 'appointment booking', 'support agent', 'lead qualifier', 'lead qualifier agent', 'sales executive', ''):
-                    v_str = str(voice_id).strip().lower()
-                    if v_str in SARVAM_FEMALE_VOICES or v_str in SARVAM_MALE_VOICES:
-                        clean_name = v_str.capitalize()
-                    elif gender_tag == 'female':
-                        clean_name = "Aditi"
+                    apt_query = supabase_admin.table("appointments").select("contact_name, contact_phone, scheduled_at, meeting_type, status").order("created_at", desc=True)
+                    if caller_number and caller_number != "Unknown":
+                        apt_query = apt_query.ilike("contact_phone", f"%{caller_number}%")
+                    elif user_id:
+                        apt_query = apt_query.eq("user_id", user_id).limit(5)
                     else:
-                        clean_name = "Vikram"
-                bot_name = clean_name
+                        apt_query = apt_query.limit(3)
+                    
+                    apt_res = await asyncio.to_thread(apt_query.execute)
+                    if apt_res.data and len(apt_res.data) > 0:
+                        apt_lines = [f"- {a.get('contact_name')}: {a.get('scheduled_at')} ({a.get('meeting_type')}, Status: {a.get('status')})" for a in apt_res.data]
+                        system_prompt += f"\n\n## EXISTING APPOINTMENT RECORDS IN DATABASE\n" + "\n".join(apt_lines) + "\n- INSTRUCTION: If caller asks to check an appointment, verify against these exact records.\n"
+                    else:
+                        system_prompt += f"\n\n## EXISTING APPOINTMENT RECORDS IN DATABASE\n- NO existing appointments found for this caller.\n- INSTRUCTION: If caller asks to check an appointment, truthfully tell them that no booking was found for their number, and offer to schedule a new appointment for their requested date/time.\n"
+                except Exception as apt_lookup_err:
+                    logger.warning(f"Could not load appointment records in run_agent: {apt_lookup_err}")
 
-                # Dynamic extraction of business name and offerings (never hardcoded to Trinetra)
-                business_info = extract_business_info(system_prompt, agent_data, profile_data)
-                business_name_val = business_info["business_name"]
-
-                # Resolve greeting message preserving user custom text and dynamic parameters
+                raw_greeting = agent_data.get('greeting_message') or default_greeting
                 is_inbound_call = not bool(campaign_contact)
                 call_direction = "inbound" if is_inbound_call else "outbound"
 
@@ -3647,30 +4356,11 @@ async def run_agent(room_name: str, agent_id: str | None = None, contact_id: str
                     direction=call_direction
                 )
 
-                # Substitute placeholders in system_prompt and scrub generic identity
-                company_display = business_name_val or 'our company'
-                system_prompt = system_prompt.replace('{{company_name}}', company_display).replace('{companyName}', company_display)
-                
-                # Active scrub of all generic names to enforce custom/selected bot identity
-                generic_names = [
-                    r'\{\{agent_name\}\}', r'\{agentName\}', r'\{agent_name\}', r'\{name\}',
-                    r'\bMulti Agent\b', r'\bmulti agent\b', r'\bSales Agent\b', r'\bsales agent\b',
-                    r'\bAppointment Agent\b', r'\bappointment agent\b', r'\bSupport Agent\b', r'\bsupport agent\b',
-                    r'\bLead Qualifier\b', r'\blead qualifier\b'
-                ]
-                for pat in generic_names:
-                    system_prompt = re.sub(pat, clean_name, system_prompt)
-                if greeting_message:
-                    for pat in generic_names:
-                        greeting_message = re.sub(pat, clean_name, greeting_message)
-
                 if campaign_contact:
                     c_name = campaign_contact.get("full_name") or ""
                     c_company = campaign_contact.get("company_name") or ""
                     c_notes = campaign_contact.get("notes") or ""
                     end_msg_text = agent_data.get("ending_message", "") if agent_data else ""
-                    
-                    # Universal, business-agnostic Master Outbound Sales Protocol
                     personalized_context = build_outbound_sales_protocol(
                         prospect_name=c_name,
                         prospect_company=c_company,
@@ -3681,28 +4371,8 @@ async def run_agent(room_name: str, agent_id: str | None = None, contact_id: str
                         end_msg_text=end_msg_text
                     )
                     system_prompt += personalized_context
-                elif customer:
-                    cust_name = customer.get("full_name") or ""
-                    cust_tags = customer.get("tags") or []
-                    cust_notes = customer.get("notes") or ""
-                    cust_last = customer.get("last_contact_at")
-                    cust_calls = customer.get("total_calls") or 1
-                    customer_context = (
-                        f"\n\n## INBOUND CALLER RECOGNITION & CONVERSATION MEMORY:\n"
-                        f"- Recognized Caller: {cust_name or 'Returning Customer'}\n"
-                        f"- Total Previous Calls: {cust_calls}\n"
-                        f"- Tags: {', '.join(cust_tags) if cust_tags else 'None'}\n"
-                        f"- Last Contacted: {cust_last or 'Earlier'}\n"
-                        f"- Past Inquiries / History: {cust_notes or 'No previous notes recorded'}\n"
-                        f"- INSTRUCTION FOR RETURNING CALLER: This caller is a recognized returning customer. "
-                        f"Greet them warmly by name ({cust_name}). "
-                        f"If they ask about their past inquiries or requests, reference the context above."
-                    )
-                    system_prompt += customer_context
 
-                # Enforce Gender-consistent Hindi/Hinglish Grammar
-                system_prompt = apply_gender_grammar_directives(system_prompt, gender_tag, bot_name, voice_id)
-
+                # 11. Ending and Fallback Messages
                 if agent_data and agent_data.get("ending_message"):
                     end_msg = agent_data['ending_message']
                     system_prompt += (
@@ -3719,106 +4389,44 @@ async def run_agent(room_name: str, agent_id: str | None = None, contact_id: str
                         f"If you ever fail to hear or understand what the caller said (or if their speech was completely unclear or garbled), "
                         f"respond naturally using your configured fallback message: '{fb_msg}'"
                     )
-                
-                if not agent_data.get("voice_provider"):
-                    prof_res = supabase_admin.table("profiles").select("country").eq("id", user_id).execute()
-                    if prof_res.data:
-                        country = prof_res.data[0].get("country", "")
-                        if country == "IN":
-                            provider = "sarvam"
-                            voice_id = "shubh"
-                            language = "hinglish"
-                        elif country == "UK":
-                            provider = "elevenlabs"
-                            voice_id = "ErXwobaYiN019PkySvjV"
-                            language = "en-GB"
-                        else:
-                            provider = "elevenlabs"
-                            voice_id = "21m00Tcm4TlvDq8ikWAM"
-                            language = "en-US"
-                # --- MULTI-PERSONALITY SETUP (run_agent path) ---
-                personalities_raw = agent_data.get("personalities")
-                enabled_count = _count_enabled_personalities(personalities_raw)
-                if enabled_count == 1:
-                    agent_data["_multi_personality_enabled"] = False
-                    try:
-                        p_dict = json.loads(personalities_raw) if isinstance(personalities_raw, str) else (personalities_raw or {})
-                        active_role = next((k for k, v in p_dict.items() if v is True), None)
-                        if active_role:
-                            role_headers = {
-                                "appointment": "Appointment Booking Agent",
-                                "sales": "Sales Agent",
-                                "support": "Customer Support Agent",
-                                "lead_qualifier": "Lead Qualifier Agent"
-                            }
-                            expected_header = role_headers.get(active_role, "")
-                            if expected_header and expected_header.lower() not in system_prompt.lower():
-                                from app.services.prompt_service import PromptService
-                                prompt_svc = PromptService(supabase_admin)
-                                resolved_prompt = await prompt_svc.get_prompt(active_role)
-                                raw_name = agent_data.get('name', 'Agent')
-                                clean_name = re.sub(r'^\[[^\]]+\]\s*', '', raw_name)
-                                clean_name = re.sub(r'\s*-\s*(Demo|Trial)\s*$', '', clean_name, flags=re.IGNORECASE)
-                                resolved_prompt = resolved_prompt.replace('{{agent_name}}', clean_name).replace('{agentName}', clean_name)
-                                company_n = business_name_val or agent_data.get('business_name') or ''
-                                resolved_prompt = resolved_prompt.replace('{{company_name}}', company_n).replace('{companyName}', company_n)
-                                system_prompt = resolved_prompt + personality_prompts.get(personality.lower(), personality_prompts["friendly"])
-                                if "## HUMAN EXPRESSIVENESS RULES" not in system_prompt:
-                                    system_prompt += expressive_instructions
-                                logger.info(f"[SINGLE-PERSONALITY AUTO-SYNC (run_agent)] Overrode prompt with role '{active_role}' for agent {agent_id}")
-                    except Exception as sp_err:
-                        logger.warning(f"[SINGLE-PERSONALITY AUTO-SYNC (run_agent)] Error: {sp_err}")
-                elif enabled_count >= 2:
-                    try:
-                        _ep = (
-                            json.loads(personalities_raw)
-                            if isinstance(personalities_raw, str)
-                            else (personalities_raw or {})
-                        )
-                        agent_data["_multi_personality_enabled"] = True
-                        agent_data["_enabled_personalities"] = _ep
 
-                        if "SYSTEM PROMPT: Multi-Personality Agent" not in system_prompt and "INTENT DETECTION" not in system_prompt:
-                            from app.services.prompt_service import PromptService
-                            prompt_svc = PromptService(supabase_admin)
-                            multi_base = prompt_svc._load_from_file("multi_agent")
-                            if not multi_base or "You are" not in multi_base:
-                                path_m = os.path.normpath(os.path.join(PROMPTS_DIR, "multi_agent.txt"))
-                                if os.path.exists(path_m):
-                                    with open(path_m, "r", encoding="utf-8") as mf:
-                                        multi_base = mf.read()
-                            if multi_base:
-                                raw_name = agent_data.get('name', 'Agent')
-                                clean_name = re.sub(r'^\[[^\]]+\]\s*', '', raw_name)
-                                clean_name = re.sub(r'\s*-\s*(Demo|Trial)\s*$', '', clean_name, flags=re.IGNORECASE)
-                                multi_base = multi_base.replace('{{agent_name}}', clean_name).replace('{agentName}', clean_name)
-                                company_n = business_name_val or agent_data.get('business_name') or ''
-                                multi_base = multi_base.replace('{{company_name}}', company_n).replace('{companyName}', company_n)
-                                system_prompt = multi_base + personality_prompts.get(personality.lower(), personality_prompts["friendly"])
-                                if "## HUMAN EXPRESSIVENESS RULES" not in system_prompt:
-                                    system_prompt += expressive_instructions
+                # 12. Fetch Knowledge Base (budgeted to max 1500 chars per doc to prevent 413 token limits)
+                kb_docs = await fetch_knowledge_base(agent_id)
+                if kb_docs:
+                    kb_context = "\n\n=== BUSINESS KNOWLEDGE BASE ===\n"
+                    for doc in kb_docs:
+                        excerpt = (doc.get('content_excerpt') or '').strip()
+                        if len(excerpt) > 1500:
+                            excerpt = excerpt[:1500] + "..."
+                        kb_context += f"\n--- {doc.get('name', 'Document')} ---\n{excerpt}\n"
+                    system_prompt += kb_context
 
-                        agent_data["_prompt_suffix"] = system_prompt[len(agent_data.get("system_prompt") or load_system_prompt()):]
-                        logger.info(
-                            f"[MULTI-PERSONALITY] run_agent: {enabled_count} personalities enabled"
-                        )
-                    except Exception as mp_err:
-                        logger.warning(f"[MULTI-PERSONALITY] run_agent setup failed: {mp_err}")
-                        agent_data["_multi_personality_enabled"] = False
-                else:
-                    agent_data["_multi_personality_enabled"] = False
-                # --- END MULTI-PERSONALITY SETUP ---
+                # 13. Critical Business Scope Grounding, 10-Digit Phone Verification, Email/WhatsApp Reminders
+                if "## STRICT BUSINESS SCOPE GROUNDING" not in system_prompt:
+                    system_prompt += (
+                        f"\n\n## STRICT BUSINESS SCOPE GROUNDING & ANTI-HALLUCINATION:\n"
+                        f"1. You represent {company_display}. You ONLY book appointments, schedule demos, and answer questions for products and services explicitly offered by {company_display} (such as AI voice agents, software automation, consultation, and technical support).\n"
+                        f"2. OUT-OF-SCOPE PROHIBITION: If a caller asks to book an appointment for an unrelated or medical service (e.g. regular health checkups, doctor consultations, clinic tests, hospital visits, dental appointments, salons), you MUST politely decline:\n"
+                        f"   'Maaf kariyega, hum regular health checkups ya doctor services provide nahi karte hain. {company_display} voice agents aur business automation solutions provide karti hai. Kya aap hamare AI automation ke baare mein demo ya consultation schedule karna chahenge?'\n"
+                        f"3. NEVER pretend to be a doctor, hospital, or clinic. NEVER accept or confirm a medical regular checkup under any circumstances!\n"
+                        f"\n## 10-DIGIT CONTACT PHONE NUMBER VALIDATION:\n"
+                        f"1. Contact phone numbers in India must have exactly 10 digits.\n"
+                        f"2. When the caller provides a phone number, count the digits: if they provide fewer than 10 digits (such as 9 digits like '654298356'), you MUST NOT accept or confirm it. Immediately ask: 'Yeh 9 digits hain, kripya apna poora 10-digit mobile number bata dijiye?'\n"
+                        f"3. Do not proceed to confirmation until all 10 digits are provided.\n"
+                        f"\n## EMAIL & WHATSAPP REMINDERS AND CONFIRMATIONS (CRITICAL RULE 52 & 53):\n"
+                        f"1. Automated delivery is 100% active. If the caller asks for email or WhatsApp confirmations or reminders (e.g., 'kya aap mujhe mail par reminder bhej sakte ho?', 'email par confirmation aayega?'), ALWAYS enthusiastically assure them:\n"
+                        f"   'Haan bilkul! Hum aapko email aur WhatsApp dono par confirmation aur reminder bhejte hain. Hum aapko mail reminder bhej denge.'\n"
+                        f"2. STRICT PROHIBITION: You must NEVER say email sending or mail reminders are unavailable ('mere paas email par reminder bhejne ka option nahi hai'). It is fully active and supported.\n"
+                    )
 
+                # 14. Enforce Gender-consistent Hindi/Hinglish Grammar
+                system_prompt = apply_gender_grammar_directives(system_prompt, gender_tag, bot_name, voice_id)
+
+                # 15. Store prompt suffix for multi-personality mid-call transitions
+                if agent_data.get("_multi_personality_enabled"):
+                    agent_data["_prompt_suffix"] = system_prompt[len(base_prompt):]
         except Exception as e:
-            logger.error(f"Failed to fetch agent configs in background run_agent: {e}")
-
-    if agent_id:
-        kb_docs = await fetch_knowledge_base(agent_id)
-        if kb_docs:
-            kb_context = "\n\n=== BUSINESS KNOWLEDGE BASE ===\n"
-            for doc in kb_docs:
-                kb_context += f"\n--- {doc.get('name', 'Document')} ---\n{doc.get('content_excerpt', '')}\n"
-            system_prompt += kb_context
+            logger.error(f"Failed to fetch config for agent in run_agent: {e}")
 
     print(f"[Agent] Joining room: {room_name}", flush=True)
     logger.info(f"[In-Process Agent] Connecting to room {room_name} at {livekit_url} (provider: {provider}, voice: {voice_id})")
@@ -3835,6 +4443,14 @@ async def run_agent(room_name: str, agent_id: str | None = None, contact_id: str
     safe_language = locals().get('language') or (agent_data.get('primary_language') if agent_data else None) or 'hinglish'
     safe_system_prompt = locals().get('system_prompt') or load_system_prompt()
 
+    # Create appointment tools for live verification and booking in run_agent
+    appointment_tools = create_appointment_tools(
+        organization_id=organization_id,
+        user_id=user_id,
+        agent_id=agent_id,
+        call_id=room_name
+    )
+
     from livekit.agents import utils
     async with utils.http_context.open():
         agent_instance = VikramAgent(
@@ -3847,20 +4463,35 @@ async def run_agent(room_name: str, agent_id: str | None = None, contact_id: str
             llm_provider=agent_data.get('llm_provider') if agent_data else None,
             llm_model=agent_data.get('llm_model') if agent_data else None,
             temperature=agent_data.get('temperature') if agent_data else None,
+            tools=appointment_tools,
         )
 
         if locals().get('greeting_message'):
             agent_instance.greeting_message = locals().get('greeting_message')
         agent_instance.room = room
 
-        # Defensive fallbacks prevent UnboundLocalError when joining LiveKit rooms
-        agent_instance.bot_name = locals().get('bot_name') or (agent_data.get('bot_name') if agent_data else None) or (agent_data.get('name') if agent_data else None) or 'Vikram'
+        # Defensive fallbacks prevent UnboundLocalError and incorrect gender fallback
+        male_names = {'vikram', 'shubh', 'aditya', 'rahul', 'rohan', 'amit', 'dev', 'ratan', 'varun', 'manan', 'sumit', 'kabir', 'aayan', 'ashutosh', 'advait', 'anand', 'tarun', 'sunny', 'mani', 'gokul', 'vijay', 'mohit', 'rehan', 'soham', 'arvind', 'neel', 'arjun', 'amol', 'raghav'}
+        resolved_bot_name_ra = str(locals().get('bot_name') or (agent_data.get('bot_name') if agent_data else None) or (agent_data.get('name') if agent_data else None) or 'Vikram').strip()
+        voice_is_male_ra = (str(safe_voice_id).lower() in SARVAM_MALE_VOICES) or (safe_voice_id in ['pNInz6obpgDQGcFmaJgB', 'TxGEqnHWrfWFTfGW9XjX'])
+        name_is_male_ra = str(resolved_bot_name_ra).lower() in male_names
+        explicit_gender_ra = locals().get('gender_tag') or (agent_data.get('gender') if agent_data else None)
+        if explicit_gender_ra in ('male', 'female'):
+            resolved_gender_ra = explicit_gender_ra
+        elif voice_is_male_ra or name_is_male_ra:
+            resolved_gender_ra = 'male'
+        else:
+            resolved_gender_ra = 'female'
+
+        agent_instance.bot_name = resolved_bot_name_ra
         agent_instance.business_name = (
             locals().get('business_name_val')
             or (agent_data.get('business_name') if agent_data else '')
             or ''
         )
-        agent_instance.gender = locals().get('gender_tag') or (agent_data.get('gender') if agent_data else None) or 'female'
+        agent_instance.gender = resolved_gender_ra
+        if hasattr(agent_instance, 'tts') and hasattr(agent_instance.tts, '_gender'):
+            agent_instance.tts._gender = resolved_gender_ra
         agent_instance.prospect_name = c_name if ('campaign_contact' in locals() and campaign_contact and locals().get('is_name_valid')) else (locals().get('cust_name') or "")
         agent_instance.campaign_goal = locals().get('notes_summary') if ('campaign_contact' in locals() and campaign_contact) else ""
         agent_instance.ending_message = agent_data.get("ending_message", "") if agent_data else ""
@@ -3869,14 +4500,19 @@ async def run_agent(room_name: str, agent_id: str | None = None, contact_id: str
         session = AgentSession(
             vad=get_vad_model(),
             turn_detection="vad",
-            min_endpointing_delay=0.5,
-            max_endpointing_delay=1.5,
+            min_endpointing_delay=0.85,
+            max_endpointing_delay=2.2,
             preemptive_generation=True,
-            min_interruption_duration=0.8,
-            min_interruption_words=3,
+            min_interruption_duration=0.6,
+            min_interruption_words=4,
             resume_false_interruption=True,
         )
         done = asyncio.Event()
+
+        @session.on("close")
+        def _on_session_close_ra(event):
+            logger.info(f"[In-Process Agent] Session closed ({getattr(event, 'reason', 'unknown')}). Signaling done.")
+            done.set()
 
         @room.on("disconnected")
         def on_disconnected(reason):
@@ -3885,10 +4521,12 @@ async def run_agent(room_name: str, agent_id: str | None = None, contact_id: str
 
         @room.on("participant_disconnected")
         def on_participant_disconnected(participant: rtc.RemoteParticipant):
-            p_id = getattr(participant, 'identity', '') or ''
-            logger.info(f"[In-Process Agent] Participant disconnected: {p_id}")
-            if "caller" in p_id or "twilio" in p_id or not room.remote_participants:
-                logger.info(f"[In-Process Agent] Phone caller left room. Ending agent session.")
+            p_id = (getattr(participant, 'identity', '') or '').lower()
+            p_name = (getattr(participant, 'name', '') or '').lower()
+            logger.info(f"[In-Process Agent] Participant disconnected: '{p_id}' ('{p_name}')")
+            is_agent = p_id.startswith("agent") or "agent" in p_id or "vikram" in p_id or "agent" in p_name
+            if not is_agent:
+                logger.info(f"[In-Process Agent] Human caller '{p_id}' left room '{room_name}'. Ending agent session immediately.")
                 done.set()
 
         call_start_time = time.time()
@@ -3925,19 +4563,24 @@ async def run_agent(room_name: str, agent_id: str | None = None, contact_id: str
             call_ending_in_progress_ra = True
             logger.info("[Intent Call Cut - RA] Closing intent detected. Waiting for speech synthesis and playback to complete...")
 
-            # 1. Wait up to 6.0s for the agent to enter 'speaking' state if not already
-            for _ in range(60):
-                if getattr(session, 'agent_state', '') == 'speaking':
+            # 1. If agent is currently thinking or preparing reply, wait for it to start speaking (up to 3.5s)
+            for _ in range(35):
+                state = getattr(session, 'agent_state', '')
+                if state == 'speaking':
+                    break
+                if state not in ('thinking', 'initializing'):
                     break
                 await asyncio.sleep(0.1)
 
-            # 2. Wait until the agent finishes speaking completely
-            while getattr(session, 'agent_state', '') == 'speaking':
-                await asyncio.sleep(0.2)
+            # 2. Wait until the agent finishes speaking completely (up to 12s)
+            speech_timeout = 0
+            while getattr(session, 'agent_state', '') == 'speaking' and speech_timeout < 120:
+                await asyncio.sleep(0.1)
+                speech_timeout += 1
 
-            # 3. Grace period for audio stream buffer and carrier line to finish playing
-            logger.info("[Intent Call Cut - RA] Agent finished speaking. Waiting 1.5s playback drain before disconnect...")
-            await asyncio.sleep(1.5)
+            # 3. Grace period for audio stream buffer and carrier line to finish playing (0.8s)
+            logger.info("[Intent Call Cut - RA] Agent finished speaking. Waiting 0.8s playback drain before disconnect...")
+            await asyncio.sleep(0.8)
 
             try:
                 call_end_signal = json.dumps({"type": "call_ended", "reason": "intent_goodbye"}).encode("utf-8")
@@ -3947,16 +4590,34 @@ async def run_agent(room_name: str, agent_id: str | None = None, contact_id: str
                 logger.warning(f"Error publishing call_ended signal: {sig_err}")
 
             try:
+                lk_url = os.getenv("LIVEKIT_URL")
+                lk_key = os.getenv("LIVEKIT_API_KEY")
+                lk_sec = os.getenv("LIVEKIT_API_SECRET")
+                if lk_url and lk_key and lk_sec and room:
+                    from livekit.api import LiveKitAPI, DeleteRoomRequest
+                    lk_api = LiveKitAPI(lk_url, lk_key, lk_sec)
+                    await lk_api.room.delete_room(DeleteRoomRequest(room=room.name))
+                    await lk_api.aclose()
+                    logger.info(f"[Intent Call Cut - RA] LiveKit server room '{room.name}' deleted")
+            except Exception as lk_err:
+                logger.warning(f"LiveKit API delete room warning: {lk_err}")
+
+            try:
                 if room:
                     await room.disconnect()
             except Exception:
                 pass
             done.set()
 
+        user_demanded_cut_ra = False
+
         def check_closing_intent_ra(text: str) -> bool:
             if not text:
                 return False
             t = text.lower().strip()
+
+            if user_demanded_cut_ra:
+                return True
 
             # SAFETY GUARD 1: If caller gave affirmative permission to speak, NEVER disconnect
             user_requested_cut = False
@@ -3971,11 +4632,15 @@ async def run_agent(room_name: str, agent_id: str | None = None, contact_id: str
                     if user_giving_permission and len(call_transcript_turns_ra) <= 4:
                         logger.warning(f"[check_closing_intent_ra] BLOCKED false disconnect: caller gave permission ('{last_cust}') on turn {len(call_transcript_turns_ra)}")
                         return False
-                    if any(cut in last_cust for cut in ["call cut", "phone rakh", "phone kaat", "bye", "disconnect", "nahi chahiye", "not interested", "wrong number"]):
+                    if any(cut in last_cust for cut in [
+                        "call cut", "phone rakh", "phone kaat", "bye", "disconnect", "cut the call",
+                        "cut kar", "kaat do", "nahi chahiye", "not interested", "wrong number",
+                        "thank you", "thanks", "dhanyawad", "shukriya"
+                    ]):
                         user_requested_cut = True
 
-            # SAFETY GUARD 2: Early turns (<= 4) cannot trigger disconnect unless caller explicitly demanded it
-            if len(call_transcript_turns_ra) <= 4 and not user_requested_cut:
+            # SAFETY GUARD 2: Early turns (<= 2) cannot trigger disconnect unless caller explicitly demanded it
+            if len(call_transcript_turns_ra) <= 2 and not user_requested_cut and not user_demanded_cut_ra:
                 logger.warning(f"[check_closing_intent_ra] Suppressing early disconnect attempt on turn {len(call_transcript_turns_ra)}: '{text}'")
                 return False
 
@@ -3985,10 +4650,19 @@ async def run_agent(room_name: str, agent_id: str | None = None, contact_id: str
             
             closing_phrases = [
                 "goodbye", "good bye", "bye bye", "take care", "have a nice day",
+                "have a good day", "have a great day", "have a wonderful day",
                 "talk to you later", "see you later", "see you soon",
-                "alvida", "phir milenge", "baat karke achha laga", "baat karke accha laga",
+                "alvida", "phir milenge", "milte hain",
+                "baat karke achha laga", "baat karke accha laga",
+                "baat karke bohot achha laga", "baat karke bohot accha laga",
+                "baat karke bahut achha laga", "baat karke bahut accha laga",
                 "call cut", "phone rakh", "phone kaat",
-                "call disconnect", "अलविदा", "गुडबाय", "गुड बाय", "बाय बाय", "फिर मिलेंगे"
+                "call disconnect", "cut the call", "you can cut", "cut kar do",
+                "cut kar dijiye", "cut kar de", "cut kar 2",
+                "you're welcome", "you are welcome", "most welcome", "welcome",
+                "koi baat nahi", "mention not", "dhanyavaad", "dhanyawad", "shukriya",
+                "अलविदा", "गुडबाय", "गुड बाय", "बाय बाय", "फिर मिलेंगे",
+                "बात करके अच्छा लगा", "बात करके बहुत अच्छा लगा", "वेलकम", "धन्यवाद", "शुक्रिया"
             ]
             if any(phrase in t for phrase in closing_phrases):
                 return True
@@ -4012,6 +4686,7 @@ async def run_agent(room_name: str, agent_id: str | None = None, contact_id: str
 
         @session.on("conversation_item_added")
         def _on_conversation_item_added_ra(event):
+            nonlocal user_demanded_cut_ra
             try:
                 item = getattr(event, 'item', None)
                 if not item:
@@ -4045,9 +4720,33 @@ async def run_agent(room_name: str, agent_id: str | None = None, contact_id: str
 
                 if role == "user":
                     logger.info(f"[AgentSession - RA] Customer turn transcribed: '{clean_txt}'")
+                    u_lower = clean_txt.lower()
+                    cust_count = sum(1 for t in call_transcript_turns_ra if t.startswith("customer:"))
+                    if any(k in u_lower for k in [
+                        "cut the call", "you can cut", "cut kar do", "cut kar dijiye",
+                        "cut kar 2", "call cut", "phone rakh do", "phone rakh dijiye",
+                        "kaat do", "phone kaat", "disconnect kar", "call disconnect",
+                        "call end", "end the call", "hang up", "bye bye", "alvida",
+                        "kuch nahi chahiye", "kuch nahi", "sab ho gaya", "bas itna hi",
+                        "that's all", "thats all", "all done", "no more help"
+                    ]):
+                        logger.info(f"[Intent Call Cut - RA] Customer explicitly requested call cut: '{clean_txt}' -> scheduling graceful disconnect")
+                        user_demanded_cut_ra = True
+                        asyncio.create_task(execute_intent_disconnect_ra())
+                    elif any(k in u_lower for k in [
+                        "thank you", "thanks", "thx", "shukriya", "dhanyawad", "dhanyavaad",
+                        "shukriyaa", "bahut shukriya", "bohot shukriya", "bye",
+                        "धन्यवाद", "शुक्रिया", "थैंक यू", "थैंक्स"
+                    ]):
+                        if cust_count >= 2:
+                            logger.info(f"[Intent Call Cut - RA] Customer signaled closing gratitude ('{clean_txt}') on turn {cust_count} -> scheduling graceful disconnect")
+                            user_demanded_cut_ra = True
+                            asyncio.create_task(execute_intent_disconnect_ra())
 
-                if role == "assistant" and check_closing_intent_ra(text):
-                    logger.info(f"[Intent Call Cut - RA] Closing utterance by assistant: '{text}' -> scheduling graceful disconnect after speech finishes")
+                # Trigger intent disconnect if assistant says goodbye or customer commanded cut
+                customer_turn_count = sum(1 for t in call_transcript_turns_ra if t.startswith("customer:"))
+                if role == "assistant" and (check_closing_intent_ra(text) or user_demanded_cut_ra) and (customer_turn_count >= 2 or user_demanded_cut_ra):
+                    logger.info(f"[Intent Call Cut - RA] Closing utterance by assistant: '{text}' (demanded={user_demanded_cut_ra}) -> scheduling graceful disconnect after speech finishes")
                     asyncio.create_task(execute_intent_disconnect_ra())
             except Exception as err:
                 logger.warning(f"Error in conversation_item_added RA hook: {err}")
@@ -4117,10 +4816,22 @@ async def run_agent(room_name: str, agent_id: str | None = None, contact_id: str
             await session.start(agent=agent_instance, room=room)
             
             async def _room_watchdog():
+                call_has_human = False
                 while not done.is_set():
                     await asyncio.sleep(1.0)
-                    if room and not room.isconnected():
+                    if not room or not room.isconnected():
                         logger.info(f"[In-Process Agent] Watchdog detected room '{room_name}' is no longer connected. Signaling done.")
+                        done.set()
+                        break
+                    remotes = list(room.remote_participants.values()) if (room and hasattr(room, 'remote_participants')) else []
+                    has_human = any(
+                        not (getattr(p, 'identity', '').lower().startswith('agent') or 'agent' in getattr(p, 'identity', '').lower() or 'vikram' in getattr(p, 'identity', '').lower() or 'agent' in (getattr(p, 'name', '') or '').lower())
+                        for p in remotes
+                    )
+                    if has_human:
+                        call_has_human = True
+                    elif call_has_human:
+                        logger.info(f"[In-Process Agent] Watchdog detected all human callers left room '{room_name}'. Concluding call.")
                         done.set()
                         break
             watchdog_task = asyncio.create_task(_room_watchdog())
@@ -4140,6 +4851,16 @@ async def run_agent(room_name: str, agent_id: str | None = None, contact_id: str
             else:
                 # Await lead extraction and analytics saving BEFORE room disconnects/exits
                 try:
+                    if not user_id and agent_id:
+                        try:
+                            ag_res = supabase_admin.table("agents").select("user_id, organization_id").eq("id", agent_id).maybe_single().execute()
+                            if ag_res and ag_res.data:
+                                user_id = ag_res.data.get("user_id")
+                                if not organization_id:
+                                    organization_id = ag_res.data.get("organization_id")
+                        except Exception:
+                            pass
+
                     if agent_id and user_id:
                         duration = int(time.time() - call_start_time)
                         if duration < 3 and not (call_transcript_turns_ra or _get_transcript_messages(agent_instance)):

@@ -26,7 +26,7 @@ export function ProfileTab() {
     country: 'Other',
     language: 'English',
     timezone: 'Asia/Kolkata',
-    theme: 'dark',
+    theme: 'light',
   })
 
   useEffect(() => {

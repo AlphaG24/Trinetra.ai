@@ -32,7 +32,7 @@ export function WelcomeHeader({ fullName, isOnboardingComplete = true, loading =
     <div className="space-y-4">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
-          <h1 className="text-2xl md:text-3xl font-black font-heading tracking-tight text-zinc-950 dark:text-white">
+          <h1 suppressHydrationWarning className="text-2xl md:text-3xl font-black font-heading tracking-tight text-zinc-950 dark:text-white">
             {getGreeting()}, {name} 👋
           </h1>
           <p className="text-sm text-zinc-550 dark:text-zinc-400 mt-1">

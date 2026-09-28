@@ -19,47 +19,30 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   // Synchronous initialization matching what SSR and <head> script placed on <html>
   const [theme, setTheme] = useState<Theme>(() => {
     if (typeof window !== 'undefined') {
-      const docTheme = document.documentElement.getAttribute('data-theme') as Theme
-      if (docTheme === 'light' || docTheme === 'dark') return docTheme
-      const localTheme = localStorage.getItem('trinetra-theme') as Theme
-      if (localTheme === 'light' || localTheme === 'dark') return localTheme
+      const explicit = localStorage.getItem('trinetra-theme-explicit')
+      if (explicit === 'true') {
+        const localTheme = localStorage.getItem('trinetra-theme') as Theme
+        if (localTheme === 'light' || localTheme === 'dark') return localTheme
+      }
+      return 'light'
     }
-    return 'dark'
+    return 'light'
   })
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
     setMounted(true)
 
-    // Sync from database only if user hasn't explicitly chosen a local preference
-    async function syncThemeFromDb() {
-      try {
-        const localTheme = localStorage.getItem('trinetra-theme')
-        if (localTheme) return
-
-        const { data: { user } } = await supabase.auth.getUser()
-        if (user) {
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('theme')
-            .eq('id', user.id)
-            .single()
-          
-          if (profile?.theme && (profile.theme === 'light' || profile.theme === 'dark')) {
-            const dbTheme = profile.theme as Theme
-            setTheme(dbTheme)
-            localStorage.setItem('trinetra-theme', dbTheme)
-            document.cookie = `trinetra-theme=${dbTheme}; path=/; max-age=31536000; SameSite=Lax`
-            document.documentElement.setAttribute('data-theme', dbTheme)
-            document.documentElement.classList.remove('light', 'dark')
-            document.documentElement.classList.add(dbTheme)
-          }
-        }
-      } catch (err) {
-        // Silently ignore background theme sync
-      }
+    const explicit = localStorage.getItem('trinetra-theme-explicit')
+    if (explicit !== 'true') {
+      // Guarantee light theme for anyone opening dashboard
+      setTheme('light')
+      localStorage.setItem('trinetra-theme', 'light')
+      document.cookie = 'trinetra-theme=light; path=/; max-age=31536000; SameSite=Lax'
+      document.documentElement.setAttribute('data-theme', 'light')
+      document.documentElement.classList.remove('dark')
+      document.documentElement.classList.add('light')
     }
-    syncThemeFromDb()
   }, [])
 
   // Keep DOM in sync when theme changes
@@ -78,8 +61,9 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     const nextTheme = theme === 'dark' ? 'light' : 'dark'
     // 1. Update React state immediately
     setTheme(nextTheme)
-    // 2. Update localStorage & Cookie immediately
+    // 2. Mark explicit user preference so it sticks
     localStorage.setItem('trinetra-theme', nextTheme)
+    localStorage.setItem('trinetra-theme-explicit', 'true')
     document.cookie = `trinetra-theme=${nextTheme}; path=/; max-age=31536000; SameSite=Lax`
     // 3. Update DOM class immediately (no re-render wait)
     document.documentElement.setAttribute('data-theme', nextTheme)

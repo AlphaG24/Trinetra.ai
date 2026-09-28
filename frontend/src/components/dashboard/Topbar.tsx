@@ -1,11 +1,10 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { createClient } from '@/utils/supabase/client'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Menu, Bell, LogOut, User, CheckCheck } from 'lucide-react'
-import { ThemeToggle } from '@/src/components/ui/theme-toggle'
+import { Bell, LogOut, User, CheckCheck } from 'lucide-react'
 import { useAuth, UserProfile } from '@/src/components/providers/AuthProvider'
 
 export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
@@ -69,9 +68,13 @@ export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
     }
   }
 
+  const fetchNotifsRef = useRef<() => void>(() => {})
+
   useEffect(() => {
     const supabase = createClient()
     let channel: any = null
+    let pollInterval: any = null
+    let cleanupHandler: (() => void) | null = null
 
     async function loadUserAndSubscribe() {
       try {
@@ -90,27 +93,32 @@ export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
           }
 
           const fetchNotifs = async () => {
-            const { count } = await supabase
-              .from('notifications')
-              .select('*', { count: 'exact', head: true })
-              .eq('user_id', currentUser.id)
-              .eq('is_read', false)
-            setUnreadCount(count || 0)
+            try {
+              const { count } = await supabase
+                .from('notifications')
+                .select('*', { count: 'exact', head: true })
+                .eq('user_id', currentUser.id)
+                .eq('is_read', false)
+              setUnreadCount(count || 0)
 
-            const { data: notifs } = await supabase
-              .from('notifications')
-              .select('*')
-              .eq('user_id', currentUser.id)
-              .order('created_at', { ascending: false })
-              .limit(10)
-            
-            if (notifs) {
-              const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000
-              const recentList = notifs.filter((n: any) => !n.is_read || new Date(n.created_at).getTime() >= sevenDaysAgo).slice(0, 5)
-              setNotifications(recentList)
+              const { data: notifs } = await supabase
+                .from('notifications')
+                .select('*')
+                .eq('user_id', currentUser.id)
+                .order('created_at', { ascending: false })
+                .limit(10)
+              
+              if (notifs) {
+                const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000
+                const recentList = notifs.filter((n: any) => !n.is_read || new Date(n.created_at).getTime() >= sevenDaysAgo).slice(0, 5)
+                setNotifications(recentList)
+              }
+            } catch (err) {
+              console.error('Error fetching notifications:', err)
             }
           }
 
+          fetchNotifsRef.current = fetchNotifs
           await fetchNotifs()
 
           // Subscribe to Postgres changes on notifications table
@@ -130,6 +138,26 @@ export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
               }
             )
             .subscribe()
+
+          const handleCallCompleted = () => {
+            fetchNotifs()
+            setTimeout(fetchNotifs, 3500)
+            setTimeout(fetchNotifs, 7000)
+          }
+          window.addEventListener('trinetra:call_completed', handleCallCompleted)
+
+          // Fallback periodic poll every 15s to guarantee fresh state
+          pollInterval = setInterval(fetchNotifs, 15000)
+
+          cleanupHandler = () => {
+            if (channel) {
+              supabase.removeChannel(channel)
+            }
+            if (pollInterval) {
+              clearInterval(pollInterval)
+            }
+            window.removeEventListener('trinetra:call_completed', handleCallCompleted)
+          }
         }
       } catch (err) {
         console.error('Error loading user profile or subscribing to notifications in Topbar:', err)
@@ -139,9 +167,8 @@ export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
     loadUserAndSubscribe()
 
     return () => {
-      if (channel) {
-        supabase.removeChannel(channel)
-      }
+      if (cleanupHandler) cleanupHandler()
+      if (pollInterval) clearInterval(pollInterval)
     }
   }, [])
 
@@ -158,17 +185,8 @@ export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
   return (
     <header className="fixed top-0 right-0 left-0 h-16 bg-[var(--card-bg)] border-b border-[var(--border)] z-[999]">
       <div className="flex items-center justify-between h-full px-6">
-        {/* Left side: Logo + Mobile Menu */}
+        {/* Left side: Logo */}
         <div className="flex items-center gap-3">
-          {onMenuClick && (
-            <button
-              onClick={onMenuClick}
-              className="lg:hidden p-2 rounded-lg text-[var(--muted)] hover:bg-[var(--hover-bg)] hover:text-[var(--heading)] transition-colors"
-              aria-label="Open menu"
-            >
-              <Menu className="w-5 h-5" />
-            </button>
-          )}
           <Link href="/dashboard" className="flex items-center gap-2">
             <img
               src="/trident.png"
@@ -183,7 +201,14 @@ export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
           {/* Notifications Dropdown */}
           <div className="relative">
             <button
-              onClick={() => setShowNotifDropdown(!showNotifDropdown)}
+              suppressHydrationWarning
+              onClick={() => {
+                const next = !showNotifDropdown
+                setShowNotifDropdown(next)
+                if (next && fetchNotifsRef.current) {
+                  fetchNotifsRef.current()
+                }
+              }}
               className="p-2 rounded-lg text-[var(--muted)] hover:bg-[var(--hover-bg)] hover:text-[var(--heading)] transition-colors relative"
               aria-label="Notifications"
             >
@@ -269,12 +294,11 @@ export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
             )}
           </div>
 
-          {/* Theme Toggle */}
-          <ThemeToggle />
 
           {/* User Dropdown */}
           <div className="relative">
             <button
+              suppressHydrationWarning
               onClick={() => setIsDropdownOpen(!isDropdownOpen)}
               className="flex items-center gap-2.5 p-1.5 hover:bg-[var(--hover-bg)] rounded-xl transition-colors"
             >
@@ -305,6 +329,7 @@ export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
                     <User className="w-4 h-4 text-[var(--muted)]" /> My Profile
                   </Link>
                   <button
+                    suppressHydrationWarning
                     onClick={() => { setIsDropdownOpen(false); handleSignOut() }}
                     className="w-full flex items-center gap-2.5 px-4 py-3 text-[13px] text-red-500 hover:bg-[var(--hover-bg)] hover:text-red-400 text-left transition-colors font-playfair font-extrabold"
                   >

@@ -316,7 +316,7 @@ async function fetchProductsInternal() {
   }
 
   return (data ?? [])
-    .map((item) => {
+    .map((item: any) => {
       const slug = asString(item.slug);
       const name = asString(item.name);
 
@@ -343,8 +343,8 @@ async function fetchProductsInternal() {
         isVisible: asBoolean(item.is_visible, true),
       } satisfies ProductRecord;
     })
-    .filter((item): item is ProductRecord => item !== null)
-    .filter((item) => item.status !== "archived");
+    .filter((item: any): item is ProductRecord => item !== null)
+    .filter((item: any) => item.status !== "archived");
 }
 
 async function fetchPlansInternal() {
@@ -361,7 +361,7 @@ async function fetchPlansInternal() {
   }
 
   return (data ?? [])
-    .map((item) => {
+    .map((item: any) => {
       const name = asString(item.name);
       const slug = asString(item.slug);
 
@@ -388,7 +388,7 @@ async function fetchPlansInternal() {
         displayOrder: asNullableNumber(item.display_order) ?? 0,
       } satisfies PlanRecord;
     })
-    .filter((item): item is PlanRecord => item !== null);
+    .filter((item: any): item is PlanRecord => item !== null);
 }
 
 async function fetchBlogPostsInternal() {
@@ -404,7 +404,7 @@ async function fetchBlogPostsInternal() {
   }
 
   return (data ?? [])
-    .map((item) => {
+    .map((item: any) => {
       const slug = asString(item.slug);
       const title = asString(item.title);
       const content = asString(item.content);
@@ -424,7 +424,7 @@ async function fetchBlogPostsInternal() {
         coverImageUrl: asString(item.cover_image_url),
       } satisfies BlogPostRecord;
     })
-    .filter((item): item is BlogPostRecord => item !== null);
+    .filter((item: any): item is BlogPostRecord => item !== null);
 }
 
 export async function loadSiteConfig() {

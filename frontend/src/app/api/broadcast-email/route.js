@@ -99,7 +99,7 @@ export async function POST(request) {
       const resend = new Resend(process.env.RESEND_API_KEY);
 
       const { data, error: sendError } = await resend.emails.send({
-        from: 'Trinetra AI Blog <blog@trinetra.ai>',
+        from: 'Trinetra AI Blog <blog@trinetraedu-ai.com>',
         to: process.env.NODE_ENV === 'development' ? [emails[0]] : emails,
         subject: `New Post: ${safeTitle}`,
         html: `

@@ -39,17 +39,16 @@ interface DashboardState {
   agents: Agent[]
   isLoading: boolean
   isMobileSidebarOpen: boolean
-  runProductTour: boolean
-  tourStepIndex: number
   setProfile: (profile: UserProfile | null) => void
   setPlan: (plan: Plan | null) => void
   setAgents: (agents: Agent[]) => void
   fetchAgents: (userId: string) => Promise<void>
   setLoading: (isLoading: boolean) => void
+  isSidebarCollapsed: boolean
   toggleMobileSidebar: () => void
   setMobileSidebarOpen: (isOpen: boolean) => void
-  setRunProductTour: (run: boolean) => void
-  setTourStepIndex: (index: number) => void
+  toggleSidebarCollapsed: () => void
+  setSidebarCollapsed: (collapsed: boolean) => void
 }
 
 export const useDashboardStore = create<DashboardState>((set) => ({
@@ -58,8 +57,6 @@ export const useDashboardStore = create<DashboardState>((set) => ({
   agents: [],
   isLoading: true,
   isMobileSidebarOpen: false,
-  runProductTour: false,
-  tourStepIndex: 0,
   setProfile: (profile) => set({ profile }),
   setPlan: (plan) => set({ plan }),
   setAgents: (agents) => set({ agents }),
@@ -76,6 +73,18 @@ export const useDashboardStore = create<DashboardState>((set) => ({
   setLoading: (isLoading) => set({ isLoading }),
   toggleMobileSidebar: () => set((state) => ({ isMobileSidebarOpen: !state.isMobileSidebarOpen })),
   setMobileSidebarOpen: (isOpen) => set({ isMobileSidebarOpen: isOpen }),
-  setRunProductTour: (runProductTour) => set({ runProductTour }),
-  setTourStepIndex: (tourStepIndex) => set({ tourStepIndex }),
+  isSidebarCollapsed: false,
+  toggleSidebarCollapsed: () => set((state) => {
+    const next = !state.isSidebarCollapsed
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('trinetra-sidebar-collapsed', String(next))
+    }
+    return { isSidebarCollapsed: next }
+  }),
+  setSidebarCollapsed: (collapsed) => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('trinetra-sidebar-collapsed', String(collapsed))
+    }
+    set({ isSidebarCollapsed: collapsed })
+  },
 }))

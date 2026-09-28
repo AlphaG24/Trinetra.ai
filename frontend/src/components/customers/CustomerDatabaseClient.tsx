@@ -74,12 +74,24 @@ export function CustomerDatabaseClient() {
 
   useEffect(() => {
     fetchCustomers()
+
+    const handleCallCompleted = () => {
+      // Refresh immediately and after backend async lead extraction completes
+      fetchCustomers(true)
+      setTimeout(() => fetchCustomers(true), 3500)
+      setTimeout(() => fetchCustomers(true), 7000)
+    }
+
+    window.addEventListener('trinetra:call_completed', handleCallCompleted)
+    return () => {
+      window.removeEventListener('trinetra:call_completed', handleCallCompleted)
+    }
   }, [])
 
-  const fetchCustomers = async () => {
+  const fetchCustomers = async (forceRefresh = false) => {
     try {
       setLoading(true)
-      const res = await fetch('/api/customers')
+      const res = await fetch(`/api/customers${forceRefresh ? '?refresh=true' : ''}`)
       if (!res.ok) throw new Error(await res.text())
       const data = await res.json()
       

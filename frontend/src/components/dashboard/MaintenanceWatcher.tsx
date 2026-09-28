@@ -39,7 +39,7 @@ export function MaintenanceWatcher({
           table: 'system_config',
           filter: "config_key=eq.maintenance_mode",
         },
-        (payload) => {
+        (payload: any) => {
           const newVal = payload.new?.config_value
           setIsMaintenanceMode(newVal === 'true')
         }
@@ -52,7 +52,7 @@ export function MaintenanceWatcher({
           table: 'system_config',
           filter: "config_key=eq.maintenance_mode",
         },
-        (payload) => {
+        (payload: any) => {
           const newVal = payload.new?.config_value
           setIsMaintenanceMode(newVal === 'true')
         }
@@ -62,7 +62,7 @@ export function MaintenanceWatcher({
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [isAdmin, supabase])
+  }, [isAdmin])
 
   if (!isMaintenanceMode || isAdmin) return null
 

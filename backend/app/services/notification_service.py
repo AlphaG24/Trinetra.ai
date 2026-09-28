@@ -88,6 +88,7 @@ class NotificationService:
             
             # Load preferences (merge with defaults to avoid missing keys)
             db_prefs = profile.get("notification_preferences") or {}
+            user_wants_email = db_prefs.get("email_alerts", True)
             prefs = {
                 "events": {**DEFAULT_PREFERENCES["events"], **db_prefs.get("events", {})},
                 "quiet_hours": {**DEFAULT_PREFERENCES["quiet_hours"], **db_prefs.get("quiet_hours", {})},
@@ -95,6 +96,8 @@ class NotificationService:
             }
             
             event_prefs = prefs["events"].get(event_type, { "email": True, "telegram": True, "dashboard": True })
+            if user_wants_email and event_type in ("call_completed", "new_lead", "appointment_scheduled"):
+                event_prefs["email"] = True
             
             # 2. In-App Dashboard Notification (always instant if enabled, does not respect quiet hours/digest)
             if event_prefs.get("dashboard", True):
@@ -204,7 +207,46 @@ class NotificationService:
         smtp_port = int(os.getenv("SMTP_PORT", "587"))
 
         if not smtp_user or not smtp_password:
-            print("[NotificationService] Skipping email send: Missing SMTP credentials", flush=True)
+            resend_key = os.getenv("RESEND_PRIVATE_KEY") or os.getenv("RESEND_API_KEY")
+            if resend_key:
+                try:
+                    async with httpx.AsyncClient() as client:
+                        res = await client.post(
+                            "https://api.resend.com/emails",
+                            headers={"Authorization": f"Bearer {resend_key}", "Content-Type": "application/json"},
+                            json={
+                                "from": "Trinetra AI Alerts <alerts@trinetraedu-ai.com>",
+                                "to": [email_address],
+                                "subject": title,
+                                "text": message
+                            },
+                            timeout=10.0
+                        )
+                        if res.status_code in (200, 201):
+                            print(f"[NotificationService] Notification email sent via Resend to {email_address}", flush=True)
+                            return
+                        elif res.status_code == 403 and "testing emails" in res.text:
+                            # Fallback if domain restriction happens
+                            print(f"[NotificationService] Resend unverified domain restriction for {email_address}. Forwarding alert to verified account owner...", flush=True)
+                            owner_res = await client.post(
+                                "https://api.resend.com/emails",
+                                headers={"Authorization": f"Bearer {resend_key}", "Content-Type": "application/json"},
+                                json={
+                                    "from": "Trinetra AI Alerts <alerts@trinetraedu-ai.com>",
+                                    "to": ["support@trinetraedu-ai.com"],
+                                    "subject": f"[Target: {email_address}] {title}",
+                                    "text": f"NOTE: Delivered to verified account owner because custom domain 'trinetraedu-ai.com' is not yet verified in Resend for direct delivery to {email_address}.\n\n" + message
+                                },
+                                timeout=10.0
+                            )
+                            if owner_res.status_code in (200, 201):
+                                print(f"[NotificationService] Fallback alert email sent via Resend to support@trinetraedu-ai.com", flush=True)
+                                return
+                        else:
+                            print(f"[NotificationService] Resend error {res.status_code}: {res.text}", flush=True)
+                except Exception as r_err:
+                    print(f"[NotificationService] Resend dispatch exception: {r_err}", flush=True)
+            print("[NotificationService] Skipping email send: Missing SMTP and Resend credentials", flush=True)
             return
 
         import smtplib

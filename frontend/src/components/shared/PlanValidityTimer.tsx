@@ -41,14 +41,19 @@ export function PlanValidityTimer({
   useEffect(() => {
     const calculateTime = () => {
       const now = Date.now();
-      const startMs = createdAt ? new Date(createdAt).getTime() : now;
       const totalDays = validityDays && validityDays > 0 ? validityDays : 30;
       const totalDurationMs = totalDays * 24 * 60 * 60 * 1000;
 
-      let endMs = expiresAt ? new Date(expiresAt).getTime() : startMs + totalDurationMs;
+      let endMs: number;
+      if (expiresAt) {
+        endMs = new Date(expiresAt).getTime();
+      } else if (createdAt) {
+        endMs = new Date(createdAt).getTime() + totalDurationMs;
+      } else {
+        endMs = now + totalDurationMs;
+      }
 
       const remainingMs = endMs - now;
-      const elapsedMs = Math.max(0, now - startMs);
 
       if (remainingMs <= 0) {
         setTimeLeft({
@@ -62,11 +67,24 @@ export function PlanValidityTimer({
         return;
       }
 
+      // Determine cycle duration: if createdAt and expiresAt form a single cycle span, use that;
+      // otherwise, default to the validityDays cycle duration (e.g. 30 days) to prevent multi-month skew
+      let cycleDurationMs = totalDurationMs;
+      if (createdAt && expiresAt) {
+        const fullSpan = endMs - new Date(createdAt).getTime();
+        if (fullSpan > 0 && fullSpan <= (totalDays + 5) * 24 * 60 * 60 * 1000) {
+          cycleDurationMs = fullSpan;
+        }
+      }
+
       const days = Math.floor(remainingMs / (24 * 60 * 60 * 1000));
       const hours = Math.floor((remainingMs % (24 * 60 * 60 * 1000)) / (60 * 60 * 1000));
       const minutes = Math.floor((remainingMs % (60 * 60 * 1000)) / (60 * 1000));
-      const daysPassed = Math.floor(elapsedMs / (24 * 60 * 60 * 1000));
-      const percentPassed = Math.min(100, Math.max(0, Math.round((elapsedMs / totalDurationMs) * 100)));
+
+      // Calculate percentage remaining (clamped to 1-100% when active)
+      const percentRemaining = Math.max(1, Math.min(100, Math.round((remainingMs / cycleDurationMs) * 100)));
+      const percentPassed = 100 - percentRemaining;
+      const daysPassed = Math.max(0, Math.floor((cycleDurationMs - remainingMs) / (24 * 60 * 60 * 1000)));
 
       setTimeLeft({
         days,

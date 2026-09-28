@@ -107,7 +107,9 @@ export function AgentOverviewTab({
   } = useVoiceAgent()
 
   const handleCloseCallModal = () => {
-    if (connectionState === 'active' || connectionState === 'connecting') return
+    if (connectionState === 'active' || connectionState === 'connecting') {
+      endCall()
+    }
     setShowCallModal(false)
     clearTranscripts()
   }
@@ -224,9 +226,29 @@ export function AgentOverviewTab({
     }
   }, [agent.id])
 
+  // Listen for call-completed events from the voice hook to refresh dashboard
+  useEffect(() => {
+    const handleCallCompleted = (e: Event) => {
+      const detail = (e as CustomEvent).detail
+      if (detail?.agentId === agent.id) {
+        // Refresh call stats and call list when a recording is uploaded
+        fetchStats()
+        fetchUsage()
+        onRefreshCalls?.()
+        // Staggered retries to catch backend-side async operations (lead extraction, transcript saving)
+        setTimeout(() => onRefreshCalls?.(), 2000)
+        setTimeout(() => onRefreshCalls?.(), 5000)
+        setTimeout(() => { fetchStats(); fetchUsage() }, 3000)
+      }
+    }
+    window.addEventListener('trinetra:call_completed', handleCallCompleted)
+    return () => window.removeEventListener('trinetra:call_completed', handleCallCompleted)
+  }, [agent.id, onRefreshCalls])
+
   // Initialize remaining seconds when modal opens — use backend agentUsage as single source of truth
   useEffect(() => {
     if (showCallModal) {
+      clearTranscripts()
       let remainingSecs = 0
       if (agentUsage && agentUsage.limit > 0) {
         remainingSecs = Math.max(0, (agentUsage.limit - agentUsage.used) * 60)
@@ -385,6 +407,7 @@ export function AgentOverviewTab({
     }
 
     setMicPermissionError(null)
+    clearTranscripts()
     const roomName = `room-${agent.id}-${Date.now().toString().slice(-6)}`
 
     try {
@@ -662,7 +685,6 @@ export function AgentOverviewTab({
                 clearTranscripts()
                 setShowCallModal(true)
               }}
-              data-tour="make-test-call"
               className="w-full flex items-center justify-between p-4 rounded-xl border border-[var(--border)] bg-[var(--background)]/40 hover:bg-[var(--hover-bg)]/20 transition-all font-montserrat font-bold text-xs uppercase tracking-wider text-[var(--heading)] cursor-pointer"
             >
               <span className="flex items-center gap-2">
@@ -768,7 +790,6 @@ export function AgentOverviewTab({
                     <>
                       <button
                         onClick={handleStartCall}
-                        data-tour="try-demo"
                         className="w-16 h-16 rounded-full bg-[var(--primary-bg)] text-[var(--heading)] hover:bg-[var(--hover-bg)] flex items-center justify-center transition-all duration-305 shadow-md border border-[var(--border)] active:scale-[0.95] cursor-pointer"
                       >
                         <Mic className="w-6 h-6" />
@@ -835,6 +856,12 @@ export function AgentOverviewTab({
                       <div>
                         <h4 className="text-xs font-bold text-[var(--heading)]">Call Ended</h4>
                         <p className="text-[10px] text-[var(--muted)] mt-0.5">Session logs synced.</p>
+                        <button
+                          onClick={handleStartCall}
+                          className="mt-2 text-[10px] font-bold uppercase tracking-wider px-3 py-1.5 rounded-lg bg-[var(--primary-bg)] text-[var(--heading)] hover:bg-[var(--hover-bg)] border border-[var(--border)] transition-all cursor-pointer"
+                        >
+                          Start New Call
+                        </button>
                       </div>
                     </>
                   )}

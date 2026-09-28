@@ -53,3 +53,5 @@ export function NetworkStatusBanner() {
     </aside>
   )
 }
+
+export default NetworkStatusBanner

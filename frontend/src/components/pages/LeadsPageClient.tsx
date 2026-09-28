@@ -267,12 +267,12 @@ export function LeadsPageClient({ initialLeads, agents = [], services = [] }: Le
       const supabase = createClient()
       const { data } = await supabase
         .from('voice_calls')
-        .select('transcript_text, transcript, recording_url, duration_seconds')
+        .select('transcript, recording_url, duration_seconds')
         .or(`id.eq.${callId},metadata->>provider_call_id.eq.${callId},metadata->>session_id.eq.${callId}`)
         .maybeSingle()
 
-      if (data?.transcript_text || data?.transcript) {
-        setSelectedTranscript(data.transcript_text || data.transcript)
+      if (data?.transcript) {
+        setSelectedTranscript(data.transcript)
       } else {
         setSelectedTranscript('No transcript record found for this call.')
       }

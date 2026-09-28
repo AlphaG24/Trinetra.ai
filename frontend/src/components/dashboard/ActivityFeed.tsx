@@ -20,7 +20,8 @@ export type ActivityType =
 
 export interface ActivityItem {
   id: string
-  type: ActivityType
+  type?: ActivityType
+  activity_type?: ActivityType
   title: string
   description: string
   created_at: string
@@ -75,7 +76,15 @@ export function ActivityFeed({
   const supabase = createClient()
 
   const isControlled = propActivities !== undefined
-  const displayActivities = isControlled ? propActivities : localActivities
+  const rawActivities = isControlled ? propActivities : localActivities
+  
+  // Strictly filter to live activity from the last 6 hours (never show days-old messages)
+  const now = Date.now()
+  const displayActivities = (rawActivities || []).filter(item => {
+    if (!item?.created_at) return true
+    const itemTime = new Date(item.created_at).getTime()
+    return (now - itemTime) <= 6 * 60 * 60 * 1000
+  })
 
   useEffect(() => {
     if (isControlled) return
@@ -86,11 +95,13 @@ export function ActivityFeed({
       const { data: { user } } = await supabase.auth.getUser()
       if (!user?.id) return
 
-      // Fetch initial data
+      // Fetch initial data strictly within last 5 hours
+      const fiveHoursAgoIso = new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString()
       const { data: initialActivities } = await supabase
         .from('activity_log')
         .select('*')
         .eq('user_id', user.id)
+        .gte('created_at', fiveHoursAgoIso)
         .order('created_at', { ascending: false })
         .limit(50)
 
@@ -166,8 +177,8 @@ export function ActivityFeed({
             <div className="w-16 h-16 rounded-full bg-[var(--hover-bg)] flex items-center justify-center mb-4 border border-[var(--border)]">
               <Activity className="w-8 h-8 text-[var(--muted)]" />
             </div>
-            <h3 className="text-lg font-medium text-[var(--heading)] mb-2">No activity yet</h3>
-            <p className="text-[var(--muted)] mb-6 text-sm max-w-xs">Activity will appear here as your agents start handling interactions</p>
+            <h3 className="text-lg font-medium text-[var(--heading)] mb-2">No recent activity</h3>
+            <p className="text-[var(--muted)] mb-6 text-sm max-w-xs">Live events from the last 5 hours will appear here in real time.</p>
           </div>
         ) : (
           <div className="space-y-4">
@@ -182,7 +193,7 @@ export function ActivityFeed({
                   className="flex items-start gap-3 p-3 rounded-xl hover:bg-[var(--hover-bg)] transition-colors"
                 >
                   <div className="flex-shrink-0 mt-0.5">
-                    {getActivityIcon(activity.type)}
+                    {getActivityIcon((activity.type || activity.activity_type || 'call_ended') as ActivityType)}
                   </div>
                   <div className="flex-1 min-w-0">
                     <h4 className="text-sm font-semibold text-[var(--heading)] truncate">{activity.title}</h4>

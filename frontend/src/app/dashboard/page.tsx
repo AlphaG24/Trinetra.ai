@@ -10,7 +10,6 @@ import { ToolHealthCards } from '@/src/components/dashboard/ToolHealthCards'
 import { ActivityFeed } from '@/src/components/dashboard/ActivityFeed'
 import { TrialWarnings } from '@/src/components/dashboard/TrialWarnings'
 import useSWR from 'swr'
-import { ProductTour } from '@/src/components/onboarding/ProductTour'
 import { AgentComparisonWidget } from '@/src/components/agents/AgentComparisonWidget'
 import { useDashboardStore } from '@/src/store/dashboardStore'
 import { useAuth } from '@/src/components/providers/AuthProvider'
@@ -25,7 +24,6 @@ interface UserProfile {
   demo_minutes_limit: number
   paid_minutes_used: number
   paid_minutes_limit: number
-  tour_completed?: boolean
 }
 
 export default function DashboardPage() {
@@ -33,7 +31,7 @@ export default function DashboardPage() {
   const { user: authUser, profile: authProfile, isLoading: authLoading } = useAuth()
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [profileLoading, setProfileLoading] = useState(true)
-  const { runProductTour, setRunProductTour, setProfile: setStoreProfile } = useDashboardStore()
+  const { setProfile: setStoreProfile } = useDashboardStore()
 
   useEffect(() => {
     if (authProfile) {
@@ -49,12 +47,6 @@ export default function DashboardPage() {
       setProfileLoading(false)
     }
   }, [authProfile, authLoading, setStoreProfile])
-
-  useEffect(() => {
-    if (profile && profile.tour_completed === false) {
-      setRunProductTour(true)
-    }
-  }, [profile, setRunProductTour])
 
   const { data: overviewData, error: overviewError, isLoading: overviewLoading, mutate: mutateOverview } = useSWR('/api/dashboard/overview', fetcher, {
     refreshInterval: 30000,
@@ -119,7 +111,7 @@ export default function DashboardPage() {
             table: 'profiles',
             filter: `id=eq.${user.id}`,
           },
-          (payload) => {
+          (payload: any) => {
             const updatedProfile = payload.new as UserProfile
             setProfile(updatedProfile)
             setStoreProfile(updatedProfile as any)
@@ -166,6 +158,18 @@ export default function DashboardPage() {
             mutateOverview()
           }
         )
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'activity_log',
+            filter: `user_id=eq.${user.id}`,
+          },
+          () => {
+            mutateOverview()
+          }
+        )
         .subscribe()
     }
 
@@ -182,7 +186,7 @@ export default function DashboardPage() {
   }, [mutateOverview])
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto p-4 md:p-6">
+    <div suppressHydrationWarning className="space-y-6 max-w-7xl mx-auto p-4 md:p-6">
       {/* 1. Welcome Header */}
       <WelcomeHeader
         fullName={profile?.full_name}
@@ -203,26 +207,32 @@ export default function DashboardPage() {
       )}
 
       {/* 3. Quick Actions */}
-      <QuickActions />
+      <div suppressHydrationWarning>
+        <QuickActions />
+      </div>
 
       {/* 4. KPI Cards Grid */}
-      <KPICards
-        stats={overviewData?.stats || null}
-        loading={overviewLoading}
-        error={overviewError?.message || (overviewData?.error ? overviewData.error : null)}
-        onRetry={() => mutateOverview()}
-      />
+      <div suppressHydrationWarning>
+        <KPICards
+          stats={overviewData?.stats || null}
+          loading={overviewLoading}
+          error={overviewError?.message || (overviewData?.error ? overviewData.error : null)}
+          onRetry={() => mutateOverview()}
+        />
+      </div>
 
       {/* Comparison Scorecard Widget */}
-      <AgentComparisonWidget
-        agents={overviewData?.tools || []}
-        loading={overviewLoading}
-      />
+      <div suppressHydrationWarning>
+        <AgentComparisonWidget
+          agents={overviewData?.tools || []}
+          loading={overviewLoading}
+        />
+      </div>
 
       {/* 5. Main Content Section (Deployed Tools & Activity Feed) */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div suppressHydrationWarning className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Deployed Tools (Left 2 Columns) */}
-        <div className="lg:col-span-2 space-y-4">
+        <div suppressHydrationWarning className="lg:col-span-2 space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="text-base font-bold font-display text-[var(--heading)] uppercase tracking-wider">
               Deployed Tools
@@ -237,7 +247,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Recent Activity (Right 1 Column) */}
-        <div className="space-y-4">
+        <div suppressHydrationWarning className="space-y-4">
           <h3 className="text-base font-bold font-display text-[var(--heading)] uppercase tracking-wider">
             Recent Activity
           </h3>
@@ -251,11 +261,6 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
-      <ProductTour
-        page="overview"
-        run={runProductTour}
-        onTourComplete={() => setRunProductTour(false)}
-      />
     </div>
   )
 }

@@ -129,12 +129,21 @@ export function CallAudioPlayer({
   const handleSeek = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!hasAudio || !audioRef.current) return
     const rect = e.currentTarget.getBoundingClientRect()
+    if (!rect.width || rect.width <= 0) return
     const clickX = e.clientX - rect.left
     const percent = Math.max(0, Math.min(1, clickX / rect.width))
-    const dur = audioRef.current.duration || totalDuration || 1
+    const rawDur = audioRef.current.duration
+    const dur = (Number.isFinite(rawDur) && rawDur > 0) ? rawDur : (Number.isFinite(totalDuration) && totalDuration > 0 ? totalDuration : 0)
+    if (dur <= 0) return
     const targetTime = Math.round(percent * dur)
-    audioRef.current.currentTime = targetTime
-    setCurrentTime(targetTime)
+    if (Number.isFinite(targetTime) && audioRef.current) {
+      try {
+        audioRef.current.currentTime = targetTime
+        setCurrentTime(targetTime)
+      } catch (seekErr) {
+        console.warn("Failed to seek audio:", seekErr)
+      }
+    }
   }
 
   // Auto-play support

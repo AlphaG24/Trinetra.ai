@@ -44,6 +44,11 @@ interface AnalyticsLog {
   status: string
   event_data: any
   created_at: string
+  transcript_text?: string | null
+  transcript?: string | null
+  recording_url?: string | null
+  prospect_name?: string | null
+  phone_number?: string | null
 }
 
 interface WorkspaceClientProps {
