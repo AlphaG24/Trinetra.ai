@@ -2,8 +2,9 @@
 
 import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import Link from 'next/link'
 import { motion } from 'framer-motion'
-import { Eye, EyeOff, Mail, Lock, ArrowRight } from 'lucide-react'
+import { Eye, EyeOff, Mail, Lock, ArrowRight, ArrowLeft } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { createClient } from '@/lib/client'
 import { getURL } from '@/src/utils/helpers'
@@ -156,6 +157,17 @@ function LoginForm() {
 
   return (
     <div className="flex h-screen w-full bg-[#06040A] overflow-hidden font-sans text-white selection:bg-amber-500/30 relative">
+
+      {/* Navigate back to homepage button */}
+      <div className="absolute top-5 left-5 sm:top-6 sm:left-6 z-50">
+        <Link
+          href="/"
+          className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-medium text-zinc-300 hover:text-white bg-white/[0.06] hover:bg-white/[0.12] border border-white/10 backdrop-blur-md transition-all duration-200 shadow-lg group hover:border-violet-500/40"
+        >
+          <ArrowLeft className="w-3.5 h-3.5 transition-transform duration-200 group-hover:-translate-x-0.5 text-violet-400" />
+          <span>Back to Home</span>
+        </Link>
+      </div>
 
       {/* Static elegant dark grid overlay */}
       <div

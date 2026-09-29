@@ -137,7 +137,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             sessionStorage.removeItem(CACHE_KEY)
             sessionStorage.removeItem('trinetra_user_role')
           } catch {}
-          router.push('/login')
+          router.push('/')
+          router.refresh()
         }
       }
     )
@@ -161,7 +162,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         sessionStorage.removeItem('trinetra_user_role')
         localStorage.removeItem('supabase.auth.token')
       } catch {}
-      router.push('/login')
+      router.push('/')
+      router.refresh()
     } catch (err) {
       console.error('[AuthProvider] Signout error:', err)
     }

@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import "./globals.css";
@@ -5,6 +6,7 @@ import { Inter, JetBrains_Mono, Playfair_Display, Montserrat, Merriweather } fro
 import localFont from 'next/font/local';
 import { Toaster } from "sonner";
 import { AuthProvider } from "@/src/components/providers/AuthProvider";
+import { MaintenanceWatcher } from "@/src/components/dashboard/MaintenanceWatcher";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -143,6 +145,23 @@ export default async function RootLayout({
     ]
   };
 
+  let initialMaintenanceMode = false;
+  try {
+    const { createClient: createSupabaseClient } = await import('@supabase/supabase-js');
+    const supabaseAdmin = createSupabaseClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    );
+    const { data: configRow } = await supabaseAdmin
+      .from('system_config')
+      .select('config_value')
+      .eq('config_key', 'maintenance_mode')
+      .maybeSingle();
+    initialMaintenanceMode = configRow?.config_value === 'true';
+  } catch {
+    initialMaintenanceMode = false;
+  }
+
   return (
     <html
       lang="en"
@@ -184,6 +203,9 @@ export default async function RootLayout({
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
         <AuthProvider>
+          <Suspense fallback={null}>
+            <MaintenanceWatcher initialMaintenanceMode={initialMaintenanceMode} />
+          </Suspense>
           {children}
           <Toaster position="bottom-right" theme={initialTheme === 'light' ? 'light' : 'dark'} />
         </AuthProvider>

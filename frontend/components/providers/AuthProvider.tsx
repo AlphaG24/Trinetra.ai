@@ -15,7 +15,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           router.refresh()
         }
         if (event === 'SIGNED_OUT') {
-          router.push('/login')
+          router.push('/')
+          router.refresh()
         }
         if (event === 'USER_UPDATED') {
           router.refresh()

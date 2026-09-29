@@ -21,6 +21,7 @@ export async function GET() {
     }
 
     const publicKeys = [
+      "maintenance_mode",
       "free_demo_minutes", "trial_price_paisa", "trial_days", 
       "trial_minutes", "starter_price_paisa", "starter_minutes", 
       "professional_price_paisa", "professional_minutes",

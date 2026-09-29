@@ -112,10 +112,11 @@ export function SecurityTab() {
 
       toast.success('Account permanently deleted. Goodbye!')
 
-      // Sign out and redirect to login
+      // Sign out and redirect to home
       const supabase = createClient()
       await supabase.auth.signOut()
-      router.push('/login')
+      router.push('/')
+      router.refresh()
     } catch (err: any) {
       toast.error(err.message || 'Something went wrong')
       setDeleting(false)

@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { motion } from 'framer-motion'
-import { Eye, EyeOff, Mail, Lock, ArrowRight, UserPlus, PhoneCall, MessageSquare, Bot } from 'lucide-react'
+import { Eye, EyeOff, Mail, Lock, ArrowRight, ArrowLeft, UserPlus, PhoneCall, MessageSquare, Bot } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { createClient } from '@/lib/client'
 import { getURL } from '@/src/utils/helpers'
@@ -84,8 +85,19 @@ export default function SignupPage() {
   }
 
   return (
-    <div className="flex h-screen w-full bg-[#05050a] overflow-hidden font-sans text-white selection:bg-amber-500/30">
+    <div className="flex h-screen w-full bg-[#05050a] overflow-hidden font-sans text-white selection:bg-amber-500/30 relative">
       
+      {/* Navigate back to homepage button */}
+      <div className="absolute top-5 left-5 sm:top-6 sm:left-6 z-50">
+        <Link
+          href="/"
+          className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-medium text-zinc-300 hover:text-white bg-white/[0.06] hover:bg-white/[0.12] border border-white/10 backdrop-blur-md transition-all duration-200 shadow-lg group hover:border-amber-500/40"
+        >
+          <ArrowLeft className="w-3.5 h-3.5 transition-transform duration-200 group-hover:-translate-x-0.5 text-amber-400" />
+          <span>Back to Home</span>
+        </Link>
+      </div>
+
       {/* Left Half - Abstract Visualization */}
       <div className="hidden lg:flex w-1/2 relative flex-col justify-center items-center p-12 overflow-hidden border-r border-white/5">
         <div className="absolute w-[600px] h-[600px] rounded-full bg-gradient-to-tr from-amber-600/20 via-yellow-500/10 to-purple-600/20 blur-[100px] pointer-events-none" />

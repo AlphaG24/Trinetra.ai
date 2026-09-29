@@ -12,6 +12,7 @@ import {
   useSiteConfig,
   useVisibleProducts,
 } from "@/lib/site-content";
+import { useAuth } from "@/src/components/providers/AuthProvider";
 
 type ProductStatus = "live" | "beta" | "coming_soon";
 
@@ -70,6 +71,7 @@ function getStatusMeta(status: ProductStatus) {
 }
 
 export function Navbar() {
+  const { user, role } = useAuth();
   const { data: siteConfig } = useSiteConfig();
   const { data: productsData, loading: productsLoading, error: productsError } = useVisibleProducts();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -267,8 +269,11 @@ export function Navbar() {
               <div className="absolute inset-0 rounded-full border border-[rgba(139,92,246,0.25)] transition-colors duration-200 ease-out group-hover:border-[#A78BFA]" />
               <span className="relative z-10">Trinetra Shiksha</span>
             </a>
-            <Link href="/login" className="navbar__btn-deploy">
-              Login
+            <Link
+              href={user ? (role === 'admin' || role === 'super_admin' ? '/admin' : '/dashboard') : '/login'}
+              className="navbar__btn-deploy"
+            >
+              {user ? 'Dashboard' : 'Login'}
             </Link>
           </div>
 
@@ -411,12 +416,12 @@ export function Navbar() {
           </a>
 
           <Link
-            href="/login"
+            href={user ? (role === 'admin' || role === 'super_admin' ? '/admin' : '/dashboard') : '/login'}
             className="navbar-mobile__deploy"
             style={{ transitionDelay: `${0.3 + navLinks.length * 0.1}s` }}
             onClick={() => setMenuOpen(false)}
           >
-            Login
+            {user ? 'Dashboard' : 'Login'}
           </Link>
         </nav>
       </div>

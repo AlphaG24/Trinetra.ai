@@ -361,7 +361,7 @@ export function AgentDetailPageClient({
           }
         })
       }
-      router.push('/login')
+      router.push('/')
       router.refresh()
     }
 
