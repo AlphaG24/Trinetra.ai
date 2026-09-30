@@ -5,7 +5,7 @@ import { usePathname, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/utils/supabase/client'
 import { useAuth } from '@/src/components/providers/AuthProvider'
-import { Wrench, ShieldAlert, RefreshCw, ArrowRight } from 'lucide-react'
+import { ShieldAlert, RefreshCw, ArrowRight } from 'lucide-react'
 
 interface MaintenanceWatcherProps {
   /** Initial server-side value to eliminate layout flash */
@@ -16,7 +16,7 @@ interface MaintenanceWatcherProps {
  * Global Maintenance Watcher for Trinetra AI.
  * 
  * Intercepts platform traffic when `system_config.maintenance_mode === 'true'`.
- * - Public visitors and non-admins immediately see a beautiful, branded maintenance screen.
+ * - Public visitors and non-admins see a sleek, minimal, branded maintenance screen.
  * - Administrators (admin / super_admin) or users accessing /admin or /login?admin=true are bypassed
  *   with an unobtrusive alert bar so they can manage and restore the system.
  * - Supabase Realtime pushes instant updates when maintenance mode is toggled.
@@ -28,7 +28,7 @@ export function MaintenanceWatcher({
   const [isChecking, setIsChecking] = useState(false)
   const pathname = usePathname() || '/'
   const searchParams = useSearchParams()
-  const { user, role } = useAuth()
+  const { role } = useAuth()
   const supabase = createClient()
 
   const isAdmin = role === 'admin' || role === 'super_admin'
@@ -119,110 +119,81 @@ export function MaintenanceWatcher({
   // If maintenance mode is off, render nothing
   if (!isMaintenanceMode) return null
 
-  // For public visitors and regular users, render the full-screen branded maintenance overlay
+  // For public visitors and regular users, render a sleek, minimal, premium maintenance screen
   return (
     <div
       role="alertdialog"
       aria-modal="true"
       aria-labelledby="maintenance-title"
-      className="fixed inset-0 bg-[#06040A] z-[999999] flex flex-col items-center justify-center p-6 text-white overflow-y-auto selection:bg-amber-500/30"
+      className="fixed inset-0 bg-[#080010] z-[999999] flex flex-col items-center justify-center p-6 text-white overflow-hidden selection:bg-purple-500/30"
     >
-      {/* Background ambient lighting */}
+      {/* Subtle ambient atmospheric glow */}
       <div
-        className="pointer-events-none absolute inset-0 z-0 opacity-20"
+        className="pointer-events-none absolute inset-0 z-0 opacity-40"
         style={{
           backgroundImage:
-            'radial-gradient(circle at 50% 25%, rgba(139, 92, 246, 0.4) 0%, rgba(6, 4, 10, 0) 65%), radial-gradient(circle at 80% 80%, rgba(245, 158, 11, 0.2) 0%, rgba(6, 4, 10, 0) 60%)',
+            'radial-gradient(circle at 50% 40%, rgba(139, 92, 246, 0.15) 0%, rgba(8, 0, 16, 0) 70%)',
         }}
       />
 
-      {/* Grid Pattern */}
-      <div
-        className="pointer-events-none absolute inset-0 z-0 opacity-[0.03]"
-        style={{
-          backgroundImage:
-            'linear-gradient(rgba(255, 255, 255, 0.4) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.4) 1px, transparent 1px)',
-          backgroundSize: '48px 48px',
-        }}
-      />
-
-      <div className="relative z-10 max-w-lg w-full text-center space-y-7 my-auto">
-        {/* Animated Brand Emblem */}
-        <div className="flex items-center justify-center">
-          <div className="relative group">
-            <div className="absolute inset-0 rounded-full bg-violet-600/30 blur-3xl animate-pulse" />
-            <div className="relative p-5 rounded-3xl bg-zinc-900/80 border border-violet-500/30 backdrop-blur-xl shadow-2xl flex items-center justify-center">
-              <img
-                src="/trident.png"
-                alt="Trinetra AI"
-                className="w-16 h-16 object-contain drop-shadow-[0_0_20px_rgba(139,92,246,0.6)]"
-              />
-              <div className="absolute -bottom-1 -right-1 p-1.5 rounded-full bg-amber-500 text-black shadow-lg">
-                <Wrench className="w-3.5 h-3.5" />
-              </div>
-            </div>
-          </div>
+      <div className="relative z-10 max-w-md w-full text-center flex flex-col items-center space-y-6">
+        {/* Sleek Standalone Trident Logo */}
+        <div className="relative flex items-center justify-center">
+          <div className="absolute inset-0 bg-violet-600/25 blur-3xl rounded-full scale-150 pointer-events-none" />
+          <img
+            src="/trident.png"
+            alt="Trinetra AI"
+            className="w-16 h-16 sm:w-20 sm:h-20 object-contain relative z-10 transition-transform duration-500 hover:scale-105"
+            style={{
+              filter: 'drop-shadow(0 0 25px rgba(139, 92, 246, 0.45))',
+            }}
+          />
         </div>
 
-        {/* Status Pill */}
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs font-semibold tracking-wider uppercase">
-          <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
-          <span>Scheduled Infrastructure Maintenance</span>
+        {/* Minimal Live Status Indicator */}
+        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-violet-500/20 bg-violet-500/5 text-violet-300 text-xs font-medium tracking-wide">
+          <span className="relative flex h-2 w-2">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-violet-400 opacity-75" />
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-violet-500" />
+          </span>
+          <span>Scheduled Maintenance</span>
         </div>
 
-        {/* Headline & Description */}
-        <div className="space-y-3">
+        {/* Headline & Concise Messaging */}
+        <div className="space-y-2.5">
           <h1
             id="maintenance-title"
-            className="text-3xl sm:text-4xl font-extrabold tracking-tight text-white"
+            className="text-2xl sm:text-3xl font-semibold tracking-tight text-white/95"
           >
-            We&apos;ll Be Right Back
+            We&apos;ll be right back
           </h1>
-          <p className="text-zinc-400 text-sm sm:text-base leading-relaxed max-w-md mx-auto">
-            Trinetra AI is currently undergoing scheduled infrastructure upgrades to ensure high availability, enhanced voice processing, and platform stability.
+          <p className="text-zinc-400 text-sm leading-relaxed max-w-sm mx-auto">
+            Trinetra AI is currently undergoing scheduled platform upgrades. Services will resume automatically shortly.
           </p>
         </div>
 
-        {/* Live Status Card */}
-        <div className="bg-zinc-900/70 border border-zinc-800/80 rounded-2xl p-5 text-left space-y-3 backdrop-blur-md shadow-xl">
-          <div className="flex items-center justify-between text-xs">
-            <span className="text-zinc-400 font-medium">Platform Status</span>
-            <span className="text-amber-400 font-mono font-semibold">Undergoing Upgrades</span>
-          </div>
-          <div className="h-1.5 w-full bg-zinc-800 rounded-full overflow-hidden">
-            <div className="h-full bg-gradient-to-r from-violet-500 via-amber-400 to-violet-500 animate-pulse w-3/4 rounded-full" />
-          </div>
-          <p className="text-xs text-zinc-500 leading-relaxed">
-            All user data, agent configurations, and telemetry remain completely secure. No data has been affected. Services will resume automatically as soon as maintenance concludes.
-          </p>
-        </div>
-
-        {/* Action Controls */}
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
+        {/* Minimal Refresh / Status Button */}
+        <div className="pt-2">
           <button
             onClick={checkMaintenanceStatus}
             disabled={isChecking}
-            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 text-white font-medium text-xs transition-all duration-200 shadow-[0_0_20px_rgba(139,92,246,0.3)] disabled:opacity-50"
+            className="group inline-flex items-center gap-2 px-4 py-2 rounded-full border border-white/10 bg-white/[0.03] hover:bg-white/[0.08] hover:border-violet-500/30 text-zinc-300 hover:text-white text-xs font-medium transition-all duration-200 backdrop-blur-sm disabled:opacity-50"
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${isChecking ? 'animate-spin' : ''}`} />
-            <span>{isChecking ? 'Checking System...' : 'Check Live Status'}</span>
+            <RefreshCw
+              className={`w-3.5 h-3.5 text-zinc-400 group-hover:text-violet-300 transition-colors ${
+                isChecking ? 'animate-spin' : ''
+              }`}
+            />
+            <span>{isChecking ? 'Checking status…' : 'Check status'}</span>
           </button>
         </div>
+      </div>
 
-        {/* User / Admin Footer Info */}
-        <div className="pt-4 flex flex-col items-center gap-2 text-[11px] text-zinc-600">
-          {user?.email && (
-            <p>
-              Signed in as <span className="text-zinc-400 font-mono">{user.email}</span>
-            </p>
-          )}
-          <Link
-            href="/login?admin=true"
-            className="text-zinc-500 hover:text-zinc-300 transition-colors underline underline-offset-4"
-          >
-            Administrator Console Access
-          </Link>
-        </div>
+      {/* Discreet footer */}
+      <div className="absolute bottom-6 inset-x-0 text-center pointer-events-none">
+        <p className="text-[11px] text-zinc-600 font-mono tracking-wider">
+          TRINETRA AI
+        </p>
       </div>
     </div>
   )
