@@ -1,17 +1,21 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { AlertTriangle, RefreshCw, BarChart3, Bot } from 'lucide-react'
+import { useState, useEffect, Suspense } from 'react'
+import { useSearchParams, useRouter } from 'next/navigation'
+import { AlertTriangle, RefreshCw, BarChart3, Bot, IndianRupee, Sparkles, ArrowRight } from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
 import { cleanAgentName } from '@/src/utils/formatAgentName'
 
-// Components
+// Analytics Components
 import { DateRangeFilter } from '@/src/components/analytics/DateRangeFilter'
 import { KPICards } from '@/src/components/analytics/KPICards'
 import { CallVolumeChart } from '@/src/components/analytics/CallVolumeChart'
 import { SentimentChart } from '@/src/components/analytics/SentimentChart'
 import { LeadFunnelChart } from '@/src/components/analytics/LeadFunnelChart'
 import { CallsByAgentChart } from '@/src/components/analytics/CallsByAgentChart'
+
+// Revenue Component
+import { RevenueDashboardClient } from '@/src/components/dashboard/revenue/RevenueDashboardClient'
 
 interface AgentOption {
   id: string
@@ -32,12 +36,35 @@ interface AnalyticsData {
   recentCalls: any[]
 }
 
-export default function AnalyticsDashboardPage() {
+function AnalyticsDashboardContent() {
+  const searchParams = useSearchParams()
+  const router = useRouter()
+  
+  const initialTab = searchParams.get('tab') === 'revenue' ? 'revenue' : 'performance'
+  const [activeTab, setActiveTab] = useState<'performance' | 'revenue'>(initialTab)
+
+  // Sync tab with URL if search param changes
+  useEffect(() => {
+    const tabParam = searchParams.get('tab')
+    if (tabParam === 'revenue') {
+      setActiveTab('revenue')
+    } else if (tabParam === 'performance') {
+      setActiveTab('performance')
+    }
+  }, [searchParams])
+
+  const handleTabChange = (newTab: 'performance' | 'revenue') => {
+    setActiveTab(newTab)
+    const params = new URLSearchParams(searchParams.toString())
+    params.set('tab', newTab)
+    router.replace(`/dashboard/analytics?${params.toString()}`, { scroll: false })
+  }
+
   const [range, setRange] = useState<number>(30)
   const [agentId, setAgentId] = useState<string>('all')
   const [agents, setAgents] = useState<AgentOption[]>([])
   
-  // States for data fetching
+  // States for performance analytics data fetching
   const [data, setData] = useState<AnalyticsData | null>(null)
   const [loading, setLoading] = useState<boolean>(true)
   const [error, setError] = useState<string | null>(null)
@@ -81,11 +108,13 @@ export default function AnalyticsDashboardPage() {
     } finally {
       setLoading(false)
     }
-  };
+  }
 
   useEffect(() => {
-    fetchAnalytics()
-  }, [range, agentId])
+    if (activeTab === 'performance') {
+      fetchAnalytics()
+    }
+  }, [range, agentId, activeTab])
 
   // Section level error UI helper
   const renderSectionError = (sectionName: string, retryFn: () => void) => (
@@ -114,96 +143,172 @@ export default function AnalyticsDashboardPage() {
   const showEmptyState = data && data.kpis.totalCalls === 0 && !loading && !error
 
   return (
-    <div className="space-y-8 text-left">
-      {/* Header and Filter Control */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-6 border-b border-[var(--border)]">
+    <div className="space-y-6 text-left">
+      {/* Header and Sub-Page Tab Navigation */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-[var(--border)]">
         <div>
-          <h1 className="text-3xl font-bold font-display text-[var(--heading)] tracking-tight leading-tight">
+          <h1 className="text-2xl sm:text-3xl font-bold font-display text-[var(--heading)] tracking-tight leading-tight">
             Analytics
           </h1>
-          <p className="text-xs text-[var(--body)] font-merriweather leading-relaxed mt-1">
-            Track performance across all your AI tools
+          <p className="text-xs text-[var(--muted)] leading-relaxed mt-0.5">
+            Monitor call activity, agent performance, and live revenue attribution
           </p>
+        </div>
+
+        {/* Tab Switcher Pills */}
+        <div className="flex items-center gap-1.5 p-1 rounded-xl bg-[var(--card-bg)] border border-[var(--border)] shadow-sm self-start md:self-auto">
+          <button
+            type="button"
+            onClick={() => handleTabChange('performance')}
+            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-montserrat font-bold uppercase tracking-wider transition-all cursor-pointer ${
+              activeTab === 'performance'
+                ? 'bg-violet-600 text-white shadow-sm'
+                : 'text-[var(--muted)] hover:text-[var(--heading)]'
+            }`}
+          >
+            <BarChart3 className="w-3.5 h-3.5" />
+            <span>Overview & Calls</span>
+          </button>
+          
+          <button
+            type="button"
+            onClick={() => handleTabChange('revenue')}
+            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-montserrat font-bold uppercase tracking-wider transition-all cursor-pointer ${
+              activeTab === 'revenue'
+                ? 'bg-violet-600 text-white shadow-sm'
+                : 'text-[var(--muted)] hover:text-[var(--heading)]'
+            }`}
+          >
+            <IndianRupee className="w-3.5 h-3.5" />
+            <span>Revenue & ROI</span>
+            <span className={`px-1.5 py-0.2 rounded-full text-[9px] font-bold ${
+              activeTab === 'revenue' ? 'bg-white/20 text-white' : 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+            }`}>
+              LIVE
+            </span>
+          </button>
         </div>
       </div>
 
-      {/* Date and Agent Filter */}
-      <DateRangeFilter
-        range={range}
-        onRangeChange={setRange}
-        agentId={agentId}
-        onAgentIdChange={setAgentId}
-        agents={agents}
-      />
-
-      {/* Loading State */}
-      {loading && (
-        <div className="space-y-8">
-          {/* KPI Loader */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {[...Array(4)].map((_, i) => (
-              <div key={i} className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-5 h-28 animate-pulse" />
-            ))}
-          </div>
-          {/* Charts Loader */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {[...Array(2)].map((_, i) => (
-              <div key={i} className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl h-80 animate-pulse" />
-            ))}
-          </div>
-          {/* CTA Card Loader */}
-          <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl h-24 animate-pulse" />
-        </div>
-      )}
-
-      {/* Error State */}
-      {!loading && error && renderSectionError('Dashboard Metrics', fetchAnalytics)}
-
-      {/* Empty State */}
-      {showEmptyState && (
-        <div className="flex flex-col items-center justify-center py-20 text-center space-y-4 border border-dashed border-[var(--border)] rounded-2xl bg-[var(--card-bg)] max-w-xl mx-auto shadow-sm">
-          <div className="w-16 h-16 rounded-2xl bg-[var(--background)] border border-[var(--border)] flex items-center justify-center text-[var(--muted)] shadow-inner">
-            <BarChart3 className="w-8 h-8" />
-          </div>
-          <div className="space-y-1.5">
-            <h2 className="text-lg font-bold font-display text-[var(--heading)]">No analytics data yet</h2>
-            <p className="text-xs text-[var(--body)] font-merriweather max-w-xs mx-auto">
-              Start provisioning agents and making calls to see live telemetry and charts.
-            </p>
-          </div>
-          <a
-            href="/dashboard/marketplace"
-            className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-[var(--primary-bg)] text-[var(--heading)] hover:bg-[var(--hover-bg)] border border-[var(--border)] font-bold text-xs uppercase tracking-wider transition-all hover:scale-[1.02] cursor-pointer"
-          >
-            <Bot className="w-4 h-4" /> Browse Marketplace
-          </a>
-        </div>
-      )}
-
-      {/* Render Data Components */}
-      {!loading && !error && data && !showEmptyState && (
-        <div className="space-y-8 animate-in fade-in duration-300">
-          {/* KPIs */}
-          <KPICards
-            totalCalls={data.kpis.totalCalls}
-            totalMinutes={data.kpis.totalMinutes}
-            avgDuration={data.kpis.avgDuration}
-            leadsGenerated={data.kpis.leadsGenerated}
+      {/* TAB 1: PERFORMANCE & CALL OVERVIEW */}
+      {activeTab === 'performance' && (
+        <div className="space-y-8 animate-in fade-in duration-200">
+          {/* Date and Agent Filter */}
+          <DateRangeFilter
+            range={range}
+            onRangeChange={setRange}
+            agentId={agentId}
+            onAgentIdChange={setAgentId}
+            agents={agents}
           />
 
-          {/* Row 1: Volume & Sentiment */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <CallVolumeChart data={data.callVolume} />
-            <SentimentChart data={data.sentiment} />
-          </div>
+          {/* Loading State */}
+          {loading && (
+            <div className="space-y-8">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                {[...Array(4)].map((_, i) => (
+                  <div key={i} className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-5 h-28 animate-pulse" />
+                ))}
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {[...Array(2)].map((_, i) => (
+                  <div key={i} className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl h-80 animate-pulse" />
+                ))}
+              </div>
+            </div>
+          )}
 
-          {/* Row 2: Funnel & Agent distribution */}
-          <div className={data.callsByAgent.length > 1 ? "grid grid-cols-1 md:grid-cols-2 gap-6" : "grid grid-cols-1 gap-6"}>
-            <LeadFunnelChart data={data.leadFunnel} />
-            {data.callsByAgent.length > 1 && <CallsByAgentChart data={data.callsByAgent} />}
-          </div>
+          {/* Error State */}
+          {!loading && error && renderSectionError('Dashboard Metrics', fetchAnalytics)}
+
+          {/* Empty State */}
+          {showEmptyState && (
+            <div className="flex flex-col items-center justify-center py-20 text-center space-y-4 border border-dashed border-[var(--border)] rounded-2xl bg-[var(--card-bg)] max-w-xl mx-auto shadow-sm">
+              <div className="w-16 h-16 rounded-2xl bg-[var(--background)] border border-[var(--border)] flex items-center justify-center text-[var(--muted)] shadow-inner">
+                <BarChart3 className="w-8 h-8" />
+              </div>
+              <div className="space-y-1.5">
+                <h2 className="text-lg font-bold font-display text-[var(--heading)]">No analytics data yet</h2>
+                <p className="text-xs text-[var(--body)] font-merriweather max-w-xs mx-auto">
+                  Start provisioning agents and making calls to see live telemetry and charts.
+                </p>
+              </div>
+              <a
+                href="/dashboard/marketplace"
+                className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-[var(--primary-bg)] text-[var(--heading)] hover:bg-[var(--hover-bg)] border border-[var(--border)] font-bold text-xs uppercase tracking-wider transition-all hover:scale-[1.02] cursor-pointer"
+              >
+                <Bot className="w-4 h-4" /> Browse Marketplace
+              </a>
+            </div>
+          )}
+
+          {/* Render Data Components */}
+          {!loading && !error && data && !showEmptyState && (
+            <div className="space-y-8 animate-in fade-in duration-300">
+              {/* KPIs */}
+              <KPICards
+                totalCalls={data.kpis.totalCalls}
+                totalMinutes={data.kpis.totalMinutes}
+                avgDuration={data.kpis.avgDuration}
+                leadsGenerated={data.kpis.leadsGenerated}
+              />
+
+              {/* Row 1: Volume & Sentiment */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <CallVolumeChart data={data.callVolume} />
+                <SentimentChart data={data.sentiment} />
+              </div>
+
+              {/* Row 2: Funnel & Agent distribution */}
+              <div className={data.callsByAgent.length > 1 ? "grid grid-cols-1 md:grid-cols-2 gap-6" : "grid grid-cols-1 gap-6"}>
+                <LeadFunnelChart data={data.leadFunnel} />
+                {data.callsByAgent.length > 1 && <CallsByAgentChart data={data.callsByAgent} />}
+              </div>
+
+              {/* Revenue Teaser Banner */}
+              <div className="p-6 rounded-2xl bg-gradient-to-r from-violet-950/40 via-purple-900/20 to-[var(--card-bg)] border border-violet-500/25 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-violet-400" />
+                    <span className="text-xs font-bold uppercase tracking-wider text-violet-300">
+                      Revenue Attribution & Pipeline
+                    </span>
+                  </div>
+                  <h3 className="text-base font-bold text-[var(--heading)]">
+                    Track quote estimates, confirmed deals, and AI return on investment
+                  </h3>
+                  <p className="text-xs text-[var(--muted)]">
+                    See commercial quotes captured from calls and verified closed revenue by source.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleTabChange('revenue')}
+                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 text-white font-bold text-xs uppercase tracking-wider transition-all shadow-md shrink-0 cursor-pointer"
+                >
+                  <span>Open Revenue & ROI</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* TAB 2: REVENUE FROM TRINETRA & ROI */}
+      {activeTab === 'revenue' && (
+        <div className="animate-in fade-in duration-200">
+          <RevenueDashboardClient embedded={true} />
         </div>
       )}
     </div>
+  )
+}
+
+export default function AnalyticsDashboardPage() {
+  return (
+    <Suspense fallback={<div className="p-8 text-center text-xs text-[var(--muted)]">Loading analytics...</div>}>
+      <AnalyticsDashboardContent />
+    </Suspense>
   )
 }

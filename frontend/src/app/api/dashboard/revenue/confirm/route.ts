@@ -73,7 +73,9 @@ export async function POST(request: Request) {
     }
 
     if (!currentEvent) {
-      return NextResponse.json({ error: 'Revenue event or associated lead not found' }, { status: 404 })
+      return NextResponse.json({
+        error: 'Revenue record not found. Note: please ensure database/migrations/20260930_create_revenue_events.sql has been executed in your Supabase SQL Editor.'
+      }, { status: 404 })
     }
 
     // Multi-tenant security check
