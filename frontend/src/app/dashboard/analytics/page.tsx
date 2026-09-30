@@ -156,34 +156,37 @@ function AnalyticsDashboardContent() {
         </div>
 
         {/* Tab Switcher Pills */}
-        <div className="flex items-center gap-1.5 p-1 rounded-xl bg-[var(--card-bg)] border border-[var(--border)] shadow-sm self-start md:self-auto">
+        <div className="flex items-center gap-2 p-1.5 rounded-2xl bg-[var(--card-bg)] border border-[var(--border)] shadow-sm self-start md:self-auto">
           <button
             type="button"
             onClick={() => handleTabChange('performance')}
-            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-montserrat font-bold uppercase tracking-wider transition-all cursor-pointer ${
+            className={`flex items-center gap-2.5 px-5 py-2.5 rounded-xl text-xs sm:text-[13px] font-semibold whitespace-nowrap transition-all cursor-pointer ${
               activeTab === 'performance'
-                ? 'bg-violet-600 text-white shadow-sm'
-                : 'text-[var(--muted)] hover:text-[var(--heading)]'
+                ? 'bg-neutral-900 text-white shadow-sm dark:bg-white dark:text-neutral-900'
+                : 'text-[var(--muted)] hover:text-[var(--heading)] hover:bg-[var(--hover-bg)]'
             }`}
           >
-            <BarChart3 className="w-3.5 h-3.5" />
-            <span>Overview & Calls</span>
+            <BarChart3 className="w-4 h-4" />
+            <span>Overview &amp; Calls</span>
           </button>
           
           <button
             type="button"
             onClick={() => handleTabChange('revenue')}
-            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-montserrat font-bold uppercase tracking-wider transition-all cursor-pointer ${
+            className={`flex items-center gap-2.5 px-5 py-2.5 rounded-xl text-xs sm:text-[13px] font-semibold whitespace-nowrap transition-all cursor-pointer ${
               activeTab === 'revenue'
-                ? 'bg-violet-600 text-white shadow-sm'
-                : 'text-[var(--muted)] hover:text-[var(--heading)]'
+                ? 'bg-neutral-900 text-white shadow-sm dark:bg-white dark:text-neutral-900'
+                : 'text-[var(--muted)] hover:text-[var(--heading)] hover:bg-[var(--hover-bg)]'
             }`}
           >
-            <IndianRupee className="w-3.5 h-3.5" />
-            <span>Revenue & ROI</span>
-            <span className={`px-1.5 py-0.2 rounded-full text-[9px] font-bold ${
-              activeTab === 'revenue' ? 'bg-white/20 text-white' : 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+            <IndianRupee className="w-4 h-4" />
+            <span>Revenue &amp; ROI</span>
+            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold tracking-wider ${
+              activeTab === 'revenue'
+                ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-400/40'
+                : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25'
             }`}>
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
               LIVE
             </span>
           </button>

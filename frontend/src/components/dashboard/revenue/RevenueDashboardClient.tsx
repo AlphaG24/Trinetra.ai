@@ -171,7 +171,8 @@ export function RevenueDashboardClient({ embedded = false }: { embedded?: boolea
                 Revenue Attribution & Pipeline
               </h2>
             )}
-            <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-violet-500/15 text-violet-400 border border-violet-500/30">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
               LIVE ATTRIBUTION
             </span>
           </div>
@@ -181,15 +182,15 @@ export function RevenueDashboardClient({ embedded = false }: { embedded?: boolea
         </div>
 
         {/* Date Filter Buttons */}
-        <div className="flex items-center gap-1.5 p-1 rounded-xl bg-[var(--card-bg)] border border-[var(--border)] self-start sm:self-auto shadow-sm">
+        <div className="flex items-center gap-1.5 p-1.5 rounded-xl bg-[var(--card-bg)] border border-[var(--border)] self-start sm:self-auto shadow-sm">
           {(['this_month', '30d', '7d'] as const).map(tab => (
             <button
               key={tab}
               onClick={() => setRange(tab)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                 range === tab
-                  ? 'bg-violet-600 text-white shadow-sm'
-                  : 'text-[var(--muted)] hover:text-[var(--heading)]'
+                  ? 'bg-neutral-900 text-white shadow-sm dark:bg-white dark:text-neutral-900'
+                  : 'text-[var(--muted)] hover:text-[var(--heading)] hover:bg-[var(--hover-bg)]'
               }`}
             >
               {tab === 'this_month' ? 'This Month' : tab === '30d' ? 'Last 30 Days' : 'Last 7 Days'}
@@ -198,39 +199,39 @@ export function RevenueDashboardClient({ embedded = false }: { embedded?: boolea
           <button
             onClick={() => fetchMetrics(range)}
             disabled={loading}
-            className="p-1.5 text-[var(--muted)] hover:text-[var(--heading)] transition-colors cursor-pointer"
+            className="p-1.5 text-[var(--muted)] hover:text-[var(--heading)] transition-colors cursor-pointer rounded-lg hover:bg-[var(--hover-bg)]"
             title="Refresh metrics"
             aria-label="Refresh metrics"
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-violet-400' : ''}`} />
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-neutral-900 dark:text-white' : ''}`} />
           </button>
         </div>
       </div>
 
       {/* ROI Highlight Banner */}
-      <div className="relative overflow-hidden rounded-2xl border border-violet-500/30 bg-gradient-to-r from-violet-950/40 via-purple-900/25 to-[var(--card-bg)] p-6 backdrop-blur-xl shadow-xl">
+      <div className="relative overflow-hidden rounded-2xl border border-neutral-800 bg-gradient-to-br from-neutral-950 via-neutral-900 to-neutral-950 p-6 md:p-7 text-white shadow-xl">
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="space-y-1.5">
             <div className="flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-violet-400" />
-              <span className="text-xs font-bold uppercase tracking-wider text-violet-300">
+              <Sparkles className="w-4 h-4 text-emerald-400" />
+              <span className="text-xs font-bold uppercase tracking-wider text-emerald-400">
                 Your Return On Investment (ROI)
               </span>
             </div>
-            <h2 className="text-xl sm:text-2xl font-extrabold text-[var(--heading)]">
+            <h2 className="text-xl sm:text-2xl font-extrabold text-white">
               You paid ₹{(metrics?.totalPaidToTrinetra || 0).toLocaleString()}, Trinetra brought{' '}
               <span className="text-emerald-400">
                 ₹{(metrics?.confirmedRevenue || 0).toLocaleString()}
               </span>
             </h2>
-            <p className="text-xs text-[var(--muted)]">
+            <p className="text-xs text-neutral-400">
               Display only &bull; Based on owner-confirmed closed deals &bull; Does not charge on these numbers
             </p>
           </div>
 
-          <div className="flex items-center gap-4 bg-[var(--card-bg)]/90 border border-[var(--border)] rounded-xl px-5 py-3 shadow-inner">
+          <div className="flex items-center gap-4 bg-neutral-800/80 border border-neutral-700/60 rounded-xl px-5 py-3.5 shadow-inner">
             <div>
-              <div className="text-[11px] font-semibold text-[var(--muted)] uppercase tracking-wider">
+              <div className="text-[11px] font-semibold text-neutral-400 uppercase tracking-wider">
                 Confirmed ROI Multiple
               </div>
               <div className="text-2xl font-extrabold text-emerald-400 flex items-center gap-1 font-mono">
@@ -238,12 +239,12 @@ export function RevenueDashboardClient({ embedded = false }: { embedded?: boolea
                 <ArrowUpRight className="w-5 h-5 text-emerald-400" />
               </div>
             </div>
-            <div className="h-8 w-px bg-[var(--border)]" />
+            <div className="h-8 w-px bg-neutral-700" />
             <div>
-              <div className="text-[11px] font-semibold text-[var(--muted)] uppercase tracking-wider">
+              <div className="text-[11px] font-semibold text-neutral-400 uppercase tracking-wider">
                 Net Value Return
               </div>
-              <div className="text-sm font-bold text-[var(--heading)] font-mono">
+              <div className="text-sm font-bold text-white font-mono">
                 {metrics && metrics.confirmedRevenue >= metrics.totalPaidToTrinetra ? '+' : ''}
                 {metrics?.roiPercentage || 0}%
               </div>
@@ -255,7 +256,7 @@ export function RevenueDashboardClient({ embedded = false }: { embedded?: boolea
       {/* Top 3 KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
         {/* Card 1: Estimated Pipeline */}
-        <div className="p-6 rounded-2xl bg-[var(--card-bg)] border border-[var(--border)] hover:border-violet-500/30 transition-all shadow-sm">
+        <div className="p-6 rounded-2xl bg-[var(--card-bg)] border border-[var(--border)] hover:border-neutral-400 dark:hover:border-neutral-600 transition-all shadow-sm">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold uppercase tracking-wider text-[var(--muted)]">
               Estimated Pipeline
@@ -293,7 +294,7 @@ export function RevenueDashboardClient({ embedded = false }: { embedded?: boolea
         </div>
 
         {/* Card 3: Deal Conversion Ratio */}
-        <div className="p-6 rounded-2xl bg-[var(--card-bg)] border border-[var(--border)] hover:border-violet-500/30 transition-all shadow-sm">
+        <div className="p-6 rounded-2xl bg-[var(--card-bg)] border border-[var(--border)] hover:border-neutral-400 dark:hover:border-neutral-600 transition-all shadow-sm">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold uppercase tracking-wider text-[var(--muted)]">
               Close Ratio
@@ -342,7 +343,7 @@ export function RevenueDashboardClient({ embedded = false }: { embedded?: boolea
               >
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-medium text-[var(--muted)] flex items-center gap-1.5">
-                    <Icon className="w-3.5 h-3.5 text-violet-400" />
+                    <Icon className="w-3.5 h-3.5 text-neutral-500 dark:text-neutral-400" />
                     {label}
                   </span>
                   <span className="text-xs font-bold text-[var(--heading)]">{pct}%</span>
@@ -352,7 +353,7 @@ export function RevenueDashboardClient({ embedded = false }: { embedded?: boolea
                 </div>
                 <div className="h-1.5 w-full bg-[var(--border)] rounded-full overflow-hidden">
                   <div
-                    className="h-full bg-violet-500 rounded-full transition-all duration-500"
+                    className="h-full bg-emerald-500 rounded-full transition-all duration-500"
                     style={{ width: `${Math.min(pct, 100)}%` }}
                   />
                 </div>
@@ -454,7 +455,7 @@ export function RevenueDashboardClient({ embedded = false }: { embedded?: boolea
                               setSelectedEventForWon(ev)
                               setCustomWonAmount(ev.won_amount ? String(ev.won_amount) : String(ev.quoted_amount || ''))
                             }}
-                            className="text-[var(--muted)] hover:text-violet-400 text-[11px] underline underline-offset-2 font-medium cursor-pointer"
+                            className="text-[var(--muted)] hover:text-[var(--heading)] text-[11px] underline underline-offset-2 font-medium cursor-pointer"
                           >
                             Edit
                           </button>
@@ -504,7 +505,7 @@ export function RevenueDashboardClient({ embedded = false }: { embedded?: boolea
                   value={customWonAmount}
                   onChange={e => setCustomWonAmount(e.target.value)}
                   placeholder="e.g. 15000"
-                  className="w-full bg-[var(--primary-bg)] border border-[var(--border)] rounded-xl px-3.5 py-2.5 text-[var(--heading)] font-mono text-sm outline-none focus:border-violet-500"
+                  className="w-full bg-[var(--primary-bg)] border border-[var(--border)] rounded-xl px-3.5 py-2.5 text-[var(--heading)] font-mono text-sm outline-none focus:border-neutral-900 dark:focus:border-white"
                   autoFocus
                 />
               </div>
@@ -520,7 +521,7 @@ export function RevenueDashboardClient({ embedded = false }: { embedded?: boolea
                 <button
                   type="submit"
                   disabled={updatingEventId !== null}
-                  className="px-4 py-2 rounded-xl bg-violet-600 hover:bg-violet-500 text-white font-semibold text-xs transition-colors shadow-sm disabled:opacity-50 cursor-pointer"
+                  className="px-4 py-2 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-white font-semibold text-xs transition-colors shadow-sm disabled:opacity-50 cursor-pointer dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-100"
                 >
                   Confirm &amp; Add Revenue
                 </button>

@@ -7,8 +7,8 @@
 -- 1. REVENUE EVENTS TABLE
 CREATE TABLE IF NOT EXISTS public.revenue_events (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    lead_id UUID REFERENCES public.leads(id) ON DELETE SET NULL,
-    call_id UUID REFERENCES public.voice_calls(id) ON DELETE SET NULL,
+    lead_id UUID,
+    call_id UUID,
     business_id UUID NOT NULL,
     quoted_amount NUMERIC(12, 2),
     currency VARCHAR(10) NOT NULL DEFAULT 'INR',
@@ -141,6 +141,14 @@ CREATE POLICY "Authenticated users can insert audit logs"
     );
 
 -- 5. SYSTEM CONFIG FEATURE FLAG
+CREATE TABLE IF NOT EXISTS public.system_config (
+    id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+    config_key text NOT NULL UNIQUE,
+    config_value text NOT NULL,
+    description text,
+    updated_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
 INSERT INTO public.system_config (config_key, config_value, description)
 VALUES ('revenue_model_enabled', 'true', 'When true, enables the Revenue from Trinetra extraction, tracking, and dashboard model')
 ON CONFLICT (config_key) DO NOTHING;
