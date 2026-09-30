@@ -2883,6 +2883,26 @@ Only return valid JSON."""
             except Exception as campaign_err:
                 logger.error(f"Failed to update campaign/contact statistics: {campaign_err}")
 
+        # 5.5 Extract and record structured revenue events behind feature flag
+        rev_event = None
+        if user_id:
+            try:
+                from app.services.revenue_service import RevenueService
+                det_source = "campaign" if campaign_id else ("callback" if lead_data.get("callback_scheduled") else "inbound")
+                rev_event = await RevenueService.process_call_revenue(
+                    business_id=user_id,
+                    call_id=original_call_id,
+                    lead_id=lead_id,
+                    transcript=transcript,
+                    summary=lead_data.get("call_summary", ""),
+                    caller_phone=resolved_phone if resolved_phone != "Unknown" else None,
+                    source=det_source,
+                    groq_api_key=groq_key,
+                    gemini_api_key=gemini_key
+                )
+            except Exception as rev_err:
+                logger.warning(f"[extract_and_save_lead] Revenue event processing warning: {rev_err}")
+
         # 6. Dispatch post-call summary alert to Dashboard & Telegram
         if user_id:
             try:
@@ -2927,21 +2947,44 @@ Only return valid JSON."""
                 if lead_data.get("callback_scheduled"):
                     notif_body += f"\n• ⏰ Callback Scheduled: {lead_data.get('callback_time_iso') or 'Later'}"
 
+                notif_payload = {
+                    "call_id": original_call_id,
+                    "agent_id": agent_id,
+                    "duration": duration_seconds,
+                    "phone": c_phone,
+                    "contact_name": c_name if c_name != "Caller" else None,
+                    "summary": c_summary,
+                    "sentiment": c_sentiment,
+                    "direction": c_dir_str.lower()
+                }
+
+                # Add Revenue Quote & Single-Use Action Buttons if quote detected
+                if rev_event and rev_event.get("quoted_amount"):
+                    from app.services.revenue_service import RevenueService
+                    q_amt = rev_event["quoted_amount"]
+                    q_cur = rev_event.get("currency", "INR")
+                    app_base = os.getenv("NEXT_PUBLIC_APP_URL", "https://trinetraedu-ai.com").rstrip("/")
+                    won_token = RevenueService.generate_action_token(rev_event["id"], user_id, "won")
+                    lost_token = RevenueService.generate_action_token(rev_event["id"], user_id, "lost")
+                    won_url = f"{app_base}/api/revenue/action?token={won_token}"
+                    lost_url = f"{app_base}/api/revenue/action?token={lost_token}"
+
+                    notif_body += (
+                        f"\n\n💰 *Quote Discussed:* {q_cur} {q_amt:,.2f}\n"
+                        f"👉 [Mark Won ({q_cur} {q_amt:,.2f})]({won_url})\n"
+                        f"❌ [Mark Lost]({lost_url})"
+                    )
+                    notif_payload["revenue_event_id"] = rev_event["id"]
+                    notif_payload["quoted_amount"] = q_amt
+                    notif_payload["won_url"] = won_url
+                    notif_payload["lost_url"] = lost_url
+
                 await NotificationService.dispatch(
                     user_id=user_id,
                     event_type="call_completed",
                     title=notif_title,
                     message=notif_body,
-                    payload={
-                        "call_id": original_call_id,
-                        "agent_id": agent_id,
-                        "duration": duration_seconds,
-                        "phone": c_phone,
-                        "contact_name": c_name if c_name != "Caller" else None,
-                        "summary": c_summary,
-                        "sentiment": c_sentiment,
-                        "direction": c_dir_str.lower()
-                    }
+                    payload=notif_payload
                 )
                 logger.info(f"[extract_and_save_lead] Dispatched call_completed notification for user {user_id}")
             except Exception as notif_err:
