@@ -158,58 +158,76 @@ def extract_amounts_heuristic(text: str) -> Tuple[Optional[float], Optional[Pric
 
     # 1. Range patterns:
     # "5 to 7 thousand", "5 se 7 hazaar", "5000 - 8000", "5k to 10k", "50k to 1 lakh"
+    UNIT_REGEX = r'(?:(?<=\d)k\b|\b(?:k|hazar|hazaar|thousand|lakh|lac|lakhs|crore|cr)\b)'
+    NUM_REGEX = r'(?:[\d,]+(?:\.\d+)?|ek|do|teen|tin|chaar|char|paanch|panch|chhe|che|saat|sat|aath|ath|nau|no|das|dus|gyarah|barah|terah|chaudah|pandrah|solah|satrah|atharah|unnis|bees|tees|chaalis|chalis|pachas|saath|sattar|assi|nabbe|sau|dedh|dhai)'
+    CURR_REGEX = r'(?:rs\.?|inr|₹)'
+
     range_regex = re.compile(
-        r'(\b\w+|\d+(?:\.\d+)?)\s*(?:-|to|se|tak)\s*(\b\w+|\d+(?:\.\d+)?)\s*(k|hazar|hazaar|thousand|lakh|lac|crore|cr)?',
+        rf'(?:{CURR_REGEX}\s*)?({NUM_REGEX})\s*({UNIT_REGEX})?\s*(?:-|to|se|tak)\s*(?:{CURR_REGEX}\s*)?({NUM_REGEX})\s*({UNIT_REGEX})?',
         re.IGNORECASE
     )
 
     for match in range_regex.finditer(lower):
-        part1 = match.group(1)
-        part2 = match.group(2)
-        unit = match.group(3)
+        part1 = match.group(1).replace(",", "")
+        unit1 = match.group(2)
+        part2 = match.group(3).replace(",", "")
+        unit2 = match.group(4)
 
-        # Skip obvious non-price ranges (e.g. "monday to friday", "2 to 3 days")
+        # Skip obvious non-price ranges
         if any(skip in match.group(0) for skip in ["day", "din", "baje", "pm", "am", "hour", "ghante", "week", "month", "sal", "year"]):
             continue
 
-        a1 = parse_hindi_amount_phrase(f"{part1} {unit}" if unit else part1)
-        a2 = parse_hindi_amount_phrase(f"{part2} {unit}" if unit else part2)
+        p1_str = f"{part1} {unit1}" if unit1 else (f"{part1} {unit2}" if unit2 and not part1.isdigit() else part1)
+        p2_str = f"{part2} {unit2}" if unit2 else part2
 
-        if a1 and a2 and a1 > 50 and a2 > 50:
+        a1 = parse_hindi_amount_phrase(p1_str)
+        a2 = parse_hindi_amount_phrase(p2_str)
+
+        # Handle "5 to 7 thousand" where part1 is 5 and unit2 is thousand
+        if a1 and a2 and a1 < 100 and a2 >= 1000 and not unit1 and unit2:
+            mult = parse_hindi_amount_phrase(f"1 {unit2}")
+            if mult and mult >= 1000:
+                a1 = a1 * mult
+
+        if a1 and a2 and a1 >= 100 and a2 >= 100:
             if a1 > a2:
                 a1, a2 = a2, a1
-            # If part1 was shorthand without unit (e.g. '5 to 7 thousand'), scale a1
-            if a1 < 100 and a2 >= 1000 and (unit or a2 >= 1000):
-                mult = a2 / (float(part2) if part2.isdigit() else 1)
-                if mult in (1000, 100000):
-                    a1 = a1 * mult
-
             avg_amount = round((a1 + a2) / 2.0, 2)
             return avg_amount, "range", a1, a2, match.group(0).strip()
 
     # 2. Single price patterns:
     # "Rs 15000", "₹ 25,000", "paanch hazaar", "10k", "50 hazar", "2.5 lakh"
     single_regex = re.compile(
-        r'(?:(?:rs\.?|inr|₹)\s*)?(\b\w+|\d+(?:\.\d+)?)\s*(k|hazar|hazaar|thousand|lakh|lac|crore|cr|\/-)?',
+        rf'({CURR_REGEX}\s*)?({NUM_REGEX})\s*({UNIT_REGEX}|\/-)?',
         re.IGNORECASE
     )
 
     found_amounts = []
     for match in single_regex.finditer(lower):
+        curr_prefix = match.group(1)
+        num_part = match.group(2).replace(",", "")
+        mult_suffix = match.group(3)
         phrase = match.group(0).strip()
-        # Filter out non-financial digits (e.g. phone numbers, minutes, dates)
-        if len(re.sub(r'\D', '', phrase)) >= 10:  # phone number
+
+        # Filter out non-financial digits (e.g. phone numbers)
+        digits_only = re.sub(r'\D', '', num_part)
+        if len(digits_only) >= 10:
             continue
         if any(w in phrase for w in ["min", "sec", "baje", "date", "tarikh", "call"]):
             continue
 
         amt = parse_hindi_amount_phrase(phrase)
-        if amt and amt >= 100:  # Sensible minimum threshold for commercial pricing
-            found_amounts.append((amt, phrase))
+        if amt and amt >= 100:
+            has_marker = bool(curr_prefix or (mult_suffix and mult_suffix != "/-") or any(hw in phrase for hw in ["hazaar", "lakh", "crore"]))
+            # Filter out plain bare numbers under 1000 that lack a currency or multiplier prefix (e.g. 500 minutes)
+            if not has_marker and amt < 1000:
+                continue
+            found_amounts.append((amt, phrase, has_marker))
 
     if found_amounts:
-        # Take the most prominent or highest quoted amount
-        best_amt, best_quote = found_amounts[-1]
+        # Prioritize amounts with explicit currency prefix or multiplier
+        marked = [fa for fa in found_amounts if fa[2]]
+        best_amt, best_quote, _ = marked[-1] if marked else found_amounts[-1]
         price_type = "monthly" if is_monthly else "one_time"
         return best_amt, price_type, None, None, best_quote
 
@@ -280,7 +298,8 @@ Return ONLY valid JSON matching this schema:
         text: str,
         source: SourceType = "inbound",
         groq_api_key: Optional[str] = None,
-        gemini_api_key: Optional[str] = None
+        gemini_api_key: Optional[str] = None,
+        use_llm: bool = True
     ) -> RevenueExtractionResult:
         """
         Runs LLM extraction with fallback to deterministic parser.
@@ -290,49 +309,54 @@ Return ONLY valid JSON matching this schema:
             return RevenueExtractionResult(source=source, confidence=0.0)
 
         groq_key = groq_api_key or os.getenv("GROQ_API_KEY")
-        gemini_key = gemini_api_key or os.getenv("GEMINI_API_KEY")
+        gemini_key = gemini_api_key or os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
         prompt = cls.EXTRACTION_PROMPT.format(text=text[:3500], source=source)
 
         raw_json_dict = None
 
-        # 1. Attempt Groq LLM extraction (fast JSON mode)
-        if groq_key:
-            try:
-                async with httpx.AsyncClient(timeout=12.0) as client:
-                    resp = await client.post(
-                        "https://api.groq.com/openai/v1/chat/completions",
-                        headers={"Authorization": f"Bearer {groq_key}", "Content-Type": "application/json"},
-                        json={
-                            "model": os.getenv("GROQ_LLM_MODEL", "openai/gpt-oss-120b"),
-                            "messages": [{"role": "user", "content": prompt}],
-                            "temperature": 0.0,
-                            "max_completion_tokens": 500,
-                            "response_format": {"type": "json_object"}
-                        }
-                    )
-                    if resp.status_code == 200:
-                        content = resp.json()["choices"][0]["message"]["content"]
-                        raw_json_dict = json.loads(content)
-                        logger.info(f"[RevenueExtractor] Groq extracted: amount={raw_json_dict.get('quoted_amount')}, type={raw_json_dict.get('price_type')}")
-            except Exception as e:
-                logger.warning(f"[RevenueExtractor] Groq extraction error: {e}")
+        if use_llm:
+            # 1. Attempt Groq LLM extraction (fast JSON mode)
+            if groq_key:
+                try:
+                    async with httpx.AsyncClient(timeout=8.0) as client:
+                        resp = await client.post(
+                            "https://api.groq.com/openai/v1/chat/completions",
+                            headers={"Authorization": f"Bearer {groq_key}", "Content-Type": "application/json"},
+                            json={
+                                "model": os.getenv("GROQ_LLM_MODEL", "openai/gpt-oss-120b"),
+                                "messages": [{"role": "user", "content": prompt}],
+                                "temperature": 0.0,
+                                "max_completion_tokens": 500,
+                                "response_format": {"type": "json_object"}
+                            }
+                        )
+                        if resp.status_code == 200:
+                            content = resp.json()["choices"][0]["message"]["content"]
+                            raw_json_dict = json.loads(content)
+                            logger.info(f"[RevenueExtractor] Groq extracted: amount={raw_json_dict.get('quoted_amount')}, type={raw_json_dict.get('price_type')}")
+                except Exception as e:
+                    logger.warning(f"[RevenueExtractor] Groq extraction error: {e}")
 
-        # 2. Attempt Gemini LLM fallback
-        if not raw_json_dict and gemini_key:
-            try:
-                from google import genai
-                g_client = genai.Client(api_key=gemini_key)
-                g_res = await asyncio.to_thread(
-                    g_client.models.generate_content,
-                    model="gemini-2.5-flash",
-                    contents=prompt,
-                    config={"response_mime_type": "application/json"}
-                )
-                if g_res and g_res.text:
-                    raw_json_dict = json.loads(g_res.text)
-                    logger.info(f"[RevenueExtractor] Gemini fallback extracted: amount={raw_json_dict.get('quoted_amount')}")
-            except Exception as e:
-                logger.warning(f"[RevenueExtractor] Gemini fallback error: {e}")
+            # 2. Attempt Gemini LLM fallback
+            if not raw_json_dict and gemini_key:
+                try:
+                    from google import genai
+                    from google.genai.types import GenerateContentConfig
+                    g_client = genai.Client(api_key=gemini_key)
+                    g_res = await asyncio.wait_for(
+                        asyncio.to_thread(
+                            g_client.models.generate_content,
+                            model="gemini-2.5-flash",
+                            contents=prompt,
+                            config=GenerateContentConfig(response_mime_type="application/json")
+                        ),
+                        timeout=10.0
+                    )
+                    if g_res and g_res.text:
+                        raw_json_dict = json.loads(g_res.text)
+                        logger.info(f"[RevenueExtractor] Gemini fallback extracted: amount={raw_json_dict.get('quoted_amount')}")
+                except Exception as e:
+                    logger.warning(f"[RevenueExtractor] Gemini fallback error: {e}")
 
         # 3. Validate with Pydantic if LLM returned structured JSON
         if raw_json_dict and isinstance(raw_json_dict, dict):
