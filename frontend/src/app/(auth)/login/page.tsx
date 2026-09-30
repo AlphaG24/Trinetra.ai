@@ -80,41 +80,43 @@ function LoginForm() {
         
         const redirectParam = searchParams ? searchParams.get('redirect') : null
         
-        if (redirectParam) {
-          let target = redirectParam.trim()
-          
-          // Check if it contains authorized domain (trinetraedu-ai.com)
-          if (target.toLowerCase().includes('trinetraedu-ai.com')) {
-            // Sanitize redirect: Ensure it starts with https:// to prevent open redirect/javascript scheme vulnerabilities
-            if (!target.startsWith('http://') && !target.startsWith('https://')) {
-              target = `https://${target}`
-            }
-            
-            // Append user_id parameter safely for seamless session handoff
-            try {
-              const urlObj = new URL(target)
-              urlObj.searchParams.set('user_id', data.user.id)
-              window.location.href = urlObj.toString()
-            } catch (err) {
-              console.error("Redirect URL format validation error, falling back to manual query append:", err)
-              const separator = target.includes('?') ? '&' : '?'
-              window.location.href = `${target}${separator}user_id=${data.user.id}`
-            }
-            return
-          }
+        // 1. If valid relative path specified (e.g. /dashboard/campaigns) and NOT home or login
+        if (redirectParam && redirectParam.startsWith('/') && redirectParam !== '/' && !redirectParam.startsWith('/login')) {
+          window.location.href = redirectParam
+          return
         }
 
-        // Fetch role for redirect
+        // 2. If full authorized domain redirect
+        if (redirectParam && redirectParam.toLowerCase().includes('trinetraedu-ai.com')) {
+          let target = redirectParam.trim()
+          if (!target.startsWith('http://') && !target.startsWith('https://')) {
+            target = `https://${target}`
+          }
+          try {
+            const urlObj = new URL(target)
+            urlObj.searchParams.set('user_id', data.user.id)
+            window.location.href = urlObj.toString()
+          } catch {
+            window.location.href = target
+          }
+          return
+        }
+
+        // 3. Default direct destination based on user role (timeout protected)
         try {
-          const { data: profile } = await supabase
+          const profilePromise = supabase
             .from('profiles')
             .select('role')
             .eq('id', data.user.id)
             .single()
+          const timeoutPromise = new Promise<{ data: any }>((resolve) => 
+            setTimeout(() => resolve({ data: null }), 1500)
+          )
+          const { data: profile } = await Promise.race([profilePromise, timeoutPromise])
+          
           const role = (profile?.role || 'client').toLowerCase()
           const isAdmin = role === 'admin' || role === 'super_admin'
 
-          console.log('[AUTH] Email login: role =', role)
           window.location.href = isAdmin ? '/admin' : '/dashboard'
         } catch {
           window.location.href = '/dashboard'

@@ -23,11 +23,5 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
     redirect('/login?error=profile_missing');
   }
 
-  // Check if free user is attempting to access campaign detail
-  const userPlanTier = profile.plan_tier?.toLowerCase() || 'free';
-  if (userPlanTier === 'free' || userPlanTier === 'free_demo') {
-    redirect('/dashboard/campaigns');
-  }
-
   return <CampaignDetailClient campaignId={id} />;
 }

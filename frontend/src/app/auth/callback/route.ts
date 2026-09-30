@@ -162,5 +162,5 @@ export const GET = safeApiHandler(async (request: Request) => {
         }
     }
 
-    return NextResponse.redirect(`${origin}/?error=auth_failed`)
+    return NextResponse.redirect(`${origin}/login?error=auth_failed`)
 })

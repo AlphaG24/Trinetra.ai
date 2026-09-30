@@ -108,6 +108,6 @@ export const GET = safeApiHandler(async (request: Request) => {
     console.error('Auth Callback Error:', error.message)
   }
 
-  // If there is no code or an error occurred, return home
-  return NextResponse.redirect(`${origin}/?error=auth_failed`)
+  // If there is no code or an error occurred, redirect to login
+  return NextResponse.redirect(`${origin}/login?error=auth_failed`)
 })
