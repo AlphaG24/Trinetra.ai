@@ -21,6 +21,14 @@ from livekit.agents import AutoSubscribe, JobContext, WorkerOptions, JobExecutor
 from livekit.agents.voice import Agent, AgentSession
 from livekit.agents.voice.agent import ModelSettings
 from database import supabase_admin
+from app.services.ai.prompt_guard import enforce_prompt_ai_guard
+from app.services.disclosure_service import (
+    build_compliant_greeting,
+    persist_call_disclosure,
+    handle_caller_recording_decline,
+    select_disclosure_variant,
+    normalize_language_code,
+)
 
 load_dotenv()
 
@@ -94,18 +102,19 @@ PROMPTS_DIR = os.path.join(os.path.dirname(__file__), "prompts")
 
 
 def load_system_prompt() -> str:
-    """Load the Vikram Sharma professional sales agent prompt."""
+    """Load the Vikram Sharma professional sales agent prompt with AI truthfulness enforcement."""
     try:
         prompt_path = os.path.join(PROMPTS_DIR, "vikram_sharma.txt")
         with open(prompt_path, "r", encoding="utf-8") as f:
-            return f.read()
+            return enforce_prompt_ai_guard(f.read())
     except:
         logger.warning("Could not load vikram_sharma.txt, using fallback prompt")
-        return """You are a professional AI sales agent.
+        fallback = """You are a professional AI sales agent.
         Speak warm, confident Hinglish. Be persuasive but never pushy.
         Handle objections professionally. Always try to convert the prospect.
         Keep responses under 2 sentences. Match the prospect's language.
-        Never reveal you are AI unless directly asked."""
+        Always be transparent that you are an AI assistant if asked. Never claim to be human."""
+        return enforce_prompt_ai_guard(fallback)
 
 
 # ============================================================
@@ -663,13 +672,18 @@ def resolve_agent_greeting(
     customer: dict | None,
     language: str,
     gender_tag: str,
-    direction: str = "outbound"
-) -> str:
+    direction: str = "outbound",
+    agent_config: dict | None = None,
+    purpose: str | None = None
+) -> Tuple[str, str, str]:
     """
-    Resolves the initial greeting message.
-    Preserves user-defined greetings while dynamically injecting the prospect's name
-    and business name without overwriting their custom pitch.
-    Handles inbound recognition greetings and outbound consultation greetings naturally.
+    Resolves the initial greeting message with Phase 1 Call Disclosure & Consent.
+    Preserves user-defined dashboard greetings while ensuring mandatory disclosure
+    (AI assistant identity, business name, recording notice, outbound purpose) is
+    smoothly prepended/integrated.
+    
+    Returns:
+        (greeting_message, selected_variant, normalized_lang)
     """
     c_name = ""
     is_name_valid = False
@@ -685,10 +699,15 @@ def resolve_agent_greeting(
 
     comp_hindi = f" {business_name} se" if business_name else ""
     comp_eng = f" calling from {business_name}" if business_name else ""
-    b_welcome = f"{business_name} me " if business_name else ""
-    b_welcome_en = f" {business_name}" if business_name else ""
     verb = "rahi" if gender_tag == "female" else "raha"
     modal = "sakti" if gender_tag == "female" else "sakta"
+
+    # Extract disclosure configuration
+    disclosure_cfg = (agent_config or {}).get("disclosure_config") or {}
+    consent_mode = disclosure_cfg.get("consent_mode", "notice_only")
+    variant = select_disclosure_variant(agent_config)
+    recording_exempt = bool(disclosure_cfg.get("recording_notice_exempt", False))
+    resolved_purpose = purpose or (campaign_contact.get("notes") if campaign_contact else None)
     
     if raw_greeting:
         gm = raw_greeting.replace('{{agent_name}}', clean_name).replace('{agentName}', clean_name).replace('{agent_name}', clean_name)
@@ -733,33 +752,34 @@ def resolve_agent_greeting(
         gm = re.sub(r'\s+', ' ', gm).strip()
         gm = gm.strip('"\'`“”‘’').strip()
         gm = gm.replace(" ,", ",").replace(" !", "!").replace(" .", ".")
-        return gm
-    
-    # Inbound greeting
-    if direction == "inbound" or (not campaign_contact and customer):
-        cust_notes = customer.get("notes") or "" if customer else ""
-        if language in ['hinglish', 'hi-IN']:
-            if first_name and cust_notes:
-                return f"Hello {first_name} ji! Kaise hain aap? {b_welcome}Aapki problem solve ho gayi thi na? Batayein aaj main aapki kaise help kar {modal} hoon?"
-            elif first_name:
-                return f"Namaste {first_name} ji! {b_welcome}aapka swagat hai. Main {clean_name} bol {verb} hoon, batayein aaj main aapki kaise help kar {modal} hoon?"
-            else:
-                return f"Namaste! {b_welcome}aapka swagat hai. Main {clean_name} bol {verb} hoon, batayein aaj main aapki kaise help kar {modal} hoon?"
-        else:
-            if first_name and cust_notes:
-                return f"Hello {first_name}, how are you doing? Following up regarding your previous inquiry—how can I assist you today?"
-            elif first_name:
-                return f"Hello {first_name}, thank you for calling{b_welcome_en}. My name is {clean_name}, how can I help you today?"
-            else:
-                return f"Hello, thank you for calling{b_welcome_en}. My name is {clean_name}, how can I help you today?"
 
-    # Natural default consultative sales greeting (outbound)
-    if language in ['hinglish', 'hi-IN']:
-        name_part = f"{first_name} ji! " if first_name else "ji! "
-        return f"Namaste {name_part}Main{comp_hindi} {clean_name} bol {verb} hoon. Kya aap abhi free hain, main sirf 2 minute aapse baat kar {modal} hoon?"
-    else:
-        name_part = f" {first_name}" if first_name else ""
-        return f"Hello{name_part}, this is {clean_name}{comp_eng}. Do you have 2 minutes to speak?"
+        # Apply Phase 1 compliance add-ons while preserving owner custom pitch
+        return build_compliant_greeting(
+            raw_greeting=gm,
+            clean_name=clean_name,
+            business_name=business_name,
+            direction=direction,
+            language=language,
+            gender_tag=gender_tag,
+            purpose=resolved_purpose,
+            consent_mode=consent_mode,
+            variant=variant,
+            recording_exempt=recording_exempt
+        )
+    
+    # When no raw greeting is provided in dashboard, generate full multilingual disclosure
+    return build_compliant_greeting(
+        raw_greeting=None,
+        clean_name=clean_name,
+        business_name=business_name,
+        direction=direction,
+        language=language,
+        gender_tag=gender_tag,
+        purpose=resolved_purpose,
+        consent_mode=consent_mode,
+        variant=variant,
+        recording_exempt=recording_exempt
+    )
 
 
 def build_outbound_sales_protocol(
@@ -1327,7 +1347,47 @@ def create_appointment_tools(organization_id: str | None = None, user_id: str | 
             logger.error(f"[reschedule_appointment_slot] Error: {e}")
             return f"Appointment reschedule noted for {new_scheduled_at}."
 
-    return [check_existing_appointment, book_appointment_slot, reschedule_appointment_slot]
+    @llm.function_tool(description="Call this immediately when the caller declines, objects to, or asks to stop call recording or consent.")
+    async def decline_call_recording(reason: str = "caller_request") -> str:
+        """
+        Handle caller refusing or revoking recording consent.
+        """
+        try:
+            outcome = await handle_caller_recording_decline(
+                supabase_client=supabase_admin,
+                room_name=call_id or "active_call",
+                allow_unrecorded_continuation=True
+            )
+            return outcome.get("spoken_response", "Recording has been stopped at your request.")
+        except Exception as err:
+            logger.error(f"[decline_call_recording] Error: {err}")
+            return "Recording has been stopped at your request. How can I help you?"
+
+    @llm.function_tool(description="Call this when the caller asks to speak to a real human, customer support executive, representative, or manager.")
+    async def transfer_to_human(reason: str = "caller_requested_human") -> str:
+        """
+        Transfer call to human operator or initiate human callback.
+        """
+        try:
+            if call_id and supabase_admin:
+                await asyncio.to_thread(
+                    supabase_admin.table("voice_calls")
+                    .update({"consent_outcome": "transferred", "call_status": "transferred"})
+                    .eq("metadata->>room_name", call_id)
+                    .execute
+                )
+            return "HUMAN TRANSFER INITIATED: Inform the caller warmly that you are connecting them to our human support executive, or taking down their details for an immediate callback if all lines are busy."
+        except Exception as err:
+            logger.error(f"[transfer_to_human] Error: {err}")
+            return "Transferring you to a human representative right now."
+
+    return [
+        check_existing_appointment,
+        book_appointment_slot,
+        reschedule_appointment_slot,
+        decline_call_recording,
+        transfer_to_human
+    ]
 
 class VikramAgent(Agent):
     def __init__(
@@ -1930,12 +1990,16 @@ class VikramAgent(Agent):
         if not greeting or not str(greeting).strip():
             b_name = getattr(self, 'bot_name', None) or "Aditi"
             b_comp = getattr(self, 'business_name', '')
-            comp_txt = f" {b_comp} se" if b_comp else ""
             gender = getattr(self, 'gender', 'female')
-            verb = "rahi" if gender == "female" else "raha"
-            modal = "sakti" if gender == "female" else "sakta"
-            greeting = f"Hello! Main {b_name} bol {verb} hoon{comp_txt}. Main aapki kaise madad kar {modal} hoon?"
-            logger.info(f"[VikramAgent] Constructed fallback greeting for immediate speech (Rule 28): '{greeting}'")
+            greeting, _, _ = build_compliant_greeting(
+                raw_greeting=None,
+                clean_name=b_name,
+                business_name=b_comp,
+                direction="inbound",
+                language=getattr(self, 'language', 'hinglish'),
+                gender_tag=gender
+            )
+            logger.info(f"[VikramAgent] Constructed compliant fallback greeting: '{greeting}'")
 
         # If greeting already introduced the agent name, mark as introduced so agent never repeats it
         agent_name_val = getattr(self, 'bot_name', '')
@@ -3466,7 +3530,7 @@ async def entrypoint(ctx: JobContext):
                 call_direction = "inbound" if is_inbound_call else "outbound"
 
                 # Resolve greeting message preserving user custom text and dynamic parameters
-                greeting_message = resolve_agent_greeting(
+                greeting_message, disc_variant, disc_lang = resolve_agent_greeting(
                     raw_greeting=raw_greeting,
                     clean_name=clean_name,
                     business_name=business_name_val,
@@ -3474,8 +3538,24 @@ async def entrypoint(ctx: JobContext):
                     customer=customer,
                     language=language,
                     gender_tag=gender_tag,
-                    direction=call_direction
+                    direction=call_direction,
+                    agent_config=agent_data,
+                    purpose=campaign_contact.get("notes") if campaign_contact else None
                 )
+
+                # Persist call disclosure telemetry asynchronously (Phase 1)
+                disc_cfg = (agent_data.get("disclosure_config") or {}) if agent_data else {}
+                disc_mode = disc_cfg.get("consent_mode", "notice_only")
+                if ctx.room and ctx.room.name:
+                    asyncio.create_task(persist_call_disclosure(
+                        supabase_client=supabase_admin,
+                        room_name=ctx.room.name,
+                        disclosure_text=greeting_message,
+                        variant=disc_variant,
+                        language=disc_lang,
+                        consent_mode=disc_mode,
+                        consent_outcome="consented"
+                    ))
 
                 if campaign_contact:
                     c_name = campaign_contact.get("full_name") or ""
@@ -3542,6 +3622,18 @@ async def entrypoint(ctx: JobContext):
 
                 # 14. Enforce Gender-consistent Hindi/Hinglish Grammar
                 system_prompt = apply_gender_grammar_directives(system_prompt, gender_tag, bot_name, voice_id)
+
+                # 14b. Mandatory Phase 1 Compliance Directives (Decline Recording & Human Transfer)
+                system_prompt += (
+                    f"\n\n## CALL DISCLOSURE & CONSENT DIRECTIVES (PHASE 1):\n"
+                    f"1. AI & Recording Transparency: You have explicitly disclosed that you are an AI assistant and that this call is recorded.\n"
+                    f"2. Right to Decline Recording: If the caller explicitly objects to being recorded, asks you to stop recording, or refuses recording consent, you MUST invoke `decline_call_recording`.\n"
+                    f"3. Human Escalation: If the caller asks to speak to a human, real person, or live agent, you MUST invoke `transfer_to_human` immediately.\n"
+                    f"4. Keypress/Spoken Consent: If the caller was prompted to press 1 / say yes, acknowledge their consent warmly. If they pressed 2 / said no, respect their refusal.\n"
+                )
+
+                # 14c. Enforce AI Identity Guard & Truthfulness (Step 0 compliance)
+                system_prompt = enforce_prompt_ai_guard(system_prompt)
 
                 # 15. Store prompt suffix for multi-personality mid-call transitions
                 if agent_data.get("_multi_personality_enabled"):
@@ -4388,7 +4480,7 @@ async def run_agent(room_name: str, agent_id: str | None = None, contact_id: str
                 call_direction = "inbound" if is_inbound_call else "outbound"
 
                 # Resolve greeting message preserving user custom text and dynamic parameters
-                greeting_message = resolve_agent_greeting(
+                greeting_message, disc_variant, disc_lang = resolve_agent_greeting(
                     raw_greeting=raw_greeting,
                     clean_name=clean_name,
                     business_name=business_name_val,
@@ -4396,8 +4488,24 @@ async def run_agent(room_name: str, agent_id: str | None = None, contact_id: str
                     customer=customer,
                     language=language,
                     gender_tag=gender_tag,
-                    direction=call_direction
+                    direction=call_direction,
+                    agent_config=agent_data,
+                    purpose=campaign_contact.get("notes") if campaign_contact else None
                 )
+
+                # Persist call disclosure telemetry asynchronously (Phase 1)
+                disc_cfg = (agent_data.get("disclosure_config") or {}) if agent_data else {}
+                disc_mode = disc_cfg.get("consent_mode", "notice_only")
+                if room_name:
+                    asyncio.create_task(persist_call_disclosure(
+                        supabase_client=supabase_admin,
+                        room_name=room_name,
+                        disclosure_text=greeting_message,
+                        variant=disc_variant,
+                        language=disc_lang,
+                        consent_mode=disc_mode,
+                        consent_outcome="consented"
+                    ))
 
                 if campaign_contact:
                     c_name = campaign_contact.get("full_name") or ""
@@ -4465,6 +4573,18 @@ async def run_agent(room_name: str, agent_id: str | None = None, contact_id: str
                 # 14. Enforce Gender-consistent Hindi/Hinglish Grammar
                 system_prompt = apply_gender_grammar_directives(system_prompt, gender_tag, bot_name, voice_id)
 
+                # 14b. Mandatory Phase 1 Compliance Directives (Decline Recording & Human Transfer)
+                system_prompt += (
+                    f"\n\n## CALL DISCLOSURE & CONSENT DIRECTIVES (PHASE 1):\n"
+                    f"1. AI & Recording Transparency: You have explicitly disclosed that you are an AI assistant and that this call is recorded.\n"
+                    f"2. Right to Decline Recording: If the caller explicitly objects to being recorded, asks you to stop recording, or refuses recording consent, you MUST invoke `decline_call_recording`.\n"
+                    f"3. Human Escalation: If the caller asks to speak to a human, real person, or live agent, you MUST invoke `transfer_to_human` immediately.\n"
+                    f"4. Keypress/Spoken Consent: If the caller was prompted to press 1 / say yes, acknowledge their consent warmly. If they pressed 2 / said no, respect their refusal.\n"
+                )
+
+                # 14c. Enforce AI Identity Guard & Truthfulness (Step 0 compliance)
+                system_prompt = enforce_prompt_ai_guard(system_prompt)
+
                 # 15. Store prompt suffix for multi-personality mid-call transitions
                 if agent_data.get("_multi_personality_enabled"):
                     agent_data["_prompt_suffix"] = system_prompt[len(base_prompt):]
@@ -4484,7 +4604,7 @@ async def run_agent(room_name: str, agent_id: str | None = None, contact_id: str
     safe_pitch = locals().get('pitch') if locals().get('pitch') is not None else 1.0
     safe_sarvam_pitch = (safe_pitch - 1.0) if safe_provider == 'sarvam' else safe_pitch
     safe_language = locals().get('language') or (agent_data.get('primary_language') if agent_data else None) or 'hinglish'
-    safe_system_prompt = locals().get('system_prompt') or load_system_prompt()
+    safe_system_prompt = enforce_prompt_ai_guard(locals().get('system_prompt') or load_system_prompt())
 
     # Create appointment tools for live verification and booking in run_agent
     appointment_tools = create_appointment_tools(

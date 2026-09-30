@@ -1,5 +1,6 @@
 import { createClient } from "@/utils/supabase/server";
 import { NextResponse } from "next/server";
+import { validatePromptAiSafety } from "@/lib/safety/promptGuard";
 
 export async function PATCH(
   request: Request,
@@ -17,11 +18,32 @@ export async function PATCH(
 
     const body = await request.json();
 
+    // Safety Guard: Prohibit prompts or greetings instructing the agent to deny being AI or claim to be human
+    if (body.system_prompt) {
+      const { isValid, violations } = validatePromptAiSafety(body.system_prompt);
+      if (!isValid) {
+        return NextResponse.json({
+          error: "Prompt safety violation: Directives instructing the agent to deny being an AI or claim to be human are prohibited.",
+          violations,
+        }, { status: 400 });
+      }
+    }
+
+    if (body.greeting_message) {
+      const { isValid, violations } = validatePromptAiSafety(body.greeting_message);
+      if (!isValid) {
+        return NextResponse.json({
+          error: "Greeting safety violation: Greetings cannot instruct the agent to deny being an AI or claim to be human.",
+          violations,
+        }, { status: 400 });
+      }
+    }
+
     // 2. Allowed whitelist columns
     const allowedKeys = [
       'name', 'role', 'voice_provider', 'voice_id', 'cloned_voice_id', 'voice_speed', 'voice_pitch',
       'system_prompt', 'temperature', 'max_tokens', 'greeting_message', 'fallback_message', 'ending_message',
-      'personality', 'personalities', 'primary_language'
+      'personality', 'personalities', 'primary_language', 'disclosure_config'
     ];
 
     const updates: Record<string, any> = {};
