@@ -49,6 +49,8 @@ def generate_agent_token(room_name: str) -> str:
         token = token.decode("utf-8")
     return token
 
+from app.services.ai.prompt_guard import enforce_prompt_ai_guard
+
 def load_system_prompt() -> str:
     try:
         prompt_path = os.path.join(
@@ -57,10 +59,10 @@ def load_system_prompt() -> str:
         )
         with open(prompt_path, "r", encoding="utf-8") as f:
             data = yaml.safe_load(f)
-        return data.get("system_prompt", "")
+        return enforce_prompt_ai_guard(data.get("system_prompt", ""))
     except Exception as e:
         logger.error(f"Failed to load system prompt: {e}")
-        return "You are Vikram Sharma, a helpful Hinglish senior sales manager at Trinetra AI."
+        return enforce_prompt_ai_guard("You are Vikram Sharma, a helpful Hinglish AI senior sales manager at Trinetra AI.")
 
 async def run_agent(room_name: str):
     livekit_url = os.getenv("LIVEKIT_URL", "ws://127.0.0.1:7880").strip()
