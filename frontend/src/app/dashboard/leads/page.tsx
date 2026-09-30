@@ -38,10 +38,17 @@ export default async function LeadsPage() {
     .eq('user_id', user.id)
     .order('created_at', { ascending: false })
 
+  // Fetch revenue events for the current user/business
+  const { data: revenueEvents } = await supabase
+    .from('revenue_events')
+    .select('id, lead_id, call_id, quoted_amount, won_amount, deal_status, price_type, source')
+    .eq('business_id', user.id)
+
   return (
     <LeadsPageClient 
       initialLeads={leads || []} 
       agents={agents} 
+      initialRevenueEvents={revenueEvents || []}
     />
   )
 }

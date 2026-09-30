@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation'
 import {
   Target, Search, Phone, Mail, ChevronDown, Database,
   Sparkles, Download, Trash2, Eye, User, Building, Calendar,
-  CheckCircle2, AlertCircle, RefreshCw, X, ArrowUpRight, Flame
+  CheckCircle2, AlertCircle, RefreshCw, X, ArrowUpRight, Flame,
+  IndianRupee, Check
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { createClient } from '@/utils/supabase/client'
@@ -52,23 +53,55 @@ export interface PlatformService {
   is_active: boolean
 }
 
+export interface RevenueEventItem {
+  id: string
+  lead_id?: string | null
+  call_id?: string | null
+  quoted_amount?: number | null
+  won_amount?: number | null
+  deal_status: 'open' | 'won' | 'lost'
+  price_type?: string | null
+  source?: string | null
+}
+
 interface LeadsPageClientProps {
   initialLeads: Lead[]
   agents?: UserAgent[]
   services?: PlatformService[]
+  initialRevenueEvents?: RevenueEventItem[]
 }
 
-export function LeadsPageClient({ initialLeads, agents = [], services = [] }: LeadsPageClientProps) {
+export function LeadsPageClient({ initialLeads, agents = [], services = [], initialRevenueEvents = [] }: LeadsPageClientProps) {
   const router = useRouter()
 
   const [selectedAgentId, setSelectedAgentId] = useState<string>('all')
 
   const [leads, setLeads] = useState<Lead[]>(initialLeads)
+  const [revenueEvents, setRevenueEvents] = useState<RevenueEventItem[]>(initialRevenueEvents)
 
-  // Sync state if initialLeads prop updates (e.g. after server revalidation or navigation)
+  // Sync state if initial props update
   useEffect(() => {
     setLeads(initialLeads)
   }, [initialLeads])
+
+  useEffect(() => {
+    if (initialRevenueEvents) setRevenueEvents(initialRevenueEvents)
+  }, [initialRevenueEvents])
+
+  // Revenue lookup map
+  const revenueByLead = useMemo(() => {
+    const map: Record<string, RevenueEventItem> = {}
+    revenueEvents.forEach(r => {
+      if (r.lead_id) map[r.lead_id] = r
+      if (r.call_id) map[r.call_id] = r
+    })
+    return map
+  }, [revenueEvents])
+
+  // Deal confirmation modal state
+  const [closingDealLead, setClosingDealLead] = useState<{ lead: Lead; currentAmount: number; dealStatus: 'won' | 'lost' | 'open' } | null>(null)
+  const [customAmountInput, setCustomAmountInput] = useState<string>('')
+  const [isSubmittingDeal, setIsSubmittingDeal] = useState<boolean>(false)
 
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
@@ -147,7 +180,7 @@ export function LeadsPageClient({ initialLeads, agents = [], services = [] }: Le
     return { total, qualified, contacted, conversionRate }
   }, [leads, selectedAgentId])
 
-  // Refresh leads from DB
+  // Refresh leads and revenue from DB
   const handleRefresh = async () => {
     try {
       setIsRefreshing(true)
@@ -155,20 +188,56 @@ export function LeadsPageClient({ initialLeads, agents = [], services = [] }: Le
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
 
-      const { data } = await supabase
-        .from('leads')
-        .select('*')
-        .order('created_at', { ascending: false })
+      const [{ data: leadsData }, { data: revData }] = await Promise.all([
+        supabase.from('leads').select('*').order('created_at', { ascending: false }),
+        supabase.from('revenue_events').select('id, lead_id, call_id, quoted_amount, won_amount, deal_status, price_type, source').eq('business_id', user.id)
+      ])
 
-      if (data) {
-        setLeads(data)
-        toast.success('Leads refreshed')
-      }
+      if (leadsData) setLeads(leadsData)
+      if (revData) setRevenueEvents(revData)
+      toast.success('Leads and revenue refreshed')
     } catch (err) {
       console.error(err)
-      toast.error('Failed to refresh leads')
+      toast.error('Failed to refresh data')
     } finally {
       setIsRefreshing(false)
+    }
+  }
+
+  // Update deal status & confirmed won amount
+  const handleUpdateDealStatus = async (leadId: string, dealStatus: 'won' | 'lost', wonAmount?: number) => {
+    setIsSubmittingDeal(true)
+    try {
+      const res = await fetch('/api/dashboard/revenue/confirm', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ leadId, dealStatus, wonAmount })
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to update deal status')
+
+      // Update local state
+      setRevenueEvents(prev => {
+        const existingIdx = prev.findIndex(r => r.lead_id === leadId)
+        if (existingIdx >= 0) {
+          const updated = [...prev]
+          updated[existingIdx] = data.event
+          return updated
+        }
+        return [data.event, ...prev]
+      })
+
+      if (dealStatus === 'won') {
+        const amtStr = wonAmount ? ` (₹${wonAmount.toLocaleString('en-IN')})` : ''
+        toast.success(`🎉 Deal marked as Won${amtStr}!`)
+      } else {
+        toast.success('Deal marked as Lost')
+      }
+      setClosingDealLead(null)
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to update deal status')
+    } finally {
+      setIsSubmittingDeal(false)
     }
   }
 
@@ -525,6 +594,7 @@ export function LeadsPageClient({ initialLeads, agents = [], services = [] }: Le
                       const company = lead.company_name || lead.company
                       const status = (lead.status || lead.stage || 'new').toLowerCase()
                       const interest = (lead.interest_level || 'medium').toLowerCase()
+                      const rev = revenueByLead[lead.id] || (lead.call_id ? revenueByLead[lead.call_id] : undefined)
 
                       return (
                         <tr key={lead.id} className="hover:bg-[var(--hover-bg)] transition-colors group">
@@ -592,6 +662,27 @@ export function LeadsPageClient({ initialLeads, agents = [], services = [] }: Le
                               <p className="text-[var(--body)] line-clamp-2 leading-relaxed text-[11px]">
                                 {lead.call_summary || lead.message || 'Call intent logged by agent.'}
                               </p>
+
+                              {/* Revenue / Quote Pill */}
+                              {rev && (
+                                <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
+                                  {rev.deal_status === 'won' ? (
+                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
+                                      <IndianRupee className="w-2.5 h-2.5" />
+                                      {Number(rev.won_amount || rev.quoted_amount || 0).toLocaleString('en-IN')} Won 🎉
+                                    </span>
+                                  ) : rev.deal_status === 'lost' ? (
+                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-zinc-500/15 text-zinc-400 border border-zinc-500/30">
+                                      Deal Lost
+                                    </span>
+                                  ) : rev.quoted_amount ? (
+                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-violet-500/15 text-violet-600 dark:text-violet-400 border border-violet-500/30">
+                                      <IndianRupee className="w-2.5 h-2.5" />
+                                      {Number(rev.quoted_amount).toLocaleString('en-IN')} Quote {rev.price_type === 'monthly' ? '/mo' : ''}
+                                    </span>
+                                  ) : null}
+                                </div>
+                              )}
                             </div>
                           </td>
 
@@ -619,6 +710,28 @@ export function LeadsPageClient({ initialLeads, agents = [], services = [] }: Le
                           {/* 5. Actions */}
                           <td className="px-5 py-3.5 whitespace-nowrap text-right">
                             <div className="flex items-center justify-end gap-1.5">
+                              {/* Deal Outcome Action */}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const defaultAmt = rev?.won_amount || rev?.quoted_amount || 0
+                                  setClosingDealLead({
+                                    lead,
+                                    currentAmount: Number(defaultAmt),
+                                    dealStatus: rev?.deal_status === 'won' ? 'won' : 'open'
+                                  })
+                                  setCustomAmountInput(defaultAmt ? String(defaultAmt) : '')
+                                }}
+                                className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                                  rev?.deal_status === 'won'
+                                    ? 'bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-600 dark:text-emerald-400'
+                                    : 'bg-[var(--primary-bg)] hover:bg-violet-500/20 text-violet-500'
+                                }`}
+                                title="Update Deal Status (Won / Closed Amount / Lost)"
+                              >
+                                <IndianRupee className="w-3.5 h-3.5" />
+                              </button>
+
                               {phone && (
                                 <button
                                   type="button"
@@ -756,6 +869,80 @@ export function LeadsPageClient({ initialLeads, agents = [], services = [] }: Le
               </div>
             </div>
 
+            {/* Revenue & Deal Tracking */}
+            {(() => {
+              const selectedRev = selectedLead ? (revenueByLead[selectedLead.id] || (selectedLead.call_id ? revenueByLead[selectedLead.call_id] : undefined)) : undefined
+              return (
+                <div className="p-3.5 rounded-xl bg-violet-500/5 border border-violet-500/20 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-7 h-7 rounded-lg bg-violet-500/15 text-violet-500 flex items-center justify-center font-bold text-xs">
+                        ₹
+                      </div>
+                      <div>
+                        <span className="text-[11px] font-bold text-[var(--heading)] block">Revenue & Deal Status</span>
+                        <span className="text-[10px] text-[var(--muted)]">Attributed via Trinetra Voice AI</span>
+                      </div>
+                    </div>
+                    {selectedRev?.deal_status === 'won' ? (
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-500 border border-emerald-500/30">
+                        Deal Won 🎉
+                      </span>
+                    ) : selectedRev?.deal_status === 'lost' ? (
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-zinc-500/15 text-zinc-400 border border-zinc-500/30">
+                        Lost
+                      </span>
+                    ) : (
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-500 border border-amber-500/30">
+                        Open Pipeline
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div className="p-2 rounded-lg bg-[var(--card-bg)] border border-[var(--border)]">
+                      <span className="text-[9px] uppercase font-bold text-[var(--muted)] block">Estimated Quote</span>
+                      <span className="font-bold text-[var(--heading)] font-mono">
+                        {selectedRev?.quoted_amount ? `₹${Number(selectedRev.quoted_amount).toLocaleString('en-IN')}` : 'None quoted'}
+                      </span>
+                    </div>
+                    <div className="p-2 rounded-lg bg-[var(--card-bg)] border border-[var(--border)]">
+                      <span className="text-[9px] uppercase font-bold text-[var(--muted)] block">Owner Confirmed</span>
+                      <span className="font-bold text-emerald-500 font-mono">
+                        {selectedRev?.won_amount ? `₹${Number(selectedRev.won_amount).toLocaleString('en-IN')}` : 'Pending Confirmation'}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const defaultAmt = selectedRev?.won_amount || selectedRev?.quoted_amount || 0
+                        setClosingDealLead({
+                          lead: selectedLead,
+                          currentAmount: Number(defaultAmt),
+                          dealStatus: 'won'
+                        })
+                        setCustomAmountInput(defaultAmt ? String(defaultAmt) : '')
+                      }}
+                      className="flex-1 py-1.5 px-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-semibold shadow-sm transition-all text-center flex items-center justify-center gap-1 cursor-pointer"
+                    >
+                      <IndianRupee className="w-3.5 h-3.5" />
+                      {selectedRev?.deal_status === 'won' ? 'Update Won Amount' : 'Mark Closed / Won'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleUpdateDealStatus(selectedLead.id, 'lost')}
+                      className="py-1.5 px-3 bg-[var(--hover-bg)] hover:bg-red-500/20 hover:text-red-500 text-[var(--muted)] border border-[var(--border)] rounded-xl text-xs font-semibold transition-all cursor-pointer"
+                    >
+                      Mark Lost
+                    </button>
+                  </div>
+                </div>
+              )
+            })()}
+
             {/* Actions in Modal */}
             <div className="flex items-center justify-between pt-3 border-t border-[var(--border)] gap-2">
               <div className="flex items-center gap-2">
@@ -793,6 +980,77 @@ export function LeadsPageClient({ initialLeads, agents = [], services = [] }: Le
                 className="px-3.5 py-1.5 bg-[var(--hover-bg)] text-[var(--heading)] rounded-xl text-xs font-semibold"
               >
                 Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Record Deal Outcome Modal */}
+      {closingDealLead && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-[var(--border)]">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-500">
+                  <IndianRupee className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-[var(--heading)]">Record Deal Outcome</h3>
+                  <p className="text-[11px] text-[var(--muted)]">
+                    {closingDealLead.lead.full_name || closingDealLead.lead.contact_name || 'Prospect'}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setClosingDealLead(null)}
+                className="p-1.5 rounded-lg hover:bg-[var(--hover-bg)] text-[var(--muted)] hover:text-[var(--heading)] cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <p className="text-xs text-[var(--body)] leading-relaxed">
+              Confirm the final revenue brought in by this lead to calculate your business ROI and net return from Trinetra AI.
+            </p>
+
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted)]">
+                Final Closed Deal Amount (₹ INR)
+              </label>
+              <div className="relative">
+                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-bold text-[var(--muted)]">₹</span>
+                <input
+                  type="number"
+                  placeholder="e.g. 25000"
+                  value={customAmountInput}
+                  onChange={(e) => setCustomAmountInput(e.target.value)}
+                  className="w-full pl-8 pr-4 py-2.5 bg-[var(--primary-bg)] border border-[var(--border)] rounded-xl text-sm font-bold font-mono text-[var(--heading)] placeholder:text-[var(--muted)] focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
+                  autoFocus
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 pt-2">
+              <button
+                type="button"
+                disabled={isSubmittingDeal}
+                onClick={() => {
+                  const amt = parseFloat(customAmountInput) || closingDealLead.currentAmount || 0
+                  handleUpdateDealStatus(closingDealLead.lead.id, 'won', amt)
+                }}
+                className="flex-1 py-2 px-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold shadow-sm transition-all disabled:opacity-50 cursor-pointer flex items-center justify-center gap-1.5"
+              >
+                {isSubmittingDeal ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                Confirm Deal Won
+              </button>
+              <button
+                type="button"
+                disabled={isSubmittingDeal}
+                onClick={() => handleUpdateDealStatus(closingDealLead.lead.id, 'lost')}
+                className="py-2 px-3 bg-[var(--hover-bg)] hover:bg-red-500/20 text-red-500 rounded-xl text-xs font-bold border border-[var(--border)] transition-all disabled:opacity-50 cursor-pointer"
+              >
+                Mark Lost
               </button>
             </div>
           </div>
