@@ -8,6 +8,7 @@ from app.services.disclosure_service import (
     get_greeting_cache_key,
     _COMPOSED_GREETING_CACHE,
     persist_call_disclosure,
+    resolve_agent_gender,
 )
 
 
@@ -460,3 +461,83 @@ def test_opening_disclosure_duration_logging():
 
     assert all(d > 0 for d in standard_durations.values())
     assert all(d <= 10.0 for d in concise_durations.values())
+
+
+def test_gender_verb_forms_hindi_and_hinglish():
+    """
+    Fix A1: Hindi and Hinglish verb forms (raha/rahi, sakta/sakti, etc.) must
+    follow the agent's configured gender or voice, never a fixed default.
+    Tests male and female agents in Hindi and Hinglish.
+    """
+    # 1. Hinglish Female Agent (Arika / female voice)
+    g_female_hinglish, _, _ = compose_single_opening_greeting(
+        dashboard_greeting=None,
+        agent_name="Arika",
+        business_name="Trinetra",
+        language="hinglish",
+        gender_tag="female"
+    )
+    assert "bol rahi hoon" in g_female_hinglish
+    assert "kar sakti hoon" in g_female_hinglish
+    assert "bol raha hoon" not in g_female_hinglish
+    assert "kar sakta hoon" not in g_female_hinglish
+
+    # 2. Hinglish Male Agent (Vikram / male voice)
+    g_male_hinglish, _, _ = compose_single_opening_greeting(
+        dashboard_greeting=None,
+        agent_name="Vikram",
+        business_name="Solar India",
+        language="hinglish",
+        gender_tag="male"
+    )
+    assert "bol raha hoon" in g_male_hinglish
+    assert "kar sakta hoon" in g_male_hinglish
+    assert "bol rahi hoon" not in g_male_hinglish
+    assert "kar sakti hoon" not in g_male_hinglish
+
+    # 3. Hindi Female Agent (रिया / female)
+    g_female_hindi, _, _ = compose_single_opening_greeting(
+        dashboard_greeting=None,
+        agent_name="रिया",
+        business_name="त्रिनेत्र",
+        language="hi",
+        gender_tag="female"
+    )
+    assert "बोल रही हूँ" in g_female_hindi
+    assert "कर सकती हूँ" in g_female_hindi
+    assert "बोल रहा हूँ" not in g_female_hindi
+    assert "कर सकता हूँ" not in g_female_hindi
+
+    # 4. Hindi Male Agent (विक्रम / male)
+    g_male_hindi, _, _ = compose_single_opening_greeting(
+        dashboard_greeting=None,
+        agent_name="विक्रम",
+        business_name="त्रिनेत्र",
+        language="hi",
+        gender_tag="male"
+    )
+    assert "बोल रहा हूँ" in g_male_hindi
+    assert "कर सकता हूँ" in g_male_hindi
+    assert "बोल रही हूँ" not in g_male_hindi
+    assert "कर सकती हूँ" not in g_male_hindi
+
+    # 5. Voice-driven dynamic resolution (voice ID alone without explicit gender_tag)
+    # Sarvam / ElevenLabs male voice "arvind"
+    g_voice_male, _, _ = compose_single_opening_greeting(
+        dashboard_greeting=None,
+        agent_name="Assistant",
+        business_name="Acme",
+        language="hinglish",
+        voice="arvind"
+    )
+    assert "bol raha hoon" in g_voice_male
+
+    # Female voice "kavya"
+    g_voice_female, _, _ = compose_single_opening_greeting(
+        dashboard_greeting=None,
+        agent_name="Assistant",
+        business_name="Acme",
+        language="hinglish",
+        voice="kavya"
+    )
+    assert "bol rahi hoon" in g_voice_female

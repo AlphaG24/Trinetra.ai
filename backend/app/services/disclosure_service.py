@@ -400,6 +400,39 @@ def strip_dashboard_self_introduction(text: str, agent_name: str = "", business_
     return candidate
 
 
+def resolve_agent_gender(
+    gender: Optional[str] = None,
+    voice: Optional[str] = None,
+    agent_name: Optional[str] = None
+) -> str:
+    """
+    Resolves agent gender ('male' or 'female') strictly based on the agent's
+    configured gender, voice ID, or agent persona name. Never relies on a fixed default.
+    """
+    for candidate in [gender, voice]:
+        if candidate and str(candidate).strip():
+            c_low = str(candidate).strip().lower()
+            if c_low in ("male", "m", "man", "boy"):
+                return "male"
+            if c_low in ("female", "f", "woman", "girl"):
+                return "female"
+            # Male voice signatures (Sarvam Bulbul / ElevenLabs / Cartesia / Deepgram)
+            if any(m in c_low for m in ["arvind", "amartya", "kabir", "rohan", "dhruv", "ratan", "aditya", "manan", "dev", "deepak", "varun", "vikram"]):
+                return "male"
+            # Female voice signatures
+            if any(f in c_low for f in ["meera", "kavya", "shreya", "priya", "arika", "aditi", "pooja", "simran", "ananya", "neha", "riya"]):
+                return "female"
+
+    if agent_name and str(agent_name).strip():
+        n_low = str(agent_name).strip().lower()
+        if any(m in n_low for m in ["vikram", "rahul", "amit", "rohan", "kabir", "arvind", "raj"]):
+            return "male"
+        if any(f in n_low for f in ["arika", "priya", "aditi", "riya", "neha", "pooja", "kavya"]):
+            return "female"
+
+    return "female"
+
+
 def compose_single_opening_greeting(
     dashboard_greeting: Optional[str],
     agent_name: str,
@@ -407,14 +440,15 @@ def compose_single_opening_greeting(
     caller_name: Optional[str] = None,
     direction: str = "inbound",
     language: str = "hinglish",
-    gender_tag: str = "female",
+    gender_tag: Optional[str] = None,
     purpose: Optional[str] = None,
     consent_mode: str = "notice_only",
     variant: Optional[str] = None,
     recording_exempt: bool = False,
     template_mode: bool = False,
     verify_identity: bool = False,
-    agent_id: Optional[str] = None
+    agent_id: Optional[str] = None,
+    voice: Optional[str] = None
 ) -> Tuple[str, str, str]:
     """
     Single source of truth for the call opening greeting.
@@ -440,10 +474,14 @@ def compose_single_opening_greeting(
     agent_display = (agent_name or "Arika").strip()
     biz_display = (business_name or "Trinetra AI").strip()
     is_outbound = str(direction).lower() == "outbound"
-    verb = "rahi" if gender_tag == "female" else "raha"
-    verb_hi = "रही" if gender_tag == "female" else "रहा"
-    modal = "sakti" if gender_tag == "female" else "sakta"
-    modal_hi = "सकती" if gender_tag == "female" else "सकता"
+
+    # Gender resolution: dynamically derived from configured gender, voice ID, or persona name
+    resolved_gender = resolve_agent_gender(gender=gender_tag, voice=voice, agent_name=agent_display)
+    is_female = (resolved_gender == "female")
+    verb = "rahi" if is_female else "raha"
+    verb_hi = "रही" if is_female else "रहा"
+    modal = "sakti" if is_female else "sakta"
+    modal_hi = "सकती" if is_female else "सकता"
 
     # Fast cache lookup for hot path (when template_mode=True or no dynamic caller name)
     cache_key = None
