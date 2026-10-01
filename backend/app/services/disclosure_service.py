@@ -897,6 +897,32 @@ def compose_single_opening_greeting(
         greeting_word = f"Namaste{slot}!"
 
     # 2. Mandatory Disclosure Statement (AI identity + business name + recording notice + purpose)
+    # A2 Pre-check: detect sensitive details early to suppress purpose from disclosure section.
+    # Purpose is only safe to announce after identity is confirmed.
+    _SENSITIVE_PRE_PATTERN = re.compile(
+        r'\b('
+        r'appointment|doctor|hospital|clinic|surgery|prescription|diagnosis|patient|'
+        r'report|test|lab|health|medical|medicine|therapy|'
+        r'scan|xray|biopsy|checkup|treatment|ward|discharge|'
+        r'account|balance|bill|payment|invoice|loan|emi|due|rupees?|\u20b9|'
+        r'tax|salary|transfer|debit|statement|premium|policy|claim|refund|'
+        r'outstanding|overdue|arrear|interest|fine|penalty|'
+        r'order|delivery|shipment|package|booking|reservation|ticket|'
+        r'subscription|renewal|expire|expiry|'
+        r'\u0905\u092a\u0949\u0907\u0902\u091f\u092e\u0947\u0902\u091f|\u0921\u0949\u0915\u094d\u091f\u0930|'
+        r'\u0905\u0938\u094d\u092a\u0924\u093e\u0932|\u092c\u093f\u0932|\u0916\u093e\u0924\u093e|'
+        r'\u092d\u0941\u0917\u0924\u093e\u0928|\u0930\u093f\u092a\u094b\u0930\u094d\u091f|'
+        r'dawa|ilaj|niyukti'
+        r')\b',
+        re.IGNORECASE
+    )
+    _purpose_has_sensitive = bool(purpose and _SENSITIVE_PRE_PATTERN.search(purpose))
+    _dashboard_has_sensitive = bool(
+        _SENSITIVE_PRE_PATTERN.search(dashboard_greeting or "")
+    )
+    # On outbound calls, suppress purpose from the disclosure line if it contains sensitive content
+    _safe_purpose = None if (is_outbound and (_purpose_has_sensitive or _dashboard_has_sensitive)) else purpose
+
     disc_parts = []
     if sel_variant == "concise":
         # Concise wording kept strictly under 10 seconds while stating AI identity and recording notice
@@ -932,19 +958,19 @@ def compose_single_opening_greeting(
         # Standard full disclosure
         if norm_lang == "en":
             disc_parts.append(f"This is {agent_display} from {biz_display}, an AI assistant.")
-            if is_outbound and purpose:
-                disc_parts.append(f"I am calling regarding {purpose}.")
+            if is_outbound and _safe_purpose:
+                disc_parts.append(f"I am calling regarding {_safe_purpose}.")
             if not recording_exempt:
                 disc_parts.append("This call may be recorded for service quality.")
         elif norm_lang == "hi":
             if resolved_gender == "neutral":
                 disc_parts.append(f"मैं {biz_display} से AI assistant {agent_display} हूँ।")
-                if is_outbound and purpose:
-                    disc_parts.append(f"यह कॉल {purpose} के सिलसिले में है।")
+                if is_outbound and _safe_purpose:
+                    disc_parts.append(f"यह कॉल {_safe_purpose} के सिलसिले में है।")
             else:
                 disc_parts.append(f"मैं {biz_display} से {agent_display} बोल {verb_hi} हूँ, एक AI assistant।")
-                if is_outbound and purpose:
-                    disc_parts.append(f"मैं {purpose} के सिलसिले में कॉल कर {verb_hi} हूँ।")
+                if is_outbound and _safe_purpose:
+                    disc_parts.append(f"मैं {_safe_purpose} के सिलसिले में कॉल कर {verb_hi} हूँ।")
             if not recording_exempt:
                 disc_parts.append("सर्विस क्वालिटी के लिए यह कॉल रिकॉर्ड की जा सकती है।")
         elif norm_lang == "ta":
@@ -966,12 +992,12 @@ def compose_single_opening_greeting(
         else:  # Hinglish default
             if resolved_gender == "neutral":
                 disc_parts.append(f"Main {biz_display} se AI assistant {agent_display} hoon.")
-                if is_outbound and purpose:
-                    disc_parts.append(f"Yeh call {purpose} ke regarding hai.")
+                if is_outbound and _safe_purpose:
+                    disc_parts.append(f"Yeh call {_safe_purpose} ke regarding hai.")
             else:
                 disc_parts.append(f"Main {biz_display} se {agent_display} बोल {verb} hoon, ek AI assistant." if norm_lang == "hi" else f"Main {biz_display} se {agent_display} bol {verb} hoon, ek AI assistant.")
-                if is_outbound and purpose:
-                    disc_parts.append(f"Main {purpose} ke regarding call kar {verb} hoon.")
+                if is_outbound and _safe_purpose:
+                    disc_parts.append(f"Main {_safe_purpose} ke regarding call kar {verb} hoon.")
             if not recording_exempt:
                 disc_parts.append("Service quality ke liye yeh call record ki ja sakti hai.")
 
@@ -981,13 +1007,24 @@ def compose_single_opening_greeting(
 
     mandatory_disclosure = " ".join(disc_parts)
 
-    # 3. Caller Name Privacy & Identity Confirmation Rule:
-    # Use caller name ONLY to greet. For outbound or matched callers, do not disclose
-    # personal, financial, or appointment details until the person confirms identity.
+    # 3. Caller Name Privacy & Identity Confirmation Rule (A2):
+    # Withhold ALL health, financial, appointment and order details from the opening
+    # on EVERY outbound call until the caller confirms identity.
     SENSITIVE_DETAILS_PATTERN = re.compile(
-        r'\b(appointment|doctor|hospital|clinic|surgery|prescription|diagnosis|patient|'
-        r'account|balance|bill|payment|invoice|credit\s+card|loan|emi|due|rupees?|₹|tax|salary|'
-        r'अपॉइंटमेंट|डॉक्टर|अस्पताल|बिल|खाता|भुगतान)\b',
+        r'\b('
+        r'appointment|doctor|hospital|clinic|surgery|prescription|diagnosis|patient|'
+        r'report|test|lab|health|medical|medicine|therapy|'
+        r'scan|xray|biopsy|checkup|treatment|ward|discharge|'
+        r'account|balance|bill|payment|invoice|loan|emi|due|rupees?|\u20b9|'
+        r'tax|salary|transfer|debit|statement|premium|policy|claim|refund|'
+        r'outstanding|overdue|arrear|interest|fine|penalty|'
+        r'order|delivery|shipment|package|booking|reservation|ticket|'
+        r'subscription|renewal|expire|expiry|'
+        r'\u0905\u092a\u0949\u0907\u0902\u091f\u092e\u0947\u0902\u091f|\u0921\u0949\u0915\u094d\u091f\u0930|'
+        r'\u0905\u0938\u094d\u092a\u0924\u093e\u0932|\u092c\u093f\u0932|\u0916\u093e\u0924\u093e|'
+        r'\u092d\u0941\u0917\u0924\u093e\u0928|\u0930\u093f\u092a\u094b\u0930\u094d\u091f|'
+        r'dawa|ilaj|niyukti'
+        r')\b',
         re.IGNORECASE
     )
 
@@ -1002,26 +1039,56 @@ def compose_single_opening_greeting(
         (purpose and SENSITIVE_DETAILS_PATTERN.search(purpose))
     )
 
-    should_confirm_identity = is_name_valid and (verify_identity or has_sensitive_details)
+    # A2: Trigger identity confirmation for ALL outbound calls with sensitive content,
+    # not just when caller name is known.
+    should_confirm_identity = verify_identity or (is_outbound and has_sensitive_details)
 
     identity_confirmation_prompt = ""
     if should_confirm_identity:
-        if norm_lang == "en":
-            identity_confirmation_prompt = f"Am I speaking with {first_name}?"
-        elif norm_lang == "hi":
-            if resolved_gender == "neutral":
-                identity_confirmation_prompt = f"क्या मेरी बात {addressed_name} से हो रही है?"
-            else:
-                identity_confirmation_prompt = f"क्या मैं {addressed_name} से बात कर {verb_hi} हूँ?"
+        if is_name_valid:
+            # Named confirmation (caller identity known)
+            if norm_lang == "en":
+                identity_confirmation_prompt = f"Am I speaking with {first_name}?"
+            elif norm_lang == "hi":
+                if resolved_gender == "neutral":
+                    identity_confirmation_prompt = f"\u0915\u094d\u092f\u093e \u092e\u0947\u0930\u0940 \u092c\u093e\u0924 {addressed_name} \u0938\u0947 \u0939\u094b \u0930\u0939\u0940 \u0939\u0948?"
+                else:
+                    identity_confirmation_prompt = f"\u0915\u094d\u092f\u093e \u092e\u0948\u0902 {addressed_name} \u0938\u0947 \u092c\u093e\u0924 \u0915\u0930 {verb_hi} \u0939\u0942\u0901?"
+            elif norm_lang == "mr":
+                identity_confirmation_prompt = f"\u092e\u0940 {addressed_name} \u092f\u093e\u0902\u091a\u094d\u092f\u093e\u0936\u0940 \u092c\u094b\u0932\u0924 \u0906\u0939\u0947 \u0915\u093e?"
+            elif norm_lang == "ta":
+                identity_confirmation_prompt = f"\u0ba8\u0bbe\u0ba9\u0bcd {addressed_name} \u0b85\u0bb5\u0bb0\u0bcd\u0b95\u0bb3\u0bbf\u0b9f\u0bae\u0bcd \u0baa\u0bc7\u0b9a\u0bc1\u0b95\u0bbf\u0bb1\u0bc7\u0ba9\u0bbe?"
+            elif norm_lang == "te":
+                identity_confirmation_prompt = f"\u0c28\u0c47\u0c28\u0c41 {addressed_name} \u0c17\u0c3e\u0c30\u0c3f\u0c24\u0c4b \u0c2e\u0c3e\u0c1f\u0c4d\u0c32\u0c3e\u0c21\u0c41\u0c24\u0c41\u0c28\u0c4d\u0c28\u0c3e\u0c28\u0c3e?"
+            else:  # Hinglish
+                if resolved_gender == "neutral":
+                    identity_confirmation_prompt = f"Kya meri baat {addressed_name} se ho rahi hai?"
+                else:
+                    identity_confirmation_prompt = f"Kya main {addressed_name} se baat kar {verb} hoon?"
         else:
-            if resolved_gender == "neutral":
-                identity_confirmation_prompt = f"Kya meri baat {addressed_name} se ho rahi hai?"
-            else:
-                identity_confirmation_prompt = f"Kya main {addressed_name} se baat kar {verb} hoon?"
+            # A2: Unknown caller — neutral anonymous confirmation; never reveal sensitive purpose
+            if norm_lang == "en":
+                identity_confirmation_prompt = "Could I confirm I'm speaking with the right person?"
+            elif norm_lang == "hi":
+                if resolved_gender == "neutral":
+                    identity_confirmation_prompt = "\u0915\u094d\u092f\u093e \u092e\u0948\u0902 \u0938\u0939\u0940 \u0935\u094d\u092f\u0915\u094d\u0924\u093f \u0938\u0947 \u092c\u093e\u0924 \u0915\u0930 \u0930\u0939\u093e/\u0930\u0939\u0940 \u0939\u0942\u0901?"
+                else:
+                    identity_confirmation_prompt = f"\u0915\u094d\u092f\u093e \u092e\u0948\u0902 \u0938\u0939\u0940 \u0935\u094d\u092f\u0915\u094d\u0924\u093f \u0938\u0947 \u092c\u093e\u0924 \u0915\u0930 {verb_hi} \u0939\u0942\u0901?"
+            elif norm_lang == "mr":
+                identity_confirmation_prompt = "\u092e\u0940 \u092f\u094b\u0917\u094d\u092f \u0935\u094d\u092f\u0915\u094d\u0924\u0940\u0936\u0940 \u092c\u094b\u0932\u0924 \u0906\u0939\u0947 \u0915\u093e?"
+            elif norm_lang == "ta":
+                identity_confirmation_prompt = "\u0ba8\u0bbe\u0ba9\u0bcd \u0b9a\u0bb0\u0bbf\u0baf\u0bbe\u0ba9 \u0ba8\u0baa\u0bb0\u0bbf\u0b9f\u0bae\u0bcd \u0baa\u0bc7\u0b9a\u0bc1\u0b95\u0bbf\u0bb1\u0bc7\u0ba9\u0bbe?"
+            elif norm_lang == "te":
+                identity_confirmation_prompt = "\u0c28\u0c47\u0c28\u0c41 \u0c38\u0c30\u0c48\u0c28 \u0c35\u0c4d\u0c2f\u0c15\u0c4d\u0c24\u0c3f\u0c24\u0c4b \u0c2e\u0c3e\u0c1f\u0c4d\u0c32\u0c3e\u0c21\u0c41\u0c24\u0c41\u0c28\u0c4d\u0c28\u0c3e\u0c28\u0c3e?"
+            else:  # Hinglish
+                if resolved_gender == "neutral":
+                    identity_confirmation_prompt = "Kya main sahi vyakti se baat kar raha/rahi hoon?"
+                else:
+                    identity_confirmation_prompt = f"Kya main sahi vyakti se baat kar {verb} hoon?"
 
     # 5. Determine the appropriate question/action for opening utterance
     if should_confirm_identity and identity_confirmation_prompt:
-        # Do NOT share sensitive appointment/financial details yet; confirm identity first!
+        # A2: Do NOT share sensitive health/financial/appointment/order details until confirmed!
         remainder = identity_confirmation_prompt
     elif not remainder:
         if is_outbound:

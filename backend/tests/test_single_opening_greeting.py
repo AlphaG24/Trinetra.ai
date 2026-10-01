@@ -251,17 +251,22 @@ def test_22_realistic_dashboard_greetings_safe_stripping_and_composition():
         # 3. Agent name must appear at most once in introduction
         assert composed.count(agent) <= 1, f"Case {cid} duplicated agent name '{agent}'"
 
-        # 4. Critical check: Case 1 ("I'm calling about your appointment tomorrow") must preserve appointment
+        # 4. A2 check: Case 1 (outbound "appointment tomorrow") must WITHHOLD the appointment
+        #    and instead ask for identity confirmation (A2 requirement).
         if cid == 1:
-            assert "appointment tomorrow" in composed.lower(), "Case 1 must preserve 'appointment tomorrow'!"
+            assert "appointment tomorrow" not in composed.lower(), \
+                "Case 1 A2: appointment must be withheld on outbound until identity confirmed!"
+            assert any(w in composed.lower() for w in ["right person", "confirm", "speaking"]), \
+                f"Case 1 A2: identity confirmation expected, got: {composed}"
 
         # 5. Case 5 (Offer with no intro) must preserve the 50% discount and demo question
         if cid == 5:
             assert "50% discount" in composed and "schedule a demo" in composed
 
-        # 6. Case 18 (Hindi appointment) must preserve Hindi appointment text
+        # 6. Case 18 (Hindi appointment outbound) must WITHHOLD appointment (A2)
         if cid == 18:
-            assert "अपॉइंटमेंट की पुष्टि" in composed
+            assert "अपॉइंटमेंट की पुष्टि" not in composed, \
+                "Case 18 A2: Hindi appointment text must be withheld on outbound until identity confirmed!"
 
 
 def test_safety_rule_never_removes_non_intro_sentences():
