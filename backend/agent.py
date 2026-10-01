@@ -23,7 +23,10 @@ from livekit.agents.voice.agent import ModelSettings
 from database import supabase_admin
 from app.services.ai.prompt_guard import enforce_prompt_ai_guard
 from app.services.disclosure_service import (
+    compose_single_opening_greeting,
     build_compliant_greeting,
+    lookup_caller_name_fast,
+    render_cached_opening_greeting,
     persist_call_disclosure,
     handle_caller_recording_decline,
     select_disclosure_variant,
@@ -678,30 +681,15 @@ def resolve_agent_greeting(
     purpose: str | None = None
 ) -> Tuple[str, str, str]:
     """
-    Resolves the initial greeting message with Phase 1 Call Disclosure & Consent.
-    Preserves user-defined dashboard greetings while ensuring mandatory disclosure
-    (AI assistant identity, business name, recording notice, outbound purpose) is
-    smoothly prepended/integrated.
-    
-    Returns:
-        (greeting_message, selected_variant, normalized_lang)
+    Single source of truth bridge in agent.py.
+    Calls compose_single_opening_greeting to produce ONE final opening utterance
+    with caller name, mandatory disclosure, and dashboard pitch.
     """
-    c_name = ""
-    is_name_valid = False
+    c_name = None
     if campaign_contact:
-        c_name = campaign_contact.get("full_name") or ""
-        is_name_valid = bool(c_name and str(c_name).strip() and str(c_name).lower() not in ("null", "unknown", "none"))
+        c_name = campaign_contact.get("full_name") or campaign_contact.get("name")
     elif customer:
-        c_name = customer.get("full_name") or ""
-        is_name_valid = bool(c_name and str(c_name).strip() and str(c_name).lower() not in ("null", "unknown", "none", "inbound caller"))
-
-    # Extract first name to avoid robotic, impolite full-name addressing (e.g. "Raghav" instead of "Raghav Thakur")
-    first_name = c_name.strip().split()[0].capitalize() if is_name_valid else ""
-
-    comp_hindi = f" {business_name} se" if business_name else ""
-    comp_eng = f" calling from {business_name}" if business_name else ""
-    verb = "rahi" if gender_tag == "female" else "raha"
-    modal = "sakti" if gender_tag == "female" else "sakta"
+        c_name = customer.get("full_name") or customer.get("name")
 
     # Extract disclosure configuration
     disclosure_cfg = (agent_config or {}).get("disclosure_config") or {}
@@ -720,70 +708,12 @@ def resolve_agent_greeting(
     variant = select_disclosure_variant(agent_config)
     recording_exempt = bool(disclosure_cfg.get("recording_notice_exempt", False))
     resolved_purpose = purpose or (campaign_contact.get("notes") if campaign_contact else None)
-    
-    if raw_greeting:
-        gm = raw_greeting.replace('{{agent_name}}', clean_name).replace('{agentName}', clean_name).replace('{agent_name}', clean_name)
-        gm = gm.replace('{{company_name}}', business_name).replace('{companyName}', business_name).replace('{company_name}', business_name)
-        
-        c_repl = f"{first_name} ji" if (first_name and language in ['hinglish', 'hi-IN']) else (first_name or "")
-        name_tokens = [
-            '{{customer_name}}', '{customerName}', '{customer_name}',
-            '{{contact_name}}', '{contactName}', '{contact_name}',
-            '{{name}}', '{name}', '[customer_name]', '[customerName]',
-            '[name]', '[Name]', '[contact_name]', '{{prospect_name}}',
-            '{prospect_name}', '[prospect_name]', '---', '___'
-        ]
-        has_token = any(t in gm for t in name_tokens)
-        if has_token:
-            for t in name_tokens:
-                if t in gm:
-                    gm = gm.replace(t, c_repl or "ji")
-        elif first_name and first_name.lower() not in gm.lower():
-            if re.search(r'^(Namaste|Hello|Hi)\b', gm, re.IGNORECASE):
-                gm = re.sub(r'^(Namaste|Hello|Hi)(\s+ji)?([,!\.]|\s+)', rf'\1 {first_name} ji, ', gm, count=1, flags=re.IGNORECASE)
-            else:
-                gm = f"Namaste {first_name} ji! {gm}"
 
-        # Ensure agent introduces itself with its name in its first sentence (Rule 26, 28, Issue 4)
-        if clean_name and clean_name.lower() not in gm.lower():
-            if language in ['hinglish', 'hi-IN']:
-                if first_name:
-                    clean_rest = re.sub(r'^(Namaste|Hello|Hi)\s*' + re.escape(first_name) + r'\s*ji[,!\.]?\s*', '', gm, flags=re.IGNORECASE).strip()
-                    gm = f"Hello {first_name} ji! Main {clean_name} bol {verb} hoon{comp_hindi}. {clean_rest}"
-                else:
-                    clean_rest = re.sub(r'^(Namaste|Hello|Hi)[,!\s]*', '', gm, flags=re.IGNORECASE).strip()
-                    gm = f"Hello! Main {clean_name} bol {verb} hoon{comp_hindi}. {clean_rest}"
-            else:
-                if first_name:
-                    clean_rest = re.sub(r'^(Hello|Hi)\s*' + re.escape(first_name) + r'[,!\.]?\s*', '', gm, flags=re.IGNORECASE).strip()
-                    gm = f"Hello {first_name}! This is {clean_name}{comp_eng}. {clean_rest}"
-                else:
-                    clean_rest = re.sub(r'^(Hello|Hi)[,!\s]*', '', gm, flags=re.IGNORECASE).strip()
-                    gm = f"Hello! This is {clean_name}{comp_eng}. {clean_rest}"
-
-        gm = re.sub(r'\s+', ' ', gm).strip()
-        gm = gm.strip('"\'`“”‘’').strip()
-        gm = gm.replace(" ,", ",").replace(" !", "!").replace(" .", ".")
-
-        # Apply Phase 1 compliance add-ons while preserving owner custom pitch
-        return build_compliant_greeting(
-            raw_greeting=gm,
-            clean_name=clean_name,
-            business_name=business_name,
-            direction=direction,
-            language=language,
-            gender_tag=gender_tag,
-            purpose=resolved_purpose,
-            consent_mode=consent_mode,
-            variant=variant,
-            recording_exempt=recording_exempt
-        )
-    
-    # When no raw greeting is provided in dashboard, generate full multilingual disclosure
-    return build_compliant_greeting(
-        raw_greeting=None,
-        clean_name=clean_name,
+    return compose_single_opening_greeting(
+        dashboard_greeting=raw_greeting,
+        agent_name=clean_name,
         business_name=business_name,
+        caller_name=c_name,
         direction=direction,
         language=language,
         gender_tag=gender_tag,
@@ -792,6 +722,7 @@ def resolve_agent_greeting(
         variant=variant,
         recording_exempt=recording_exempt
     )
+
 
 
 def build_outbound_sales_protocol(
@@ -2000,30 +1931,41 @@ class VikramAgent(Agent):
 
         greeting = getattr(self, 'greeting_message', None)
         if not greeting or not str(greeting).strip():
-            b_name = getattr(self, 'bot_name', None) or "Aditi"
+            b_name = getattr(self, 'bot_name', None) or "Arika"
             b_comp = getattr(self, 'business_name', '')
             gender = getattr(self, 'gender', 'female')
-            greeting, _, _ = build_compliant_greeting(
-                raw_greeting=None,
-                clean_name=b_name,
+            greeting, _, _ = compose_single_opening_greeting(
+                dashboard_greeting=None,
+                agent_name=b_name,
                 business_name=b_comp,
+                caller_name=getattr(self, 'prospect_name', None),
                 direction="inbound",
                 language=getattr(self, 'language', 'hinglish'),
                 gender_tag=gender
             )
             logger.info(f"[VikramAgent] Constructed compliant fallback greeting: '{greeting}'")
 
-        # If greeting already introduced the agent name, mark as introduced so agent never repeats it
-        agent_name_val = getattr(self, 'bot_name', '')
-        if agent_name_val and agent_name_val.lower() in str(greeting).lower():
-            self._has_introduced_self = True
+        # Mark as introduced so agent never repeats itself during later turns
+        self._has_introduced_self = True
 
-        logger.info(f"[VikramAgent] Speaking greeting: '{greeting}'")
+        logger.info(f"[VikramAgent] Speaking single compliant opening greeting: '{greeting}'")
         print(f"[Agent] Speaking greeting: '{greeting}'", flush=True)
-        await self.session.say(
+        speech_handle = self.session.say(
             greeting,
-            allow_interruptions=False
+            allow_interruptions=False,
+            add_to_chat_ctx=True
         )
+        await speech_handle
+
+        # Add to chat context as an assistant message so the LLM never repeats the opening
+        try:
+            if hasattr(self, 'session') and hasattr(self.session, 'history') and self.session.history:
+                has_msg = any(getattr(m, 'content', '') == greeting for m in self.session.history.messages)
+                if not has_msg:
+                    self.session.history.add_message(role="assistant", content=greeting)
+        except Exception as ctx_err:
+            logger.warning(f"Error adding opening greeting to session history: {ctx_err}")
+
 
     def _clean_chunk(self, chunk):
         gender = getattr(self, 'gender', '')
@@ -3500,23 +3442,23 @@ async def entrypoint(ctx: JobContext):
                     except Exception as e:
                         logger.error(f"Failed to fetch campaign contact {contact_id}: {e}")
 
-                # 9. Lookup Returning Customer
+                # 9. Fast Caller Name Lookup (bounded by 300ms timeout, isolated to organization_id)
                 customer = None
                 if not campaign_contact and organization_id and caller_number != "Unknown":
                     try:
-                        from app.services.caller_lookup import CallerLookupService
-                        lookup_svc = CallerLookupService(supabase_admin)
-                        customer = await lookup_svc.lookup_caller(organization_id, caller_number)
-                        if customer:
-                            cust_name = customer.get("full_name") or ""
-                            cust_notes = customer.get("notes") or ""
-                            cust_company = customer.get("company") or ""
-                            cust_tags = customer.get("tags") or []
-                            logger.info(f"[CallerLookup - EP] Recognized returning customer: {cust_name} ({caller_number})")
-                            customer_context = f"\n\n## CALLER RECOGNITION (CUSTOMER DATABASE MATCH)\n- Caller Name: {cust_name}\n- Caller Phone: {caller_number}\n- Company: {cust_company}\n- Customer Tags: {', '.join(cust_tags) if cust_tags else 'None'}\n- Past Interaction History / Notes: {cust_notes or 'First recorded interaction'}\n- INSTRUCTION: Address the caller warmly by their name ({cust_name}) as a valued contact. Do not introduce yourself as a stranger!\n"
-                            system_prompt += customer_context
+                        fast_name = await lookup_caller_name_fast(
+                            supabase_admin,
+                            organization_id=organization_id,
+                            phone_number=caller_number,
+                            timeout_sec=0.30
+                        )
+                        if fast_name:
+                            customer = {"full_name": fast_name, "phone": caller_number}
+                            logger.info(f"[CallerLookup - EP] Recognized customer: {fast_name} ({caller_number})")
+                            system_prompt += f"\n\n## CALLER RECOGNITION (CUSTOMER DATABASE MATCH)\n- Caller Name: {fast_name}\n- Caller Phone: {caller_number}\n- INSTRUCTION: Address the caller warmly by their name ({fast_name}) as a valued contact.\n"
                     except Exception as lookup_err:
-                        logger.error(f"Failed to lookup caller in EP: {lookup_err}")
+                        logger.warning(f"Fast caller lookup timed out or failed in EP: {lookup_err}")
+
 
                 # 10. Lookup Existing Appointment Records in DB
                 try:

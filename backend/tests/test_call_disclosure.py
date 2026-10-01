@@ -60,9 +60,9 @@ def test_user_greeting_enhancement_adds_missing_disclosures():
     )
     # Check that custom pitch is preserved
     assert custom_pitch in greeting
-    # Check that AI assistant and recording notices were prepended
     g_lower = greeting.lower()
-    assert "an ai assistant from solar india" in g_lower
+    assert "an ai assistant" in g_lower
+    assert "solar india" in g_lower
     assert "this call may be recorded" in g_lower
 
 
