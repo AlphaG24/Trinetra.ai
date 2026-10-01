@@ -14,6 +14,7 @@ async def create_campaign(
     name: str = Form(...),
     agent_id: str = Form(...),
     organization_id: str = Form(...),
+    purpose: str = Form("promotional"),
     calling_hours_start: str = Form("10:00"),
     calling_hours_end: str = Form("18:00"),
     timezone: str = Form("Asia/Kolkata"),
@@ -28,6 +29,7 @@ async def create_campaign(
             name=name,
             file_content=file_content,
             filename=file.filename,
+            purpose=purpose,
             calling_hours_start=calling_hours_start,
             calling_hours_end=calling_hours_end,
             timezone_str=timezone,
@@ -40,6 +42,22 @@ async def create_campaign(
     except Exception as e:
         logger.error(f"Error creating campaign: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Unexpected server error: {str(e)}")
+
+@router.get("/{id}/pre-send-report")
+async def get_pre_send_report(id: str):
+    """
+    Returns pre-send safety audit report showing how many contacts pass or fail
+    statutory checks (consent, DND, 09:00-21:00 calling window, phone format).
+    """
+    try:
+        report = await CampaignService.get_pre_send_report(id)
+        return {"success": True, "data": report}
+    except ValueError as ve:
+        raise HTTPException(status_code=404, detail=str(ve))
+    except Exception as e:
+        logger.error(f"Error generating pre-send report for campaign {id}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 @router.get("")
 async def list_campaigns(organization_id: str = Query(...)):

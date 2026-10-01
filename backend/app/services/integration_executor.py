@@ -625,15 +625,41 @@ class IntegrationExecutor:
 
     async def _send_whatsapp(self, config: dict, message: str, data: dict = None) -> bool:
         to_number = (data or {}).get("contact_phone") or (data or {}).get("prospect_phone") or config.get("target_phone")
+        if not to_number:
+            logger.warning("WhatsApp dispatch skipped: no destination contact phone provided.")
+            return False
+
+        # Phase 3 Guard: Check internal DND/opt-out registry before sending
+        from app.services.outbound_safety_guardrails import check_internal_dnd, validate_whatsapp_outbound
+        from database import supabase_admin
+        
+        is_dnd = await check_internal_dnd(str(to_number), supabase_admin)
+        if is_dnd:
+            logger.warning(f"[WhatsApp Safety Guard] Blocked dispatch to {to_number}: Number is registered on DND/opt-out list.")
+            return False
+
+        # Phase 3 Guard: Validate proactive messaging opt-in & approved template
+        is_proactive = bool((data or {}).get("is_proactive", False))
+        whatsapp_opt_in = bool((data or {}).get("whatsapp_opt_in", False))
+        template_name = (data or {}).get("template_name")
+
+        is_valid, reason = validate_whatsapp_outbound(
+            phone_number=str(to_number),
+            message_text=message,
+            template_name=template_name,
+            whatsapp_opt_in=whatsapp_opt_in,
+            is_proactive=is_proactive
+        )
+        if not is_valid:
+            logger.warning(f"[WhatsApp Safety Guard] Blocked dispatch to {to_number}: {reason}")
+            return False
+
         twilio_sid = config.get("twilio_sid") or os.getenv("TWILIO_ACCOUNT_SID")
         auth_token = config.get("auth_token") or os.getenv("TWILIO_AUTH_TOKEN")
         from_number = config.get("phone_number") or config.get("from_number") or os.getenv("TWILIO_WHATSAPP_FROM") or os.getenv("TWILIO_PHONE_NUMBER")
 
         # 1. Twilio WhatsApp dispatch
         if twilio_sid and auth_token and from_number:
-            if not to_number:
-                logger.warning("Twilio WhatsApp dispatch skipped: no destination contact phone provided.")
-                return False
             from_whatsapp = format_whatsapp_number(from_number)
             to_whatsapp = format_whatsapp_number(to_number)
             if not to_whatsapp or to_whatsapp == "whatsapp:+":
