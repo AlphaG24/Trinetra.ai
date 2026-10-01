@@ -28,6 +28,7 @@ from app.services.disclosure_service import (
     handle_caller_recording_decline,
     select_disclosure_variant,
     normalize_language_code,
+    resolve_jurisdiction_consent_mode,
 )
 
 load_dotenv()
@@ -704,7 +705,18 @@ def resolve_agent_greeting(
 
     # Extract disclosure configuration
     disclosure_cfg = (agent_config or {}).get("disclosure_config") or {}
-    consent_mode = disclosure_cfg.get("consent_mode", "notice_only")
+    raw_consent_mode = disclosure_cfg.get("consent_mode")
+    lawyer_confirmed = bool((disclosure_cfg.get("exemption_details") or {}).get("lawyer_confirmed", False))
+    phone_val = (campaign_contact.get("phone_number") if campaign_contact else None) or (customer.get("phone") if customer else None)
+    
+    consent_mode = resolve_jurisdiction_consent_mode(
+        configured_mode=raw_consent_mode,
+        phone_number=phone_val,
+        country_code=disclosure_cfg.get("jurisdiction"),
+        call_direction=direction,
+        is_marketing=True,
+        lawyer_confirmed=lawyer_confirmed
+    )
     variant = select_disclosure_variant(agent_config)
     recording_exempt = bool(disclosure_cfg.get("recording_notice_exempt", False))
     resolved_purpose = purpose or (campaign_contact.get("notes") if campaign_contact else None)
@@ -3545,7 +3557,14 @@ async def entrypoint(ctx: JobContext):
 
                 # Persist call disclosure telemetry asynchronously (Phase 1)
                 disc_cfg = (agent_data.get("disclosure_config") or {}) if agent_data else {}
-                disc_mode = disc_cfg.get("consent_mode", "notice_only")
+                disc_mode = resolve_jurisdiction_consent_mode(
+                    configured_mode=disc_cfg.get("consent_mode"),
+                    phone_number=campaign_contact.get("phone_number") if campaign_contact else None,
+                    country_code=disc_cfg.get("jurisdiction"),
+                    call_direction=call_direction,
+                    is_marketing=True,
+                    lawyer_confirmed=bool((disc_cfg.get("exemption_details") or {}).get("lawyer_confirmed", False))
+                )
                 if ctx.room and ctx.room.name:
                     asyncio.create_task(persist_call_disclosure(
                         supabase_client=supabase_admin,
@@ -4495,7 +4514,14 @@ async def run_agent(room_name: str, agent_id: str | None = None, contact_id: str
 
                 # Persist call disclosure telemetry asynchronously (Phase 1)
                 disc_cfg = (agent_data.get("disclosure_config") or {}) if agent_data else {}
-                disc_mode = disc_cfg.get("consent_mode", "notice_only")
+                disc_mode = resolve_jurisdiction_consent_mode(
+                    configured_mode=disc_cfg.get("consent_mode"),
+                    phone_number=campaign_contact.get("phone_number") if campaign_contact else None,
+                    country_code=disc_cfg.get("jurisdiction"),
+                    call_direction=call_direction,
+                    is_marketing=True,
+                    lawyer_confirmed=bool((disc_cfg.get("exemption_details") or {}).get("lawyer_confirmed", False))
+                )
                 if room_name:
                     asyncio.create_task(persist_call_disclosure(
                         supabase_client=supabase_admin,

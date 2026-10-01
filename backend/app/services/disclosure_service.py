@@ -138,6 +138,68 @@ CONSENT_MODE_SUFFIXES = {
     }
 }
 
+# Jurisdictions where passive consent ('stay_on_line') is legally non-compliant or questionable for outbound marketing
+# [CONFIRM WITH A LAWYER] India: Digital Personal Data Protection Act 2023 Sec 6 & TRAI TCCCPR 2018 (https://trai.gov.in)
+# [CONFIRM WITH A LAWYER] EU: General Data Protection Regulation (EU) 2016/679 Art 7 & EU AI Act Art 50 (https://eur-lex.europa.eu)
+RESTRICTED_AFFIRMATIVE_CONSENT_PREFIXES = (
+    "+91", "91", # India
+    "+49", "+33", "+39", "+34", "+31", "+32", "+43", "+46", "+48", "+353",
+    "+45", "+358", "+351", "+30", "+420", "+40", "+36", "+421", "+359",
+    "+385", "+370", "+386", "+371", "+372", "+357", "+352", "+356", "+44"
+)
+RESTRICTED_AFFIRMATIVE_COUNTRY_CODES = {
+    "IN", "INDIA",
+    "EU", "DE", "FR", "IT", "ES", "NL", "BE", "AT", "SE", "PL", "IE", "DK",
+    "FI", "PT", "GR", "CZ", "RO", "HU", "SK", "BG", "HR", "LT", "SI", "LV",
+    "EE", "CY", "LU", "MT", "GB", "UK"
+}
+
+
+def resolve_jurisdiction_consent_mode(
+    configured_mode: Optional[str] = None,
+    phone_number: Optional[str] = None,
+    country_code: Optional[str] = None,
+    call_direction: str = "outbound",
+    is_marketing: bool = True,
+    lawyer_confirmed: bool = False
+) -> str:
+    """
+    Resolves the applicable consent mode based on jurisdiction, direction, and campaign purpose.
+    
+    COMPLIANCE RULES (CONFIRM WITH A LAWYER):
+    1. Outbound marketing calls in India (+91) and EU default to 'spoken_or_keypress' (affirmative consent).
+    2. 'stay_on_line' MUST NEVER be the default in India or the EU for outbound marketing calls.
+    3. Passive 'stay_on_line' or 'notice_only' is rejected for outbound marketing in these jurisdictions
+       unless formal lawyer confirmation is verified.
+    """
+    clean_phone = (phone_number or "").strip()
+    clean_cc = (country_code or "").strip().upper()
+
+    is_restricted_jurisdiction = False
+    if clean_cc in RESTRICTED_AFFIRMATIVE_COUNTRY_CODES or clean_cc.startswith("IN-") or clean_cc.startswith("EU-"):
+        is_restricted_jurisdiction = True
+    elif clean_phone:
+        normalized_num = clean_phone if clean_phone.startswith("+") else f"+{clean_phone}"
+        if any(normalized_num.startswith(pfx) for pfx in RESTRICTED_AFFIRMATIVE_CONSENT_PREFIXES):
+            is_restricted_jurisdiction = True
+        elif len(clean_phone) == 10 and clean_phone.isdigit() and clean_phone[0] in "6789":
+            # Standard 10-digit Indian mobile number
+            is_restricted_jurisdiction = True
+
+    # Rule: Outbound marketing in India/EU strictly defaults to spoken_or_keypress
+    if call_direction.lower() == "outbound" and is_marketing and is_restricted_jurisdiction:
+        if configured_mode == "stay_on_line" and not lawyer_confirmed:
+            logger.warning(
+                f"[Consent Guard] 'stay_on_line' is prohibited as default for outbound marketing in "
+                f"India/EU jurisdiction. Overriding to 'spoken_or_keypress' [CONFIRM WITH A LAWYER]."
+            )
+            return "spoken_or_keypress"
+        if not configured_mode or configured_mode in ["notice_only", "default"]:
+            return "spoken_or_keypress"
+
+    # Default fallback for other jurisdictions / non-marketing
+    return configured_mode or "notice_only"
+
 
 def normalize_language_code(language_str: Optional[str]) -> str:
     """Maps language identifiers to canonical supported keys."""
@@ -406,3 +468,30 @@ async def handle_caller_recording_decline(
 async def asyncio_to_thread(fn, *args, **kwargs):
     import asyncio
     return await asyncio.to_thread(fn, *args, **kwargs)
+
+
+def handle_greeting_barge_in(
+    disclosure_text: str,
+    caller_interruption_text: Optional[str] = None,
+    is_interrupted: bool = False
+) -> Dict[str, Any]:
+    """
+    Handles edge cases where a caller speaks over the initial disclosure greeting.
+    
+    Requirements:
+    1. Disclosure must always play before any sales pitch.
+    2. If caller speaks over the greeting (barge-in):
+       - Caller's utterance is captured and preserved for immediate response.
+       - Disclosure is logged as initiated/delivered.
+       - System handles the speech gracefully without repeating the full disclosure greeting.
+    """
+    cleaned_utterance = (caller_interruption_text or "").strip()
+    has_barge_in = is_interrupted or bool(cleaned_utterance)
+
+    return {
+        "disclosure_text": disclosure_text,
+        "disclosure_delivered": True,
+        "caller_barge_in": has_barge_in,
+        "caller_utterance": cleaned_utterance,
+        "next_action": "respond_to_caller_utterance" if cleaned_utterance else "await_user_response"
+    }
