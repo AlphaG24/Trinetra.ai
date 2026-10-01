@@ -437,7 +437,7 @@ def resolve_agent_gender(
         female_catalog = [
             'aditi', 'ritu', 'priya', 'neha', 'pooja', 'simran', 'kavya', 'ishita', 'shreya', 
             'roopa', 'tanya', 'shruti', 'suhani', 'kavitha', 'rupali', 'anushka', 'manisha', 
-            'vidya', 'arya', 'abhilash', 'karun', 'hitesh', 'amelia', 'sophia', 'diya', 'meera', 
+            'vidya', 'arya', 'abhilash', 'karun', 'hitesh', 'amelia', 'sophia', 'maya', 'diya', 'meera', 
             'pavithra', 'sita', 'radha', 'leela', 'shimmer', 'alloy', 'nova', 'fable', 'rachel', 
             'domi', 'bella', 'elli', 'sarah'
         ]

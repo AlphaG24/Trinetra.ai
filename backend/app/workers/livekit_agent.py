@@ -6,6 +6,7 @@ from livekit import rtc
 from livekit.agents.voice import Agent, AgentSession
 from livekit.plugins import sarvam, silero
 import yaml
+from app.services.disclosure_service import resolve_agent_gender, resolve_gendered_phrases
 
 load_dotenv()
 
@@ -106,8 +107,11 @@ async def run_agent(room_name: str):
         await session.start(room=room, agent=agent)
         logger.info("Agent session started")
 
-        # TODO(A1c): Replace hardcoded greeting with resolve_gendered_phrases() when this worker is production-ready
-        await session.say("Namaste ji, main Trinetra AI se Vikram bol raha hoon. Kaise hain aap?")
+        # A1c: Derive opening greeting from resolver so it matches TTS voice gender
+        _speaker = "shubh"  # matches TTS speaker above; update here if speaker changes
+        _gp = resolve_gendered_phrases(voice=_speaker, agent_name="Vikram")
+        _v_bol = _gp["v_bol"]  # 'bol raha hoon' (male) or 'bol rahi hoon' (female)
+        await session.say(f"Namaste ji, main Trinetra AI se Vikram {_v_bol}. Kaise hain aap?")
 
         await done.wait()
 
