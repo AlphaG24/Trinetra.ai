@@ -464,6 +464,327 @@ def resolve_agent_gender(
     return "neutral", "unresolved"
 
 
+def resolve_gendered_phrases(
+    gender: Optional[str] = None,
+    voice: Optional[str] = None,
+    agent_name: Optional[str] = None,
+    language: str = "hinglish",
+    caller_name: Optional[str] = None,
+    business_name: str = "Trinetra AI"
+) -> Dict[str, Any]:
+    """
+    Unified gender resolution engine for all spoken and system strings:
+    - Identity confirmation ("Kya main Rahul ji se baat kar raha/rahi hoon?" / Marathi / Hindi)
+    - Human-transfer messages
+    - Retry and fallback lines
+    - Recording-decline replies (continue unrecorded or end call)
+    - Callback and reminder messages
+    - Grammatical verb forms (v_bol, v_sun, v_samajh, v_check, v_call, v_respect, v_note, v_madad, v_chahta,
+      v_karungi, v_lungi, v_bhej, v_seedhi, v_leti)
+    
+    Resolution Order:
+    1. Explicit agent gender setting ('male' / 'female')
+    2. Voice's gender from TTS provider catalog or voice list ('voice_catalog')
+    3. Persona-name guess as last resort ('guessed')
+    4. Unresolved -> neutral phrasing in Hindi, Hinglish, Marathi
+    """
+    resolved_gender, gender_source = resolve_agent_gender(gender=gender, voice=voice, agent_name=agent_name)
+    norm_lang = normalize_language_code(language)
+    agent_display = (agent_name or "Agent").strip()
+    biz_display = (business_name or "Trinetra AI").strip()
+
+    # Determine addressed caller name
+    addressed_name = ""
+    if caller_name and str(caller_name).strip() and str(caller_name).strip().lower() not in ("none", "null", "unknown"):
+        first_name = caller_name.strip().split()[0].capitalize()
+        if norm_lang == "hi":
+            addressed_name = f"{first_name} जी"
+        elif norm_lang in ("hinglish", "mr"):
+            addressed_name = f"{first_name} ji"
+        else:
+            addressed_name = first_name
+
+    # 1. Base Grammatical Verbs
+    if resolved_gender == "male":
+        v_bol = "bol raha hoon"
+        v_bol_hi = "बोल रहा हूँ"
+        v_bol_mr = "बोलत आहे"
+        v_sun = "sun raha hoon"
+        v_sun_hi = "सुन रहा हूँ"
+        v_sun_mr = "ऐकत आहे"
+        v_samajh = "samajh sakta hoon"
+        v_samajh_hi = "समझ सकता हूँ"
+        v_samajh_mr = "समजू शकतो"
+        v_check = "check karta hoon"
+        v_check_hi = "चेक करता हूँ"
+        v_check_mr = "तपासतो"
+        v_call = "call nahi karunga"
+        v_call_hi = "कॉल नहीं करूँगा"
+        v_call_mr = "पुन्हा कॉल करणार नाही"
+        v_respect = "respect karta hoon"
+        v_respect_hi = "सम्मान करता हूँ"
+        v_respect_mr = "आदर करतो"
+        v_note = "note kar leta hoon"
+        v_note_hi = "नोट कर लेता हूँ"
+        v_note_mr = "नोंद करून घेतो"
+        v_madad = "kar sakta hoon"
+        v_madad_hi = "कर सकता हूँ"
+        v_madad_mr = "करू शकतो"
+        v_chahta = "chahta hoon"
+        v_chahta_hi = "चाहता हूँ"
+        v_chahta_mr = "इच्छितो"
+        v_karungi = "karunga"
+        v_lungi = "kar lunga"
+        v_bhej = "bhej deta hoon"
+        v_seedhi = "seedhi baat karta hoon"
+        v_leti = "kar leta hoon"
+    elif resolved_gender == "female":
+        v_bol = "bol rahi hoon"
+        v_bol_hi = "बोल रही हूँ"
+        v_bol_mr = "बोलत आहे"
+        v_sun = "sun rahi hoon"
+        v_sun_hi = "सुन रही हूँ"
+        v_sun_mr = "ऐकत आहे"
+        v_samajh = "samajh sakti hoon"
+        v_samajh_hi = "समझ सकती हूँ"
+        v_samajh_mr = "समजू शकते"
+        v_check = "check karti hoon"
+        v_check_hi = "चेक करती हूँ"
+        v_check_mr = "तपासते"
+        v_call = "call nahi karungi"
+        v_call_hi = "कॉल नहीं करूँगी"
+        v_call_mr = "पुन्हा कॉल करणार नाही"
+        v_respect = "respect karti hoon"
+        v_respect_hi = "सम्मान करती हूँ"
+        v_respect_mr = "आदर करते"
+        v_note = "note kar leti hoon"
+        v_note_hi = "नोट कर लेती हूँ"
+        v_note_mr = "नोंद करून घेते"
+        v_madad = "kar sakti hoon"
+        v_madad_hi = "कर सकती हूँ"
+        v_madad_mr = "करू शकते"
+        v_chahta = "chahti hoon"
+        v_chahta_hi = "चाहती हूँ"
+        v_chahta_mr = "इच्छिते"
+        v_karungi = "karungi"
+        v_lungi = "kar lungi"
+        v_bhej = "bhej deti hoon"
+        v_seedhi = "seedhi baat karti hoon"
+        v_leti = "kar leti hoon"
+    else:  # neutral
+        v_bol = "bol rahe hain"
+        v_bol_hi = "बोल रहे हैं"
+        v_bol_mr = "बोलत आहे"
+        v_sun = "sun rahe hain"
+        v_sun_hi = "सुन रहे हैं"
+        v_sun_mr = "ऐकत आहे"
+        v_samajh = "samajh sakte hain"
+        v_samajh_hi = "समझ सकते हैं"
+        v_samajh_mr = "समजू शकेन"
+        v_check = "check karte hain"
+        v_check_hi = "चेक करते हैं"
+        v_check_mr = "तपासले जाईल"
+        v_call = "aage call nahi aayegi"
+        v_call_hi = "आगे कॉल नहीं की जाएगी"
+        v_call_mr = "पुन्हा कॉल केला जाणार नाही"
+        v_respect = "respect karte hain"
+        v_respect_hi = "सम्मान करते हैं"
+        v_respect_mr = "आदर राखतो"
+        v_note = "note kar liya gaya hai"
+        v_note_hi = "नोट कर लिया गया है"
+        v_note_mr = "नोंद केली आहे"
+        v_madad = "kar sakte hain"
+        v_madad_hi = "की जा सकती है"
+        v_madad_mr = "करू शकेन"
+        v_chahta = "chahte hain"
+        v_chahta_hi = "चाहते हैं"
+        v_chahta_mr = "इच्छितो"
+        v_karungi = "karenge"
+        v_lungi = "kar lenge"
+        v_bhej = "bhej dete hain"
+        v_seedhi = "seedhi baat karte hain"
+        v_leti = "kar lete hain"
+
+    # 2. Identity Confirmation
+    target_person = addressed_name or ("sir/ma'am" if norm_lang != "hi" else "महोदय")
+    if norm_lang == "hi":
+        if resolved_gender == "neutral":
+            identity_confirmation = f"क्या मेरी बात {target_person} से हो रही है?"
+        elif resolved_gender == "female":
+            identity_confirmation = f"क्या मैं {target_person} से बात कर रही हूँ?"
+        else:
+            identity_confirmation = f"क्या मैं {target_person} से बात कर रहा हूँ?"
+    elif norm_lang == "mr":
+        if resolved_gender == "neutral":
+            identity_confirmation = f"माझे {target_person} यांच्याशी बोलणे होत आहे का?"
+        elif resolved_gender == "female":
+            identity_confirmation = f"मी {target_person} यांच्याशी बोलते आहे का?"
+        else:
+            identity_confirmation = f"मी {target_person} यांच्याशी बोलतो आहे का?"
+    elif norm_lang == "en":
+        identity_confirmation = f"Am I speaking with {target_person}?"
+    else:  # Hinglish default
+        if resolved_gender == "neutral":
+            identity_confirmation = f"Kya meri baat {target_person} se ho rahi hai?"
+        elif resolved_gender == "female":
+            identity_confirmation = f"Kya main {target_person} se baat kar rahi hoon?"
+        else:
+            identity_confirmation = f"Kya main {target_person} se baat kar raha hoon?"
+
+    # 3. Human Transfer Message
+    if norm_lang == "hi":
+        if resolved_gender == "neutral":
+            human_transfer = "आपकी कॉल तुरंत हमारे सपोर्ट एग्जीक्यूटिव को ट्रांसफर की जा रही है, कृपया लाइन पर बने रहिए।"
+        elif resolved_gender == "female":
+            human_transfer = "मैं आपकी कॉल तुरंत हमारे सपोर्ट एग्जीक्यूटिव को ट्रांसफर कर रही हूँ, कृपया लाइन पर बने रहिए।"
+        else:
+            human_transfer = "मैं आपकी कॉल तुरंत हमारे सपोर्ट एग्जीक्यूटिव को ट्रांसफर कर रहा हूँ, कृपया लाइन पर बने रहिए।"
+    elif norm_lang == "mr":
+        if resolved_gender == "neutral":
+            human_transfer = "आपला कॉल त्वरित प्रतिनिधीकडे ट्रान्सफर केला जात आहे, कृपया थांबा."
+        elif resolved_gender == "female":
+            human_transfer = "मी आपला कॉल त्वरित आमच्या सहकाऱ्याकडे ट्रान्सफर करत आहे, कृपया थांबा."
+        else:
+            human_transfer = "मी आपला कॉल त्वरित आमच्या सहकाऱ्याकडे ट्रान्सफर करत आहे, कृपया थांबा."
+    elif norm_lang == "en":
+        human_transfer = "I am transferring your call to a representative right now. Please stay on the line."
+    else:  # Hinglish
+        if resolved_gender == "neutral":
+            human_transfer = "Aapki call turant hamare human support executive ko transfer ki ja rahi hai, kripya line par bane rahiye."
+        elif resolved_gender == "female":
+            human_transfer = "Main aapki call turant hamare human support executive ko transfer kar rahi hoon, kripya line par bane rahiye."
+        else:
+            human_transfer = "Main aapki call turant hamare human support executive ko transfer kar raha hoon, kripya line par bane rahiye."
+
+    # 4. Recording Decline: Continue Unrecorded
+    if norm_lang == "hi":
+        if resolved_gender == "neutral":
+            decline_continue = "आपकी रिक्वेस्ट पर रिकॉर्डिंग रोक दी गई है। बताइए, आपकी क्या मदद की जा सकती है?"
+        elif resolved_gender == "female":
+            decline_continue = "आपकी रिक्वेस्ट पर रिकॉर्डिंग रोक दी गई है। बताइए, मैं आपकी क्या मदद कर सकती हूँ?"
+        else:
+            decline_continue = "आपकी रिक्वेस्ट पर रिकॉर्डिंग रोक दी गई है। बताइए, मैं आपकी क्या मदद कर सकता हूँ?"
+    elif norm_lang == "mr":
+        decline_continue = "आपल्या विनंतीनुसार रेकॉर्डिंग थांबवली आहे. सांगा, मी काय मदत करू शकेन?"
+    elif norm_lang == "en":
+        decline_continue = "I have stopped recording as requested. How can I help you?"
+    else:  # Hinglish
+        if resolved_gender == "neutral":
+            decline_continue = "Aapki request par recording band kar di gayi hai. Boliye, main aapki kya madad kar sakte hain?"
+        elif resolved_gender == "female":
+            decline_continue = "Aapki request par recording band kar di gayi hai. Boliye, main aapki kya madad kar sakti hoon?"
+        else:
+            decline_continue = "Aapki request par recording band kar di gayi hai. Boliye, main aapki kya madad kar sakta hoon?"
+
+    # 5. Recording Decline: Disconnect Call
+    if norm_lang == "hi":
+        if resolved_gender == "neutral":
+            decline_disconnect = "पॉलिसी के तहत इस सेवा के लिए कॉल रिकॉर्डिंग अनिवार्य है, इसलिए कॉल समाप्त की जा रही है। आपके समय के लिए धन्यवाद।"
+        elif resolved_gender == "female":
+            decline_disconnect = "समझ गई। हमारी पॉलिसी के तहत इस सर्विस के लिए कॉल रिकॉर्डिंग अनिवार्य है, इसलिए मैं अभी कॉल समाप्त कर रही हूँ। आपके समय के लिए धन्यवाद।"
+        else:
+            decline_disconnect = "समझ गया। हमारी पॉलिसी के तहत इस सर्विस के लिए कॉल रिकॉर्डिंग अनिवार्य है, इसलिए मैं अभी कॉल समाप्त कर रहा हूँ। आपके समय के लिए धन्यवाद।"
+    elif norm_lang == "mr":
+        decline_disconnect = "समजले. आमच्या नियमांनुसार कॉल रेकॉर्ड करणे आवश्यक असल्याने, हा कॉल आता समाप्त केला जात आहे. आपल्या वेळेबद्दल धन्यवाद."
+    elif norm_lang == "en":
+        decline_disconnect = "Understood. As our policy requires call recording for this service, I will disconnect now. Thank you for your time."
+    else:  # Hinglish
+        if resolved_gender == "neutral":
+            decline_disconnect = "Samajh gaye. Humari policy ke mutabik call recording zaruri hai, isliye call disconnect ki ja rahi hai. Aapke waqt ke liye shukriya."
+        elif resolved_gender == "female":
+            decline_disconnect = "Samajh gayi. Humari policy ke mutabik call recording zaruri hai, isliye main abhi call disconnect kar rahi hoon. Aapke waqt ke liye shukriya."
+        else:
+            decline_disconnect = "Samajh gaya. Humari policy ke mutabik call recording zaruri hai, isliye main abhi call disconnect kar raha hoon. Aapke waqt ke liye shukriya."
+
+    # 6. Fallback / Retry Line
+    if norm_lang == "hi":
+        if resolved_gender == "neutral":
+            fallback_retry = "क्षमा कीजिए, आवाज़ स्पष्ट नहीं आई, क्या आप दोबारा दोहरा सकते हैं?"
+        elif resolved_gender == "female":
+            fallback_retry = "क्षमा कीजिए, मैं आपकी आवाज़ ठीक से नहीं सुन सकी, क्या आप दोबारा बताएंगे?"
+        else:
+            fallback_retry = "क्षमा कीजिए, मैं आपकी आवाज़ ठीक से नहीं सुन सका, क्या आप दोबारा बताएंगे?"
+    elif norm_lang == "mr":
+        fallback_retry = "क्षमस्व, आपला आवाज स्पष्ट आला नाही, कृपया पुन्हा सांगू शकाल का?"
+    elif norm_lang == "en":
+        fallback_retry = "I'm sorry, I could not hear you clearly. Could you please repeat that?"
+    else:  # Hinglish
+        if resolved_gender == "neutral":
+            fallback_retry = "Maaf kariyega, मुझे aapki awaaz theek se sunai nahi di, kya aap dubara bol sakte hain?"
+        elif resolved_gender == "female":
+            fallback_retry = "Maaf kariyega, mujhe aapki awaaz theek se sunai nahi di, kya aap dubara bol sakti hain?"
+        else:
+            fallback_retry = "Maaf kariyega, mujhe aapki awaaz theek se sunai nahi di, kya aap dubara bol sakte hain?"
+
+    # 7. Callback & Reminder Message
+    if norm_lang == "hi":
+        if resolved_gender == "neutral":
+            callback_reminder = "जी बिल्कुल! ईमेल और व्हाट्सएप दोनों पर कन्फर्मेशन और रिमाइंडर भेज दिया जाएगा।"
+        elif resolved_gender == "female":
+            callback_reminder = "जी बिल्कुल! मैं आपके ईमेल और व्हाट्सएप पर कन्फर्मेशन और रिमाइंडर भेज रही हूँ।"
+        else:
+            callback_reminder = "जी बिल्कुल! मैं आपके ईमेल और व्हाट्सएप पर कन्फर्मेशन और रिमाइंडर भेज रहा हूँ।"
+    elif norm_lang == "mr":
+        if resolved_gender == "neutral":
+            callback_reminder = "होय नक्कीच! आपल्या ईमेल आणि व्हॉट्सॲपवर माहिती व स्मरणपत्र पाठवले जाईल."
+        elif resolved_gender == "female":
+            callback_reminder = "होय नक्कीच! मी आपल्या ईमेल आणि नंबरवर स्मरणपत्र पाठवत आहे."
+        else:
+            callback_reminder = "होय नक्कीच! मी आपल्या ईमेल आणि नंबरवर स्मरणपत्र पाठवत आहे."
+    elif norm_lang == "en":
+        callback_reminder = "Yes, absolutely! We will send a confirmation and reminder to your email and WhatsApp."
+    else:  # Hinglish
+        if resolved_gender == "neutral":
+            callback_reminder = "Haan bilkul! Aapko email aur WhatsApp dono par confirmation aur reminder bhej diya jayega."
+        elif resolved_gender == "female":
+            callback_reminder = "Haan bilkul! Main aapke email aur WhatsApp dono par confirmation aur reminder bhej rahi hoon."
+        else:
+            callback_reminder = "Haan bilkul! Main aapke email aur WhatsApp dono par confirmation aur reminder bhej raha hoon."
+
+    return {
+        "resolved_gender": resolved_gender,
+        "gender_source": gender_source,
+        "v_bol": v_bol,
+        "v_bol_hi": v_bol_hi,
+        "v_bol_mr": v_bol_mr,
+        "v_sun": v_sun,
+        "v_sun_hi": v_sun_hi,
+        "v_sun_mr": v_sun_mr,
+        "v_samajh": v_samajh,
+        "v_samajh_hi": v_samajh_hi,
+        "v_samajh_mr": v_samajh_mr,
+        "v_check": v_check,
+        "v_check_hi": v_check_hi,
+        "v_check_mr": v_check_mr,
+        "v_call": v_call,
+        "v_call_hi": v_call_hi,
+        "v_call_mr": v_call_mr,
+        "v_respect": v_respect,
+        "v_respect_hi": v_respect_hi,
+        "v_respect_mr": v_respect_mr,
+        "v_note": v_note,
+        "v_note_hi": v_note_hi,
+        "v_note_mr": v_note_mr,
+        "v_madad": v_madad,
+        "v_madad_hi": v_madad_hi,
+        "v_madad_mr": v_madad_mr,
+        "v_chahta": v_chahta,
+        "v_chahta_hi": v_chahta_hi,
+        "v_chahta_mr": v_chahta_mr,
+        "identity_confirmation": identity_confirmation,
+        "human_transfer": human_transfer,
+        "decline_continue": decline_continue,
+        "decline_disconnect": decline_disconnect,
+        "fallback_retry": fallback_retry,
+        "callback_reminder": callback_reminder,
+        "v_karungi": v_karungi,
+        "v_lungi": v_lungi,
+        "v_bhej": v_bhej,
+        "v_seedhi": v_seedhi,
+        "v_leti": v_leti
+    }
+
+
 def compose_single_opening_greeting(
     dashboard_greeting: Optional[str],
     agent_name: str,

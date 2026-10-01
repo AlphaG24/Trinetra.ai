@@ -106,6 +106,7 @@ async def run_agent(room_name: str):
         await session.start(room=room, agent=agent)
         logger.info("Agent session started")
 
+        # TODO(A1c): Replace hardcoded greeting with resolve_gendered_phrases() when this worker is production-ready
         await session.say("Namaste ji, main Trinetra AI se Vikram bol raha hoon. Kaise hain aap?")
 
         await done.wait()

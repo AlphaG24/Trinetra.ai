@@ -32,6 +32,7 @@ from app.services.disclosure_service import (
     select_disclosure_variant,
     normalize_language_code,
     resolve_jurisdiction_consent_mode,
+    resolve_gendered_phrases,
 )
 
 load_dotenv()
@@ -605,11 +606,15 @@ def generate_personalized_greeting(name: str, tags: list, last_call: str | None,
     comp_eng = f" from {company_name}" if company_name else ""
     
     if is_hindi:
+        # Use resolver for gender-correct verb forms (supports male/female/neutral)
+        _gp = resolve_gendered_phrases(gender=gender)
+        _v_bol = _gp["v_bol"]
+        _v_madad = _gp["v_madad"]
         greet = f"Namaste {first_name} ji" if first_name else "Namaste ji"
         if is_vip:
-            greet += f", swagat hai aapka. Main{comp_hindi} {bot_name} bol {'rahi' if gender=='female' else 'raha'} hoon. Kaise hain aap?"
+            greet += f", swagat hai aapka. Main{comp_hindi} {bot_name} {_v_bol}. Kaise hain aap?"
         else:
-            greet += f", main{comp_hindi} {bot_name} bol {'rahi' if gender=='female' else 'raha'} hoon. Kaise help kar {'sakti' if gender=='female' else 'sakta'} hoon?"
+            greet += f", main{comp_hindi} {bot_name} {_v_bol}. Kaise help {_v_madad}?"
     else:
         greet = f"Hello {first_name}" if first_name else "Hello"
         if is_vip:
@@ -747,8 +752,10 @@ def build_outbound_sales_protocol(
     p_name = f"{first_name} ji" if first_name else "the prospect"
     notes_summary = lead_notes if lead_notes else "discussing your offerings and understanding their requirements"
     
-    gender_verb_listen = "chahti" if gender_tag == "female" else "chahta"
-    gender_verb_speak = "rahi" if gender_tag == "female" else "raha"
+    # Use resolver for gender-correct verb forms (supports male/female/neutral)
+    _gp = resolve_gendered_phrases(gender=gender_tag)
+    gender_verb_listen = _gp["v_chahta"].split()[0]  # chahti/chahta/chahte
+    gender_verb_speak = _gp["v_bol"].split()[1] if len(_gp["v_bol"].split()) > 1 else "raha"  # rahi/raha/rahe
     
     protocol = (
         f"\n\n## OUTBOUND SALES PROTOCOL:\n"
@@ -779,7 +786,7 @@ def build_outbound_sales_protocol(
         f"### 2-NO EXIT RULE (CRITICAL):\n"
         f"- If the prospect says 'no', 'nahi chahiye', 'not interested', 'busy hoon' TWICE in the call:\n"
         f"  STOP SELLING IMMEDIATELY. Do not attempt a third angle, a third hook, or a third ask.\n"
-        f"  Close with dignity: 'Bilkul sir, respect {'karti' if gender_tag == 'female' else 'karta'} hoon. Aapka time dene ke liye shukriya, have a great day!'\n"
+        f"  Close with dignity: 'Bilkul sir, {_gp['v_respect']}. Aapka time dene ke liye shukriya, have a great day!'\n"
         f"\n"
         f"### THIRD-PARTY PICKUP / PROSPECT ABSENT PROTOCOL (CRITICAL):\n"
         f"- If someone else answers or indicates that the prospect ({p_name}) is NOT available / not here (e.g. 'wo yahan nahi hain', 'phone ghar pe hai', 'bahar gaye hain', 'office mein hain', 'abhi baat nahi ho sakti', 'baad mein call karna'):\n"
@@ -787,7 +794,7 @@ def build_outbound_sales_protocol(
         f"  2. Respond warmly, politely, and respectfully:\n"
         f"     'Theek hai, koi baat nahi ji! Jab bhi wo wapas aayein, kya aap unhe bata denge ki Trinetra se {bot_name} ka call aaya tha?'\n"
         f"  3. Ask gently when they will return or be available: 'Wo lagbhag kab tak free honge?'\n"
-        f"  4. Acknowledge and wrap up: 'Bahut shukriya! Main unhe 3-4 ghante baad ya sham ko dobara connect kar {gender_verb_listen if gender_tag == 'female' else 'lunga'}. Have a great day!'\n"
+        f"  4. Acknowledge and wrap up: 'Bahut shukriya! Main unhe 3-4 ghante baad ya sham ko dobara connect {_gp['v_lungi']}. Have a great day!'\n"
         f"  5. End the call smoothly without lingering.\n"
         f"\n"
         f"### TELEPHONY RULES:\n"
@@ -808,7 +815,11 @@ def apply_gender_grammar_directives(system_prompt: str, gender_tag: str, bot_nam
     Enforces gender-consistent Hindi/Hinglish grammar directives and verb forms.
     Ensures female voices consistently use feminine endings (rahi hoon, sakti hoon, etc.)
     and male voices consistently use masculine endings (raha hoon, sakta hoon, etc.).
+    Uses resolve_gendered_phrases() as the single source of truth for example strings.
     """
+    # A1c: Resolver for gender-correct example verbs in directives
+    _gp_eq = resolve_gendered_phrases(gender=gender_tag)
+    
     # Normalize 24/7 to natural speech in system prompt
     system_prompt = re.sub(r'\b24/7\b', 'twenty-four seven', system_prompt)
     system_prompt = re.sub(r'24/7', 'twenty-four seven', system_prompt)
@@ -838,13 +849,13 @@ def apply_gender_grammar_directives(system_prompt: str, gender_tag: str, bot_nam
                 f"- You are {bot_name}, a FEMALE assistant speaking with a female voice ({voice_id}).\n"
                 f"- In Hindi and Hinglish, you MUST ALWAYS use FEMININE grammatical endings for yourself:\n"
                 f"  * ALWAYS say: 'Haan main samajh rahi hoon' (STRICTLY NEVER say 'samajh raha hoon' or 'samajh rha hu').\n"
-                f"  * ALWAYS say: 'Main bol rahi hoon' (STRICTLY NEVER say 'bol raha hoon' or 'bol rha hu').\n"
-                f"  * ALWAYS say: 'Main aapki madad kar sakti hoon' (STRICTLY NEVER say 'kar sakta hoon').\n"
-                f"  * ALWAYS say: 'Main check karti hoon' (STRICTLY NEVER say 'karta hoon').\n"
-                f"  * ALWAYS say: 'Main seedhi baat karti hoon' (STRICTLY NEVER say 'karta hoon').\n"
-                f"  * ALWAYS say: 'Main janna chahti hoon' (STRICTLY NEVER say 'chahta hoon').\n"
-                f"  * ALWAYS say: 'Main WhatsApp bhej deti hoon' (STRICTLY NEVER say 'bhej deta hoon').\n"
-                f"  * ALWAYS say: 'Main call nahi karungi' (STRICTLY NEVER say 'call nahi karunga').\n"
+                f"  * ALWAYS say: 'Main {_gp_eq['v_bol']}' (STRICTLY NEVER say 'bol raha hoon' or 'bol rha hu').\n"
+                f"  * ALWAYS say: 'Main aapki madad {_gp_eq['v_madad']}' (STRICTLY NEVER say 'kar sakta hoon').\n"
+                f"  * ALWAYS say: 'Main {_gp_eq['v_check']}' (STRICTLY NEVER say 'karta hoon').\n"
+                f"  * ALWAYS say: 'Main {_gp_eq['v_seedhi']}' (STRICTLY NEVER say 'karta hoon').\n"
+                f"  * ALWAYS say: 'Main janna {_gp_eq['v_chahta']}' (STRICTLY NEVER say 'chahta hoon').\n"
+                f"  * ALWAYS say: 'Main WhatsApp {_gp_eq['v_bhej']}' (STRICTLY NEVER say 'bhej deta hoon').\n"
+                f"  * ALWAYS say: 'Main {_gp_eq['v_call']}' (STRICTLY NEVER say 'call nahi karunga').\n"
                 f"- Never use male grammatical endings ('raha', 'sakta', 'karta', 'chahta', 'lunga', 'karunga') when referring to yourself."
             )
     else:
@@ -872,13 +883,13 @@ def apply_gender_grammar_directives(system_prompt: str, gender_tag: str, bot_nam
                 f"- You are {bot_name}, a MALE assistant speaking with a male voice ({voice_id}).\n"
                 f"- In Hindi and Hinglish, you MUST ALWAYS use MASCULINE grammatical endings for yourself:\n"
                 f"  * ALWAYS say: 'Haan main samajh raha hoon' (STRICTLY NEVER say 'samajh rahi hoon' or 'samajh rhi hu').\n"
-                f"  * ALWAYS say: 'Main bol raha hoon' (STRICTLY NEVER say 'bol rahi hoon' or 'bol rhi hu').\n"
-                f"  * ALWAYS say: 'Main aapki madad kar sakta hoon' (STRICTLY NEVER say 'kar sakti hoon').\n"
-                f"  * ALWAYS say: 'Main check karta hoon' (STRICTLY NEVER say 'karti hoon').\n"
-                f"  * ALWAYS say: 'Main janna chahta hoon' (STRICTLY NEVER say 'chahti hoon').\n"
-                f"  * ALWAYS say: 'Main abhi WhatsApp par bhej raha hoon' (STRICTLY NEVER say 'bhej rahi hoon' or 'bhej deti hoon').\n"
-                f"  * ALWAYS say: 'Main appointment confirm kar raha hoon' (STRICTLY NEVER say 'confirm kar rahi hoon').\n"
-                f"  * ALWAYS say: 'Main call nahi karunga' (STRICTLY NEVER say 'call nahi karungi').\n"
+                f"  * ALWAYS say: 'Main {_gp_eq['v_bol']}' (STRICTLY NEVER say 'bol rahi hoon' or 'bol rhi hu').\n"
+                f"  * ALWAYS say: 'Main aapki madad {_gp_eq['v_madad']}' (STRICTLY NEVER say 'kar sakti hoon').\n"
+                f"  * ALWAYS say: 'Main {_gp_eq['v_check']}' (STRICTLY NEVER say 'karti hoon').\n"
+                f"  * ALWAYS say: 'Main janna {_gp_eq['v_chahta']}' (STRICTLY NEVER say 'chahti hoon').\n"
+                f"  * ALWAYS say: 'Main abhi WhatsApp par {_gp_eq['v_bhej']}' (STRICTLY NEVER say 'bhej rahi hoon' or 'bhej deti hoon').\n"
+                f"  * ALWAYS say: 'Main appointment confirm {_gp_eq['v_bol'].split()[0]} {_gp_eq['v_bol'].split()[1]} hoon' (STRICTLY NEVER say 'confirm kar rahi hoon').\n"
+                f"  * ALWAYS say: 'Main {_gp_eq['v_call']}' (STRICTLY NEVER say 'call nahi karungi').\n"
                 f"- NEVER use female grammatical endings ('rahi hoon', 'sakti hoon', 'karti hoon', 'chahti hoon', 'lungi', 'karungi') when referring to yourself."
             )
 
@@ -899,7 +910,7 @@ def apply_gender_grammar_directives(system_prompt: str, gender_tag: str, bot_nam
         system_prompt += (
             f"\n\n## UNIVERSAL EQ & HUMAN EXPRESSIVENESS:\n"
             f"- You are a warm, emotionally intelligent human on a real phone call, NOT a robot.\n"
-            f"- MIRROR emotions: Relaxed caller? Be warm ('Arey main bhi ekdum first class sir!'). Busy caller? Drop pressure ('Bilkul samajh {'sakti' if gender_tag == 'female' else 'sakta'} hoon sir'). Agreed? Show delight ('Arey waah! Bilkul!').\n"
+            f"- MIRROR emotions: Relaxed caller? Be warm ('Arey main bhi ekdum first class sir!'). Busy caller? Drop pressure ('Bilkul {_gp_eq['v_samajh']} sir'). Agreed? Show delight ('Arey waah! Bilkul!').\n"
             f"- Use natural fillers: 'Arey waah!', 'Haanji bilkul!', 'Sach kahun toh...', 'Oh achha!'. Use commas and exclamation marks for vocal melody.\n"
             f"- Casual spoken Hinglish only. No bookish terms ('customized preview', 'dhanyavaad', 'boost karega').\n"
             f"- Clean Romanized Hinglish only, no Devanagari mid-call. No hyphens, dashes, or symbols (say '5 minute' not '5‑minute')."
@@ -911,14 +922,17 @@ def build_agent_expressive_rules(bot_name: str = "Agent", gender_tag: str = "fem
     """
     Returns the comprehensive, non-negotiable personality, behavioral, and talking style
     rules derived from rules.md. Injected into every agent's runtime instructions.
+    Uses resolve_gendered_phrases() as the single source of truth for all gendered verb forms.
     """
-    v_bol = "bol rahi hoon" if gender_tag == "female" else "bol raha hoon"
-    v_sun = "sun rahi hoon" if gender_tag == "female" else "sun raha hoon"
-    v_madad = "kar sakti hoon" if gender_tag == "female" else "kar sakta hoon"
-    v_karti = "karti hoon" if gender_tag == "female" else "karta hoon"
-    v_chahti = "chahti hoon" if gender_tag == "female" else "chahta hoon"
-    v_karungi = "karungi" if gender_tag == "female" else "karunga"
-    v_lungi = "kar lungi" if gender_tag == "female" else "kar lunga"
+    # A1c: All gendered verbs resolved through the central resolver
+    _gp = resolve_gendered_phrases(gender=gender_tag)
+    v_bol = _gp["v_bol"]
+    v_sun = _gp["v_sun"]
+    v_madad = _gp["v_madad"]
+    v_karti = _gp["v_check"].replace("check ", "")  # karti/karta/karte hoon/hain
+    v_chahti = _gp["v_chahta"]
+    v_karungi = _gp["v_karungi"]
+    v_lungi = _gp["v_lungi"]
     v_kar = "kar doon"
 
     return f"""
@@ -1002,7 +1016,7 @@ def build_agent_expressive_rules(bot_name: str = "Agent", gender_tag: str = "fem
 
 ### 16. Disinterest & DND Protocol vs. Call Wrap-Up (Rule 43, 54.4, 55):
 - STRICT SEPARATION BETWEEN REJECTION (DND) AND NORMAL CALL WRAP-UP:
-  * REJECTION / DND: Apologize for disturbing ("Maaf kariyega disturb karne ke liye, main note kar {'leti' if gender_tag == 'female' else 'leta'} hoon aur ensure {'karti' if gender_tag == 'female' else 'karta'} hoon ki aage se call na aaye. Have a good day!") ONLY when the customer rejects or objects ("nahi chahiye", "not interested", "wrong number", "don't call again").
+  * REJECTION / DND: Apologize for disturbing ("Maaf kariyega disturb karne ke liye, main note {_gp['v_leti']} aur ensure {v_karti} hoon ki aage se call na aaye. Have a good day!") ONLY when the customer rejects or objects ("nahi chahiye", "not interested", "wrong number", "don't call again").
   * NORMAL CALL WRAP-UP & USER HANG-UP COMMAND: If the customer agreed, booked an appointment, confirmed email/WhatsApp, or says "cut the call", "you can cut the call", "cut kar do", "phone rakh do", "goodbye", "have a good day", DO NOT EVER say "Maaf kariyega disturb karne ke liye"! The call was a SUCCESS!
   * Instead, acknowledge crisply in ONE short sentence: "Ji bilkul, thank you so much! Have a wonderful day!" or "Ji bilkul, aapse baat karke achha laga! Have a great day!" and wrap up cleanly.
 
@@ -1010,10 +1024,10 @@ def build_agent_expressive_rules(bot_name: str = "Agent", gender_tag: str = "fem
 - We fully support automated email and WhatsApp/SMS booking confirmations and reminders.
 - If the customer asks for Email reminder or confirmation ("email reminder aayega?", "kya aap mujhe mail par bhej sakte ho?", "send confirmation on email"):
   ALWAYS CONFIRM ENTHUSIASTICALLY:
-  "Haan bilkul! Hum aapko email aur WhatsApp dono par confirmation aur reminder bhejte hain. Aap apna email address bata dijiye, main note kar {'leti' if gender_tag == 'female' else 'leta'} hoon."
+  "Haan bilkul! Hum aapko email aur WhatsApp dono par confirmation aur reminder bhejte hain. Aap apna email address bata dijiye, main note {_gp['v_leti']}."
   STRICTLY NEVER claim email sending or reminder is unavailable, unsupported, or that you cannot send email!
 - Confirm preference: "Main details aapke WhatsApp par share kar doon ya email par?"
-- If the customer asks for Email only, respect their preference: "Ji bilkul, main sirf aapke email par confirmation aur reminder bhej {v_bol.replace('bol', 'rahi' if gender_tag == 'female' else 'raha')} hoon."
+- If the customer asks for Email only, respect their preference: "Ji bilkul, main sirf aapke email par confirmation aur reminder {_gp['v_bhej']}."
 
 ### 18. Joe Girard Referral Engine (Rule 48):
 - At successful closing: "Aapse baat karke bohot achha laga! Agar aapke circle ya network me kisi ko bhi zaroorat ho, toh unka contact hume zaroor batayiyega."
