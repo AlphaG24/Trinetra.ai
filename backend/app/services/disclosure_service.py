@@ -331,9 +331,9 @@ def strip_dashboard_self_introduction(text: str, agent_name: str = "", business_
 
     # 2. Strict patterns for sentences that are PURE self-introductions (no action/purpose words)
     pure_intro_patterns = [
-        # Hindi / Hinglish self-intro (e.g., 'Main Arika bol rahi hoon trinetra se.' or 'Main Trinetra AI se Arika bol rahi hoon, ek AI assistant.')
-        r'^(?:main|hum)\s+(?:(?:[a-zA-Z\u0900-\u097F0-9_\'\"]+\s+){0,3}(?:se|from)\s+)?(?:[a-zA-Z\u0900-\u097F0-9_\'\"]+\s+)?bol\s+(?:rahi|raha|rahe)\s+(?:hoon|hain)(?:\s+(?:(?:[a-zA-Z\u0900-\u097F0-9_\'\"]+\s+){0,3}(?:se|from)))?(?:\s*,\s*(?:ek|an?)\s+ai\s+assistant)?[.!,।]?$',
-        r'^(?:main|hum)\s+[a-zA-Z\u0900-\u097F0-9_\'\"]+\s+bol\s+(?:rahi|raha|rahe)\s+(?:hoon|hain)(?:\s*,\s*(?:ek|an?)\s+ai\s+assistant)?[.!,।]?$',
+        # Hindi / Hinglish self-intro (e.g., 'Main Arika bol rahi hoon trinetra se.', 'Mai Trinetra ki AI assistant Arika bol rahi hu.', 'Main Trinetra AI se Arika bol rahi hoon, ek AI assistant.')
+        r'^(?:main|mai|hum)\s+(?:(?:[a-zA-Z\u0900-\u097F0-9_\'\"]+\s+){0,3}(?:se|ki|from)\s+)?(?:(?:ek|an?)?\s*ai\s+assistant\s+)?(?:[a-zA-Z\u0900-\u097F0-9_\'\"]+\s+)?bol\s+(?:rahi|raha|rahe)\s+(?:hoon|hu|hain)(?:\s+(?:(?:[a-zA-Z\u0900-\u097F0-9_\'\"]+\s+){0,3}(?:se|ki|from)))?(?:\s*,\s*(?:ek|an?)?\s*ai\s+assistant)?[.!,।]?$',
+        r'^(?:main|mai|hum)\s+[a-zA-Z\u0900-\u097F0-9_\'\"]+\s+bol\s+(?:rahi|raha|rahe)\s+(?:hoon|hu|hain)(?:\s*,\s*(?:ek|an?)?\s*ai\s+assistant)?[.!,।]?$',
         r'^(?:mera|hamara)\s+naam\s+[a-zA-Z\u0900-\u097F0-9_\'\"]+\s+hai[.!,।]?$',
         r'^मैं\s+(?:(?:[\u0900-\u097F0-9\s]+से\s+)?[\u0900-\u097F0-9\s]+)?बोल\s+(?:रही|रहा|रहे)\s+(?:हूँ|हैं)(?:\s*,\s*(?:एक|an?)\s+ai\s+assistant)?[.!,।]?$',
         r'^मेरा\s+नाम\s+[\u0900-\u097F0-9\s]+है[.!,।]?$',
@@ -341,7 +341,7 @@ def strip_dashboard_self_introduction(text: str, agent_name: str = "", business_
         r'^(?:this\s+is|my\s+name\s+is|i\s+am|i\'m)\s+[a-zA-Z\s]+(?:\s*,\s*(?:an?|the)?\s*ai\s+assistant)?(?:\s+(?:from|with)\s+[a-zA-Z0-9\s]+)?(?:\s*,\s*(?:an?|the)?\s*ai\s+assistant)?[.!,]?$',
         # Redundant compliance statements already present in owner wording
         r'^(?:(?:ek|an?)\s+ai\s+assistant|virtual\s+assistant)[.!,।]?$',
-        r'^(?:(?:yeh\s+)?call\s*(?:quality|service\s+quality)?\s*(?:ke\s+liye)?\s*record\s+(?:ki\s+ja\s+sakti\s+hai|hogi|ki\s+jayegi))[.!,।]?$',
+        r'^(?:(?:service\s+quality|quality)?\s*(?:ke\s+liye)?\s*(?:yeh|ye)?\s*call\s*(?:quality|service\s+quality)?\s*(?:ke\s+liye)?\s*record\s+(?:ki\s+ja\s+sakti\s+hai|ho\s+sakti\s+hai|hogi|ki\s+jayegi))[.!,।]?$',
         r'^(?:this\s+call\s+(?:may\s+be|is)\s+recorded(?:\s+for\s+(?:quality|service\s+quality))?)[.!,]?$',
     ]
 
@@ -361,10 +361,25 @@ def strip_dashboard_self_introduction(text: str, agent_name: str = "", business_
         # Trim leading greeting word only (Hello, Namaste) from start of sentence
         s_no_greet = re.sub(r'^(?:namaste|hello|hi|hey|नमस्ते|வணக்கம்|నమస్కారం)[\s,!\.]*', '', s_clean, flags=re.IGNORECASE).strip()
         
-        # If it was only a greeting word with no other content, omit so single compliant greeting word replaces it
+        # Check for embedded recording disclosure clause (e.g. 'Service quality ke liye ye call record ho sakti hai, kaise hai aap?')
+        rec_clause_patterns = [
+            r'^(?:(?:service\s+quality|quality)?\s*(?:ke\s+liye)?\s*(?:yeh|ye)?\s*call\s*(?:quality|service\s+quality)?\s*(?:ke\s+liye)?\s*record\s+(?:ki\s+ja\s+sakti\s+hai|ho\s+sakti\s+hai|hogi|ki\s+jayegi))[\s,;]*',
+            r'^(?:this\s+call\s+(?:may\s+be|is)\s+recorded(?:\s+for\s+(?:quality|service\s+quality))?)[\s,;]*'
+        ]
+        for r_pat in rec_clause_patterns:
+            s_no_rec = re.sub(r_pat, '', s_no_greet, flags=re.IGNORECASE).strip()
+            if s_no_rec != s_no_greet:
+                s_no_rec_clean = s_no_rec.strip(' .,!;:।')
+                if s_no_rec_clean:
+                    s_clean = s_no_rec_clean
+                    s_no_greet = s_no_rec_clean
+                else:
+                    s_no_greet = ""
+                break
+
         if not s_no_greet:
             continue
-        
+
         is_pure_intro = False
         for pat in pure_intro_patterns:
             if re.match(pat, s_no_greet, flags=re.IGNORECASE):
@@ -376,6 +391,7 @@ def strip_dashboard_self_introduction(text: str, agent_name: str = "", business_
 
     candidate = " ".join(kept_sentences).strip()
     candidate = re.sub(r'^(?:namaste|hello|hi|hey|नमस्ते)[\s,!]+', '', candidate, flags=re.IGNORECASE).strip()
+    candidate = re.sub(r'^[.,!;:।\s]+', '', candidate).strip()
 
     # SAFETY RULES:
     # 1. If candidate is empty or fewer than 3 words:
@@ -1031,16 +1047,16 @@ def compose_single_opening_greeting(
     # 4. Strip self-intro from dashboard greeting and extract remainder
     remainder = strip_dashboard_self_introduction(dashboard_greeting or "", agent_display, biz_display)
 
-    # Privacy enforcement: if remainder, raw greeting, or purpose contains sensitive details,
-    # withhold them from opening greeting until identity is confirmed
-    has_sensitive_details = bool(
-        SENSITIVE_DETAILS_PATTERN.search(remainder or "") or 
-        SENSITIVE_DETAILS_PATTERN.search(dashboard_greeting or "") or
-        (purpose and SENSITIVE_DETAILS_PATTERN.search(purpose))
-    )
+    # Privacy enforcement: if remainder, raw greeting, or purpose contains sensitive private details
+    # (appointments, medical tests, account balances, debt dues), withhold them from opening greeting
+    # until identity is confirmed. Exclude general promotional offers (discounts, loan offers, demos)
+    # which are marketing pitches, not private personal records.
+    raw_content = f"{remainder or ''} {dashboard_greeting or ''} {purpose or ''}"
+    is_promo_offer = bool(re.search(r'\b(offer|pre-approved|discount|demo|zaroorat|looking\s+to|interested\s+in)\b', raw_content, re.IGNORECASE))
+    has_sensitive_details = bool(SENSITIVE_DETAILS_PATTERN.search(raw_content)) and not is_promo_offer
 
     # A2: Trigger identity confirmation for ALL outbound calls with sensitive content,
-    # not just when caller name is known.
+    # or when verify_identity is explicitly requested.
     should_confirm_identity = verify_identity or (is_outbound and has_sensitive_details)
 
     identity_confirmation_prompt = ""

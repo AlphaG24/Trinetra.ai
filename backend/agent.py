@@ -715,19 +715,6 @@ def resolve_agent_greeting(
     recording_exempt = bool(disclosure_cfg.get("recording_notice_exempt", False))
     resolved_purpose = purpose or (campaign_contact.get("notes") if campaign_contact else None)
 
-    # If owner provided a custom greeting message, preserve their exact wording without rewriting
-    if raw_greeting and str(raw_greeting).strip():
-        gm = str(raw_greeting).strip()
-        for tok in ('{{agent_name}}', '{agentName}', '{agent_name}', '{{name}}', '{name}'):
-            gm = gm.replace(tok, clean_name)
-        for tok in ('{{company_name}}', '{companyName}', '{company_name}', '{{business_name}}', '{business_name}'):
-            gm = gm.replace(tok, business_name)
-        if c_name:
-            first_name = c_name.strip().split()[0].capitalize()
-            for tok in ('{{customer_name}}', '{customerName}', '{customer_name}', '{{contact_name}}', '{contactName}'):
-                gm = gm.replace(tok, f"{first_name} ji" if language in ['hinglish', 'hi-IN'] else first_name)
-        gm = re.sub(r'\s+', ' ', gm).strip()
-        return gm, "custom", "hi" if language in ['hinglish', 'hi-IN'] else "en"
 
     return compose_single_opening_greeting(
         dashboard_greeting=raw_greeting,
