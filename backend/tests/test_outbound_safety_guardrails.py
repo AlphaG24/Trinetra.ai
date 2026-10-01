@@ -228,12 +228,22 @@ class TestOutboundSafetyGuardrails(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(is_dnd)
 
     def test_national_dnd_registry_hook_and_trai_citations(self):
-        """National DND registry hook provides official TRAI primary citations."""
-        res = check_national_dnd_registry("+919876543210", country_code="IN")
-        self.assertEqual(res["phone_number"], "+919876543210")
-        self.assertEqual(res["country"], "IN")
-        self.assertIn("trai.gov.in", res["primary_law_reference"])
-        self.assertIn("CONFIRM WITH A LAWYER", res["legal_notice"])
+        """National DND registry hook marks status PARTIAL and provides official TRAI & TCPA primary citations."""
+        res_in = check_national_dnd_registry("+919876543210", country_code="IN")
+        self.assertEqual(res_in["phone_number"], "+919876543210")
+        self.assertEqual(res_in["country"], "IN")
+        self.assertEqual(res_in["compliance_status"], "PARTIAL")
+        self.assertTrue(res_in["internal_dnd_enforced"])
+        self.assertFalse(res_in["live_carrier_dlt_active"])
+        self.assertIn("trai.gov.in", res_in["primary_law_reference"])
+        self.assertIn("CONFIRM WITH A LAWYER", res_in["legal_notice"])
+
+        # Test US DND hook
+        res_us = check_national_dnd_registry("+12025550199", country_code="US")
+        self.assertEqual(res_us["country"], "US")
+        self.assertEqual(res_us["compliance_status"], "PARTIAL")
+        self.assertIn("donotcall.gov", res_us["primary_law_reference"])
+        self.assertIn("CONFIRM WITH A LAWYER", res_us["regulatory_notice"])
 
     def test_whatsapp_proactive_requires_opt_in(self):
         """Proactive WhatsApp message fails without recorded opt-in."""

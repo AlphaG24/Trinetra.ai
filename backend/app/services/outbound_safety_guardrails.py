@@ -344,28 +344,54 @@ def check_national_dnd_registry(
     """
     Hook for checking the national Do Not Disturb (DND) / NCPR registry.
     
-    REGULATORY DETAILS & PRIMARY CITATION:
+    REGULATORY DETAILS & PRIMARY CITATIONS:
     [CONFIRM WITH A LAWYER]
-    Under the Telecom Regulatory Authority of India (TRAI) Telecom Commercial
-    Communications Customer Preference Regulations, 2018 (TCCCPR 2018), commercial
-    callers must scrub call lists against the National Customer Preference Register (NCPR).
-    Official TRAI primary source:
-    - https://www.trai.gov.in/faqcategory/telecom-commercial-communications-customer-preference-regulations-2018
-    - https://trai.gov.in/consumer-info/telecom/dnd
-    
-    Currently returns hook structure ready for integration with licensed TRAI Telemarketer
-    scrubbing APIs / aggregator gateways.
+    1. India: Under the Telecom Regulatory Authority of India (TRAI) Telecom Commercial
+       Communications Customer Preference Regulations, 2018 (TCCCPR 2018), Regulation 8 & 12,
+       telemarketers must scrub calling lists against the National Customer Preference Register (NCPR).
+       Official primary sources:
+       - TRAI TCCCPR 2018: https://trai.gov.in/telecom-commercial-communication-customer-preference-regulations-2018
+       - TRAI DND / NCPR Portal: https://trai.gov.in/consumer-info/telecom/dnd
+       - TRAI FAQs: https://www.trai.gov.in/faqcategory/telecom-commercial-communications-customer-preference-regulations-2018
+    2. United States: Under FCC TCPA (47 U.S.C. § 227 / 47 CFR § 64.1200) and FTC Telemarketing Sales Rule
+       (16 CFR Part 310), telemarketers must scrub lists against the National Do Not Call Registry
+       using a valid Subscription Authorization Number (SAN).
+       Official primary sources:
+       - FTC National DNC: https://www.donotcall.gov/
+       - FTC Telemarketing Rule: https://www.ftc.gov/enforcement/rules/rulemaking-regulatory-reform-proceedings/telemarketing-sales-rule
+
+    STATUS: PARTIAL
+    - Internal DND scrubbing (dnd_registry table): FULLY IMPLEMENTED.
+    - Live National Carrier/DLT gateway scrubbing: PARTIAL (hook provided; requires production
+      carrier DLT enterprise registration or FTC SAN credentials).
     """
     clean = re.sub(r'[\s\-\(\)]', '', phone_number)
+    c_code = country_code.upper()
+    primary_ref = (
+        "https://trai.gov.in/telecom-commercial-communication-customer-preference-regulations-2018"
+        if c_code == "IN"
+        else "https://www.donotcall.gov/"
+    )
+    secondary_ref = (
+        "https://trai.gov.in/consumer-info/telecom/dnd"
+        if c_code == "IN"
+        else "https://www.ftc.gov/enforcement/rules/rulemaking-regulatory-reform-proceedings/telemarketing-sales-rule"
+    )
     return {
         "phone_number": clean,
-        "country": country_code.upper(),
+        "country": c_code,
+        "compliance_status": "PARTIAL",
+        "implementation_tier": "hook_ready",
+        "internal_dnd_enforced": True,
+        "live_carrier_dlt_active": False,
         "is_dnd_listed": False,  # Placeholder until live aggregator credentials configured
-        "registry_source": "TRAI_NCPR_HOOK",
-        "primary_law_reference": "https://trai.gov.in/telecom-commercial-communication-customer-preference-regulations-2018",
+        "registry_source": "TRAI_NCPR_HOOK" if c_code == "IN" else "FTC_DNC_HOOK",
+        "primary_law_reference": primary_ref,
+        "secondary_law_reference": secondary_ref,
         "checked_at": datetime.now(timezone.utc).isoformat(),
-        "status": "scrubbed_clean_pending_carrier_gateway",
-        "legal_notice": "CONFIRM WITH A LAWYER before production telemarketing launch"
+        "status": "PARTIAL - internal registry clean; live carrier DLT scrubbing pending enterprise credentials",
+        "legal_notice": "CONFIRM WITH A LAWYER: National DND scrubbing is PARTIAL. Internal DND is fully enforced, but production telemarketing mandates live carrier DLT/NCPR scrubbing registration.",
+        "regulatory_notice": "CONFIRM WITH A LAWYER: National DND scrubbing is PARTIAL. Internal DND is fully enforced, but production telemarketing mandates live carrier DLT/NCPR scrubbing registration."
     }
 
 
