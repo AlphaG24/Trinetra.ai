@@ -1106,6 +1106,40 @@ def compose_single_opening_greeting(
             else:
                 remainder = f"Main aapki kya madad kar {modal} hoon?"
 
+    # A3: Strip leading/trailing greeting fragments from remainder that duplicate greeting_word.
+    # Patterns: "Ji," / "ji," / "Namaste" / "Hello" / "नमस्ते" / "नमस्कार" at start/end of remainder.
+    _LEADING_GREETING_RE = re.compile(
+        r'^[\s,;!।]*('
+        r'ji\b|ji,|jee\b|'
+        r'namaste[,!]?|namaskar[,!]?|hello[,!]?|hi[,!]?|hey[,!]?|'
+        r'haan[,!]?|han[,!]?|'
+        r'\u0928\u092e\u0938\u094d\u0924\u0947[,!]?|'  # नमस्ते
+        r'\u0928\u092e\u0938\u094d\u0915\u093e\u0930[,!]?|'  # नमस्कार
+        r'\u0928\u092e\u0938\u094d\u0915\u093e\u0930\u092e\u094d[,!]?|'  # నమస్కారం
+        r'\u0b35\u0ba3\u0b95\u0bcd\u0b95\u0bae\u0bcd[,!]?|'  # வணக்கம்
+        r'\u091c\u0940[,!]?'  # जी
+        r')[\s,;!।.]*',
+        re.IGNORECASE
+    )
+    _TRAILING_GREETING_RE = re.compile(
+        r'[\s,;!।.]*('
+        r'ji\b|ji,|jee\b|'
+        r'\u091c\u0940'  # जी
+        r')[\s,;!।.]*$',
+        re.IGNORECASE
+    )
+    if remainder and not (should_confirm_identity and identity_confirmation_prompt):
+        # Only strip from dashboard remainder, not from identity confirmation prompts
+        had_terminal = remainder.rstrip().endswith(('.', '?', '!', '।'))
+        remainder = _LEADING_GREETING_RE.sub('', remainder).strip()
+        remainder = _TRAILING_GREETING_RE.sub('', remainder).strip()
+        remainder = remainder.rstrip(',; ')
+        if had_terminal and remainder and not remainder.endswith(('.', '?', '!', '।')):
+            remainder += '.'
+        # Re-capitalize first letter after stripping
+        if remainder:
+            remainder = remainder[0].upper() + remainder[1:]
+
     # Assemble final single opening utterance
     final_opening = f"{greeting_word} {mandatory_disclosure} {remainder}"
     final_opening = re.sub(r'\s+', ' ', final_opening).strip()
