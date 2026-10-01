@@ -267,17 +267,61 @@ def validate_owner_disclosure_wording(wording: str, language: str = "en") -> Tup
     return (len(errors) == 0, errors)
 
 
+# In-memory greeting cache: key -> (composed_utterance, variant, norm_lang)
+_COMPOSED_GREETING_CACHE: Dict[str, Tuple[str, str, str]] = {}
+
+
+def get_greeting_cache_key(
+    agent_id: Optional[str],
+    dashboard_greeting: Optional[str],
+    agent_name: str,
+    business_name: str,
+    language: str,
+    direction: str = "inbound",
+    variant: Optional[str] = "standard",
+    recording_exempt: bool = False,
+    verify_identity: bool = False
+) -> str:
+    """Computes a deterministic cache key for composed opening greetings."""
+    return f"{agent_id or 'anon'}::{dashboard_greeting or ''}::{agent_name}::{business_name}::{language}::{direction}::{variant}::{recording_exempt}::{verify_identity}"
+
+
+def invalidate_greeting_cache(agent_id: Optional[str] = None):
+    """
+    Invalidates cached composed greetings.
+    If agent_id is provided, flushes all entries for that agent.
+    If agent_id is None, clears the entire cache.
+    """
+    global _COMPOSED_GREETING_CACHE
+    if agent_id:
+        keys_to_del = [k for k in _COMPOSED_GREETING_CACHE if k.startswith(f"{agent_id}::")]
+        for k in keys_to_del:
+            _COMPOSED_GREETING_CACHE.pop(k, None)
+        logger.info(f"[invalidate_greeting_cache] Flushed {len(keys_to_del)} cache entries for agent {agent_id}")
+    else:
+        cleared_count = len(_COMPOSED_GREETING_CACHE)
+        _COMPOSED_GREETING_CACHE.clear()
+        logger.info(f"[invalidate_greeting_cache] Cleared entire greeting cache ({cleared_count} entries)")
+
+
 def strip_dashboard_self_introduction(text: str, agent_name: str = "", business_name: str = "") -> str:
     """
-    Strips self-introductions, agent/company name re-announcements, and leading greetings
-    from the dashboard greeting text so that the mandatory disclosure statement smoothly
-    serves as the sole introduction without repeating words.
+    Safely strips self-introductions from dashboard greetings using sentence-level analysis.
+
+    Safety Rules:
+    1. NEVER remove sentences containing purpose, appointment details, questions, or offers
+       (e.g., "Hello, I'm calling about your appointment tomorrow" preserves the appointment sentence!).
+    2. Only remove sentences that are strictly PURE self-introductions (name + agent identity).
+    3. Safety Rule: If stripping would remove more than 50% of the character count, or leave fewer
+       than 3 words of meaningful content, keep the owner's text intact and only trim leading greetings.
     """
     if not text or not text.strip():
         return ""
-    cleaned = text.strip()
+    raw = text.strip()
+    original_len = len(raw)
 
-    # Replace dynamic placeholders first
+    # 1. Substitute dynamic placeholders
+    cleaned = raw
     for p in ['{{agent_name}}', '{agentName}', '{agent_name}', '{{name}}', '{name}']:
         cleaned = cleaned.replace(p, agent_name or '')
     for p in ['{{company_name}}', '{companyName}', '{company_name}', '{{business_name}}', '{business_name}']:
@@ -285,39 +329,75 @@ def strip_dashboard_self_introduction(text: str, agent_name: str = "", business_
     for p in ['{{customer_name}}', '{customerName}', '{customer_name}', '{{contact_name}}', '{contactName}']:
         cleaned = cleaned.replace(p, '')
 
-    intro_patterns = [
-        # Hindi / Hinglish self-intros and greetings
-        r'^(?:namaste|hello|hi|hey|नमस्ते|வணக்கம்|నమస్కారం)[\s,!\.]*',
-        r'^(?:main|hum|me)\s+(?:(?:[a-zA-Z\u0900-\u097F0-9_\'\"]+\s+){0,3}(?:se|from)\s+)?(?:[a-zA-Z\u0900-\u097F0-9_\'\"]+\s+)?bol\s+(?:rahi|raha|rahe)\s+(?:hoon|hain)(?:\s+(?:(?:[a-zA-Z\u0900-\u097F0-9_\'\"]+\s+){0,3}(?:se|from)))?[.!,]?',
-        r'^(?:main|hum)\s+[a-zA-Z\u0900-\u097F0-9_\'\"]+\s+bol\s+(?:rahi|raha|rahe)\s+(?:hoon|hain)[.!,]?',
-        r'^(?:mera|hamara)\s+naam\s+[a-zA-Z\u0900-\u097F0-9_\'\"]+\s+hai[.!,]?',
-        r'^मैं\s+(?:(?:[\u0900-\u097F0-9\s]+से\s+)?[\u0900-\u097F0-9\s]+)?बोल\s+(?:रही|रहा|रहे)\s+(?:हूँ|हैं)[.!,]?',
-        r'^मेरा\s+नाम\s+[\u0900-\u097F0-9\s]+है[.!,]?',
-        # English self-intros
-        r'^(?:this\s+is|my\s+name\s+is|i\s+am|i\'m)\s+[a-zA-Z\s]+(?:\s+(?:from|calling\s+from|with)\s+[a-zA-Z0-9\s]+)?[.!,]?',
-        r'^(?:calling\s+from|from)\s+[a-zA-Z0-9\s]+[.!,]?',
-        # Pre-existing redundant declarations
-        r'^(?:(?:ek|an?)\s+ai\s+assistant|virtual\s+assistant)[.!,]?',
-        r'^(?:(?:yeh\s+)?call\s+(?:quality|service\s+quality)?\s*(?:ke\s+liye)?\s*record\s+(?:ki\s+ja\s+sakti\s+hai|hogi|ki\s+jayegi))[.!,]?',
-        r'^(?:this\s+call\s+(?:may\s+be|is)\s+recorded(?:\s+for\s+(?:quality|service\s+quality))?)[.!,]?',
+    # 2. Strict patterns for sentences that are PURE self-introductions (no action/purpose words)
+    pure_intro_patterns = [
+        # Hindi / Hinglish self-intro (e.g., 'Main Arika bol rahi hoon trinetra se.' or 'Main Trinetra AI se Arika bol rahi hoon, ek AI assistant.')
+        r'^(?:main|hum)\s+(?:(?:[a-zA-Z\u0900-\u097F0-9_\'\"]+\s+){0,3}(?:se|from)\s+)?(?:[a-zA-Z\u0900-\u097F0-9_\'\"]+\s+)?bol\s+(?:rahi|raha|rahe)\s+(?:hoon|hain)(?:\s+(?:(?:[a-zA-Z\u0900-\u097F0-9_\'\"]+\s+){0,3}(?:se|from)))?(?:\s*,\s*(?:ek|an?)\s+ai\s+assistant)?[.!,।]?$',
+        r'^(?:main|hum)\s+[a-zA-Z\u0900-\u097F0-9_\'\"]+\s+bol\s+(?:rahi|raha|rahe)\s+(?:hoon|hain)(?:\s*,\s*(?:ek|an?)\s+ai\s+assistant)?[.!,।]?$',
+        r'^(?:mera|hamara)\s+naam\s+[a-zA-Z\u0900-\u097F0-9_\'\"]+\s+hai[.!,।]?$',
+        r'^मैं\s+(?:(?:[\u0900-\u097F0-9\s]+से\s+)?[\u0900-\u097F0-9\s]+)?बोल\s+(?:रही|रहा|रहे)\s+(?:हूँ|हैं)(?:\s*,\s*(?:एक|an?)\s+ai\s+assistant)?[.!,।]?$',
+        r'^मेरा\s+नाम\s+[\u0900-\u097F0-9\s]+है[.!,।]?$',
+        # English pure self-intro: matches name/identity/AI assistant, NOT purpose/action ('calling about', 'calling regarding')
+        r'^(?:this\s+is|my\s+name\s+is|i\s+am|i\'m)\s+[a-zA-Z\s]+(?:\s*,\s*(?:an?|the)?\s*ai\s+assistant)?(?:\s+(?:from|with)\s+[a-zA-Z0-9\s]+)?(?:\s*,\s*(?:an?|the)?\s*ai\s+assistant)?[.!,]?$',
+        # Redundant compliance statements already present in owner wording
+        r'^(?:(?:ek|an?)\s+ai\s+assistant|virtual\s+assistant)[.!,।]?$',
+        r'^(?:(?:yeh\s+)?call\s*(?:quality|service\s+quality)?\s*(?:ke\s+liye)?\s*record\s+(?:ki\s+ja\s+sakti\s+hai|hogi|ki\s+jayegi))[.!,।]?$',
+        r'^(?:this\s+call\s+(?:may\s+be|is)\s+recorded(?:\s+for\s+(?:quality|service\s+quality))?)[.!,]?$',
     ]
 
-    changed = True
-    while changed:
-        changed = False
-        cleaned = cleaned.lstrip(' ,.!-:;\"\'।|?').rstrip(' \"\'')
-        for pat in intro_patterns:
-            m = re.match(pat, cleaned, flags=re.IGNORECASE)
-            if m:
-                cleaned = cleaned[m.end():].lstrip(' ,.!-:;\"\'।|?').rstrip(' \"\'')
-                changed = True
-                break
+    # Split into sentences or clauses by punctuation [.!?।\n]
+    tokens = re.split(r'([.!?।\n]+)', cleaned)
+    sentences = []
+    for i in range(0, len(tokens) - 1, 2):
+        s = (tokens[i] + tokens[i+1]).strip()
+        if s:
+            sentences.append(s)
+    if len(tokens) % 2 == 1 and tokens[-1].strip():
+        sentences.append(tokens[-1].strip())
 
-    if agent_name:
-        cleaned = re.sub(rf'^(?:this\s+is\s+)?{re.escape(agent_name)}[,!\.\s]*', '', cleaned, flags=re.IGNORECASE).strip()
-    if cleaned:
-        cleaned = cleaned[0].upper() + cleaned[1:]
-    return cleaned
+    kept_sentences = []
+    for s in sentences:
+        s_clean = s.strip()
+        # Trim leading greeting word only (Hello, Namaste) from start of sentence
+        s_no_greet = re.sub(r'^(?:namaste|hello|hi|hey|नमस्ते|வணக்கம்|నమస్కారం)[\s,!\.]*', '', s_clean, flags=re.IGNORECASE).strip()
+        
+        # If it was only a greeting word with no other content, omit so single compliant greeting word replaces it
+        if not s_no_greet:
+            continue
+        
+        is_pure_intro = False
+        for pat in pure_intro_patterns:
+            if re.match(pat, s_no_greet, flags=re.IGNORECASE):
+                is_pure_intro = True
+                break
+        
+        if not is_pure_intro:
+            kept_sentences.append(s_clean)
+
+    candidate = " ".join(kept_sentences).strip()
+    candidate = re.sub(r'^(?:namaste|hello|hi|hey|नमस्ते)[\s,!]+', '', candidate, flags=re.IGNORECASE).strip()
+
+    # SAFETY RULES:
+    # 1. If candidate is empty or fewer than 3 words:
+    original_words = raw.split()
+    candidate_words = candidate.split()
+    if len(candidate_words) < 3:
+        if len(original_words) >= 4:
+            # Keep original text (trimming only redundant leading hello)
+            safe_text = re.sub(r'^(?:namaste|hello|hi|hey|नमस्ते)[\s,!]+', '', raw, flags=re.IGNORECASE).strip()
+            return safe_text[0].upper() + safe_text[1:] if safe_text else raw
+        return candidate[0].upper() + candidate[1:] if candidate else ""
+
+    # 2. If stripping removed MORE THAN 50% of the text, verify if it was a false positive
+    if len(candidate) < 0.50 * original_len:
+        has_critical_info = bool(re.search(r'\b(appointment|meeting|order|demo|inquiry|discount|subsidy|offer|bill|rupee|₹|कल|अपॉइंटमेंट)\b', raw, re.IGNORECASE))
+        if has_critical_info:
+            safe_text = re.sub(r'^(?:namaste|hello|hi|hey|नमस्ते)[\s,!]+', '', raw, flags=re.IGNORECASE).strip()
+            return safe_text[0].upper() + safe_text[1:] if safe_text else raw
+
+    if candidate:
+        candidate = candidate[0].upper() + candidate[1:]
+    return candidate
 
 
 def compose_single_opening_greeting(
@@ -332,39 +412,31 @@ def compose_single_opening_greeting(
     consent_mode: str = "notice_only",
     variant: Optional[str] = None,
     recording_exempt: bool = False,
-    template_mode: bool = False
+    template_mode: bool = False,
+    verify_identity: bool = False,
+    agent_id: Optional[str] = None
 ) -> Tuple[str, str, str]:
     """
     Single source of truth for the call opening greeting.
     Composes ONE final opening string spoken ONCE as ONE utterance.
 
     Composition Rules (in order):
-    1. Greeting word, with the caller's name if known (honorific-adapted).
+    1. Greeting word, with the caller's name if known.
     2. Mandatory disclosure: AI identity ("AI assistant"), business name, and
        the recording notice. For outbound calls, also the purpose.
-    3. The dashboard greeting's remaining content (pitch, offer, question), with any
-       duplicate self-introduction removed.
-    4. If the dashboard greeting is empty, uses the default template.
-
-    Args:
-        dashboard_greeting: Raw greeting configured by owner in dashboard.
-        agent_name: Name of agent (e.g. Arika, Vikram).
-        business_name: Name of business.
-        caller_name: Name of known caller or None.
-        direction: 'inbound' or 'outbound'.
-        language: Language code ('hinglish', 'en', 'hi', etc.).
-        gender_tag: 'female' or 'male'.
-        purpose: Outbound call purpose / campaign goal.
-        consent_mode: 'notice_only', 'spoken_or_keypress', etc.
-        variant: A/B disclosure variant name.
-        recording_exempt: If true, recording notice is omitted (logged owner attestation).
-        template_mode: If true, embeds '{caller_name_slot}' so final string can be cached.
-
-    Returns:
-        (final_opening_utterance, selected_variant, normalized_language)
+    3. Caller name privacy rule: For outbound calls or matched callers, the name
+       is used to greet and verify identity ('Kya main Rahul ji se baat kar rahi hoon?'),
+       preventing unauthorized disclosure of personal/appointment details before confirmation.
+    4. Dashboard greeting's remaining content with duplicate self-introductions safely stripped.
+    5. Fallback default template if dashboard greeting is empty.
     """
+    global _COMPOSED_GREETING_CACHE
+
     norm_lang = normalize_language_code(language)
-    sel_variant = variant if variant in DISCLOSURE_VARIANTS else "standard"
+    v_clean = str(variant or "standard").lower()
+    if v_clean == "short":
+        v_clean = "concise"
+    sel_variant = v_clean if v_clean in DISCLOSURE_VARIANTS else "standard"
     agent_display = (agent_name or "Arika").strip()
     biz_display = (business_name or "Trinetra AI").strip()
     is_outbound = str(direction).lower() == "outbound"
@@ -373,12 +445,23 @@ def compose_single_opening_greeting(
     modal = "sakti" if gender_tag == "female" else "sakta"
     modal_hi = "सकती" if gender_tag == "female" else "सकता"
 
+    # Fast cache lookup for hot path (when template_mode=True or no dynamic caller name)
+    cache_key = None
+    if agent_id and not caller_name:
+        cache_key = get_greeting_cache_key(
+            agent_id, dashboard_greeting, agent_display, biz_display,
+            norm_lang, direction, sel_variant, recording_exempt, verify_identity
+        )
+        if cache_key in _COMPOSED_GREETING_CACHE:
+            return _COMPOSED_GREETING_CACHE[cache_key]
+
     # 1. Caller Name & Greeting Word
     is_name_valid = bool(
         caller_name and str(caller_name).strip() and
         str(caller_name).strip().lower() not in ("none", "null", "unknown", "unknown caller", "inbound caller", "client")
     )
 
+    first_name = ""
     addressed_name = ""
     if template_mode:
         slot = "{caller_name_slot}"
@@ -410,58 +493,121 @@ def compose_single_opening_greeting(
         greeting_word = f"నమస్కారం{slot}!"
     elif norm_lang == "es":
         greeting_word = f"¡Hola{slot}!"
-    else:  # Hinglish
+    else:  # Hinglish default
         greeting_word = f"Namaste{slot}!"
 
     # 2. Mandatory Disclosure Statement (AI identity + business name + recording notice + purpose)
     disc_parts = []
-    if norm_lang == "en":
-        disc_parts.append(f"This is {agent_display} from {biz_display}, an AI assistant.")
-        if is_outbound and purpose:
-            disc_parts.append(f"I am calling regarding {purpose}.")
-        if not recording_exempt:
-            disc_parts.append("This call may be recorded for service quality.")
-    elif norm_lang == "hi":
-        disc_parts.append(f"मैं {biz_display} से {agent_display} बोल {verb_hi} हूँ, एक AI assistant।")
-        if is_outbound and purpose:
-            disc_parts.append(f"मैं {purpose} के सिलसिले में कॉल कर {verb_hi} हूँ।")
-        if not recording_exempt:
-            disc_parts.append("सर्विस क्वालिटी के लिए यह कॉल रिकॉर्ड की जा सकती है।")
-    elif norm_lang == "ta":
-        disc_parts.append(f"நான் {biz_display} நிறுவனத்திலிருந்து {agent_display}, ஓர் AI assistant.")
-        if not recording_exempt:
-            disc_parts.append("சேவைத் தரத்திற்காக இந்த அழைப்பு பதிவு செய்யப்படலாம்.")
-    elif norm_lang == "te":
-        disc_parts.append(f"నేను {biz_display} నుండి {agent_display}, ఒక AI assistant.")
-        if not recording_exempt:
-            disc_parts.append("నాణ్యత పరిశీలన కోసం ఈ కాల్ రికార్డ్ చేయబడవచ్చు.")
-    elif norm_lang == "mr":
-        disc_parts.append(f"मी {biz_display} कडून {agent_display} बोलत आहे, एक AI assistant.")
-        if not recording_exempt:
-            disc_parts.append("सेवेच्या गुणवत्तेसाठी हा कॉल रेकॉर्ड केला जाऊ शकतो.")
-    elif norm_lang == "es":
-        disc_parts.append(f"Soy {agent_display}, un asistente de IA de {biz_display}.")
-        if not recording_exempt:
-            disc_parts.append("Esta llamada puede ser grabada para control de calidad.")
-    else:  # Hinglish default
-        disc_parts.append(f"Main {biz_display} se {agent_display} bol {verb} hoon, ek AI assistant.")
-        if is_outbound and purpose:
-            disc_parts.append(f"Main {purpose} ke regarding call kar {verb} hoon.")
-        if not recording_exempt:
-            disc_parts.append("Service quality ke liye yeh call record ki ja sakti hai.")
+    if sel_variant == "concise":
+        # Concise wording kept strictly under 10 seconds while stating AI identity and recording notice
+        if norm_lang == "en":
+            disc_parts.append(f"I'm {agent_display}, an AI assistant from {biz_display}.")
+            if not recording_exempt:
+                disc_parts.append("This call is recorded.")
+        elif norm_lang == "hi":
+            disc_parts.append(f"मैं {biz_display} से AI असिस्टेंट {agent_display} बोल {verb_hi} हूँ।")
+            if not recording_exempt:
+                disc_parts.append("कॉल रिकॉर्ड हो सकती है।")
+        elif norm_lang == "ta":
+            disc_parts.append(f"நான் {biz_display} AI assistant {agent_display}.")
+            if not recording_exempt:
+                disc_parts.append("அழைப்பு பதிவு செய்யப்படலாம்.")
+        elif norm_lang == "te":
+            disc_parts.append(f"నేను {biz_display} AI assistant {agent_display}.")
+            if not recording_exempt:
+                disc_parts.append("కాల్ రికార్డ్ చేయబడవచ్చు.")
+        elif norm_lang == "mr":
+            disc_parts.append(f"मी {biz_display} कडून AI assistant {agent_display} बोलत आहे.")
+            if not recording_exempt:
+                disc_parts.append("कॉल रेकॉर्ड होऊ शकतो.")
+        elif norm_lang == "es":
+            disc_parts.append(f"Soy {agent_display}, asistente de IA de {biz_display}.")
+            if not recording_exempt:
+                disc_parts.append("Llamada grabada.")
+        else:  # Hinglish concise
+            disc_parts.append(f"Main {biz_display} se AI assistant {agent_display} bol {verb} hoon.")
+            if not recording_exempt:
+                disc_parts.append("Call record ho sakti hai.")
+    else:
+        # Standard full disclosure
+        if norm_lang == "en":
+            disc_parts.append(f"This is {agent_display} from {biz_display}, an AI assistant.")
+            if is_outbound and purpose:
+                disc_parts.append(f"I am calling regarding {purpose}.")
+            if not recording_exempt:
+                disc_parts.append("This call may be recorded for service quality.")
+        elif norm_lang == "hi":
+            disc_parts.append(f"मैं {biz_display} से {agent_display} बोल {verb_hi} हूँ, एक AI assistant।")
+            if is_outbound and purpose:
+                disc_parts.append(f"मैं {purpose} के सिलसिले में कॉल कर {verb_hi} हूँ।")
+            if not recording_exempt:
+                disc_parts.append("सर्विस क्वालिटी के लिए यह कॉल रिकॉर्ड की जा सकती है।")
+        elif norm_lang == "ta":
+            disc_parts.append(f"நான் {biz_display} நிறுவனத்திலிருந்து {agent_display}, ஓர் AI assistant.")
+            if not recording_exempt:
+                disc_parts.append("சேவைத் தரத்திற்காக இந்த அழைப்பு பதிவு செய்யப்படலாம்.")
+        elif norm_lang == "te":
+            disc_parts.append(f"నేను {biz_display} నుండి {agent_display}, ఒక AI assistant.")
+            if not recording_exempt:
+                disc_parts.append("నాణ్యత పరిశీలన కోసం ఈ కాల్ రికార్డ్ చేయబడవచ్చు.")
+        elif norm_lang == "mr":
+            disc_parts.append(f"मी {biz_display} कडून {agent_display} बोलत आहे, एक AI assistant.")
+            if not recording_exempt:
+                disc_parts.append("सेवेच्या गुणवत्तेसाठी हा कॉल रेकॉर्ड केला जाऊ शकतो.")
+        elif norm_lang == "es":
+            disc_parts.append(f"Soy {agent_display}, un asistente de IA de {biz_display}.")
+            if not recording_exempt:
+                disc_parts.append("Esta llamada puede ser grabada para control de calidad.")
+        else:  # Hinglish default
+            disc_parts.append(f"Main {biz_display} se {agent_display} bol {verb} hoon, ek AI assistant.")
+            if is_outbound and purpose:
+                disc_parts.append(f"Main {purpose} ke regarding call kar {verb} hoon.")
+            if not recording_exempt:
+                disc_parts.append("Service quality ke liye yeh call record ki ja sakti hai.")
 
-    # Append affirmative consent suffix if required by jurisdiction
     if consent_mode in CONSENT_MODE_SUFFIXES:
         suffix = CONSENT_MODE_SUFFIXES[consent_mode].get(norm_lang, CONSENT_MODE_SUFFIXES[consent_mode]["en"])
         disc_parts.append(suffix)
 
     mandatory_disclosure = " ".join(disc_parts)
 
-    # 3. Strip self-intro from dashboard greeting and extract remaining pitch/question
+    # 3. Caller Name Privacy & Identity Confirmation Rule:
+    # Use caller name ONLY to greet. For outbound or matched callers, do not disclose
+    # personal, financial, or appointment details until the person confirms identity.
+    SENSITIVE_DETAILS_PATTERN = re.compile(
+        r'\b(appointment|doctor|hospital|clinic|surgery|prescription|diagnosis|patient|'
+        r'account|balance|bill|payment|invoice|credit\s+card|loan|emi|due|rupees?|₹|tax|salary|'
+        r'अपॉइंटमेंट|डॉक्टर|अस्पताल|बिल|खाता|भुगतान)\b',
+        re.IGNORECASE
+    )
+
+    # 4. Strip self-intro from dashboard greeting and extract remainder
     remainder = strip_dashboard_self_introduction(dashboard_greeting or "", agent_display, biz_display)
 
-    # 4. If remainder is empty, use default question
-    if not remainder:
+    # Privacy enforcement: if remainder, raw greeting, or purpose contains sensitive details,
+    # withhold them from opening greeting until identity is confirmed
+    has_sensitive_details = bool(
+        SENSITIVE_DETAILS_PATTERN.search(remainder or "") or 
+        SENSITIVE_DETAILS_PATTERN.search(dashboard_greeting or "") or
+        (purpose and SENSITIVE_DETAILS_PATTERN.search(purpose))
+    )
+
+    should_confirm_identity = is_name_valid and (verify_identity or has_sensitive_details)
+
+    identity_confirmation_prompt = ""
+    if should_confirm_identity:
+        if norm_lang == "en":
+            identity_confirmation_prompt = f"Am I speaking with {first_name}?"
+        elif norm_lang == "hi":
+            identity_confirmation_prompt = f"क्या मैं {addressed_name} से बात कर {verb_hi} हूँ?"
+        else:
+            identity_confirmation_prompt = f"Kya main {addressed_name} se baat kar {verb} hoon?"
+
+    # 5. Determine the appropriate question/action for opening utterance
+    if should_confirm_identity and identity_confirmation_prompt:
+        # Do NOT share sensitive appointment/financial details yet; confirm identity first!
+        remainder = identity_confirmation_prompt
+    elif not remainder:
         if is_outbound:
             if norm_lang == "en":
                 remainder = "Do you have a couple of minutes to talk?"
@@ -480,7 +626,11 @@ def compose_single_opening_greeting(
     # Assemble final single opening utterance
     final_opening = f"{greeting_word} {mandatory_disclosure} {remainder}"
     final_opening = re.sub(r'\s+', ' ', final_opening).strip()
-    return final_opening, sel_variant, norm_lang
+
+    result = (final_opening, sel_variant, norm_lang)
+    if cache_key:
+        _COMPOSED_GREETING_CACHE[cache_key] = result
+    return result
 
 
 def render_cached_opening_greeting(cached_template: str, caller_name: Optional[str], language: str = "hinglish") -> str:
@@ -543,7 +693,8 @@ def build_compliant_greeting(
         purpose=purpose,
         consent_mode=consent_mode,
         variant=variant,
-        recording_exempt=recording_exempt
+        recording_exempt=recording_exempt,
+        verify_identity=False
     )
 
 
@@ -571,7 +722,6 @@ async def lookup_caller_name_fast(
         return None
 
     async def _do_lookup():
-        # 1. Check customer_contacts for this specific organization
         try:
             res_cust = await asyncio.to_thread(
                 supabase_client.table("customer_contacts")
@@ -588,7 +738,6 @@ async def lookup_caller_name_fast(
         except Exception:
             pass
 
-        # 2. Check leads for this specific organization
         try:
             res_lead = await asyncio.to_thread(
                 supabase_client.table("leads")
@@ -614,7 +763,6 @@ async def lookup_caller_name_fast(
         return None
 
 
-
 async def persist_call_disclosure(
     supabase_client,
     room_name: str,
@@ -622,10 +770,11 @@ async def persist_call_disclosure(
     variant: str,
     language: str,
     consent_mode: str = "notice_only",
-    consent_outcome: str = "consented"
+    consent_outcome: str = "consented",
+    duration_seconds: Optional[float] = None
 ):
     """
-    Persists disclosure telemetry to voice_calls table in Supabase.
+    Persists disclosure telemetry and duration to voice_calls table in Supabase.
     Called asynchronously so it never blocks audio initialization.
     """
     if not supabase_client or not room_name:
@@ -633,6 +782,11 @@ async def persist_call_disclosure(
 
     try:
         now_iso = datetime.now(timezone.utc).isoformat()
+        if duration_seconds is None and disclosure_text:
+            # Measured average speech rate across Indian English & Hinglish TTS: ~2.3 words/sec
+            word_count = len(disclosure_text.split())
+            duration_seconds = round(word_count / 2.3, 1)
+
         update_data = {
             "disclosure_played": True,
             "disclosure_text": disclosure_text,
@@ -643,16 +797,19 @@ async def persist_call_disclosure(
             "consent_outcome": consent_outcome
         }
 
-        # Update voice_calls matching room_name in metadata or call_id
-        await asyncio_to_thread(
+        logger.info(
+            f"[persist_call_disclosure] Room '{room_name}': Disclosed '{variant}' ({language}), "
+            f"est. duration: {duration_seconds}s"
+        )
+
+        await asyncio.to_thread(
             supabase_client.table("voice_calls")
             .update(update_data)
             .eq("metadata->>room_name", room_name)
             .execute
         )
-        logger.info(f"[Disclosure] Successfully logged disclosure telemetry for room '{room_name}' (variant={variant}, lang={language}, mode={consent_mode})")
     except Exception as e:
-        logger.warning(f"[Disclosure] Failed to persist disclosure telemetry for room '{room_name}': {e}")
+        logger.warning(f"[persist_call_disclosure] Failed to persist disclosure telemetry for room '{room_name}': {e}")
 
 
 async def handle_caller_recording_decline(

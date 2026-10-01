@@ -1949,13 +1949,18 @@ class VikramAgent(Agent):
         self._has_introduced_self = True
 
         logger.info(f"[VikramAgent] Speaking single compliant opening greeting: '{greeting}'")
-        print(f"[Agent] Speaking greeting: '{greeting}'", flush=True)
         speech_handle = self.session.say(
             greeting,
             allow_interruptions=False,
             add_to_chat_ctx=True
         )
-        await speech_handle
+        try:
+            # Enforce 12-second watchdog timeout so allow_interruptions=False can never freeze the session
+            await asyncio.wait_for(speech_handle, timeout=12.0)
+        except asyncio.TimeoutError:
+            logger.warning("[VikramAgent] Opening greeting playout exceeded 12s safety timeout; releasing session to listener")
+        except Exception as play_err:
+            logger.warning(f"[VikramAgent] Error or cancellation during greeting playout: {play_err}")
 
         # Add to chat context as an assistant message so the LLM never repeats the opening
         try:
