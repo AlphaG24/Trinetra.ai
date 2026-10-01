@@ -14,7 +14,7 @@ import json
 import time
 import logging
 import asyncio
-from typing import AsyncIterable, AsyncGenerator, Any
+from typing import AsyncIterable, AsyncGenerator, Any, Tuple
 import jwt
 from dotenv import load_dotenv
 from livekit.agents import AutoSubscribe, JobContext, WorkerOptions, JobExecutorType, cli, tts, llm
