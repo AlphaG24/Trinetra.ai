@@ -1,5 +1,5 @@
-from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Query
-from typing import Optional, List, Dict
+from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Query, Response
+from typing import Optional, List, Dict, Union
 import logging
 import asyncio
 
@@ -8,6 +8,39 @@ from app.services.campaign_service import CampaignService
 
 logger = logging.getLogger("CampaignRouter")
 router = APIRouter(prefix="/api/campaigns", tags=["campaigns"])
+
+@router.get("/template.csv")
+@router.get("/template")
+async def get_campaign_contacts_template():
+    """
+    Returns a downloadable sample CSV template for campaign contact lists
+    demonstrating required affirmative consent columns (consent, consent_source).
+    [CONFIRM WITH A LAWYER]
+    """
+    sample_csv = (
+        "full_name,phone,company_name,consent,consent_source,notes\n"
+        "Rajesh Sharma,+919876543210,Acme Corp,true,website_inquiry_form_2026,Requested demo of voice agent\n"
+        "Priya Patel,+919876543211,Nexus Tech,true,conference_booth_optin_delhi,Interested in customer support automation\n"
+        "Amit Verma,+919876543212,Global Logistics,true,webinar_attendee_march2026,Inquired about outbound notifications\n"
+    )
+    return Response(
+        content=sample_csv,
+        media_type="text/csv",
+        headers={"Content-Disposition": 'attachment; filename="campaign_contacts_sample.csv"'}
+    )
+
+@router.get("/active/consent-audit")
+async def get_active_campaigns_consent_audit():
+    """
+    Returns an audit report on running/active campaigns and contact consent breakdown.
+    Documents status of legacy contacts and statutory compliance before dialing. [CONFIRM WITH A LAWYER]
+    """
+    try:
+        report = await CampaignService.get_active_campaigns_consent_audit()
+        return {"success": True, "data": report}
+    except Exception as e:
+        logger.error(f"Error fetching active campaigns consent audit: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("")
 async def create_campaign(
@@ -19,9 +52,26 @@ async def create_campaign(
     calling_hours_end: str = Form("18:00"),
     timezone: str = Form("Asia/Kolkata"),
     scheduled_start: Optional[str] = Form(None),
+    consent_attestation: Union[bool, str] = Form(False),
+    attestation_statement: Optional[str] = Form(None),
+    user_id: Optional[str] = Form(None),
+    user_email: Optional[str] = Form(None),
     file: UploadFile = File(...)
 ):
     try:
+        # Validate affirmative consent attestation (TRAI TCCCPR 2018 / TCPA) [CONFIRM WITH A LAWYER]
+        is_attested = False
+        if isinstance(consent_attestation, bool):
+            is_attested = consent_attestation
+        elif isinstance(consent_attestation, str):
+            is_attested = consent_attestation.strip().lower() in ("true", "1", "yes", "on")
+
+        if not is_attested:
+            raise HTTPException(
+                status_code=400,
+                detail="Mandatory statutory attestation missing: You must certify that you have verifiable affirmative consent for all contacts in this campaign before uploading. [CONFIRM WITH A LAWYER]"
+            )
+
         file_content = await file.read()
         campaign = await CampaignService.create_campaign(
             organization_id=organization_id,
@@ -33,9 +83,15 @@ async def create_campaign(
             calling_hours_start=calling_hours_start,
             calling_hours_end=calling_hours_end,
             timezone_str=timezone,
-            scheduled_start=scheduled_start if scheduled_start else None
+            scheduled_start=scheduled_start if scheduled_start else None,
+            consent_attestation=is_attested,
+            attestation_statement=attestation_statement,
+            user_id=user_id,
+            user_email=user_email
         )
         return {"success": True, "data": campaign}
+    except HTTPException:
+        raise
     except ValueError as ve:
         logger.error(f"Validation error creating campaign: {ve}", exc_info=True)
         raise HTTPException(status_code=400, detail=str(ve))

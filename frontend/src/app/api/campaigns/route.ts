@@ -68,7 +68,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const { authenticated, profile, error, supabase } = await authenticateRequest();
+    const { authenticated, user, profile, error, supabase } = await authenticateRequest();
     if (!authenticated || !profile || !supabase) {
       return NextResponse.json({ error: error || "Unauthorized" }, { status: 401 });
     }
@@ -82,9 +82,18 @@ export async function POST(request: Request) {
     const name = formData.get("name");
     const agentId = formData.get("agentId");
     const file = formData.get("file") as File;
+    const consentAttestation = formData.get("consent_attestation");
     
     if (!name || !agentId || !file) {
       return NextResponse.json({ error: "Missing required fields (name, agentId, file)" }, { status: 400 });
+    }
+
+    // Enforce affirmative consent attestation [CONFIRM WITH A LAWYER]
+    const isAttested = consentAttestation === "true" || consentAttestation === true;
+    if (!isAttested) {
+      return NextResponse.json({ 
+        error: "Mandatory statutory attestation missing: You must certify affirmative consent for all contacts before uploading [CONFIRM WITH A LAWYER]" 
+      }, { status: 400 });
     }
 
     // Validate that agent is not a free demo agent
@@ -108,6 +117,14 @@ export async function POST(request: Request) {
     forwardData.append("name", name as string);
     forwardData.append("agent_id", agentId as string);
     forwardData.append("organization_id", profile.organization_id);
+    forwardData.append("consent_attestation", "true");
+    
+    const statement = formData.get("attestation_statement");
+    if (statement) {
+      forwardData.append("attestation_statement", statement as string);
+    }
+    if (user?.id) forwardData.append("user_id", user.id);
+    if (user?.email) forwardData.append("user_email", user.email);
     
     const startHours = formData.get("calling_hours_start");
     const endHours = formData.get("calling_hours_end");

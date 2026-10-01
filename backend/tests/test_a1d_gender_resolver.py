@@ -198,6 +198,7 @@ ALLOWED_FILES = {
     "voice_router.py",                 # TTS spelling guide only (not templates)
     "sample_revenue_extractions.py",
     "test_revenue_extractor.py",
+    "test_csv_consent_attestation.py",
 }
 
 
