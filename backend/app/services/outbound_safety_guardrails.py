@@ -29,10 +29,28 @@ from typing import Dict, Any, Optional, Tuple, List, Set
 
 logger = logging.getLogger("outbound-safety-guardrails")
 
-# Hard Floor calling hours for promotional outbound calls (09:00 to 21:00 local time)
-# [CONFIRM WITH A LAWYER: TRAI TCCCPR 2018 Regulation 12 / TCPA 47 CFR § 64.1200(c)(1)]
-HARD_FLOOR_START = time(9, 0)   # 09:00:00
-HARD_FLOOR_END = time(21, 0)    # 21:00:00
+# ==============================================================================
+# PROMOTIONAL CALLING HOURS WINDOW
+# [CONFIRM WITH A LAWYER: TRAI TCCCPR 2018 Regulation 12]
+# Official TRAI Text: https://trai.gov.in/telecom-commercial-communication-customer-preference-regulations-2018
+# Under TRAI Telecom Commercial Communications Customer Preference Regulations 2018 (Regulation 12),
+# no commercial communication shall be sent or made between 21:00 hrs and 09:00 hrs in the recipient's local time.
+# Statutory permitted window: 09:00 to 21:00.
+# NOTE ON 09:00-20:00 VS 09:00-21:00:
+# While TRAI TCCCPR 2018 Regulation 12 sets 21:00 (9:00 PM) as the statutory curfew,
+# earlier draft advisories and certain state/sectoral guidelines recommended an 09:00 - 20:00
+# (8:00 PM) window. The hard floor here is enforced at 09:00 - 21:00 per the codified 2018 regulation;
+# campaign owners can further narrow this window down (e.g. to 20:00) via campaign settings.
+# ==============================================================================
+PROMOTIONAL_CALLING_HOURS_WINDOW: Dict[str, Any] = {
+    "start": time(9, 0),    # 09:00:00
+    "end": time(21, 0),     # 21:00:00
+    "default_timezone": "Asia/Kolkata",
+    "regulation": "TRAI TCCCPR 2018 Regulation 12",
+    "official_url": "https://trai.gov.in/telecom-commercial-communication-customer-preference-regulations-2018",
+}
+HARD_FLOOR_START = PROMOTIONAL_CALLING_HOURS_WINDOW["start"]
+HARD_FLOOR_END = PROMOTIONAL_CALLING_HOURS_WINDOW["end"]
 
 # Canonical campaign purposes
 VALID_CAMPAIGN_PURPOSES = {"promotional", "service", "transactional"}

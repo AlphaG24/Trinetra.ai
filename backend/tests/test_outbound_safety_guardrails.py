@@ -35,6 +35,7 @@ from app.services.outbound_safety_guardrails import (
     generate_pre_send_campaign_report,
     HARD_FLOOR_START,
     HARD_FLOOR_END,
+    PROMOTIONAL_CALLING_HOURS_WINDOW,
     APPROVED_WHATSAPP_TEMPLATES,
 )
 
@@ -120,6 +121,15 @@ class TestOutboundSafetyGuardrails(unittest.IsolatedAsyncioTestCase):
         )
         self.assertFalse(is_allowed)
         self.assertIn("BLOCKED BY HARD FLOOR", msg)
+
+    def test_promotional_calling_hours_window_constant(self):
+        """Verifies named constant specifies 09:00-21:00 window, TRAI link, and regulation key."""
+        self.assertEqual(PROMOTIONAL_CALLING_HOURS_WINDOW["start"], time(9, 0))
+        self.assertEqual(PROMOTIONAL_CALLING_HOURS_WINDOW["end"], time(21, 0))
+        self.assertIn("trai.gov.in", PROMOTIONAL_CALLING_HOURS_WINDOW["official_url"])
+        self.assertEqual(PROMOTIONAL_CALLING_HOURS_WINDOW["regulation"], "TRAI TCCCPR 2018 Regulation 12")
+        self.assertEqual(HARD_FLOOR_START, time(9, 0))
+        self.assertEqual(HARD_FLOOR_END, time(21, 0))
 
     def test_requested_callback_permitted_outside_calling_hours(self):
         """
