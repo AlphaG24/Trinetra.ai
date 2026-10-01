@@ -199,6 +199,7 @@ ALLOWED_FILES = {
     "sample_revenue_extractions.py",
     "test_revenue_extractor.py",
     "test_csv_consent_attestation.py",
+    "test_barge_in_interruption.py",
 }
 
 
