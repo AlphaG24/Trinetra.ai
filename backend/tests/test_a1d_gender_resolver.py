@@ -202,6 +202,7 @@ ALLOWED_FILES = {
     "test_barge_in_interruption.py",
     "test_campaign_purpose_attestation.py",
     "test_service_role_safety.py",
+    "test_migrations_validation.py",
 }
 
 
