@@ -404,33 +404,64 @@ def resolve_agent_gender(
     gender: Optional[str] = None,
     voice: Optional[str] = None,
     agent_name: Optional[str] = None
-) -> str:
+) -> Tuple[str, str]:
     """
-    Resolves agent gender ('male' or 'female') strictly based on the agent's
-    configured gender, voice ID, or agent persona name. Never relies on a fixed default.
-    """
-    for candidate in [gender, voice]:
-        if candidate and str(candidate).strip():
-            c_low = str(candidate).strip().lower()
-            if c_low in ("male", "m", "man", "boy"):
-                return "male"
-            if c_low in ("female", "f", "woman", "girl"):
-                return "female"
-            # Male voice signatures (Sarvam Bulbul / ElevenLabs / Cartesia / Deepgram)
-            if any(m in c_low for m in ["arvind", "amartya", "kabir", "rohan", "dhruv", "ratan", "aditya", "manan", "dev", "deepak", "varun", "vikram"]):
-                return "male"
-            # Female voice signatures
-            if any(f in c_low for f in ["meera", "kavya", "shreya", "priya", "arika", "aditi", "pooja", "simran", "ananya", "neha", "riya"]):
-                return "female"
+    Gender resolution order:
+    (1) explicit agent gender setting ('male' / 'female')
+    (2) voice's gender from TTS provider catalog or voice list ('voice_catalog')
+    (3) persona-name guess as last resort ('guessed')
+    (4) unresolved -> 'neutral' with respectful neutral phrasing
 
+    Returns:
+        (resolved_gender, resolution_source)
+        where resolved_gender in ('male', 'female', 'neutral')
+        and resolution_source in ('explicit', 'voice_catalog', 'guessed', 'unresolved')
+    """
+    # 1. Explicit agent gender setting
+    if gender and str(gender).strip():
+        g_clean = str(gender).strip().lower()
+        if g_clean in ("male", "m", "man", "boy"):
+            return "male", "explicit"
+        if g_clean in ("female", "f", "woman", "girl"):
+            return "female", "explicit"
+
+    # 2. Voice's gender from TTS catalog
+    if voice and str(voice).strip():
+        v_clean = str(voice).strip().lower()
+        male_catalog = [
+            'shubh', 'aditya', 'rahul', 'rohan', 'amit', 'dev', 'ratan', 'varun', 
+            'manan', 'sumit', 'kabir', 'aayan', 'ashutosh', 'advait', 'anand', 
+            'tarun', 'sunny', 'mani', 'gokul', 'vijay', 'mohit', 'rehan', 'soham',
+            'arvind', 'neel', 'arjun', 'amol'
+        ]
+        female_catalog = [
+            'aditi', 'ritu', 'priya', 'neha', 'pooja', 'simran', 'kavya', 'ishita', 'shreya', 
+            'roopa', 'tanya', 'shruti', 'suhani', 'kavitha', 'rupali', 'anushka', 'manisha', 
+            'vidya', 'arya', 'abhilash', 'karun', 'hitesh', 'amelia', 'sophia', 'diya', 'meera', 
+            'pavithra', 'sita', 'radha', 'leela', 'shimmer', 'alloy', 'nova', 'fable', 'rachel', 
+            'domi', 'bella', 'elli', 'sarah'
+        ]
+        if any(v_clean == m or v_clean.endswith(f"-{m}") or v_clean.startswith(f"{m}-") for m in male_catalog):
+            return "male", "voice_catalog"
+        if any(v_clean == f or v_clean.endswith(f"-{f}") or v_clean.startswith(f"{f}-") for f in female_catalog):
+            return "female", "voice_catalog"
+
+    # 3. Persona-name guess as last resort
     if agent_name and str(agent_name).strip():
         n_low = str(agent_name).strip().lower()
-        if any(m in n_low for m in ["vikram", "rahul", "amit", "rohan", "kabir", "arvind", "raj"]):
-            return "male"
-        if any(f in n_low for f in ["arika", "priya", "aditi", "riya", "neha", "pooja", "kavya"]):
-            return "female"
+        if any(m in n_low for m in ["vikram", "rahul", "amit", "rohan", "kabir", "arvind", "raj", "suresh", "deepak"]):
+            logger.info(f"[resolve_agent_gender] Gender guessed as 'male' from persona name '{agent_name}'")
+            return "male", "guessed"
+        if any(f in n_low for f in ["arika", "priya", "aditi", "riya", "neha", "pooja", "kavya", "ananya", "shreya"]):
+            logger.info(f"[resolve_agent_gender] Gender guessed as 'female' from persona name '{agent_name}'")
+            return "female", "guessed"
 
-    return "female"
+    # 4. Unresolved -> neutral fallback
+    logger.warning(
+        f"[resolve_agent_gender] Gender unresolved for agent '{agent_name}' with voice '{voice}'. "
+        "Defaulting to neutral phrasing. Owner should configure gender in dashboard."
+    )
+    return "neutral", "unresolved"
 
 
 def compose_single_opening_greeting(
@@ -475,13 +506,23 @@ def compose_single_opening_greeting(
     biz_display = (business_name or "Trinetra AI").strip()
     is_outbound = str(direction).lower() == "outbound"
 
-    # Gender resolution: dynamically derived from configured gender, voice ID, or persona name
-    resolved_gender = resolve_agent_gender(gender=gender_tag, voice=voice, agent_name=agent_display)
-    is_female = (resolved_gender == "female")
-    verb = "rahi" if is_female else "raha"
-    verb_hi = "रही" if is_female else "रहा"
-    modal = "sakti" if is_female else "sakta"
-    modal_hi = "सकती" if is_female else "सकता"
+    # 4-Tier Gender Resolution: (1) explicit (2) voice catalog (3) persona name guess (4) neutral
+    resolved_gender, gender_source = resolve_agent_gender(gender=gender_tag, voice=voice, agent_name=agent_display)
+    if resolved_gender == "male":
+        verb = "raha"
+        verb_hi = "रहा"
+        modal = "sakta"
+        modal_hi = "सकता"
+    elif resolved_gender == "female":
+        verb = "rahi"
+        verb_hi = "रही"
+        modal = "sakti"
+        modal_hi = "सकती"
+    else:  # neutral
+        verb = "rahe"
+        verb_hi = "रहे"
+        modal = "sakte"
+        modal_hi = "सकते"
 
     # Fast cache lookup for hot path (when template_mode=True or no dynamic caller name)
     cache_key = None
@@ -575,9 +616,14 @@ def compose_single_opening_greeting(
             if not recording_exempt:
                 disc_parts.append("This call may be recorded for service quality.")
         elif norm_lang == "hi":
-            disc_parts.append(f"मैं {biz_display} से {agent_display} बोल {verb_hi} हूँ, एक AI assistant।")
-            if is_outbound and purpose:
-                disc_parts.append(f"मैं {purpose} के सिलसिले में कॉल कर {verb_hi} हूँ।")
+            if resolved_gender == "neutral":
+                disc_parts.append(f"मैं {biz_display} से AI assistant {agent_display} हूँ।")
+                if is_outbound and purpose:
+                    disc_parts.append(f"यह कॉल {purpose} के सिलसिले में है।")
+            else:
+                disc_parts.append(f"मैं {biz_display} से {agent_display} बोल {verb_hi} हूँ, एक AI assistant।")
+                if is_outbound and purpose:
+                    disc_parts.append(f"मैं {purpose} के सिलसिले में कॉल कर {verb_hi} हूँ।")
             if not recording_exempt:
                 disc_parts.append("सर्विस क्वालिटी के लिए यह कॉल रिकॉर्ड की जा सकती है।")
         elif norm_lang == "ta":
@@ -597,9 +643,14 @@ def compose_single_opening_greeting(
             if not recording_exempt:
                 disc_parts.append("Esta llamada puede ser grabada para control de calidad.")
         else:  # Hinglish default
-            disc_parts.append(f"Main {biz_display} se {agent_display} bol {verb} hoon, ek AI assistant.")
-            if is_outbound and purpose:
-                disc_parts.append(f"Main {purpose} ke regarding call kar {verb} hoon.")
+            if resolved_gender == "neutral":
+                disc_parts.append(f"Main {biz_display} se AI assistant {agent_display} hoon.")
+                if is_outbound and purpose:
+                    disc_parts.append(f"Yeh call {purpose} ke regarding hai.")
+            else:
+                disc_parts.append(f"Main {biz_display} se {agent_display} बोल {verb} hoon, ek AI assistant." if norm_lang == "hi" else f"Main {biz_display} se {agent_display} bol {verb} hoon, ek AI assistant.")
+                if is_outbound and purpose:
+                    disc_parts.append(f"Main {purpose} ke regarding call kar {verb} hoon.")
             if not recording_exempt:
                 disc_parts.append("Service quality ke liye yeh call record ki ja sakti hai.")
 
@@ -637,9 +688,15 @@ def compose_single_opening_greeting(
         if norm_lang == "en":
             identity_confirmation_prompt = f"Am I speaking with {first_name}?"
         elif norm_lang == "hi":
-            identity_confirmation_prompt = f"क्या मैं {addressed_name} से बात कर {verb_hi} हूँ?"
+            if resolved_gender == "neutral":
+                identity_confirmation_prompt = f"क्या मेरी बात {addressed_name} से हो रही है?"
+            else:
+                identity_confirmation_prompt = f"क्या मैं {addressed_name} से बात कर {verb_hi} हूँ?"
         else:
-            identity_confirmation_prompt = f"Kya main {addressed_name} se baat kar {verb} hoon?"
+            if resolved_gender == "neutral":
+                identity_confirmation_prompt = f"Kya meri baat {addressed_name} se ho rahi hai?"
+            else:
+                identity_confirmation_prompt = f"Kya main {addressed_name} se baat kar {verb} hoon?"
 
     # 5. Determine the appropriate question/action for opening utterance
     if should_confirm_identity and identity_confirmation_prompt:

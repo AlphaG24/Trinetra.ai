@@ -541,3 +541,111 @@ def test_gender_verb_forms_hindi_and_hinglish():
         voice="kavya"
     )
     assert "bol rahi hoon" in g_voice_female
+
+
+def test_gender_resolution_order_four_tiers():
+    """
+    Fix A1b: Verify the exact 4-tier resolution order:
+    (1) explicit agent gender setting
+    (2) voice's gender from TTS provider catalog
+    (3) persona-name guess as last resort (logged as 'guessed')
+    (4) neutral fallback when unresolved
+    """
+    # Tier 1: Explicit overrides voice catalog and name
+    g1, src1 = resolve_agent_gender(gender="male", voice="aditi", agent_name="Arika")
+    assert g1 == "male"
+    assert src1 == "explicit"
+
+    g2, src2 = resolve_agent_gender(gender="female", voice="shubh", agent_name="Vikram")
+    assert g2 == "female"
+    assert src2 == "explicit"
+
+    # Tier 2: Voice catalog when gender is not explicitly provided
+    g3, src3 = resolve_agent_gender(gender=None, voice="shubh", agent_name="UnknownBot")
+    assert g3 == "male"
+    assert src3 == "voice_catalog"
+
+    g4, src4 = resolve_agent_gender(gender=None, voice="aditi", agent_name="UnknownBot")
+    assert g4 == "female"
+    assert src4 == "voice_catalog"
+
+    # Tier 3: Persona name guess as last resort
+    g5, src5 = resolve_agent_gender(gender=None, voice=None, agent_name="Vikram")
+    assert g5 == "male"
+    assert src5 == "guessed"
+
+    g6, src6 = resolve_agent_gender(gender=None, voice=None, agent_name="Arika")
+    assert g6 == "female"
+    assert src6 == "guessed"
+
+    # Tier 4: Unresolved fallback -> neutral
+    g7, src7 = resolve_agent_gender(gender=None, voice=None, agent_name="SupportBot")
+    assert g7 == "neutral"
+    assert src7 == "unresolved"
+
+
+def test_neutral_phrasing_when_gender_unresolved():
+    """
+    Fix A1b: If gender is unresolved, use neutral phrasing where the language allows it.
+    Verifies Hinglish and Hindi neutral greetings and identity confirmation.
+    """
+    # 1. Hinglish Unresolved Opening Greeting
+    g_hinglish, _, _ = compose_single_opening_greeting(
+        dashboard_greeting=None,
+        agent_name="SupportBot",
+        business_name="Trinetra AI",
+        language="hinglish",
+        gender_tag=None,
+        voice=None
+    )
+    # Neutral phrasing must not contain gendered verbs
+    assert "bol raha hoon" not in g_hinglish
+    assert "bol rahi hoon" not in g_hinglish
+    assert "Main Trinetra AI se AI assistant SupportBot hoon." in g_hinglish
+
+    # 2. Hinglish Unresolved Outbound with Identity Confirmation
+    g_hinglish_id, _, _ = compose_single_opening_greeting(
+        dashboard_greeting="Hello! We are calling to confirm your consultation.",
+        agent_name="SupportBot",
+        business_name="Trinetra AI",
+        caller_name="Rahul Verma",
+        direction="outbound",
+        language="hinglish",
+        gender_tag=None,
+        voice=None,
+        verify_identity=True
+    )
+    # Neutral identity confirmation must use "Kya meri baat ... se ho rahi hai?"
+    assert "Kya meri baat Rahul ji se ho rahi hai?" in g_hinglish_id
+    assert "bol raha" not in g_hinglish_id
+    assert "bol rahi" not in g_hinglish_id
+
+    # 3. Hindi Unresolved Opening Greeting
+    g_hindi, _, _ = compose_single_opening_greeting(
+        dashboard_greeting=None,
+        agent_name="सपोर्ट बॉट",
+        business_name="त्रिनेत्र",
+        language="hi",
+        gender_tag=None,
+        voice=None
+    )
+    # Neutral Hindi must not contain gendered verbs
+    assert "बोल रहा हूँ" not in g_hindi
+    assert "बोल रही हूँ" not in g_hindi
+    assert "मैं त्रिनेत्र से AI assistant सपोर्ट बॉट हूँ।" in g_hindi
+
+    # 4. Hindi Unresolved Outbound with Identity Confirmation
+    g_hindi_id, _, _ = compose_single_opening_greeting(
+        dashboard_greeting="नमस्ते! आपकी कंसल्टेशन कन्फर्म करने के लिए कॉल किया है।",
+        agent_name="सपोर्ट बॉट",
+        business_name="त्रिनेत्र",
+        caller_name="राहुल वर्मा",
+        direction="outbound",
+        language="hi",
+        gender_tag=None,
+        voice=None,
+        verify_identity=True
+    )
+    assert "क्या मेरी बात राहुल जी से हो रही है?" in g_hindi_id
+    assert "बोल रहा" not in g_hindi_id
+    assert "बोल रही" not in g_hindi_id
