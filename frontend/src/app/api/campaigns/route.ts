@@ -89,7 +89,7 @@ export async function POST(request: Request) {
     }
 
     // Enforce affirmative consent attestation [CONFIRM WITH A LAWYER]
-    const isAttested = consentAttestation === "true" || consentAttestation === true;
+    const isAttested = typeof consentAttestation === 'string' && (consentAttestation.toLowerCase() === 'true' || consentAttestation === '1');
     if (!isAttested) {
       return NextResponse.json({ 
         error: "Mandatory statutory attestation missing: You must certify affirmative consent for all contacts before uploading [CONFIRM WITH A LAWYER]" 
