@@ -54,6 +54,7 @@ async def create_campaign(
     scheduled_start: Optional[str] = Form(None),
     consent_attestation: Union[bool, str] = Form(False),
     attestation_statement: Optional[str] = Form(None),
+    purpose_attestation: Union[bool, str] = Form(False),
     user_id: Optional[str] = Form(None),
     user_email: Optional[str] = Form(None),
     file: UploadFile = File(...)
@@ -72,6 +73,27 @@ async def create_campaign(
                 detail="Mandatory statutory attestation missing: You must certify that you have verifiable affirmative consent for all contacts in this campaign before uploading. [CONFIRM WITH A LAWYER]"
             )
 
+        # Validate purpose classification and purpose attestation [CONFIRM WITH A LAWYER]
+        valid_purposes = ("promotional", "service", "transactional")
+        norm_purpose = purpose.strip().lower()
+        if norm_purpose not in valid_purposes:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid campaign purpose '{purpose}'. Allowed values: {list(valid_purposes)}. [CONFIRM WITH A LAWYER]"
+            )
+
+        is_purpose_attested = False
+        if isinstance(purpose_attestation, bool):
+            is_purpose_attested = purpose_attestation
+        elif isinstance(purpose_attestation, str):
+            is_purpose_attested = purpose_attestation.strip().lower() in ("true", "1", "yes", "on")
+
+        if norm_purpose != "promotional" and not is_purpose_attested:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Statutory purpose attestation missing: '{norm_purpose}' campaigns require explicit affirmative certification that calls contain no marketing or sales content under TRAI TCCCPR 2018 / TCPA. [CONFIRM WITH A LAWYER]"
+            )
+
         file_content = await file.read()
         campaign = await CampaignService.create_campaign(
             organization_id=organization_id,
@@ -79,13 +101,14 @@ async def create_campaign(
             name=name,
             file_content=file_content,
             filename=file.filename,
-            purpose=purpose,
+            purpose=norm_purpose,
             calling_hours_start=calling_hours_start,
             calling_hours_end=calling_hours_end,
             timezone_str=timezone,
             scheduled_start=scheduled_start if scheduled_start else None,
             consent_attestation=is_attested,
             attestation_statement=attestation_statement,
+            purpose_attestation=is_purpose_attested,
             user_id=user_id,
             user_email=user_email
         )

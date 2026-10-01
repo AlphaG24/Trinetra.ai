@@ -108,6 +108,7 @@ class CampaignService:
         scheduled_start: Optional[str] = None,
         consent_attestation: bool = False,
         attestation_statement: Optional[str] = None,
+        purpose_attestation: bool = False,
         user_id: Optional[str] = None,
         user_email: Optional[str] = None
     ) -> Dict:
@@ -120,6 +121,17 @@ class CampaignService:
                 "for all contacts before creating a campaign. [CONFIRM WITH A LAWYER]"
             )
 
+        # Mandatory purpose attestation for non-promotional campaigns [CONFIRM WITH A LAWYER]
+        norm_purpose = str(purpose).strip().lower()
+        if norm_purpose not in ("promotional", "service", "transactional"):
+            norm_purpose = "promotional"
+
+        if norm_purpose != "promotional" and not purpose_attestation:
+            raise ValueError(
+                f"Statutory purpose attestation missing: '{norm_purpose}' campaigns require explicit affirmative "
+                "certification that calls contain no marketing or sales content under TRAI TCCCPR 2018 / TCPA. [CONFIRM WITH A LAWYER]"
+            )
+
         import hashlib
         file_hash = hashlib.sha256(file_content).hexdigest()
         statement_text = attestation_statement or (
@@ -128,6 +140,8 @@ class CampaignService:
         )
         attestation_meta = {
             "attested": True,
+            "purpose": norm_purpose,
+            "purpose_attested": bool(purpose_attestation),
             "statement": statement_text,
             "file_hash_sha256": file_hash,
             "filename": filename,
