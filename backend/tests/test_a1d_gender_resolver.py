@@ -190,6 +190,7 @@ ALLOWED_FILES = {
     "test_a1d_gender_resolver.py",     # this file
     "test_a2_sensitive_detail_withholding.py", # checks output strings with identity prompts
     "test_a3_greeting_fragments.py",   # checks user dashboard greeting text
+    "test_a4_opening_watchdog.py",     # checks playout watchdog scaling on sample greetings
     "test_prompt_guard_adversarial.py",
     "verify_all_agent_features.py",
     "agent.py",                        # LLM directives are negative-example strings or f-strings via resolver

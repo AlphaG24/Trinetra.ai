@@ -1150,6 +1150,49 @@ def compose_single_opening_greeting(
     return result
 
 
+def estimate_opening_duration(text: Optional[str], wpm: float = 130.0) -> float:
+    """
+    Estimates spoken audio duration in seconds for an opening greeting utterance.
+    Uses conservative speech rate (~130 wpm = ~2.17 words/sec) with character-length
+    and punctuation pause bounds so watchdog calculations never underestimate length.
+    """
+    if not text or not str(text).strip():
+        return 0.0
+    cleaned = str(text).strip()
+    words = cleaned.split()
+    word_count = len(words)
+    # Base estimate from word count at specified wpm
+    duration_words = (word_count / max(wpm, 60.0)) * 60.0
+    # Conservative character fallback (approx 12 chars per second in Indic/English scripts)
+    duration_chars = len(cleaned) / 12.0
+    # Punctuation pauses: ~0.25s per clause boundary
+    pause_count = len(re.findall(r'[,;.!?;!।]', cleaned))
+    pause_duration = pause_count * 0.25
+    estimated = max(duration_words, duration_chars) + pause_duration
+    return round(max(estimated, 1.0), 2)
+
+
+def calculate_opening_watchdog_timeout(
+    text: Optional[str],
+    min_timeout: float = 15.0,
+    scale_factor: float = 1.5,
+    grace_seconds: float = 3.0,
+    wpm: float = 130.0,
+) -> float:
+    """
+    A4: Playout watchdog timeout that scales dynamically with expected opening duration:
+        timeout = max(min_timeout, estimated_duration * scale_factor + grace_seconds)
+    Ensures the watchdog can NEVER fire during legitimate playback, even for lengthy
+    dashboard greetings, while maintaining a firm hard ceiling against session freezes.
+    """
+    est = estimate_opening_duration(text, wpm=wpm)
+    if est <= 0.0:
+        return min_timeout
+    import math
+    scaled = math.ceil((est * scale_factor + grace_seconds) * 10.0) / 10.0
+    return max(min_timeout, scaled)
+
+
 def render_cached_opening_greeting(cached_template: str, caller_name: Optional[str], language: str = "hinglish") -> str:
     """
     Renders a pre-cached greeting template in O(1) time at call start by substituting

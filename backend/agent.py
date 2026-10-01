@@ -33,6 +33,7 @@ from app.services.disclosure_service import (
     normalize_language_code,
     resolve_jurisdiction_consent_mode,
     resolve_gendered_phrases,
+    calculate_opening_watchdog_timeout,
 )
 
 load_dotenv()
@@ -1968,11 +1969,16 @@ class VikramAgent(Agent):
             allow_interruptions=False,
             add_to_chat_ctx=True
         )
+        # A4: Opening playout watchdog scales with expected duration (est * 1.5 + 3s, min 15s)
+        watchdog_timeout = calculate_opening_watchdog_timeout(greeting)
         try:
-            # Enforce 12-second watchdog timeout so allow_interruptions=False can never freeze the session
-            await asyncio.wait_for(speech_handle, timeout=12.0)
+            # Enforce watchdog timeout so allow_interruptions=False can never freeze the session
+            await asyncio.wait_for(speech_handle, timeout=watchdog_timeout)
         except asyncio.TimeoutError:
-            logger.warning("[VikramAgent] Opening greeting playout exceeded 12s safety timeout; releasing session to listener")
+            logger.warning(
+                f"[VikramAgent] Opening greeting playout exceeded {watchdog_timeout:.1f}s safety timeout; "
+                "releasing session to listener"
+            )
         except Exception as play_err:
             logger.warning(f"[VikramAgent] Error or cancellation during greeting playout: {play_err}")
 
