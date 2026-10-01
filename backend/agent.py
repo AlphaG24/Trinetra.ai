@@ -1157,9 +1157,8 @@ SARVAM_MALE_VOICES = [
 ]
 SARVAM_FEMALE_VOICES = [
     'aditi', 'ritu', 'priya', 'neha', 'pooja', 'simran', 'kavya', 'ishita', 'shreya', 
-    'roopa', 'tanya', 'shruti', 'suhani', 'kavitha', 'rupali', 'amelia', 
-    'sophia', 'anushka', 'maya', 'diya', 'meera', 'pavithra', 'sita', 'radha', 'leela', 
-    'shimmer', 'alloy', 'nova', 'fable', 'rachel', 'domi', 'bella', 'elli', 'sarah'
+    'roopa', 'tanya', 'shruti', 'suhani', 'kavitha', 'rupali', 'anushka', 'maya', 
+    'diya', 'meera', 'pavithra', 'sita', 'radha', 'leela'
 ]
 sarvam_male = SARVAM_MALE_VOICES
 sarvam_female = SARVAM_FEMALE_VOICES
@@ -1172,9 +1171,64 @@ LANGUAGE_VOICE_MAPPING = {
 }
 
 LANGUAGE_FEMALE_VOICE_MAPPING = {
-    'en': 'amelia',   # Crisp, natural English voice for female agents (Anika)
-    'hi': 'ritu',     # Fluent Hindi/Hinglish voice for female agents (Anika)
+    'en': 'priya',    # Natural Indian-accented English voice for female agents (Sarvam bulbul:v3)
+    'hi': 'ritu',     # Fluent Hindi/Hinglish voice for female agents (Sarvam bulbul:v3)
 }
+
+# Valid Sarvam bulbul:v3 speakers (37 official supported speakers)
+BULBUL_V3_SPEAKERS = {
+    'aditya', 'ritu', 'ashutosh', 'priya', 'neha', 'rahul', 'pooja', 'rohan', 'simran',
+    'kavya', 'amit', 'dev', 'ishita', 'shreya', 'ratan', 'varun', 'manan', 'sumit',
+    'roopa', 'kabir', 'aayan', 'shubh', 'advait', 'anand', 'tanya', 'tarun', 'sunny',
+    'mani', 'gokul', 'vijay', 'shruti', 'suhani', 'mohit', 'kavitha', 'rehan', 'soham', 'rupali'
+}
+
+# Map deprecated v2 / legacy / external speakers to closest bulbul:v3 counterparts
+V2_TO_V3_SPEAKER_MAP = {
+    'anushka': 'ritu',
+    'manisha': 'ritu',
+    'vidya': 'pooja',
+    'arya': 'priya',
+    'abhilash': 'aditya',
+    'karun': 'rahul',
+    'hitesh': 'amit',
+    'aditi': 'ritu',
+    'amelia': 'priya',
+    'sophia': 'priya',
+    'shimmer': 'priya',
+    'alloy': 'aditya',
+    'nova': 'priya',
+    'fable': 'aditya',
+    'rachel': 'priya',
+    'domi': 'aditya',
+    'bella': 'priya',
+    'elli': 'priya',
+    'sarah': 'priya',
+    'maya': 'priya',
+    'diya': 'priya',
+    'meera': 'priya',
+    'pavithra': 'priya',
+    'sita': 'priya',
+    'radha': 'priya',
+    'leela': 'priya',
+}
+
+
+def sanitize_sarvam_speaker(speaker: str | None, is_female: bool = True) -> str:
+    """
+    Guarantees the speaker is a valid bulbul:v3 speaker.
+    Maps legacy/external voices to valid bulbul:v3 counterparts,
+    with safe default fallback to 'priya' (female) or 'aditya' (male).
+    """
+    if not speaker:
+        return 'priya' if is_female else 'aditya'
+    spk_lower = str(speaker).strip().lower()
+    if spk_lower in BULBUL_V3_SPEAKERS:
+        return spk_lower
+    if spk_lower in V2_TO_V3_SPEAKER_MAP:
+        return V2_TO_V3_SPEAKER_MAP[spk_lower]
+    return 'priya' if is_female else 'aditya'
+
 
 def create_appointment_tools(organization_id: str | None = None, user_id: str | None = None, agent_id: str | None = None, call_id: str | None = None) -> list:
     """
@@ -1394,29 +1448,7 @@ class VikramAgent(Agent):
                 sarvam_pace = 1.0
             sarvam_pace = max(0.5, min(2.0, sarvam_pace))
 
-            # bulbul:v3 supported speakers
-            bulbul_v3_speakers = {
-                'aditya', 'ritu', 'ashutosh', 'priya', 'neha', 'rahul', 'pooja', 'rohan', 'simran',
-                'kavya', 'amit', 'dev', 'ishita', 'shreya', 'ratan', 'varun', 'manan', 'sumit',
-                'roopa', 'kabir', 'aayan', 'shubh', 'advait', 'anand', 'tanya', 'tarun', 'sunny',
-                'mani', 'gokul', 'vijay', 'shruti', 'suhani', 'mohit', 'kavitha', 'rehan', 'soham', 'rupali'
-            }
-            # Map deprecated v2 speakers to closest v3 counterparts
-            v2_to_v3_map = {
-                'anushka': 'ritu',
-                'manisha': 'ritu',
-                'vidya': 'pooja',
-                'arya': 'priya',
-                'abhilash': 'aditya',
-                'karun': 'rahul',
-                'hitesh': 'amit'
-            }
-            if voice_id in v2_to_v3_map:
-                sarvam_speaker = v2_to_v3_map[voice_id]
-            elif voice_id in bulbul_v3_speakers:
-                sarvam_speaker = voice_id
-            else:
-                sarvam_speaker = 'ritu' if self.gender == 'female' else 'aditya'
+            sarvam_speaker = sanitize_sarvam_speaker(voice_id, is_female=(self.gender == 'female'))
 
             model_name = "bulbul:v3"
 
@@ -1724,7 +1756,8 @@ class VikramAgent(Agent):
                 if detected_lang != current_active_lang:
                     is_female = getattr(self, 'gender', 'male') == 'female'
                     voice_map = LANGUAGE_FEMALE_VOICE_MAPPING if is_female else LANGUAGE_VOICE_MAPPING
-                    new_voice_id = voice_map.get(detected_lang, 'shubh' if not is_female else 'ritu')
+                    raw_voice_id = voice_map.get(detected_lang, 'shubh' if not is_female else 'priya')
+                    new_voice_id = sanitize_sarvam_speaker(raw_voice_id, is_female=is_female)
                     new_target_lang = "en-IN" if detected_lang == "en" else "hi-IN"
 
                     logger.info(
@@ -1966,9 +1999,10 @@ class VikramAgent(Agent):
         logger.info(f"[VikramAgent] Speaking single compliant opening greeting: '{greeting}'")
         speech_handle = self.session.say(
             greeting,
-            allow_interruptions=False,
+            allow_interruptions=True,
             add_to_chat_ctx=True
         )
+
         # A4: Opening playout watchdog scales with expected duration (est * 1.5 + 3s, min 15s)
         watchdog_timeout = calculate_opening_watchdog_timeout(greeting)
         try:
@@ -3273,15 +3307,17 @@ async def entrypoint(ctx: JobContext):
                 fake_elevenlabs_ids = ['calm', 'energetic', 'warm', 'professional', 'anika-voice', 'nova-openai', 'shimmer-openai', 'echo-openai', 'onyx-openai', 'fable-openai']
                 if provider == 'elevenlabs' and (voice_id in fake_elevenlabs_ids or '-' in voice_id):
                     provider = 'sarvam'
-                    voice_id = 'anushka'
-                    
+                    voice_id = 'priya'
+
                 if agent_data.get("primary_language"): language = agent_data["primary_language"]
                 if agent_data.get("voice_speed"): speed = agent_data["voice_speed"]
                 if agent_data.get("voice_pitch"): pitch = agent_data["voice_pitch"]
-                
+
                 # 1. Resolve Gender and Clean Name
                 is_female = (str(voice_id).lower() in SARVAM_FEMALE_VOICES or (agent_data and (agent_data.get("gender") == "female" or agent_data.get("voice_gender") == "female")))
                 gender_tag = 'female' if is_female else 'male'
+                if provider == 'sarvam':
+                    voice_id = sanitize_sarvam_speaker(voice_id, is_female=is_female)
                 
                 raw_name = agent_data.get('name', 'Agent') if agent_data else 'Agent'
                 clean_name = re.sub(r'^\[[^\]]+\]\s*', '', raw_name)
@@ -4186,18 +4222,16 @@ async def run_agent(room_name: str, agent_id: str | None = None, contact_id: str
                 fake_elevenlabs_ids = ['calm', 'energetic', 'warm', 'professional', 'anika-voice', 'nova-openai', 'shimmer-openai', 'echo-openai', 'onyx-openai', 'fable-openai']
                 if provider == 'elevenlabs' and (voice_id in fake_elevenlabs_ids or '-' in voice_id):
                     provider = 'sarvam'
-                    voice_id = 'anushka'
+                    voice_id = 'priya'
 
-                if provider == 'sarvam' and str(voice_id).lower() == 'aditi':
-                    # Sarvam bulbul:v3 uses ritu as conversational female voice
-                    voice_id = 'ritu'
-                    
                 if agent_data.get("primary_language"): language = agent_data["primary_language"]
                 if agent_data.get("voice_speed"): speed = agent_data["voice_speed"]
                 if agent_data.get("voice_pitch"): pitch = agent_data["voice_pitch"]
                 # 1. Resolve Gender and Clean Name
                 gender_tag = 'female' if str(voice_id).lower() in SARVAM_FEMALE_VOICES else 'male'
                 is_female = (gender_tag == 'female')
+                if provider == 'sarvam':
+                    voice_id = sanitize_sarvam_speaker(voice_id, is_female=is_female)
 
                 raw_name = agent_data.get('name', 'Agent')
                 clean_name = re.sub(r'^\[[^\]]+\]\s*', '', raw_name)
