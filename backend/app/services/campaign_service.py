@@ -1144,12 +1144,21 @@ class CampaignService:
         Provides regulatory oversight for active campaigns dialed under TRAI TCCCPR 2018. [CONFIRM WITH A LAWYER]
         """
         try:
-            campaigns_res = await asyncio.to_thread(
-                supabase_admin.table("campaigns")
-                .select("id, name, status, purpose, total_contacts, created_at, consent_attestation")
-                .in_("status", ["running", "in_progress", "active", "ready", "paused"])
-                .execute
-            )
+            try:
+                campaigns_res = await asyncio.to_thread(
+                    supabase_admin.table("campaigns")
+                    .select("id, name, status, purpose, total_contacts, created_at, consent_attestation")
+                    .in_("status", ["running", "in_progress", "active", "ready", "paused"])
+                    .execute
+                )
+            except Exception:
+                # Fallback if consent_attestation migration hasn't been executed on remote DB yet
+                campaigns_res = await asyncio.to_thread(
+                    supabase_admin.table("campaigns")
+                    .select("id, name, status, purpose, total_contacts, created_at")
+                    .in_("status", ["running", "in_progress", "active", "ready", "paused"])
+                    .execute
+                )
             campaigns = campaigns_res.data or []
             
             report = {
@@ -1160,12 +1169,20 @@ class CampaignService:
             
             for c in campaigns:
                 c_id = c["id"]
-                contacts_res = await asyncio.to_thread(
-                    supabase_admin.table("campaign_contacts")
-                    .select("call_status, consent_flag")
-                    .eq("campaign_id", c_id)
-                    .execute
-                )
+                try:
+                    contacts_res = await asyncio.to_thread(
+                        supabase_admin.table("campaign_contacts")
+                        .select("call_status, consent_flag")
+                        .eq("campaign_id", c_id)
+                        .execute
+                    )
+                except Exception:
+                    contacts_res = await asyncio.to_thread(
+                        supabase_admin.table("campaign_contacts")
+                        .select("call_status")
+                        .eq("campaign_id", c_id)
+                        .execute
+                    )
                 contacts = contacts_res.data or []
                 status_counts: Dict[str, int] = {}
                 consented_count = 0
