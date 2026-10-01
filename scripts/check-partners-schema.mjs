@@ -17,20 +17,24 @@ for (const user of userList?.users || []) {
   const confirmed = user.email_confirmed_at ? 'YES' : 'NO';
   console.log(`  ${user.email} | confirmed: ${confirmed} | id: ${user.id}`);
   
-  if (!user.email_confirmed_at) {
-    // Use admin API to update user and confirm email
-    const res = await fetch(`${env.NEXT_PUBLIC_SUPABASE_URL}/auth/v1/admin/users/${user.id}`, {
-      method: 'PUT',
-      headers: {
-        'Authorization': `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
-        'apikey': env.SUPABASE_SERVICE_ROLE_KEY,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ email_confirm: true }),
-    });
-    const result = await res.json();
-    console.log(`    -> Auto-confirmed: ${res.ok ? 'SUCCESS' : 'FAILED: ' + JSON.stringify(result)}`);
-  }
+    const shouldAutoConfirm = process.argv.includes('--fix-confirmation');
+    if (!user.email_confirmed_at && shouldAutoConfirm) {
+      // Use admin API to update user and confirm email only when explicitly requested
+      const res = await fetch(`${env.NEXT_PUBLIC_SUPABASE_URL}/auth/v1/admin/users/${user.id}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+          'apikey': env.SUPABASE_SERVICE_ROLE_KEY,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email_confirm: true }),
+      });
+      const result = await res.json();
+      console.log(`    -> Auto-confirmed: ${res.ok ? 'SUCCESS' : 'FAILED: ' + JSON.stringify(result)}`);
+    } else if (!user.email_confirmed_at) {
+      console.log(`    -> Unconfirmed (pass --fix-confirmation to auto-confirm via admin)`);
+    }
+
 }
 
 // Check partner records

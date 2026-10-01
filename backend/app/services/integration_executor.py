@@ -16,8 +16,15 @@ from cryptography.hazmat.backends import default_backend
 logger = logging.getLogger("integration-executor")
 logger.setLevel(logging.INFO)
 
-SECRET_SEED = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or 'default-secret-key-seed-value'
+SECRET_SEED = os.getenv("ENCRYPTION_SECRET_SEED") or os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+if not SECRET_SEED:
+    if os.getenv("ENVIRONMENT") == "production" or os.getenv("NODE_ENV") == "production":
+        raise RuntimeError("FATAL SECURITY CONFIGURATION: ENCRYPTION_SECRET_SEED or SUPABASE_SERVICE_ROLE_KEY is required for integration encryption (SEC-001).")
+    logger.warning("No ENCRYPTION_SECRET_SEED or SUPABASE_SERVICE_ROLE_KEY found; using fallback development encryption key.")
+    SECRET_SEED = "trinetra-dev-local-encryption-seed"
+
 ENCRYPTION_KEY = hashlib.sha256(SECRET_SEED.encode('utf-8')).digest()
+
 
 def decrypt_val(encrypted_text: str) -> str:
     if not encrypted_text or not isinstance(encrypted_text, str):

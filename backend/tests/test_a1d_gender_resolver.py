@@ -201,6 +201,7 @@ ALLOWED_FILES = {
     "test_csv_consent_attestation.py",
     "test_barge_in_interruption.py",
     "test_campaign_purpose_attestation.py",
+    "test_service_role_safety.py",
 }
 
 

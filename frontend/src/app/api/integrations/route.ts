@@ -2,8 +2,9 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/server'
 import crypto from 'crypto'
 
-const SECRET_SEED = process.env.SUPABASE_SERVICE_ROLE_KEY || 'default-secret-key-seed-value'
+const SECRET_SEED = process.env.ENCRYPTION_SECRET_SEED || process.env.SUPABASE_SERVICE_ROLE_KEY || (process.env.NODE_ENV === 'production' ? (() => { throw new Error('FATAL: ENCRYPTION_SECRET_SEED or SUPABASE_SERVICE_ROLE_KEY required for integration encryption (SEC-001).'); })() : 'trinetra-dev-local-encryption-seed');
 const ENCRYPTION_KEY = crypto.createHash('sha256').update(SECRET_SEED).digest()
+
 const IV_LENGTH = 16
 
 function encrypt(text: string) {
