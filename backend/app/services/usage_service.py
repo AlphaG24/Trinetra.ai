@@ -15,7 +15,7 @@ class UsageService:
         """Check if an agent has exceeded its minutes limit"""
         res = await asyncio.to_thread(
             self.supabase.table("agents")
-            .select("id, name, organization_id, minutes_limit, minutes_used, status, config")
+            .select("id, name, organization_id, user_id, minutes_limit, minutes_used, status, config, is_demo")
             .eq("id", agent_id).single().execute
         )
         
@@ -25,70 +25,74 @@ class UsageService:
         a = res.data
         db_limit = a.get("minutes_limit", 0) or 0
         org_id = a.get("organization_id")
+        user_id = a.get("user_id")
         config = a.get("config", {}) or {}
-        
-        # Calculate dynamic minutes used by this agent this month from voice_calls
-        start_of_month = datetime.utcnow().replace(day=1, hour=0, minute=0, second=0).isoformat()
-        try:
-            calls_res = await asyncio.to_thread(
-                self.supabase.table("voice_calls")
-                .select("duration_seconds")
-                .eq("agent_id", agent_id)
-                .gte("created_at", start_of_month).execute
-            )
-            import math
-            used = sum(max(1, math.ceil((c.get("duration_seconds", 0) or 0) / 60)) for c in (calls_res.data or []) if (c.get("duration_seconds", 0) or 0) > 0)
-            
-            # Sync back to agents table so the cached value in the DB matches
-            await asyncio.to_thread(
-                self.supabase.table("agents").update({"minutes_used": used}).eq("id", agent_id).execute
-            )
-        except Exception as e:
-            logger.error(f"Failed to fetch dynamic minutes for agent {agent_id}: {e}")
-            used = a.get("minutes_used", 0) or 0
-        
-        # 1. Resolve from agent config
-        config_limit = config.get("minutes_limit")
-        config_tier = config.get("plan_tier")
-        
-        resolved_limit = db_limit
-        if config_limit is not None:
-            resolved_limit = max(resolved_limit, int(config_limit))
-            
-        if config_tier:
-            tier_lower = str(config_tier).lower()
-            if tier_lower in ('pro', 'professional'):
-                resolved_limit = max(resolved_limit, 2000)
-            elif tier_lower == 'starter':
-                resolved_limit = max(resolved_limit, 500)
-            elif tier_lower == 'trial':
-                resolved_limit = max(resolved_limit, 100)
-            elif tier_lower == 'enterprise':
-                resolved_limit = max(resolved_limit, 10000)
-                
-        # 2. Fallback to profiles table if organization_id is present
-        if org_id and resolved_limit <= 100: # Only fallback if we haven't resolved a higher tier limit yet
+        is_demo = a.get("is_demo", False) or (config.get("plan_tier") == "free_demo")
+
+        # Fetch owner profile to respect persistent billing cycle quota
+        profile = {}
+        if user_id:
             try:
                 prof_res = await asyncio.to_thread(
                     self.supabase.table("profiles")
-                    .select("plan_tier")
+                    .select("plan_tier, paid_minutes_limit, paid_minutes_used, demo_minutes_limit, demo_minutes_used")
+                    .eq("id", user_id).execute
+                )
+                if prof_res.data:
+                    profile = prof_res.data[0]
+            except Exception as pe:
+                logger.warning(f"Error fetching profile for user {user_id}: {pe}")
+        elif org_id:
+            try:
+                prof_res = await asyncio.to_thread(
+                    self.supabase.table("profiles")
+                    .select("plan_tier, paid_minutes_limit, paid_minutes_used, demo_minutes_limit, demo_minutes_used")
                     .eq("organization_id", org_id).execute
                 )
                 if prof_res.data:
-                    plan_tier = (prof_res.data[0].get("plan_tier") or "free").lower()
-                    if plan_tier in ('pro', 'professional'):
-                        tier_limit = 2000
-                    elif plan_tier == 'starter':
-                        tier_limit = 500
-                    elif plan_tier == 'trial':
-                        tier_limit = 100
-                    elif plan_tier == 'enterprise':
-                        tier_limit = 10000
-                    else:
-                        tier_limit = 10
-                    resolved_limit = max(resolved_limit, tier_limit)
-            except Exception as e:
-                logger.error(f"Failed to fetch profile plan tier in check_agent_minutes: {e}")
+                    profile = prof_res.data[0]
+            except Exception as pe:
+                logger.warning(f"Error fetching profile for org {org_id}: {pe}")
+
+        plan_tier = (profile.get("plan_tier") or config.get("plan_tier") or "free").lower()
+
+        # 1. Resolve limits based on persistent plan tier & configuration
+        resolved_limit = db_limit
+        if is_demo:
+            resolved_limit = profile.get("demo_minutes_limit", 10)
+        else:
+            if config.get("minutes_limit") is not None:
+                resolved_limit = max(resolved_limit, int(config["minutes_limit"]))
+            
+            if plan_tier in ('pro', 'professional'):
+                tier_limit = 2000
+            elif plan_tier == 'starter':
+                tier_limit = 500
+            elif plan_tier == 'trial':
+                tier_limit = 100
+            elif plan_tier == 'enterprise':
+                tier_limit = 10000
+            else:
+                tier_limit = 10
+            
+            resolved_limit = max(resolved_limit, profile.get("paid_minutes_limit", 0) or 0, tier_limit)
+
+        # 2. Resolve Used minutes without blindly wiping out on calendar month change:
+        # In production SaaS, usage persists throughout the user's billing cycle until an invoice renewal.
+        if is_demo:
+            used = profile.get("demo_minutes_used", 0) or a.get("minutes_used", 0) or 0
+        else:
+            profile_used = profile.get("paid_minutes_used", 0) or 0
+            agent_used = a.get("minutes_used", 0) or 0
+            used = max(profile_used, agent_used)
+            # Sync persistent value if cached agent record fell behind
+            if used > agent_used:
+                try:
+                    await asyncio.to_thread(
+                        self.supabase.table("agents").update({"minutes_used": used}).eq("id", agent_id).execute
+                    )
+                except Exception:
+                    pass
 
         if resolved_limit == 0:
             return {"status": "unlimited", "used": used, "limit": resolved_limit, "percent": 0}

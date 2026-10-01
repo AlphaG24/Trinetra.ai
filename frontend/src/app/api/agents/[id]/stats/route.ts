@@ -42,20 +42,23 @@ export async function GET(
       .or(`organization_id.eq.${profile?.organization_id || user.id},user_id.eq.${user.id}`)
       .gte('created_at', todayStart.toISOString());
 
-    // 4. Query Minutes Used This Month
-    const monthStart = new Date();
-    monthStart.setDate(1);
-    monthStart.setHours(0, 0, 0, 0);
+    // 4. Query Minutes Used for current plan cycle
+    const { data: agentData } = await supabase
+      .from('agents')
+      .select('minutes_used, user_id, is_demo')
+      .eq('id', agentId)
+      .maybeSingle();
 
-    const { data: monthCalls, error: errMonthCalls } = await supabase
-      .from('voice_calls')
-      .select('duration_seconds')
-      .eq('agent_id', agentId)
-      .or(`organization_id.eq.${profile?.organization_id || user.id},user_id.eq.${user.id}`)
-      .gte('created_at', monthStart.toISOString());
+    const { data: profQuota } = await supabase
+      .from('profiles')
+      .select('paid_minutes_used, demo_minutes_used, plan_tier')
+      .eq('id', agentData?.user_id || user.id)
+      .maybeSingle();
 
-    const totalSeconds = monthCalls?.reduce((acc, c) => acc + (c.duration_seconds || 0), 0) || 0;
-    const minutesUsed = Math.round(totalSeconds / 60);
+    const isDemo = agentData?.is_demo === true || profQuota?.plan_tier === 'free_demo';
+    const planUsed = isDemo ? (profQuota?.demo_minutes_used || 0) : (profQuota?.paid_minutes_used || 0);
+    const agentUsed = agentData?.minutes_used || 0;
+    const minutesUsed = Math.max(planUsed, agentUsed);
 
     // 5. Query Leads Generated
     const { count: leadsGenerated, error: errLeads } = await supabase

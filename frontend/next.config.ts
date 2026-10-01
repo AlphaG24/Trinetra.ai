@@ -88,6 +88,11 @@ const nextConfig: NextConfig = {
   async redirects() {
     return [
       {
+        source: '/dashboard/numbers',
+        destination: '/dashboard/phone-numbers',
+        permanent: true,
+      },
+      {
         source: '/pricing',
         destination: '/contact',
         permanent: false,

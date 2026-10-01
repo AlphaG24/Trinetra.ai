@@ -116,7 +116,7 @@ export async function GET(request: Request) {
             title: "Winning Bid Priority Purchase Available! 🎯",
             message: `Previous claim window expired. You are now the top bidder for phone number ${phoneRow?.phone_number || ""}! Claim within 24 hours at ₹${(nextBid.bid_amount_paisa / 100).toFixed(2)}.`,
             type: "auction_won",
-            action_url: "/dashboard/numbers",
+            action_url: "/dashboard/phone-numbers",
             action_label: "Claim Number",
             is_read: false
           });
@@ -177,7 +177,7 @@ export async function GET(request: Request) {
             title: "Urgent: Phone Number Expiring in 24 Hours! 🚨",
             message: `Your phone number ${phone.phone_number} will expire in less than 24 hours. Please renew now to maintain inbound and outbound line connectivity.`,
             type: "warning",
-            action_url: "/dashboard/numbers",
+            action_url: "/dashboard/phone-numbers",
             action_label: "Renew Line",
             is_read: false
           });
@@ -205,7 +205,7 @@ export async function GET(request: Request) {
             title: "Phone Number Expiring Soon ⚠️",
             message: `Your virtual phone line ${phone.phone_number} is scheduled to expire on ${expiryDateFormatted}. Renew to avoid line release.`,
             type: "info",
-            action_url: "/dashboard/numbers",
+            action_url: "/dashboard/phone-numbers",
             action_label: "View Numbers",
             is_read: false
           });
@@ -267,7 +267,7 @@ export async function GET(request: Request) {
               title: "Auction Won: Priority Purchase Open! 🏆",
               message: `Phone number ${phone.phone_number} owner did not renew. Complete your priority purchase within 24 hours at ₹${(topBid.bid_amount_paisa / 100).toFixed(2)}.`,
               type: "auction_won",
-              action_url: "/dashboard/numbers",
+              action_url: "/dashboard/phone-numbers",
               action_label: "Purchase Now",
               is_read: false
             });
@@ -299,7 +299,7 @@ export async function GET(request: Request) {
             title: "Phone Number Released to Pool 📞",
             message: `Your virtual phone line ${phone.phone_number} was not renewed and has been returned to the available number pool.`,
             type: "warning",
-            action_url: "/dashboard/numbers",
+            action_url: "/dashboard/phone-numbers",
             action_label: "Browse Numbers",
             is_read: false
           });
