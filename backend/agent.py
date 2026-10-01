@@ -715,6 +715,20 @@ def resolve_agent_greeting(
     recording_exempt = bool(disclosure_cfg.get("recording_notice_exempt", False))
     resolved_purpose = purpose or (campaign_contact.get("notes") if campaign_contact else None)
 
+    # If owner provided a custom greeting message, preserve their exact wording without rewriting
+    if raw_greeting and str(raw_greeting).strip():
+        gm = str(raw_greeting).strip()
+        for tok in ('{{agent_name}}', '{agentName}', '{agent_name}', '{{name}}', '{name}'):
+            gm = gm.replace(tok, clean_name)
+        for tok in ('{{company_name}}', '{companyName}', '{company_name}', '{{business_name}}', '{business_name}'):
+            gm = gm.replace(tok, business_name)
+        if c_name:
+            first_name = c_name.strip().split()[0].capitalize()
+            for tok in ('{{customer_name}}', '{customerName}', '{customer_name}', '{{contact_name}}', '{contactName}'):
+                gm = gm.replace(tok, f"{first_name} ji" if language in ['hinglish', 'hi-IN'] else first_name)
+        gm = re.sub(r'\s+', ' ', gm).strip()
+        return gm, "custom", "hi" if language in ['hinglish', 'hi-IN'] else "en"
+
     return compose_single_opening_greeting(
         dashboard_greeting=raw_greeting,
         agent_name=clean_name,
@@ -1582,7 +1596,12 @@ class VikramAgent(Agent):
                 _groq_healthy = False
             logger.info(f"[VikramAgent] Groq health check result: {_groq_healthy}")
 
-        use_groq = bool(groq_api_key) and (_groq_healthy is True) and (chosen_provider == "groq" or not gemini_api_key)
+        prompt_len = len(instructions or "")
+        # Groq on-demand tier enforces an 8,000 TPM limit across all models.
+        # If the agent instructions exceed ~7,500 chars (~2,200 tokens), Turn 2 will exceed 8,000 TPM and fail with 429.
+        # When instructions exceed this size and Gemini API key is present, route to Gemini 2.5 Flash (4M TPM limit).
+        prompt_exceeds_groq_tpm = prompt_len > 7500
+        use_groq = bool(groq_api_key) and (_groq_healthy is True) and (chosen_provider == "groq" or not gemini_api_key) and not (prompt_exceeds_groq_tpm and gemini_api_key)
 
         # Telephony voice timeout: allow sufficient read time for reasoning models and tools without hanging
         llm_timeout = httpx.Timeout(connect=3.0, read=8.0, write=3.0, pool=3.0)
@@ -1607,18 +1626,30 @@ class VikramAgent(Agent):
             )
             logger.info(f"[VikramAgent] Using Groq LLM ({groq_model}) for zero-latency voice response")
 
-            # Secondary failover LLM on Groq (using lightweight 20b model with low token footprint)
-            fallback_model = "openai/gpt-oss-20b"
-            self._fallback_llm = openai.LLM(
-                model=fallback_model,
-                base_url="https://api.groq.com/openai/v1",
-                api_key=groq_api_key,
-                temperature=chosen_temp if temperature is not None else 0.6,
-                max_completion_tokens=150,
-                timeout=llm_timeout,
-                max_retries=1,
-            )
-            logger.info(f"[VikramAgent] Configured Groq ({fallback_model}) as secondary failover LLM")
+            # Secondary failover LLM: Use Gemini 2.5 Flash if available to avoid Groq account-wide 8k TPM lockouts!
+            if gemini_api_key:
+                self._fallback_llm = openai.LLM(
+                    model="gemini-2.5-flash",
+                    base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
+                    api_key=gemini_api_key,
+                    temperature=chosen_temp if temperature is not None else 0.6,
+                    max_completion_tokens=150,
+                    timeout=llm_timeout,
+                    max_retries=0,
+                )
+                logger.info("[VikramAgent] Configured Google Gemini (gemini-2.5-flash) as secondary failover LLM (high TPM headroom)")
+            else:
+                fallback_model = "openai/gpt-oss-20b"
+                self._fallback_llm = openai.LLM(
+                    model=fallback_model,
+                    base_url="https://api.groq.com/openai/v1",
+                    api_key=groq_api_key,
+                    temperature=chosen_temp if temperature is not None else 0.6,
+                    max_completion_tokens=150,
+                    timeout=llm_timeout,
+                    max_retries=1,
+                )
+                logger.info(f"[VikramAgent] Configured Groq ({fallback_model}) as secondary failover LLM")
         elif gemini_api_key:
             gemini_model = chosen_model if "gemini" in chosen_model.lower() else "gemini-2.5-flash"
             llm_plugin = openai.LLM(
