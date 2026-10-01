@@ -374,16 +374,28 @@ def validate_whatsapp_outbound(
     message_text: Optional[str] = None,
     template_name: Optional[str] = None,
     whatsapp_opt_in: bool = False,
-    is_proactive: bool = True
+    is_proactive: bool = True,
+    recipient_type: str = "customer",
 ) -> Tuple[bool, str]:
     """
     Validates outbound WhatsApp sends:
-    1. Proactive messages REQUIRE recorded opt-in (whatsapp_opt_in == True).
-    2. Proactive messages REQUIRE an approved template from APPROVED_WHATSAPP_TEMPLATES.
-    3. Blocks unapproved free-form promotional messages.
+    
+    Customer Guard (End Customers):
+    1. Proactive messages to end customers REQUIRE recorded opt-in (whatsapp_opt_in == True).
+    2. Proactive messages to end customers REQUIRE an approved template from APPROVED_WHATSAPP_TEMPLATES.
+    3. Blocks unapproved free-form promotional messages to end customers.
+    
+    Owner Exception:
+    - Administrative notifications to the business owner (e.g. new lead alert, callback scheduled,
+      campaign summary, or in-call 'send details to owner') are EXEMPT from customer marketing
+      opt-in and consumer template requirements. [CONFIRM WITH A LAWYER: Internal operational notification]
     """
-    if not phone_number or not phone_number.strip():
+    if not phone_number or not str(phone_number).strip():
         return False, "Destination phone number is required"
+
+    # Owner operational notification bypass
+    if str(recipient_type).lower() == "owner":
+        return True, "Owner operational notification permitted [CONFIRM WITH A LAWYER: Administrative alert exemption]"
 
     if is_proactive:
         if not whatsapp_opt_in:

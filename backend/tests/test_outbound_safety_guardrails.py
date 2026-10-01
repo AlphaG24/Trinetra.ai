@@ -268,6 +268,19 @@ class TestOutboundSafetyGuardrails(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(is_valid)
         self.assertIn("validated successfully", reason)
 
+    def test_whatsapp_owner_notification_bypasses_customer_opt_in_and_template(self):
+        """Owner operational notification bypasses consumer opt-in and marketing template requirements."""
+        is_valid, reason = validate_whatsapp_outbound(
+            phone_number="+919988776655",
+            message_text="🔔 Qualified Lead Alert: Vikram from Acme Corp",
+            template_name=None,  # Free-form internal operational alert
+            whatsapp_opt_in=False,  # Owner does not need customer opt-in
+            is_proactive=True,
+            recipient_type="owner"
+        )
+        self.assertTrue(is_valid)
+        self.assertIn("Owner operational notification permitted", reason)
+
     async def test_generate_pre_send_campaign_report(self):
         """Pre-send audit report calculates accurate pass/fail counts across all checks."""
         mock_campaign = {
