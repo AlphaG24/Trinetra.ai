@@ -33,6 +33,13 @@ from app.services.pdf_invoice_generator import PDFInvoiceGenerator
 
 logger = logging.getLogger("InvoiceVaultService")
 
+# Statutory Series Prefix & Branding (Vaakriti)
+# CGST Rule 46(b) mandates invoice serial numbers <= 16 characters.
+# 'VAK/26-27/00001' is 15 characters (safe within 16-char ceiling).
+DEFAULT_INVOICE_SERIES_PREFIX = os.getenv("INVOICE_SERIES_PREFIX", "VAK").strip().upper()
+DEFAULT_SUPPLIER_NAME = os.getenv("SUPPLIER_LEGAL_NAME", "Vaakriti Technologies Private Limited")
+DEFAULT_SUPPLIER_STREET = os.getenv("SUPPLIER_STREET", "Vaakriti Tower, Tech Park")
+
 
 class InvoiceVaultService:
     """Enterprise GST invoice generation, vaulting, and CA review service."""
@@ -63,16 +70,18 @@ class InvoiceVaultService:
         fy_short = f"{str(start_year)[-2:]}-{str(end_year)[-2:]}"
         return f"{start_year}-{end_year}", fy_short
 
-    def get_next_invoice_number(self, fy_short: str) -> str:
+    def get_next_invoice_number(self, fy_short: str, prefix: Optional[str] = None) -> str:
         """
-        Generates sequential, gapless invoice number formatted as TRI/{fy_short}/{seq:05d}.
+        Generates sequential, gapless invoice number formatted as {prefix}/{fy_short}/{seq:05d}.
+        Defaults to 'VAK' for Vaakriti branding (Rule 46(b) CGST Rules <= 16 characters).
         """
-        prefix = f"TRI/{fy_short}/"
+        pfx = (prefix or DEFAULT_INVOICE_SERIES_PREFIX or "VAK").strip().upper()
+        series_prefix = f"{pfx}/{fy_short}/"
         try:
             res = (
                 self.supabase.table("invoices")
                 .select("invoice_number")
-                .like("invoice_number", f"{prefix}%")
+                .like("invoice_number", f"{series_prefix}%")
                 .order("invoice_number", desc=True)
                 .limit(1)
                 .execute()
@@ -87,7 +96,7 @@ class InvoiceVaultService:
             logger.warning(f"Error querying last invoice number: {e}. Defaulting to 1.")
             next_seq = 1
 
-        return f"{prefix}{next_seq:05d}"
+        return f"{series_prefix}{next_seq:05d}"
 
     # -------------------------------------------------------------------------
     # 2. Cryptographic Integrity Hashing
@@ -189,12 +198,12 @@ class InvoiceVaultService:
             "payment_reference_id": payment_reference_id,
             "transaction_type": transaction_type,
             "currency": "INR",
-            "supplier_name": "Trinetra Technologies Private Limited",
+            "supplier_name": DEFAULT_SUPPLIER_NAME,
             "supplier_gstin": "07AAAAA0000A1Z5",
             "supplier_state": "Delhi",
             "supplier_state_code": supplier_code,
             "supplier_address": {
-                "street": "Trinetra Tower, Tech Park",
+                "street": DEFAULT_SUPPLIER_STREET,
                 "city": "New Delhi",
                 "state": "Delhi",
                 "pincode": "110001",
@@ -232,7 +241,7 @@ class InvoiceVaultService:
         # Create Itemized Line Item
         line_item_record = {
             "invoice_id": invoice_id,
-            "description": "Trinetra AI Voice Telephony & Cloud Infrastructure Credits",
+            "description": "Vaakriti AI Voice Telephony & Cloud Infrastructure Credits",
             "hsn_sac_code": DEFAULT_SAC_CODE,
             "quantity": 1.0,
             "unit_price_paisa": gst_breakdown["subtotal_paisa"],

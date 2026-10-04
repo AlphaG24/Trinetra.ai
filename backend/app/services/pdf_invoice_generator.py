@@ -96,7 +96,7 @@ class PDFInvoiceGenerator:
         story.append(Spacer(1, 12))
 
         # 2. Supplier vs Buyer Header Table
-        supplier_name = invoice_data.get("supplier_name", "Trinetra Technologies Private Limited")
+        supplier_name = invoice_data.get("supplier_name", "Vaakriti Technologies Private Limited")
         supplier_gstin = invoice_data.get("supplier_gstin", "07AAAAA0000A1Z5")
         supplier_state = invoice_data.get("supplier_state", "Delhi")
         supplier_code = invoice_data.get("supplier_state_code", "07")
@@ -112,7 +112,7 @@ class PDFInvoiceGenerator:
             f"<b>{supplier_name}</b><br/>"
             f"GSTIN: <b>{supplier_gstin}</b><br/>"
             f"State: {supplier_state} (Code: {supplier_code})<br/>"
-            f"Address: Tech Park, New Delhi, India 110001"
+            f"Address: Vaakriti Tower, Tech Park, New Delhi, India 110001"
         )
 
         buyer_info = (
@@ -144,7 +144,7 @@ class PDFInvoiceGenerator:
         story.append(Spacer(1, 10))
 
         # 3. Invoice Metadata Bar
-        inv_no = invoice_data.get("invoice_number", "TRI/26-27/00001")
+        inv_no = invoice_data.get("invoice_number", "VAK/26-27/00001")
         inv_date = invoice_data.get("invoice_date", "")[:10]
         pay_ref = invoice_data.get("payment_reference_id", "N/A")
         fy = invoice_data.get("fiscal_year", "2026-2027")

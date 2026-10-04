@@ -27,12 +27,12 @@ CREATE TABLE IF NOT EXISTS public.invoices (
         CHECK (transaction_type IN ('wallet_topup', 'subscription', 'usage_overage', 'manual_credit')),
     currency VARCHAR(10) NOT NULL DEFAULT 'INR',
     
-    -- Supplier Details (Trinetra)
-    supplier_name TEXT NOT NULL DEFAULT 'Trinetra Technologies Private Limited',
+    -- Supplier Details (Vaakriti)
+    supplier_name TEXT NOT NULL DEFAULT 'Vaakriti Technologies Private Limited',
     supplier_gstin VARCHAR(15) NOT NULL DEFAULT '07AAAAA0000A1Z5',
     supplier_state TEXT NOT NULL DEFAULT 'Delhi',
     supplier_state_code VARCHAR(5) NOT NULL DEFAULT '07',
-    supplier_address JSONB NOT NULL DEFAULT '{"street": "Trinetra Tower, Tech Park", "city": "New Delhi", "state": "Delhi", "pincode": "110001", "country": "IN"}'::jsonb,
+    supplier_address JSONB NOT NULL DEFAULT '{"street": "Vaakriti Tower, Tech Park", "city": "New Delhi", "state": "Delhi", "pincode": "110001", "country": "IN"}'::jsonb,
     
     -- Customer / Buyer Details
     customer_legal_name TEXT NOT NULL,

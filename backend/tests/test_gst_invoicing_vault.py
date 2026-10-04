@@ -289,23 +289,28 @@ class TestInvoiceVaultService:
         assert fy_apr_short == "27-28"
 
     def test_sequential_gapless_invoice_numbering(self):
-        """Asserts sequential generation from TRI/26-27/00001 onwards."""
+        """Asserts sequential generation with VAK (Vaakriti) prefix (Rule 46(b) <= 16 chars)."""
         mock_db = MockSupabaseClient()
         service = InvoiceVaultService(supabase_client=mock_db)
 
-        # First invoice in FY
+        # First invoice in FY with default VAK (Vaakriti) prefix
         no1 = service.get_next_invoice_number("26-27")
-        assert no1 == "TRI/26-27/00001"
+        assert no1 == "VAK/26-27/00001"
+        assert len(no1) <= 16  # Rule 46(b) CGST compliance
 
         # Store record and verify next is 00002
-        mock_db.tables["invoices"].append({"invoice_number": "TRI/26-27/00001"})
+        mock_db.tables["invoices"].append({"invoice_number": "VAK/26-27/00001"})
         no2 = service.get_next_invoice_number("26-27")
-        assert no2 == "TRI/26-27/00002"
+        assert no2 == "VAK/26-27/00002"
+
+        # Explicit / custom series prefix support
+        custom_no = service.get_next_invoice_number("26-27", prefix="VAAK")
+        assert custom_no == "VAAK/26-27/00001"
 
     def test_tamper_evident_sha256_hash(self):
         """Asserts SHA-256 integrity hash is computed over canonical payload."""
         sample_inv = {
-            "invoice_number": "TRI/26-27/00001",
+            "invoice_number": "VAK/26-27/00001",
             "organization_id": "org-uuid-1",
             "invoice_date": "2026-10-04T12:00:00Z",
             "subtotal_paisa": 100000,
@@ -340,7 +345,8 @@ class TestInvoiceVaultService:
             customer_state_code="27",
         )
 
-        assert inv["invoice_number"] == "TRI/26-27/00001"
+        assert inv["invoice_number"] == "VAK/26-27/00001"
+        assert inv["supplier_name"] == "Vaakriti Technologies Private Limited"
         assert inv["customer_legal_name"] == "Acme Tech Solutions Pvt Ltd"
         assert inv["customer_gstin"] == "27AABCA1234B1Z9"
         assert inv["place_of_supply"] == "27-Maharashtra"
@@ -387,11 +393,11 @@ class TestPDFInvoiceGenerator:
     def test_generate_invoice_pdf_bytes(self):
         """Generates valid PDF stream starting with %PDF magic bytes."""
         invoice_data = {
-            "invoice_number": "TRI/26-27/00001",
+            "invoice_number": "VAK/26-27/00001",
             "invoice_date": "2026-10-04T12:00:00Z",
             "payment_reference_id": "pay_test_pdf_123",
             "fiscal_year": "2026-2027",
-            "supplier_name": "Trinetra Technologies Private Limited",
+            "supplier_name": "Vaakriti Technologies Private Limited",
             "supplier_gstin": "07AAAAA0000A1Z5",
             "supplier_state": "Delhi",
             "supplier_state_code": "07",
@@ -585,7 +591,7 @@ class TestRazorpayWebhookAutoInvoice:
         assert details["wallet_credited"] is True
         assert details["credited_amount_paisa"] == 118000
         assert details["invoice_generated"] is True
-        assert details["invoice_number"].startswith("TRI/")
+        assert details["invoice_number"].startswith("VAK/")
 
         # Verify in mock database tables
         assert len(mock_db.tables["invoices"]) == 1
