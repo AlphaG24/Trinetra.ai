@@ -204,3 +204,93 @@ Output:
    ```
    Confirm emergency warning printed and exit code is 0.
 
+---
+
+## Task 3: Roles Engine, Central Exemption Policy & Sandbox Isolation
+
+- **Date**: 2026-10-04
+- **Branch**: `feature/roles-exemption-policy`
+- **Status**: `IMPLEMENTED, pending legal review`
+- **Mandate**: Master Plan Section 18.3 & 18.4 (Authoritative Overrides).
+
+### 1. Implementation Summary
+1. **Canonical Three-Role System**:
+   - `customer`: Standard business limits, quotas, rate limits; cannot view other accounts' KYC.
+   - `developer_tester`: Excluded from business metrics, exempt from business limits for verification, strictly blocked from viewing KYC documents, subject to mandatory MFA, cannot bypass security primitives.
+   - `admin`: Full administrative access, subject to 30-min idle timeout and step-up re-authentication for KYC view, wallet adjustments, pricing, and credentials.
+2. **Central Exemption Policy Function**:
+   - `backend/app/services/role_policy_service.py` (`can_exempt`, `is_exempt_from_business_limits`):
+     - Single source of truth.
+     - Primitives in `NON_EXEMPTIBLE_PRIMITIVES` (`ai_disclosure`, `call_recording_notice`, `pii_redaction`, `audit_logging`, `mfa_requirement`, `statutory_curfew`, `dnd_scrubbing`) can NEVER be bypassed by any role.
+     - Business limits (`agent_creation_limit`, `phone_number_claim_limit`, `monthly_minutes_quota`) are exemptible only for `developer_tester` and `admin`.
+   - `frontend/src/lib/safety/rolePolicy.ts`:
+     - Mirrored TypeScript utility for UI gating and client-side protection.
+3. **Metrics Exclusion**:
+   - `is_account_excluded_from_metrics`: Programmatically excludes `developer_tester` accounts from revenue (MRR/ARR), deal won totals, and statutory compliance aggregations.
+4. **Sandbox Number Flag & Quarantining**:
+   - Numbers marked `is_sandbox: True` or labeled `TEST` are strictly quarantined from customer-facing live campaign and inbound flows (`validate_number_for_flow`).
+   - Additive-only database migration scripts prepared:
+     - `database/migrations/20261004_add_sandbox_number_flag.sql` (UP)
+     - `database/migrations/20261004_add_sandbox_number_flag_down.sql` (DOWN)
+     - Synchronized in `supabase/migrations/` (14-digit timestamp).
+5. **Admin 30-Min Idle Sessions & Privileged Step-Up Auth**:
+   - Admin idle session timeout configured to 1800 seconds (30 minutes).
+   - Step-up re-authentication required for: `kyc_view`, `wallet_adjust`, `price_change`, `credential_update`.
+
+### 2. Real Test Output
+Execution command:
+```powershell
+.venv\Scripts\python.exe -m pytest tests/test_role_policy_service.py -v
+```
+Output:
+```
+============================= test session starts =============================
+platform win32 -- Python 3.11.9, pytest-9.1.1, pluggy-1.6.0 -- C:\Users\Ketan singh\trinetra-workspace\trinetra-fresh\backend\.venv\Scripts\python.exe
+cachedir: .pytest_cache
+rootdir: C:\Users\Ketan singh\trinetra-workspace\trinetra-fresh\backend
+plugins: anyio-4.13.0, asyncio-1.4.0
+asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 69 items
+
+tests/test_role_policy_service.py::TestRoleNormalization::test_customer_role_normalization PASSED [  1%]
+tests/test_role_policy_service.py::TestRoleNormalization::test_developer_tester_role_normalization PASSED [  2%]
+tests/test_role_policy_service.py::TestRoleNormalization::test_admin_role_normalization PASSED [  4%]
+tests/test_role_policy_service.py::TestNonExemptibleSecurityPrimitives::test_no_role_can_bypass_primitives[...] (35 test matrix variants) PASSED [ 55%]
+tests/test_role_policy_service.py::TestKycDocumentPermissions::test_developer_tester_cannot_view_kyc PASSED [ 56%]
+tests/test_role_policy_service.py::TestKycDocumentPermissions::test_customer_cannot_view_general_kyc PASSED [ 57%]
+tests/test_role_policy_service.py::TestKycDocumentPermissions::test_admin_can_view_kyc_with_stepup PASSED [ 59%]
+tests/test_role_policy_service.py::TestBusinessLimitExemptions::test_developer_tester_and_admin_exempt_from_business_limits[...] (6 variants) PASSED [ 68%]
+tests/test_role_policy_service.py::TestBusinessLimitExemptions::test_customers_not_exempt_from_business_limits[...] (6 variants) PASSED [ 76%]
+tests/test_role_policy_service.py::TestMetricsExclusion::test_developer_tester_excluded_from_metrics PASSED [ 78%]
+tests/test_role_policy_service.py::TestMetricsExclusion::test_customer_included_in_metrics PASSED [ 79%]
+tests/test_role_policy_service.py::TestMetricsExclusion::test_admin_included_in_metrics PASSED [ 81%]
+tests/test_role_policy_service.py::TestSandboxNumberValidation::test_sandbox_number_blocked_from_customer_campaigns PASSED [ 82%]
+tests/test_role_policy_service.py::TestSandboxNumberValidation::test_sandbox_number_blocked_from_customer_live_inbound PASSED [ 84%]
+tests/test_role_policy_service.py::TestSandboxNumberValidation::test_sandbox_number_allowed_in_test_flow PASSED [ 85%]
+tests/test_role_policy_service.py::TestSandboxNumberValidation::test_real_number_with_verified_kyc_allowed PASSED [ 86%]
+tests/test_role_policy_service.py::TestSandboxNumberValidation::test_real_number_with_pending_kyc_blocked_from_live_flow PASSED [ 88%]
+tests/test_role_policy_service.py::TestAdminSessionsAndStepUpAuth::test_admin_idle_timeout_is_30_minutes PASSED [ 89%]
+tests/test_role_policy_service.py::TestAdminSessionsAndStepUpAuth::test_privileged_actions_require_step_up[kyc_view] PASSED [ 91%]
+tests/test_role_policy_service.py::TestAdminSessionsAndStepUpAuth::test_privileged_actions_require_step_up[wallet_adjust] PASSED [ 92%]
+tests/test_role_policy_service.py::TestAdminSessionsAndStepUpAuth::test_privileged_actions_require_step_up[price_change] PASSED [ 94%]
+tests/test_role_policy_service.py::TestAdminSessionsAndStepUpAuth::test_privileged_actions_require_step_up[credential_update] PASSED [ 95%]
+tests/test_role_policy_service.py::TestAdminSessionsAndStepUpAuth::test_unprivileged_actions_do_not_require_step_up[...] (3 variants) PASSED [100%]
+
+============================= 69 passed in 0.14s ==============================
+```
+
+Full Project Suite:
+`140 passed in 14.75s (100% pass rate)`
+
+### 3. Manual Validation Steps for Reviewer
+1. **Role Exemption Checks**:
+   - Call `can_exempt('admin', 'ai_disclosure')` -> Verify return is `{"exempt": False, ...}`.
+   - Call `can_exempt('developer_tester', 'agent_creation_limit')` -> Verify return is `{"exempt": True, ...}`.
+   - Call `can_exempt('customer', 'agent_creation_limit')` -> Verify return is `{"exempt": False, ...}`.
+2. **KYC Privacy Check**:
+   - Call `can_view_kyc_documents('developer_tester')` -> Verify return is `False`.
+   - Call `can_view_kyc_documents('admin')` -> Verify return is `True` and `requires_step_up_reauth('kyc_view')` is `True`.
+3. **Sandbox Number Dialing Check**:
+   - Call `validate_number_for_flow({'is_sandbox': True, 'label': 'TEST'}, 'customer_campaign')` -> Verify return is `(False, '...strictly prohibited...')`.
+
+

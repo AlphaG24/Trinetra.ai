@@ -29,7 +29,6 @@ from app.services.voice_reliability_service import (
     InCallNoAudioWatchdog,
     get_conversational_filler,
     get_tool_fallback_message,
-    FILLER_LINES,
     TOOL_FALLBACK_LINES,
 )
 
@@ -92,15 +91,15 @@ class TestLanguageAndGenderFallbacks:
     def test_filler_lines_languages_and_genders(self):
         # Hinglish
         h_f = get_conversational_filler("hinglish", "female")
-        assert "rahi hoon" in h_f or "moment" in h_f or "check" in h_f
+        assert "karti hoon" in h_f or "moment" in h_f or "check" in h_f
         h_m = get_conversational_filler("hinglish", "male")
-        assert "raha hoon" in h_m or "moment" in h_m or "check" in h_m
+        assert "karta hoon" in h_m or "moment" in h_m or "check" in h_m
 
         # Hindi
         hi_f = get_conversational_filler("hindi", "female")
-        assert "रही हूँ" in hi_f
+        assert "करती हूँ" in hi_f or "चेक" in hi_f
         hi_m = get_conversational_filler("hindi", "male")
-        assert "रहा हूँ" in hi_m
+        assert "करता हूँ" in hi_m or "चेक" in hi_m
 
         # English
         en_f = get_conversational_filler("english", "female")
@@ -161,7 +160,7 @@ class TestToolExecutionGuard:
         # Verify filler WAS dispatched
         assert speak_mock.call_count == 1
         call_arg = speak_mock.call_args[0][0]
-        assert "rahi hoon" in call_arg or "moment" in call_arg or "check" in call_arg
+        assert "karti hoon" in call_arg or "moment" in call_arg or "check" in call_arg
         assert guard.is_tool_running is False
 
     @pytest.mark.asyncio

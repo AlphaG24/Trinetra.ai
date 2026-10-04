@@ -93,41 +93,6 @@ class VoiceTimingTracker:
 # ---------------------------------------------------------------------------
 # 2. CONVERSATIONAL FILLER LINES & FALLBACKS
 # ---------------------------------------------------------------------------
-FILLER_LINES: Dict[str, Dict[str, list]] = {
-    "hinglish": {
-        "female": [
-            "Ji, main details check kar rahi hoon, ek second...",
-            "Haan ji, bas ek moment dijiyega, main dekh rahi hoon...",
-            "Bilkul, system me check kar rahi hoon..."
-        ],
-        "male": [
-            "Ji, main details check kar raha hoon, ek second...",
-            "Haan ji, bas ek moment dijiyega, main dekh raha hoon...",
-            "Bilkul, system me check kar raha hoon..."
-        ],
-    },
-    "hindi": {
-        "female": [
-            "जी, मैं विवरण देख रही हूँ, एक क्षण...",
-            "हाँ जी, सिस्टम में चेक कर रही हूँ...",
-        ],
-        "male": [
-            "जी, मैं विवरण देख रहा हूँ, एक क्षण...",
-            "हाँ जी, सिस्टम में चेक कर रहा हूँ...",
-        ],
-    },
-    "english": {
-        "female": [
-            "One moment, let me check that for you right now...",
-            "Just checking the details for you, one second...",
-        ],
-        "male": [
-            "One moment, let me check that for you right now...",
-            "Just checking the details for you, one second...",
-        ],
-    }
-}
-
 TOOL_FALLBACK_LINES: Dict[str, Dict[str, str]] = {
     "hinglish": {
         "female": "Abhi system se live details connect nahi ho pa rahi hain. Kya main aapka phone number note kar loon taaki hamari team call back kar sake?",
@@ -145,10 +110,30 @@ TOOL_FALLBACK_LINES: Dict[str, Dict[str, str]] = {
 
 
 def get_conversational_filler(language: str = "hinglish", gender: str = "female", index: int = 0) -> str:
-    """Return a low-latency conversational filler line based on language and gender."""
-    lang_key = "english" if language.lower() in ("en", "en-us", "en-in", "english") else ("hindi" if language.lower() in ("hi", "hi-in", "hindi") else "hinglish")
-    g_key = "female" if gender.lower() == "female" else "male"
-    choices = FILLER_LINES.get(lang_key, FILLER_LINES["hinglish"])[g_key]
+    """Return a low-latency conversational filler line dynamically resolved via resolve_gendered_phrases."""
+    from app.services.disclosure_service import resolve_gendered_phrases
+    lang_val = (language or "hinglish").lower()
+    norm_lang = "en" if lang_val in ("en", "en-us", "en-in", "english") else ("hi" if lang_val in ("hi", "hi-in", "hindi") else "hinglish")
+    p = resolve_gendered_phrases(gender=gender, language=norm_lang)
+
+    if norm_lang == "en":
+        choices = [
+            "One moment, let me check that for you right now...",
+            "Just checking the details for you, one second...",
+        ]
+    elif norm_lang == "hi":
+        v_chk_hi = p.get("v_check_hi", "देखते हैं")
+        choices = [
+            f"जी, मैं विवरण {v_chk_hi}, एक क्षण...",
+            f"हाँ जी, सिस्टम में {v_chk_hi}...",
+        ]
+    else:  # hinglish
+        v_chk = p.get("v_check", "check karte hain")
+        choices = [
+            f"Ji, main details {v_chk}, ek second...",
+            f"Haan ji, bas ek moment dijiyega, main system me {v_chk}...",
+            f"Bilkul, system me {v_chk}...",
+        ]
     return choices[index % len(choices)]
 
 
@@ -341,7 +326,10 @@ class InCallNoAudioWatchdog:
                         self.record_activity()
                         if self.speak_fn:
                             is_en = self.language.lower() in ("en", "en-us", "en-in", "english")
-                            prompt = "Are you able to hear me? Please let me know how I can help." if is_en else "Ji, kya aap mujhe sun pa rahe hain? Kahiye, main aapki kya madad kar sakti hoon?"
+                            from app.services.disclosure_service import resolve_gendered_phrases
+                            phrases = resolve_gendered_phrases(gender=self.gender, language=self.language)
+                            v_madad = phrases.get("v_madad", "kar sakte hain")
+                            prompt = "Are you able to hear me? Please let me know how I can help." if is_en else f"Ji, kya aap mujhe sun pa rahe hain? Kahiye, main aapki kya madad {v_madad}?"
                             await self.speak_fn(prompt)
             except asyncio.CancelledError:
                 break

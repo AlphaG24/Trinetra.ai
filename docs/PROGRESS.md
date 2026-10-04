@@ -12,7 +12,7 @@
 | :---: | :--- | :--- | :--- | :--- | :--- | :--- |
 | **1** | **Voice Pipeline Reliability, Latency Timing & Anti-Stall Engine** | **IMPLEMENTED; live validation PENDING** | `feature/voice-reliability-stall-fix` | `1711ba2` | [VALIDATION_LOG.md](file:///c:/Users/Ketan%20singh/trinetra-workspace/trinetra-fresh/docs/VALIDATION_LOG.md#task-1-voice-pipeline-stall-elimination--latency-instrumentation), [test_voice_reliability.py](file:///c:/Users/Ketan%20singh/trinetra-workspace/trinetra-fresh/backend/tests/test_voice_reliability.py) (12/12 pass) | Third-party provider jitter (`UNVERIFIED, check provider terms`). Live call verification pending owner confirmation. |
 | **2** | **Frozen Compliance Files, CI SHA-256 Hashes & CODEOWNERS** | **DONE** | `feature/frozen-files-ci` | `c8762e1` | [VALIDATION_LOG.md](file:///c:/Users/Ketan%20singh/trinetra-workspace/trinetra-fresh/docs/VALIDATION_LOG.md#task-2-frozen-compliance-files-deterministic-sha-256-ci-integrity--code-ownership), [test_frozen_files_ci.py](file:///c:/Users/Ketan%20singh/trinetra-workspace/trinetra-fresh/backend/tests/test_frozen_files_ci.py) (8/8 pass) | Requires owner manual branch protection configuration on GitHub. |
-| **3** | **Roles (customer, developer_tester, admin) & Central Exemption Policy** | **OPEN** | `feature/roles-exemption-policy` | *Pending* | Central policy function + test suite | Compliance primitives must remain non-exemptible. |
+| **3** | **Roles (customer, developer_tester, admin) & Central Exemption Policy** | **DONE** | `feature/roles-exemption-policy` | `f6a4701` | [VALIDATION_LOG.md](file:///c:/Users/Ketan%20singh/trinetra-workspace/trinetra-fresh/docs/VALIDATION_LOG.md#task-3-roles-central-exemption-policy-metrics-exclusion--sandbox-numbers), [test_role_policy_service.py](file:///c:/Users/Ketan%20singh/trinetra-workspace/trinetra-fresh/backend/tests/test_role_policy_service.py) (69/69 pass) | Manual SQL migration application required by workspace owner. |
 | **4** | **Disclosure & Outbound Safety Reconciliation** | **OPEN** | `feature/disclosure-reconciliation` | *Pending* | Verification audit across 9 carry-over controls | TRAI DLT registration dependency. |
 | **5** | **Caller Rights & Mid-Call Human Escalation** | **OPEN** | `feature/caller-rights-escalation` | *Pending* | Transfer & decline handlers + tests | Live carrier SIP transfer capabilities (`UNVERIFIED`). |
 | **6** | **Data Retention Split & Statutory Minimization** | **OPEN** | `feature/retention-split-minimization` | *Pending* | DRY_RUN purge job + audit logs | Statutory period `CONFIRM WITH CA`. |
@@ -34,5 +34,5 @@
 ---
 
 ## 🎯 NEXT TASK
-**Task 3**: Roles (customer, developer_tester, admin), central exemption policy function with unit tests, non-exemptible security primitives enforcement, exclusion of test accounts from revenue/compliance metrics, and TEST-labeled sandbox number flag.
+**Task 4**: Disclosure & Outbound Safety Reconciliation (audit all 9 carry-over compliance items 2-9 against the active codebase: disclosure_service, outbound_safety_guardrails, agent.py; verify test suite; update registers).
 
