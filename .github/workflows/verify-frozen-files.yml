@@ -1,0 +1,27 @@
+name: Verify Frozen Compliance Files
+
+on:
+  push:
+    branches: [ main, dev, integration ]
+  pull_request:
+    branches: [ main, dev, integration ]
+
+permissions:
+  contents: read
+
+jobs:
+  verify-frozen-hashes:
+    name: Verify Frozen Files SHA-256 Integrity
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Run Frozen Files Verification Script
+        run: |
+          python scripts/verify_frozen_files.py

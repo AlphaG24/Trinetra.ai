@@ -111,3 +111,96 @@ Output:
      backend\.venv\Scripts\python.exe backend\scripts\summarize_voice_timing.py call_output.log
      ```
    - Verifies all 13 stages and outputs the real measured latency table.
+
+---
+
+## Task 2: Frozen Compliance Files, Deterministic SHA-256 CI Integrity & Code Ownership
+
+- **Date**: 2026-10-04
+- **Branch**: `feature/frozen-files-ci`
+- **Status**: `IMPLEMENTED, pending legal review`
+- **Mandate**: Master Plan Section 18.5 (Authoritative Overrides).
+
+### 1. Implementation Summary
+1. **Target Frozen Files Manifest (`docs/compliance/FROZEN_FILES_MANIFEST.json`)**:
+   - Deterministic SHA-256 manifest capturing the 4 validated compliance files:
+     - `backend/app/services/disclosure_service.py`: `e9580c12b7c6bece21a499089c9c020c0a7ad1c400787a24c6bfec5dad30bb37`
+     - `backend/app/services/outbound_safety_guardrails.py`: `86edbf54522d61570650c6ada0ac39870c616361b1e472e347f102dbb5fb5937`
+     - `backend/app/services/ai/prompt_guard.py`: `ba4ccf1205ecef224e66c5317154cbe468e3f5f3c0967010b6295982010485a7`
+     - `frontend/src/lib/safety/promptGuard.ts`: `02f0dea341f94608867d67ca06b8417f9952f30e1e0ed4fc86c6d4576c480c74`
+   - Explicitly excludes `voice_reliability_service.py` and `backend/agent.py` pending live call verification by the repository owner.
+   - Canonical hash function normalizes `\r\n` to `\n` to guarantee identical hashes on Windows local checkouts and Linux GitHub Actions runners.
+2. **CI Integrity Check Script (`scripts/verify_frozen_files.py`)**:
+   - Verifies files against manifest; returns exit code 1 on mismatch or missing file.
+   - Supports `--update` flag for authorized owner updates.
+   - Supports emergency fix bypass with `--emergency-fix-reason` or `$env:ALLOW_FROZEN_FILE_MODIFICATION=true`.
+3. **GitHub Actions Workflow (`.github/workflows/verify-frozen-files.yml`)**:
+   - Runs automatically on pull requests and pushes to `main`, `dev`, `integration`.
+4. **Code Ownership (`.github/CODEOWNERS`)**:
+   - Assigns `@AlphaG24` as mandatory reviewer for all 4 frozen compliance files, manifest, security rules, and brand constants.
+5. **Centralized Brand Constants**:
+   - `backend/app/config/constants.py`: `BRAND_NAME = "Trinetra"`
+   - `frontend/src/config/constants.ts`: `export const BRAND_NAME = "Trinetra";`
+6. **Emergency Fix Runbook (`docs/compliance/EMERGENCY_FIX_RUNBOOK.md`)**:
+   - Documented procedure for temporary hotfix bypass and manifest recalculation during production incidents.
+
+### 2. Real Test Output
+Execution command:
+```powershell
+.venv\Scripts\python.exe -m pytest tests/test_frozen_files_ci.py -v
+```
+Output:
+```
+============================= test session starts =============================
+platform win32 -- Python 3.11.9, pytest-9.1.1, pluggy-1.6.0 -- C:\Users\Ketan singh\trinetra-workspace\trinetra-fresh\backend\.venv\Scripts\python.exe
+cachedir: .pytest_cache
+rootdir: C:\Users\Ketan singh\trinetra-workspace\trinetra-fresh\backend
+plugins: anyio-4.13.0, asyncio-1.4.0
+asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 8 items
+
+tests/test_frozen_files_ci.py::TestFrozenFilesIntegrity::test_manifest_structure_and_version PASSED [ 12%]
+tests/test_frozen_files_ci.py::TestFrozenFilesIntegrity::test_all_frozen_files_match_manifest_hashes PASSED [ 25%]
+tests/test_frozen_files_ci.py::TestFrozenFilesIntegrity::test_agent_and_voice_reliability_not_frozen PASSED [ 37%]
+tests/test_frozen_files_ci.py::TestFrozenFilesIntegrity::test_tampered_file_triggers_failure PASSED [ 50%]
+tests/test_frozen_files_ci.py::TestFrozenFilesIntegrity::test_missing_file_triggers_failure PASSED [ 62%]
+tests/test_frozen_files_ci.py::TestFrozenFilesIntegrity::test_script_cli_execution_clean_exit PASSED [ 75%]
+tests/test_frozen_files_ci.py::TestCentralizedBrandConstants::test_backend_brand_constant PASSED [ 87%]
+tests/test_frozen_files_ci.py::TestCentralizedBrandConstants::test_frontend_brand_constant_file_exists_and_valid PASSED [100%]
+
+============================== 8 passed in 0.19s ==============================
+```
+
+Direct script CLI check:
+```powershell
+python scripts/verify_frozen_files.py
+```
+Output:
+```
+==================================================================
+ TRINETRA AI - FROZEN COMPLIANCE FILES INTEGRITY CHECK: PASSED
+==================================================================
+ [PASS] backend/app/services/disclosure_service.py
+ [PASS] backend/app/services/outbound_safety_guardrails.py
+ [PASS] backend/app/services/ai/prompt_guard.py
+ [PASS] frontend/src/lib/safety/promptGuard.ts
+==================================================================
+```
+
+### 3. Manual Validation Steps for Reviewer
+1. **Run Integrity Check Locally**:
+   ```powershell
+   python scripts/verify_frozen_files.py
+   ```
+   Confirm all 4 files pass with exit code 0.
+2. **Simulate Unauthorized Modification**:
+   - Add a test comment `# test tamper` to `backend/app/services/disclosure_service.py`.
+   - Run `python scripts/verify_frozen_files.py`.
+   - Confirm output: `[FAIL] FROZEN COMPLIANCE FILES INTEGRITY VIOLATION` and non-zero exit code (1).
+   - Revert change: `git checkout backend/app/services/disclosure_service.py`.
+3. **Verify Emergency Fix Escape Hatch**:
+   ```powershell
+   python scripts/verify_frozen_files.py --emergency-fix-reason "Simulated incident hotfix"
+   ```
+   Confirm emergency warning printed and exit code is 0.
+

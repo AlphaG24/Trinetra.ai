@@ -1,0 +1,26 @@
+# ==============================================================================
+# TRINETRA AI - GITHUB CODEOWNERS
+# ==============================================================================
+# In accordance with Master Plan Section 18.5:
+# Core regulatory compliance and security guardrails require explicit review
+# and approval by the repository owner before merging to any integration branch.
+#
+# NOTE: CODEOWNERS enforcement requires the following GitHub repository settings:
+# 1. Branch protection rule on 'main' and 'dev'
+# 2. "Require a pull request before merging" -> Checked
+# 3. "Require review from Code Owners" -> Checked
+# 4. "Require status checks to pass before merging" -> 'verify-frozen-files'
+# ==============================================================================
+
+# Core Frozen Compliance & Safety Modules
+/backend/app/services/disclosure_service.py @AlphaG24
+/backend/app/services/outbound_safety_guardrails.py @AlphaG24
+/backend/app/services/ai/prompt_guard.py @AlphaG24
+/frontend/src/lib/safety/promptGuard.ts @AlphaG24
+/docs/compliance/FROZEN_FILES_MANIFEST.json @AlphaG24
+
+# Security Rules and Central Policy
+/.agents/rules/ @AlphaG24
+/AGENTS.md @AlphaG24
+/backend/app/config/constants.py @AlphaG24
+/frontend/src/config/constants.ts @AlphaG24
