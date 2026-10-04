@@ -45,6 +45,7 @@ from app.routers.byon_router import byon_router
 from app.routers.support_ticket_router import support_ticket_router
 from app.routers.kyc_router import kyc_router
 from app.routers.admin_operations_router import router as admin_operations_router
+from app.routers.compliance_router import compliance_router
 
 app = FastAPI(title="Trinetra API")
 
@@ -111,6 +112,7 @@ app.include_router(byon_router)
 app.include_router(support_ticket_router)
 app.include_router(kyc_router)
 app.include_router(admin_operations_router)
+app.include_router(compliance_router)
 
 @app.on_event("startup")
 async def app_startup():
