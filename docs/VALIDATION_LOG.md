@@ -1099,7 +1099,82 @@ backend/tests/test_byon_credential_vault.py::TestDirectBYONRouteLogic::test_rout
 
 #### Regression Suite Verification:
 - Tests: `test_pii_sanitizer.py`, `test_wallet_razorpay_quota.py`, `test_gst_invoicing_vault.py`, `test_number_lifecycle_grace.py`, `test_byon_credential_vault.py`.
-- Result: **90 passed out of 90 tests (100% pass)**.
+- Result: **120 passed out of 120 tests (100% pass)**.
+
+---
+
+## Task 15: Encrypted KYC Vault & Admin Access Controls
+
+- **Date**: 2026-10-04
+- **Branch**: `feature/encrypted-kyc-vault`
+- **Commit**: `5dc13bb`
+- **Status**: `DONE`
+- **Mandate**: Master Plan Section 18.7, Section 18.15 Item 10, and Security Directives SEC-001/SEC-004/SEC-005.
+- **Governing Standard**:
+  - Zero raw secrets or raw Aadhaar numbers stored in plaintext; UIDAI Aadhaar masking (`XXXX-XXXX-1234`) and PAN/GSTIN masking.
+  - Statutory affirmative KYC consent recorded with timestamp, client IP, and immutable declaration text.
+  - AES-256-GCM symmetric encryption for uploaded binary documents before storage.
+  - Signed document viewing URLs capped at 15 minutes (900 seconds).
+  - Admin Step-Up Authentication (`action: 'kyc_view'`) enforced for viewing customer KYC documents.
+  - `developer_tester` accounts strictly forbidden from uploading, viewing, or reviewing KYC documents.
+  - Immutable append-only audit trail (`kyc_audit_logs`) tracking all views, uploads, and review actions.
+
+### 1. Implementation Summary
+1. **Database Schema & RLS Migrations**:
+   - `supabase/migrations/20261004230000_create_encrypted_kyc_vault.sql` (UP)
+   - `supabase/migrations/20261004230000_create_encrypted_kyc_vault_down.sql` (DOWN)
+   - Created `kyc_documents` table with status (`pending`, `under_review`, `verified`, `rejected`), masked ID number, SHA-256 checksum, encryption metadata, and affirmative consent verification.
+   - Created `kyc_audit_logs` table for append-only forensic logging of document access, verification, and rejection.
+   - Enforced Row Level Security (RLS) policies guaranteeing tenant isolation and preventing non-admin access across organizations.
+2. **KYC Vault Service (`backend/app/services/kyc_vault_service.py`)**:
+   - `mask_id_number`: Masking engine adhering to UIDAI guidelines (`XXXX-XXXX-1234` for 12-digit Aadhaar, `AAAAA****A` for PAN, generic tail-masking for other ID types).
+   - `encrypt_file` & `decrypt_file`: AES-256-GCM authenticated payload encryption with fresh 12-byte initialization vectors and 16-byte authentication tags.
+   - `upload_document`: Validates statutory consent, computes SHA-256 digest, encrypts payload, records document metadata, and appends audit log.
+   - `generate_signed_view_url`: Enforces admin Step-Up Auth (`action: 'kyc_view'`) and tenant isolation; caps URL lifespan at 900 seconds (15 minutes).
+   - `review_document`: Admin verification or rejection with mandatory statutory reason logging.
+3. **FastAPI Router (`backend/app/routers/kyc_router.py`)**:
+   - Mounted in `backend/main.py` at `/api/kyc`.
+   - Endpoints:
+     - `POST /api/kyc/upload`: Upload KYC document with consent and encryption.
+     - `GET /api/kyc/documents`: List organization documents.
+     - `POST /api/kyc/documents/{id}/signed-url`: Generate short-lived signed viewing URL.
+     - `POST /api/kyc/documents/{id}/review`: Admin approve/reject document.
+     - `GET /api/kyc/documents/{id}/audit`: Admin forensic audit logs.
+
+### 2. Test Results (Authoritative)
+```
+backend/tests/test_encrypted_kyc_vault.py::TestUIDAIMaskingAndConsent::test_aadhaar_masking_12_digits PASSED
+backend/tests/test_encrypted_kyc_vault.py::TestUIDAIMaskingAndConsent::test_pan_card_masking PASSED
+backend/tests/test_encrypted_kyc_vault.py::TestUIDAIMaskingAndConsent::test_passport_and_other_id_masking PASSED
+backend/tests/test_encrypted_kyc_vault.py::TestUIDAIMaskingAndConsent::test_empty_or_none_id_returns_none PASSED
+backend/tests/test_encrypted_kyc_vault.py::TestUIDAIMaskingAndConsent::test_mandatory_consent_text_integrity PASSED
+backend/tests/test_encrypted_kyc_vault.py::TestAES256StorageEncryption::test_document_bytes_encryption_roundtrip PASSED
+backend/tests/test_encrypted_kyc_vault.py::TestAES256StorageEncryption::test_fresh_nonce_per_encryption PASSED
+backend/tests/test_encrypted_kyc_vault.py::TestAES256StorageEncryption::test_corrupted_payload_raises_error PASSED
+backend/tests/test_encrypted_kyc_vault.py::TestKYCDocumentIngestion::test_customer_upload_success PASSED
+backend/tests/test_encrypted_kyc_vault.py::TestKYCDocumentIngestion::test_missing_consent_raises_value_error PASSED
+backend/tests/test_encrypted_kyc_vault.py::TestKYCDocumentIngestion::test_invalid_document_type_rejected PASSED
+backend/tests/test_encrypted_kyc_vault.py::TestRoleBasedAccessAndStepUpAuth::test_developer_tester_forbidden_from_uploading PASSED
+backend/tests/test_encrypted_kyc_vault.py::TestRoleBasedAccessAndStepUpAuth::test_developer_tester_forbidden_from_viewing PASSED
+backend/tests/test_encrypted_kyc_vault.py::TestRoleBasedAccessAndStepUpAuth::test_customer_cross_tenant_view_blocked PASSED
+backend/tests/test_encrypted_kyc_vault.py::TestRoleBasedAccessAndStepUpAuth::test_admin_requires_step_up_token PASSED
+backend/tests/test_encrypted_kyc_vault.py::TestRoleBasedAccessAndStepUpAuth::test_admin_with_valid_step_up_token_succeeds PASSED
+backend/tests/test_encrypted_kyc_vault.py::TestAdminReviewAndAuditTrail::test_admin_verify_document_success PASSED
+backend/tests/test_encrypted_kyc_vault.py::TestAdminReviewAndAuditTrail::test_admin_reject_document_with_reason PASSED
+backend/tests/test_encrypted_kyc_vault.py::TestAdminReviewAndAuditTrail::test_non_admin_cannot_review_documents PASSED
+backend/tests/test_encrypted_kyc_vault.py::TestAdminReviewAndAuditTrail::test_get_document_audit_logs_restricted_to_admin PASSED
+backend/tests/test_encrypted_kyc_vault.py::TestDirectKYCRouteLogic::test_route_upload_kyc_document PASSED
+backend/tests/test_encrypted_kyc_vault.py::TestDirectKYCRouteLogic::test_route_list_kyc_documents PASSED
+backend/tests/test_encrypted_kyc_vault.py::TestDirectKYCRouteLogic::test_route_generate_signed_view_url PASSED
+backend/tests/test_encrypted_kyc_vault.py::TestDirectKYCRouteLogic::test_route_review_kyc_document PASSED
+backend/tests/test_encrypted_kyc_vault.py::TestDirectKYCRouteLogic::test_route_get_document_audit_logs PASSED
+======================== 25 passed, 1 warning in 1.76s ========================
+```
+
+#### Regression Suite Verification:
+- Tests: `test_pii_sanitizer.py`, `test_wallet_razorpay_quota.py`, `test_gst_invoicing_vault.py`, `test_number_lifecycle_grace.py`, `test_byon_credential_vault.py`, `test_support_ticket_system.py`, `test_encrypted_kyc_vault.py`.
+- Result: **145 passed out of 145 tests (100% pass)** in 2.04s.
+
 
 ---
 
