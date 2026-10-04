@@ -293,4 +293,45 @@ Full Project Suite:
 3. **Sandbox Number Dialing Check**:
    - Call `validate_number_for_flow({'is_sandbox': True, 'label': 'TEST'}, 'customer_campaign')` -> Verify return is `(False, '...strictly prohibited...')`.
 
+---
+
+## Task 4: Disclosure & Outbound Safety Reconciliation
+
+**Status**: `IMPLEMENTED, pending legal review`  
+**Date**: October 4, 2026  
+**Target Branch**: `feature/disclosure-reconciliation`  
+**Governing Standard**: Antigravity Personalization Rules SEC-011, MASTER_PLAN.md Section 18.15  
+
+### 1. Reconciled Carry-Over Controls (Items 1 through 9)
+
+| Item / Control | Domain | Implementation Summary | Test Suite Evidence |
+| :--- | :--- | :--- | :--- |
+| **Item 1 & A1d** | 4-Tier Gender Resolution | Resolution hierarchy: (1) explicit, (2) voice catalog, (3) persona heuristic, (4) neutral fallback. Conjugation of 20+ Hindi/Hinglish/Marathi verbs. | `test_a1d_gender_resolver.py` (70 pass), `test_compliance_reconciliation.py` |
+| **Item 2 (A2)** | Sensitive Detail Withholding | Withholds sensitive medical, financial, and appointment data prior to affirmative caller identity verification. | `test_a2_sensitive_detail_withholding.py` (15 pass) |
+| **Item 3 (A3)** | Opening Self-Intro Deduplication | `compose_single_opening_greeting()` removes repetitive owner self-intros while preserving >= 50% non-intro sentence content. | `test_single_opening_greeting.py` (16 pass), `test_a3_greeting_fragments.py` (22 pass) |
+| **Item 4** | DND Scrubbing & National Hook | Pre-dial scrubbing against `dnd_registry`. National DND registry hook implemented with official TRAI TCCCPR 2018 Regulation 12 & TCPA citations (status: PARTIAL, pending carrier DLT registration). | `test_outbound_safety_guardrails.py` |
+| **Item 5** | Campaign Purpose Classification | Purpose classification (`promotional`, `service`, `transactional`) with conditional non-promotional attestation card under TRAI TCCCPR 2018 Regulation 12. | `test_campaign_purpose_attestation.py` (4 pass) |
+| **Item 6** | Caller Barge-In Interruption | Audio interruption enabled with guidance logging in LiveKit voice pipeline; prevents re-playing opening greeting on subsequent turns. | `test_barge_in_interruption.py` (2 pass) |
+| **Item 7** | Affirmative CSV Consent Attestation | Mandatory affirmative statutory consent checkbox (`consent_attestation: true`), immutable audit logging with SHA-256 file fingerprint, pre-dial skip for unconsented contacts. | `test_csv_consent_attestation.py` (5 pass) |
+| **Item 8** | Service-Role Script Safety | AST/regex check barring `SUPABASE_SERVICE_ROLE_KEY` from `"use client"` or `NEXT_PUBLIC_` variables. Runtime `typeof window !== 'undefined'` guards. | `test_service_role_safety.py` (5 pass) |
+| **Item 9** | Reversible Migration Symmetry | Full drop/revert symmetry across tables, columns, and indexes for all `.sql` and `_down.sql` pairs. Mandatory Row-Level Security. | `test_migrations_validation.py` (4 pass) |
+| **agent.py Integration** | Single Opening Utterance Delivery | `backend/agent.py` routes all opening greetings through `compose_single_opening_greeting()`, scales watchdog timeout, and records disclosure telemetry via `persist_call_disclosure()`. | `test_compliance_reconciliation.py` (10 pass) |
+
+### 2. Test Execution Evidence
+
+Full Carry-Over Suite Execution:
+`133 passed in 27.09s`
+
+Reconciliation & Audit Suite Execution (`test_compliance_reconciliation.py`):
+`10 passed in 0.09s`
+
+Overall Backend Repository Suite:
+`301 passed, 1 warning in 30.48s (100% pass rate)`
+
+### 3. Reviewer Verification Steps
+1. Run `python -m pytest tests/test_compliance_reconciliation.py -v`.
+2. Inspect `agent.py` lines 25–36 and 2050–2086 to verify that `compose_single_opening_greeting()` cannot be bypassed by raw dashboard text.
+3. Verify that `PROMOTIONAL_CALLING_HOURS_WINDOW` in `outbound_safety_guardrails.py` maintains hard floors 09:00–21:00 with TRAI citations.
+
+
 
