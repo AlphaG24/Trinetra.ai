@@ -1348,3 +1348,64 @@ backend/tests/test_essential_admin_panel.py::TestDirectAdminRouteLogic::test_rou
 - Tests: 	est_pii_sanitizer.py, 	est_wallet_razorpay_quota.py, 	est_gst_invoicing_vault.py, 	est_number_lifecycle_grace.py, 	est_byon_credential_vault.py, 	est_support_ticket_system.py, 	est_encrypted_kyc_vault.py, 	est_essential_admin_panel.py.
 - Result: **172 passed out of 172 tests (100% pass)** in 2.24s.
 
+
+
+---
+
+## Task 17: Data Processing Addendum (DPA), Breach Runbook & Subprocessor Register
+
+- **Date**: 2026-10-04
+- **Branch**: eature/compliance-dpa-runbook
+- **Commit**: e6d6a13
+- **Status**: DONE
+- **Mandate**: Master Plan Section 18.15 Item 15, Section 18.16 Statutory Status Labels & Caveat Taxonomy.
+- **Governing Standard**:
+  - Formal statutory subprocessor register cataloging all 11 critical vendors with categories, locations, safeguards, and verified statuses.
+  - Strict compliance status taxonomy: strictly uses IMPLEMENTED, pending legal review and VERIFIED, with zero raw COMPLIANT claims.
+  - Customer Data Processing Addendum (DPA) incorporating statutory Data Fiduciary / Processor roles, technical security safeguards (AES-256-GCM, TLS 1.3, UIDAI masking, RLS tenant isolation, admin step-up auth), 30-day subprocessor change notice, and data subject rights (DSAR).
+  - Data Breach Incident Response Runbook with P1-P4 triage matrix, CERT-In 6-hour and GDPR 72-hour reporting clocks, containment protocols, and pre-drafted customer breach notice template.
+  - Programmatic API access to compliance records via GET /api/compliance/*.
+
+### 1. Implementation Summary
+1. **Compliance Documentation**:
+   - docs/compliance/SUBPROCESSOR_REGISTER.md: Complete register covering Supabase, LiveKit, Exotel, Twilio, Google Gemini, Groq, Sarvam AI, ElevenLabs, Deepgram, Razorpay, Vultr/DigitalOcean. Includes 30-day change notification protocol and vendor due diligence criteria.
+   - docs/compliance/DATA_PROCESSING_ADDENDUM.md: Formal customer DPA with roles, security measures, subprocessor terms, data subject rights, breach notification, and statutory retention exceptions.
+   - docs/compliance/DATA_BREACH_RUNBOOK.md: Phase-by-phase breach response runbook with severity matrix, forensic audit trail procedures, 6h/72h notification triggers, and pre-drafted notification template.
+2. **Compliance Service (ackend/app/services/compliance_service.py)**:
+   - get_subprocessors: Returns structured catalog of all 11 active subprocessors.
+   - get_dpa_metadata: Returns customer DPA summary, roles, and technical safeguards.
+   - get_breach_runbook_summary: Returns incident response severity levels, reporting clocks, and containment protocols.
+   - get_compliance_overview: Aggregated statutory summary with caveat verifications.
+3. **FastAPI Router (ackend/app/routers/compliance_router.py)**:
+   - Mounted in ackend/main.py at /api/compliance.
+   - Endpoints:
+     - GET /api/compliance/subprocessors: Subprocessor register.
+     - GET /api/compliance/dpa: Customer DPA terms and safeguards.
+     - GET /api/compliance/breach-runbook: Incident response runbook parameters.
+     - GET /api/compliance/summary: Statutory compliance summary.
+
+### 2. Test Results (Authoritative)
+`
+backend/tests/test_compliance_dpa_runbook.py::TestSubprocessorRegister::test_required_vendors_present PASSED
+backend/tests/test_compliance_dpa_runbook.py::TestSubprocessorRegister::test_subprocessor_schema_completeness PASSED
+backend/tests/test_compliance_dpa_runbook.py::TestSubprocessorRegister::test_telephony_co_location_in_register PASSED
+backend/tests/test_compliance_dpa_runbook.py::TestSubprocessorRegister::test_statutory_status_taxonomy_no_prohibited_claims PASSED
+backend/tests/test_compliance_dpa_runbook.py::TestSubprocessorRegister::test_subprocessor_register_markdown_file_exists PASSED
+backend/tests/test_compliance_dpa_runbook.py::TestDataProcessingAddendum::test_dpa_parties_and_roles PASSED
+backend/tests/test_compliance_dpa_runbook.py::TestDataProcessingAddendum::test_dpa_technical_safeguards_completeness PASSED
+backend/tests/test_compliance_dpa_runbook.py::TestDataProcessingAddendum::test_dpa_notification_timelines PASSED
+backend/tests/test_compliance_dpa_runbook.py::TestDataProcessingAddendum::test_dpa_markdown_file_exists_and_complete PASSED
+backend/tests/test_compliance_dpa_runbook.py::TestDataBreachRunbook::test_runbook_severity_levels PASSED
+backend/tests/test_compliance_dpa_runbook.py::TestDataBreachRunbook::test_runbook_deadlines PASSED
+backend/tests/test_compliance_dpa_runbook.py::TestDataBreachRunbook::test_runbook_containment_protocols PASSED
+backend/tests/test_compliance_dpa_runbook.py::TestDataBreachRunbook::test_breach_runbook_markdown_file_exists_and_complete PASSED
+backend/tests/test_compliance_dpa_runbook.py::TestDirectComplianceRouteLogic::test_route_get_subprocessors PASSED
+backend/tests/test_compliance_dpa_runbook.py::TestDirectComplianceRouteLogic::test_route_get_dpa PASSED
+backend/tests/test_compliance_dpa_runbook.py::TestDirectComplianceRouteLogic::test_route_get_breach_runbook PASSED
+backend/tests/test_compliance_dpa_runbook.py::TestDirectComplianceRouteLogic::test_route_get_compliance_summary PASSED
+============================= 17 passed in 0.60s ==============================
+`
+
+#### Regression Suite Verification:
+- Tests: 	est_pii_sanitizer.py, 	est_wallet_razorpay_quota.py, 	est_gst_invoicing_vault.py, 	est_number_lifecycle_grace.py, 	est_byon_credential_vault.py, 	est_support_ticket_system.py, 	est_encrypted_kyc_vault.py, 	est_essential_admin_panel.py, 	est_compliance_dpa_runbook.py.
+- Result: **189 passed out of 189 tests (100% pass)** in 2.20s.
