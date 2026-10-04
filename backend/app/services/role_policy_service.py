@@ -53,6 +53,7 @@ STEP_UP_REAUTH_ACTIONS: Set[str] = frozenset({
     "kyc_view",
     "wallet_adjust",
     "price_change",
+    "role_change",
     "credential_update",
     "number_release_override",
 })
