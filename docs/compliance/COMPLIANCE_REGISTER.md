@@ -114,5 +114,15 @@
    - **PSTN + WhatsApp**: Confirmed. Provides E.164 phone numbers, PSTN voice/SMS, and WhatsApp Business API integration.
 
 9. **Supabase**:
-   - **Status**: `UNVERIFIED, check provider terms` (PostgreSQL database; verify SOC2 Type II certification, HIPAA BAA availability, and encryption at rest).
+   - **Status**: `VERIFIED (2026-10-04)`
+   - **Compliance Certifications**:
+     - **SOC 2 Type II**: Certified. Audited annually against Security, Availability, and Confidentiality trust criteria. Reports available via dashboard for Team and Enterprise tiers.
+     - **HIPAA**: Compliant. Business Associate Agreements (BAA) available on Team and Enterprise plans under shared responsibility model.
+     - **ISO/IEC 27001**: Certified information security management system (ISMS). Certificate available on dashboard.
+     - **GDPR**: European compliance supported. Customer data can be locked to EU regions (e.g. Frankfurt); Standard Contractual Clauses (SCC) and DPA provided.
+   - **Data Protection & Encryption**:
+     - **Encryption at Rest**: AES-256 encryption across all primary databases, backups, and storage volumes.
+     - **Encryption in Transit**: TLS 1.3 enforced for all client-to-database and client-to-API connections.
+     - **Backups**: Daily automated backups; Point-in-Time Recovery (PITR) with physical write-ahead log shipping.
+   - **Security Controls**: Multi-factor authentication (MFA), role-based access control (RBAC), continuous vulnerability scanning, and network DDoS mitigation.
 
