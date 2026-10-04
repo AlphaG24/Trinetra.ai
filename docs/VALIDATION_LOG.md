@@ -1017,3 +1017,87 @@ backend/tests/test_number_lifecycle_grace.py::TestDirectNumberLifecycleRouteLogi
 #### Regression Suite Verification:
 - Tests: `test_pii_sanitizer.py`, `test_wallet_razorpay_quota.py`, `test_gst_invoicing_vault.py`, `test_number_lifecycle_grace.py`.
 - Result: **62 passed out of 62 tests (100% pass)**.
+
+---
+
+## Task 13: Bring-Your-Own Numbers (BYON - Twilio & Exotel)
+
+- **Date**: 2026-10-04
+- **Branch**: `feature/byon-credential-vault`
+- **Commit**: `280b1f6`
+- **Status**: `DONE`
+- **Mandate**: Master Plan Section 18.8 (Authoritative Overrides).
+- **Governing Standard**:
+  - AES-256-GCM authenticated encryption for carrier API tokens and secrets.
+  - Zero plaintext secrets in database columns, API responses, or system logs.
+  - Secret masking in UI/API responses (e.g., `AC39...XXXX...a9b1`).
+  - Strict cross-tenant credential isolation.
+  - Number inventory synchronization with carrier account.
+  - Agent assignment with tenant boundary enforcement.
+  - Revocation handling with graceful number suspension.
+  - DLT compliance exemption (DLT parameters remain on customer's own telecom account).
+  - Twilio webhook HMAC-SHA1 signature verification.
+
+### 1. Implementation Summary
+1. **Database Schema & RLS Migrations**:
+   - `supabase/migrations/20261004210000_create_byon_credential_vault.sql` (UP)
+   - `supabase/migrations/20261004210000_create_byon_credential_vault_down.sql` (DOWN)
+   - Created `byon_carrier_credentials` table: encrypted auth tokens, key fingerprints, webhook URLs, synchronization timestamps, and status (`active`, `revoked`, `error`).
+   - Created `byon_phone_numbers` table: carrier SIDs, customer DLT entity/template IDs, capabilities, status (`active`, `suspended`, `unassigned`), and agent assignment.
+   - Row Level Security (RLS) policies enforcing organization tenant isolation (`organization_id = auth.uid()`).
+2. **BYON Vault Service (`backend/app/services/byon_vault_service.py`)**:
+   - `encrypt_secret`: Encrypts plaintext strings using AES-256-GCM with a fresh 12-byte random nonce per operation.
+   - `decrypt_secret`: Decrypts and authenticates AES-256-GCM payloads; rejects tampered ciphertexts.
+   - `mask_secret`: Formats sensitive tokens safely (`4_prefix...XXXX...4_suffix`).
+   - `store_carrier_credential`: Vaults Twilio and Exotel credentials; idempotent upsert on carrier + account SID.
+   - `get_decrypted_credential`: Server-side retrieval of credentials strictly enforcing organization boundary. Rejects revoked credentials.
+   - `sync_carrier_numbers`: Ingests customer numbers into `byon_phone_numbers` while preserving DLT entity and template IDs on customer's account.
+   - `assign_number_to_agent`: Assigns customer-owned numbers to organization agents with dual-sided tenant verification.
+   - `revoke_credential`: Revokes carrier credentials and transitions all associated BYON numbers to `suspended` status.
+   - `verify_twilio_webhook_signature`: Standard Twilio HMAC-SHA1 signature verification algorithm.
+3. **FastAPI Router (`backend/app/routers/byon_router.py`)**:
+   - Mounted in `backend/main.py` at `/api/telephony/byon`.
+   - Endpoints:
+     - `POST /api/telephony/byon/credentials`: Vault credentials.
+     - `GET /api/telephony/byon/credentials`: List sanitized credentials.
+     - `POST /api/telephony/byon/credentials/{id}/sync`: Synchronize carrier numbers.
+     - `POST /api/telephony/byon/credentials/{id}/revoke`: Revoke credentials and suspend numbers.
+     - `POST /api/telephony/byon/numbers/{id}/assign`: Assign number to agent.
+
+### 2. Test Results (Authoritative)
+```
+backend/tests/test_byon_credential_vault.py::TestAES256GCMEncryption::test_encryption_and_decryption_roundtrip PASSED
+backend/tests/test_byon_credential_vault.py::TestAES256GCMEncryption::test_nonce_uniqueness_on_identical_plaintexts PASSED
+backend/tests/test_byon_credential_vault.py::TestAES256GCMEncryption::test_tampered_ciphertext_raises_error PASSED
+backend/tests/test_byon_credential_vault.py::TestAES256GCMEncryption::test_corrupted_or_truncated_payload_raises_value_error PASSED
+backend/tests/test_byon_credential_vault.py::TestAES256GCMEncryption::test_empty_secret_raises_value_error PASSED
+backend/tests/test_byon_credential_vault.py::TestAES256GCMEncryption::test_secret_masking PASSED
+backend/tests/test_byon_credential_vault.py::TestAES256GCMEncryption::test_fingerprint_deterministic_and_unique PASSED
+backend/tests/test_byon_credential_vault.py::TestAES256GCMEncryption::test_custom_master_key_validation PASSED
+backend/tests/test_byon_credential_vault.py::TestBYONVaultService::test_store_carrier_credential_twilio PASSED
+backend/tests/test_byon_credential_vault.py::TestBYONVaultService::test_store_carrier_credential_exotel PASSED
+backend/tests/test_byon_credential_vault.py::TestBYONVaultService::test_store_carrier_credential_invalid_carrier PASSED
+backend/tests/test_byon_credential_vault.py::TestBYONVaultService::test_store_carrier_credential_upsert_updates_existing PASSED
+backend/tests/test_byon_credential_vault.py::TestBYONVaultService::test_cross_tenant_isolation_get_decrypted_credential PASSED
+backend/tests/test_byon_credential_vault.py::TestBYONVaultService::test_carrier_number_sync PASSED
+backend/tests/test_byon_credential_vault.py::TestBYONVaultService::test_assign_number_to_agent_success PASSED
+backend/tests/test_byon_credential_vault.py::TestBYONVaultService::test_assign_number_cross_tenant_blocked PASSED
+backend/tests/test_byon_credential_vault.py::TestBYONVaultService::test_revoke_credential_suspends_numbers PASSED
+backend/tests/test_byon_credential_vault.py::TestTwilioWebhookSignature::test_valid_twilio_signature PASSED
+backend/tests/test_byon_credential_vault.py::TestTwilioWebhookSignature::test_tampered_signature_rejected PASSED
+backend/tests/test_byon_credential_vault.py::TestTwilioWebhookSignature::test_tampered_params_rejected PASSED
+backend/tests/test_byon_credential_vault.py::TestTwilioWebhookSignature::test_empty_signature_or_token_returns_false_cleanly PASSED
+backend/tests/test_byon_credential_vault.py::TestDirectBYONRouteLogic::test_route_store_carrier_credential PASSED
+backend/tests/test_byon_credential_vault.py::TestDirectBYONRouteLogic::test_route_store_carrier_credential_bad_carrier_raises_400 PASSED
+backend/tests/test_byon_credential_vault.py::TestDirectBYONRouteLogic::test_route_list_carrier_credentials PASSED
+backend/tests/test_byon_credential_vault.py::TestDirectBYONRouteLogic::test_route_sync_carrier_numbers PASSED
+backend/tests/test_byon_credential_vault.py::TestDirectBYONRouteLogic::test_route_sync_carrier_numbers_forbidden_cross_tenant_raises_403 PASSED
+backend/tests/test_byon_credential_vault.py::TestDirectBYONRouteLogic::test_route_assign_byon_number PASSED
+backend/tests/test_byon_credential_vault.py::TestDirectBYONRouteLogic::test_route_revoke_carrier_credential PASSED
+======================== 28 passed, 1 warning in 2.10s ========================
+```
+
+#### Regression Suite Verification:
+- Tests: `test_pii_sanitizer.py`, `test_wallet_razorpay_quota.py`, `test_gst_invoicing_vault.py`, `test_number_lifecycle_grace.py`, `test_byon_credential_vault.py`.
+- Result: **90 passed out of 90 tests (100% pass)**.
+
