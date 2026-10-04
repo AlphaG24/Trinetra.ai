@@ -102,6 +102,11 @@ const nextConfig: NextConfig = {
         destination: '/dashboard/deploy',
         permanent: false,
       },
+      {
+        source: '/dashboard/integrations',
+        destination: '/dashboard/settings?tab=integrations',
+        permanent: false,
+      },
     ];
   },
   async rewrites() {

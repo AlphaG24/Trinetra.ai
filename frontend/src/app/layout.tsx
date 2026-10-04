@@ -6,7 +6,7 @@ import { Inter, JetBrains_Mono, Playfair_Display, Montserrat, Merriweather } fro
 import localFont from 'next/font/local';
 import { Toaster } from "sonner";
 import { AuthProvider } from "@/src/components/providers/AuthProvider";
-import { MaintenanceWatcher } from "@/src/components/dashboard/MaintenanceWatcher";
+import MaintenanceWatcher from "@/src/components/dashboard/MaintenanceWatcher";
 
 const inter = Inter({
   subsets: ["latin"],

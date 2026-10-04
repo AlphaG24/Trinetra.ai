@@ -21,7 +21,7 @@ interface MaintenanceWatcherProps {
  *   with an unobtrusive alert bar so they can manage and restore the system.
  * - Supabase Realtime pushes instant updates when maintenance mode is toggled.
  */
-export function MaintenanceWatcher({
+export default function MaintenanceWatcher({
   initialMaintenanceMode = false,
 }: MaintenanceWatcherProps) {
   const [isMaintenanceMode, setIsMaintenanceMode] = useState(initialMaintenanceMode)
@@ -198,5 +198,4 @@ export function MaintenanceWatcher({
     </div>
   )
 }
-
-export default MaintenanceWatcher
+export { MaintenanceWatcher }

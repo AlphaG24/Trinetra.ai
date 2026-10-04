@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, Suspense } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { User, ShieldCheck, Bell, Sparkles } from 'lucide-react'
 
@@ -10,8 +11,16 @@ import { SecurityTab } from '@/src/components/settings/SecurityTab'
 import { NotificationsTab } from '@/src/components/settings/NotificationsTab'
 import { IntegrationsTab } from '@/src/components/settings/IntegrationsTab'
 
-export default function SettingsPage() {
+function SettingsContent() {
+  const searchParams = useSearchParams()
+  const tabParam = searchParams.get('tab') as 'profile' | 'security' | 'notifications' | 'integrations' | null
   const [activeTab, setActiveTab] = useState<'profile' | 'security' | 'notifications' | 'integrations'>('profile')
+
+  useEffect(() => {
+    if (tabParam && ['profile', 'security', 'notifications', 'integrations'].includes(tabParam)) {
+      setActiveTab(tabParam)
+    }
+  }, [tabParam])
 
   const tabs = [
     { id: 'profile', label: 'Profile Settings', icon: User },
@@ -94,5 +103,13 @@ export default function SettingsPage() {
         </AnimatePresence>
       </div>
     </div>
+  )
+}
+
+export default function SettingsPage() {
+  return (
+    <Suspense fallback={null}>
+      <SettingsContent />
+    </Suspense>
   )
 }
