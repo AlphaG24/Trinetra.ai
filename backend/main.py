@@ -43,6 +43,7 @@ from app.routers.invoice_router import invoice_router
 from app.routers.number_lifecycle_router import number_lifecycle_router
 from app.routers.byon_router import byon_router
 from app.routers.support_ticket_router import support_ticket_router
+from app.routers.kyc_router import kyc_router
 
 app = FastAPI(title="Trinetra API")
 
@@ -107,6 +108,7 @@ app.include_router(invoice_router)
 app.include_router(number_lifecycle_router)
 app.include_router(byon_router)
 app.include_router(support_ticket_router)
+app.include_router(kyc_router)
 
 @app.on_event("startup")
 async def app_startup():
