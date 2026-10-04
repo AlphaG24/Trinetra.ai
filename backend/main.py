@@ -33,6 +33,7 @@ from app.routers.usage_router import router as usage_router
 from app.routers.blog_ai_router import router as blog_ai_router
 from app.routers.revenue_router import router as revenue_router
 from app.routers.caller_rights_router import router as caller_rights_router
+from app.routers.retention_router import router as retention_router
 
 app = FastAPI(title="Trinetra API")
 
@@ -89,6 +90,7 @@ app.include_router(usage_router)
 app.include_router(blog_ai_router)
 app.include_router(revenue_router)
 app.include_router(caller_rights_router)
+app.include_router(retention_router)
 
 @app.on_event("startup")
 async def app_startup():

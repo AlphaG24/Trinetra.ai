@@ -417,5 +417,74 @@ Exit code: 0 (Zero type errors)
 3. **Verify Machine-Readable Export**:
    - Run `python -m pytest backend/tests/test_caller_rights_service.py -k test_export_csv_format_statutory_dsar -v`.
 
+---
+
+## Task 6: Data Retention Split & Statutory Minimization
+
+- **Date**: October 4, 2026
+- **Branch**: `feature/retention-split-minimization`
+- **Status**: `IMPLEMENTED, pending legal review`
+- **Governing Standard**: CERT-In Directions (April 28, 2022) Sec 4(6), India Income Tax Act 1961 Sec 44AA (`CONFIRM WITH CA`), CGST Act 2017 Sec 36 (`CONFIRM WITH CA`), India DPDP Act 2023 Sec 6 & 8, EU GDPR Art 5(1)(e), Master Plan Section 18.2 (Direct-database mode & dry-run default).
+
+### 1. Implementation Summary
+1. **Dual-Track Statutory Retention Architecture**:
+   - **Operational Media Minimization**: Call audio recordings (`recording_url`, `stereo_recording_url`) and text transcripts (`transcript_text`) minimized after 180 days per CERT-In Directions 2022 and DPDP storage limitation principles.
+   - **Call Metadata & Duration Preservation**: Non-PII call records (duration, timestamps, call status, cost) are preserved indefinitely to support billing calculation audits, customer dispute resolution, and regulatory transparency.
+   - **Statutory Financial Shield (8 Years)**: Books of accounts, invoices (`invoices`), payment transactions (`transactions`), and revenue recognition events (`revenue_events`) are permanently shielded under an 8-year retention lock (`CONFIRM WITH CA`).
+   - **Statutory Compliance Records (Permanent)**: Affirmative consent records (`consent_records`) and immutable audit logs (`audit_logs`, `revenue_audit_logs`) are permanently shielded and cannot be purged.
+2. **Retention Policy Service (`RetentionPolicyService`)**:
+   - Computes statutory cutoffs: 180-day operational media cutoff, 180-day security log cutoff, 2,920-day (8-year) financial ledger cutoff.
+   - `audit_retention_status`: Reports candidate counts of operational media eligible for minimization alongside protected financial and compliance counts without mutating data.
+   - `execute_retention_purge`: Strictly defaults to `dry_run=True`. When executed live (`dry_run=False`), scrubs audio URLs and transcript text, verifies zero financial records are mutated, and creates an immutable audit record in `audit_logs`.
+3. **Admin Routing & Next.js Endpoints**:
+   - FastAPI: `GET /api/retention/policies`, `POST /api/retention/audit`, `POST /api/retention/purge` mounted in `main.py`.
+   - Next.js Admin Route: `frontend/src/app/api/admin/retention/route.ts` with `requireAdmin()` (validating via `supabase.auth.getUser()` per SEC-003 and checking admin role per API-001) wrapped in `safeApiHandler`.
+
+### 2. Test Execution Evidence
+
+#### Task 6 Test Suite (`backend/tests/test_retention_split.py`):
+```
+backend/tests/test_retention_split.py::TestStatutoryRetentionCutoffs::test_cutoffs_relative_to_reference_date PASSED [ 14%]
+backend/tests/test_retention_split.py::TestStatutoryRetentionCutoffs::test_shielded_tables_registrations PASSED [ 28%]
+backend/tests/test_retention_split.py::TestRetentionAuditStatus::test_audit_identifies_eligible_and_shielded_records PASSED [ 42%]
+backend/tests/test_retention_split.py::TestRetentionPurgeSafeguards::test_purge_defaults_to_dry_run_zero_mutations PASSED [ 57%]
+backend/tests/test_retention_split.py::TestRetentionPurgeSafeguards::test_purge_live_execution_minimizes_media_and_preserves_financials PASSED [ 71%]
+backend/tests/test_retention_split.py::TestRetentionPydanticSchemas::test_audit_request_schema PASSED [ 85%]
+backend/tests/test_retention_split.py::TestRetentionPydanticSchemas::test_purge_request_defaults_dry_run_true PASSED [100%]
+
+============================== 7 passed in 0.73s ==============================
+```
+
+#### Frozen Files CI Integrity Check:
+```
+backend/tests/test_frozen_files_ci.py: 8 passed in 0.32s (100% pass rate)
+```
+
+#### Hardcoded Gender Scanner Check:
+```
+backend/tests/test_a1d_gender_resolver.py: 70 passed in 13.58s (100% pass rate)
+```
+
+#### Overall Repository Test Suite:
+```
+324 passed, 1 warning in 27.04s (100% pass rate)
+```
+
+#### Frontend TypeScript Build Validation:
+```
+npx tsc --noEmit
+Exit code: 0 (Zero type errors)
+```
+
+### 3. Reviewer Verification Steps
+1. **Verify Dry Run Zero-Mutation Guarantee**:
+   - Run `python -m pytest backend/tests/test_retention_split.py -k test_purge_defaults_to_dry_run_zero_mutations -v`.
+   - Confirm that `dry_run=True` reports `WOULD_PURGE` and performs zero delete/update operations on database tables.
+2. **Verify 8-Year Financial Shield**:
+   - Run `python -m pytest backend/tests/test_retention_split.py -k test_purge_live_execution_minimizes_media_and_preserves_financials -v`.
+   - Confirm that `invoices`, `transactions`, and `revenue_events` are never modified during purge.
+3. **Verify API Policy Endpoint**:
+   - Inspect `GET /api/retention/policies` output to confirm all statutory periods and legal citations match the compliance register.
+
 
 
