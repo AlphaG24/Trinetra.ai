@@ -1101,3 +1101,95 @@ backend/tests/test_byon_credential_vault.py::TestDirectBYONRouteLogic::test_rout
 - Tests: `test_pii_sanitizer.py`, `test_wallet_razorpay_quota.py`, `test_gst_invoicing_vault.py`, `test_number_lifecycle_grace.py`, `test_byon_credential_vault.py`.
 - Result: **90 passed out of 90 tests (100% pass)**.
 
+---
+
+## Task 14: Support Tickets System (CFU Call Forwarding & SLA Tracking)
+
+- **Date**: 2026-10-04
+- **Branch**: `feature/support-ticket-system`
+- **Commit**: `9f1e46c`
+- **Status**: `DONE`
+- **Mandate**: Master Plan Section 18.15 Item 12.
+- **Governing Standard**:
+  - Predefined CFU setup flows for carrier unconditional forwarding (Airtel, Jio, Vi, BSNL, AT&T, Verizon, T-Mobile, GSM/CDMA).
+  - Multi-tiered SLA tracking: Urgent/CFU = 4 hours, High = 8 hours, Medium = 24 hours, Low = 48 hours.
+  - Automated SLA status evaluation (`within_sla`, `escalated`, `breached`).
+  - Automated test call dispatch and verification sign-off.
+  - Admin triage queue sorted by SLA urgency.
+  - Strict multi-tenant ticket isolation.
+
+### 1. Implementation Summary
+1. **Database Schema & RLS Migrations**:
+   - `supabase/migrations/20261004220000_create_support_tickets_cfu_workflows.sql` (UP)
+   - `supabase/migrations/20261004220000_create_support_tickets_cfu_workflows_down.sql` (DOWN)
+   - Added CFU columns to `support_tickets`: `cfu_source_number`, `cfu_carrier`, `cfu_forward_to_number`, `cfu_dial_code`, `cfu_verification_status` (`pending_setup`, `dial_code_shared`, `test_call_pending`, `verified`, `failed`).
+   - Added SLA tracking columns: `sla_due_at`, `sla_status` (`within_sla`, `breached`, `escalated`), `assigned_admin_id`.
+   - Created partial indexes for CFU status, active SLA deadlines, and admin triage queues.
+   - Row Level Security (RLS) policies enforcing organization isolation and admin oversight.
+2. **Support Ticket Service (`backend/app/services/support_ticket_service.py`)**:
+   - `resolve_cfu_instructions`: Standardizes carrier-specific MMI/USSD codes (`*401*` for Jio, `*21*...#` for Airtel/Vi/BSNL/AT&T/GSM, `*72` for Verizon/CDMA).
+   - `calculate_sla_due_at`: Computes statutory deadlines based on urgency.
+   - `evaluate_sla_status`: Live evaluation of ticket health (breached if overdue, escalated if <= 2 hours remaining, healthy within SLA).
+   - `create_cfu_ticket`: Generates carrier instructions, formats initial guidance message, sets SLA deadline, and records ticket.
+   - `create_ticket`: Creates general helpdesk tickets with category and priority validation.
+   - `trigger_cfu_test_call`: Dispatches test call verification and updates ticket status to `in_progress`.
+   - `confirm_cfu_verification`: Marks verification success/failure; automatically resolves ticket upon successful test call.
+   - `add_reply`: Threaded conversation updates with automated status transitions (`waiting_on_client` on admin reply, `in_progress` on client reply).
+   - `get_admin_triage_queue`: Live triage queue sorted by SLA urgency (breached first, then escalated, then within_sla).
+3. **FastAPI Router (`backend/app/routers/support_ticket_router.py`)**:
+   - Mounted in `backend/main.py` at `/api/support`.
+   - Endpoints:
+     - `POST /api/support/tickets/cfu`: Create specialized CFU request.
+     - `POST /api/support/tickets`: Create standard ticket.
+     - `GET /api/support/tickets`: List tenant tickets.
+     - `GET /api/support/tickets/{id}`: Detailed ticket with CFU instructions & dynamic SLA health.
+     - `POST /api/support/tickets/{id}/reply`: Add reply.
+     - `POST /api/support/tickets/{id}/cfu/test-call`: Dispatch test call.
+     - `POST /api/support/tickets/{id}/cfu/confirm`: Confirm verification.
+     - `GET /api/support/admin/triage`: Admin triage queue.
+     - `POST /api/support/admin/tickets/{id}/assign`: Assign admin.
+4. **Frontend Integration**:
+   - Updated `frontend/src/app/api/support/tickets/route.ts` to accept `cfu_forwarding` category.
+   - Updated `frontend/src/app/dashboard/support/page.tsx` category dropdown with `Call Forwarding (CFU) Setup`.
+   - Validated full frontend typecheck (`npx tsc --noEmit` exited 0).
+
+### 2. Test Results (Authoritative)
+```
+backend/tests/test_support_ticket_system.py::TestCFUCarrierResolution::test_jio_carrier_resolution PASSED
+backend/tests/test_support_ticket_system.py::TestCFUCarrierResolution::test_airtel_carrier_resolution PASSED
+backend/tests/test_support_ticket_system.py::TestCFUCarrierResolution::test_vi_carrier_resolution PASSED
+backend/tests/test_support_ticket_system.py::TestCFUCarrierResolution::test_bsnl_carrier_resolution PASSED
+backend/tests/test_support_ticket_system.py::TestCFUCarrierResolution::test_verizon_carrier_resolution PASSED
+backend/tests/test_support_ticket_system.py::TestCFUCarrierResolution::test_att_carrier_resolution PASSED
+backend/tests/test_support_ticket_system.py::TestCFUCarrierResolution::test_tmobile_carrier_resolution PASSED
+backend/tests/test_support_ticket_system.py::TestCFUCarrierResolution::test_generic_fallback_for_unknown_carrier PASSED
+backend/tests/test_support_ticket_system.py::TestCFUCarrierResolution::test_generic_cdma_fallback_for_us_unknown_carrier PASSED
+backend/tests/test_support_ticket_system.py::TestSLAManagement::test_sla_due_date_calculation_by_priority PASSED
+backend/tests/test_support_ticket_system.py::TestSLAManagement::test_evaluate_sla_status_within_sla PASSED
+backend/tests/test_support_ticket_system.py::TestSLAManagement::test_evaluate_sla_status_escalated PASSED
+backend/tests/test_support_ticket_system.py::TestSLAManagement::test_evaluate_sla_status_breached PASSED
+backend/tests/test_support_ticket_system.py::TestSLAManagement::test_evaluate_sla_status_resolved_or_closed_never_breached PASSED
+backend/tests/test_support_ticket_system.py::TestCFUTicketLifecycle::test_create_cfu_ticket_flow PASSED
+backend/tests/test_support_ticket_system.py::TestCFUTicketLifecycle::test_cfu_test_call_dispatch PASSED
+backend/tests/test_support_ticket_system.py::TestCFUTicketLifecycle::test_confirm_cfu_verification_success PASSED
+backend/tests/test_support_ticket_system.py::TestCFUTicketLifecycle::test_confirm_cfu_verification_failure PASSED
+backend/tests/test_support_ticket_system.py::TestStandardTicketAndConversation::test_create_standard_ticket_success PASSED
+backend/tests/test_support_ticket_system.py::TestStandardTicketAndConversation::test_create_ticket_invalid_category_rejected PASSED
+backend/tests/test_support_ticket_system.py::TestStandardTicketAndConversation::test_add_reply_admin_sets_waiting_on_client PASSED
+backend/tests/test_support_ticket_system.py::TestMultiTenantIsolationAndTriage::test_cross_tenant_ticket_access_rejected PASSED
+backend/tests/test_support_ticket_system.py::TestMultiTenantIsolationAndTriage::test_admin_triage_queue_sla_urgency_ordering PASSED
+backend/tests/test_support_ticket_system.py::TestMultiTenantIsolationAndTriage::test_admin_triage_queue_filter_only_breached PASSED
+backend/tests/test_support_ticket_system.py::TestMultiTenantIsolationAndTriage::test_assign_ticket_admin PASSED
+backend/tests/test_support_ticket_system.py::TestDirectSupportRouteLogic::test_route_create_cfu_ticket PASSED
+backend/tests/test_support_ticket_system.py::TestDirectSupportRouteLogic::test_route_create_standard_ticket PASSED
+backend/tests/test_support_ticket_system.py::TestDirectSupportRouteLogic::test_route_trigger_cfu_test_call PASSED
+backend/tests/test_support_ticket_system.py::TestDirectSupportRouteLogic::test_route_confirm_cfu_verification PASSED
+backend/tests/test_support_ticket_system.py::TestDirectSupportRouteLogic::test_route_admin_triage_queue PASSED
+======================== 30 passed, 1 warning in 1.55s ========================
+```
+
+#### Regression Suite Verification:
+- Tests: `test_pii_sanitizer.py`, `test_wallet_razorpay_quota.py`, `test_gst_invoicing_vault.py`, `test_number_lifecycle_grace.py`, `test_byon_credential_vault.py`, `test_support_ticket_system.py`.
+- Result: **120 passed out of 120 tests (100% pass)**.
+
+
