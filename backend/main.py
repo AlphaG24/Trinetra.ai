@@ -46,6 +46,8 @@ from app.routers.support_ticket_router import support_ticket_router
 from app.routers.kyc_router import kyc_router
 from app.routers.admin_operations_router import router as admin_operations_router
 from app.routers.compliance_router import compliance_router
+from app.routers.observability_router import observability_router
+from app.services.observability_service import ObservabilityService
 
 app = FastAPI(title="Trinetra API")
 
@@ -113,9 +115,15 @@ app.include_router(support_ticket_router)
 app.include_router(kyc_router)
 app.include_router(admin_operations_router)
 app.include_router(compliance_router)
+app.include_router(observability_router)
 
 @app.on_event("startup")
 async def app_startup():
+    try:
+        ObservabilityService.init_sentry()
+    except Exception as e:
+        print(f"[Startup] Observability Sentry init warning: {e}", flush=True)
+
     try:
         from agent import run_agent
         print("[Startup] Agent runner pre-warmed successfully.", flush=True)

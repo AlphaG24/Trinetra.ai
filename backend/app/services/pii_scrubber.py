@@ -69,12 +69,19 @@ API_KEY_PATTERN = re.compile(
     re.IGNORECASE
 )
 
+# 7. Indian PAN (5 letters, 4 digits, 1 letter)
+PAN_PATTERN = re.compile(r"\b[A-Z]{5}[0-9]{4}[A-Z]\b")
+
+# 8. Email addresses
+EMAIL_PATTERN = re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b")
+
 # Sensitive dictionary keys to redact automatically
 SENSITIVE_KEY_NAMES = {
     "password", "secret", "token", "access_token", "refresh_token",
     "authorization", "api_key", "apikey", "private_key", "service_role_key",
     "supabase_service_role_key", "anon_key", "client_secret", "cookie",
     "set-cookie", "credit_card", "cvv", "card_number", "aadhaar", "ssn",
+    "pan", "pan_number"
 }
 
 
@@ -159,6 +166,12 @@ def sanitize_text(text: str) -> str:
 
     # 6. SSN
     sanitized = SSN_PATTERN.sub(mask_ssn_match, sanitized)
+
+    # 7. PAN
+    sanitized = PAN_PATTERN.sub("[REDACTED_PAN]", sanitized)
+
+    # 8. Email
+    sanitized = EMAIL_PATTERN.sub("[REDACTED_EMAIL]", sanitized)
 
     return sanitized
 
@@ -246,6 +259,13 @@ def sentry_before_send(event: Dict[str, Any], hint: Optional[Dict[str, Any]] = N
     try:
         # Deep copy to avoid mutating original objects if shared
         cleaned = copy.deepcopy(event)
+
+        # 0. Cleanse top-level message and logentry
+        if "message" in cleaned and isinstance(cleaned["message"], str):
+            cleaned["message"] = sanitize_text(cleaned["message"])
+        if "logentry" in cleaned and isinstance(cleaned["logentry"], dict):
+            if "message" in cleaned["logentry"] and isinstance(cleaned["logentry"]["message"], str):
+                cleaned["logentry"]["message"] = sanitize_text(cleaned["logentry"]["message"])
 
         # 1. Cleanse top-level request data
         if "request" in cleaned and isinstance(cleaned["request"], dict):
@@ -340,3 +360,15 @@ def betterstack_log_formatter(record: logging.LogRecord) -> Dict[str, Any]:
         payload["extra"] = sanitize_data(record.extra)
 
     return payload
+
+
+class PIIScrubber:
+    """Wrapper class providing static helper methods for PII sanitization."""
+    @staticmethod
+    def scrub_text(text: str) -> str:
+        return sanitize_text(text)
+
+    @staticmethod
+    def scrub_dict(data: Any) -> Any:
+        return sanitize_data(data)
+
