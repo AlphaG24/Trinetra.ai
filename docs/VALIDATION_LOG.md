@@ -872,3 +872,86 @@ TestWalletRouteLogicDirect::test_constants_match_master_plan_section_18 PASSED
 ### 4. Provider Verification Status
 - **Twilio DPA**: VERIFIED (2026-10-04) — processor/sub-processor model; annual independent audits; SCCs, BCRs, Data Privacy Framework transfer mechanisms; 30-day data deletion post-termination.
 - **LiveKit Cloud**: VERIFIED (2026-10-04) — Zero Data Retention by default; SRTP/DTLS-SRTP in-transit encryption; ephemeral media; optional Agent Observability 30-day retention window; PII Redaction available.
+- **Supabase**: VERIFIED (2026-10-04) — SOC 2 Type II certified, HIPAA BAA available, ISO 27001 certified, AES-256 encryption at rest, TLS 1.3 in transit, automated daily backups with PITR.
+
+---
+
+## Task 11: GST Invoicing Vault & CA-Reviewed Workflows
+
+- **Date**: 2026-10-04
+- **Branch**: `feature/gst-invoicing-vault`
+- **Commit**: `43f5458`
+- **Status**: `IMPLEMENTED, pending CA review`
+- **Mandate**: Master Plan Sections 18.10, 18.11, B6.
+- **Governing Standard**:
+  - CGST Act 2017 Sections 31 & 36 (`CONFIRM WITH CA`)
+  - Rule 46 of CGST Rules 2017 (Tax Invoice Contents & Requirements)
+  - SAC 998311 for IT & Cloud Software Services (18% standard GST rate)
+  - Income Tax Act 1961 Section 44AA (Statutory 8-year record retention: `CONFIRM WITH CA`)
+
+### 1. Implementation Summary
+1. **Database Schema (UP & DOWN Migrations)**:
+   - `supabase/migrations/20261004190000_create_gst_invoice_vault_and_ca_workflows.sql`
+   - `supabase/migrations/20261004190000_create_gst_invoice_vault_and_ca_workflows_down.sql`
+   - Tables created with strict foreign key constraints and RLS:
+     - `public.invoices`: Master invoice record storing organization_id, fiscal_year, sequential invoice_number, GSTIN, place_of_supply, subtotal_paisa, cgst/sgst/igst breakdown, status, ca_review_status, pdf_storage_path, and SHA-256 integrity_hash.
+     - `public.invoice_line_items`: Itemized lines referencing SAC 998311, quantities, unit prices, taxable value, and tax amounts in integer paisa.
+     - `public.invoice_ca_reviews`: Immutable, append-only Chartered Accountant sign-off audit trail with ICAI membership number, review action, notes, and SHA-256 checksum.
+   - Row Level Security (RLS) policies:
+     - Tenant members can only SELECT invoices and line items matching their own `organization_id`.
+     - Admins / Super Admins can manage all invoices and perform CA reviews.
+     - Append-only policy for CA review audit trail (no deletes or in-place mutations allowed).
+2. **Statutory GST Calculator (`backend/app/services/gst_calculator.py`)**:
+   - Intra-state supply (Supplier 07-Delhi == Customer 07-Delhi): 9% CGST + 9% SGST.
+   - Inter-state supply (Supplier 07-Delhi != Customer State): 18% IGST.
+   - Exact integer paisa arithmetic preserving mathematical equality: `subtotal_paisa + taxes == grand_total_paisa`.
+   - Statutory 15-character GSTIN regex validation and state-code prefix resolution.
+3. **Statutory PDF Invoice Generator (`backend/app/services/pdf_invoice_generator.py`)**:
+   - Uses `reportlab` to render high-precision PDF bytes complying with Rule 46 of CGST Rules 2017.
+   - Includes Supplier/Buyer details, sequential invoice number, SAC 998311, tax breakdowns, Reverse Charge declaration ("NO"), SHA-256 integrity checksum, and statutory 8-year retention notice (`CONFIRM WITH CA`).
+4. **GST Invoicing Vault Service (`backend/app/services/invoice_vault_service.py`)**:
+   - Financial year calculation (April 1 to March 31 boundary).
+   - Gapless sequential invoice numbering (`TRI/26-27/00001`).
+   - Tamper-evident SHA-256 integrity hashing of canonical invoice records.
+   - Automated creation of statutory invoices on wallet top-ups.
+   - Chartered Accountant review sign-off workflow (`approved`, `flagged`, `waived`, `amended`) with SHA-256 audit trail checksum.
+   - Periodic GSTR-1 and GSTR-3B tax summary aggregation for CA tax filing.
+5. **Razorpay Top-Up Webhook Integration**:
+   - `backend/app/services/razorpay_webhook_service.py` automatically generates and vaults a GST invoice upon verified `payment.captured` or `order.paid` events.
+   - Idempotency hash deduplication prevents duplicate invoice creation on webhook retry bursts.
+6. **FastAPI Router (`backend/app/routers/invoice_router.py`)**:
+   - Mounted in `backend/main.py` at `/api/invoices`.
+   - Endpoints:
+     - `GET /api/invoices`: List organization-scoped invoices.
+     - `GET /api/invoices/{id}`: Detailed invoice with line items and CA review history.
+     - `GET /api/invoices/{id}/pdf`: Download statutory PDF invoice bytes.
+     - `POST /api/invoices/{id}/ca-review`: Chartered Accountant review sign-off endpoint.
+     - `GET /api/invoices/ca-summary`: GSTR-1 / GSTR-3B statutory tax aggregation summary.
+     - `POST /api/invoices/generate`: On-demand statutory invoice generation.
+
+### 2. Test Results (Authoritative)
+```
+backend/tests/test_gst_invoicing_vault.py::TestGSTCalculator::test_intra_state_inclusive_calculation PASSED
+backend/tests/test_gst_invoicing_vault.py::TestGSTCalculator::test_inter_state_inclusive_calculation PASSED
+backend/tests/test_gst_invoicing_vault.py::TestGSTCalculator::test_exclusive_calculation_mode PASSED
+backend/tests/test_gst_invoicing_vault.py::TestGSTCalculator::test_gstin_validation PASSED
+backend/tests/test_invoice_vault_service::test_fiscal_year_resolution PASSED
+backend/tests/test_invoice_vault_service::test_sequential_gapless_invoice_numbering PASSED
+backend/tests/test_invoice_vault_service::test_tamper_evident_sha256_hash PASSED
+backend/tests/test_invoice_vault_service::test_create_b2b_invoice_vault_entry PASSED
+backend/tests/test_invoice_vault_service::test_tenant_isolation_on_invoice_query PASSED
+backend/tests/test_pdf_invoice_generator::test_generate_invoice_pdf_bytes PASSED
+backend/tests/test_ca_review_workflow::test_ca_review_approval_with_checksum PASSED
+backend/tests/test_ca_review_workflow::test_ca_review_flagging PASSED
+backend/tests/test_ca_review_workflow::test_ca_review_validation_errors PASSED
+backend/tests/test_ca_review_workflow::test_ca_tax_summary_gstr_aggregation PASSED
+backend/tests/test_razorpay_webhook_auto_invoice::test_webhook_payment_captured_generates_invoice PASSED
+backend/tests/test_razorpay_webhook_auto_invoice::test_webhook_idempotency_prevents_duplicate_invoice PASSED
+backend/tests/test_direct_invoice_route_logic::test_route_generate_and_get_invoice PASSED
+backend/tests/test_direct_invoice_route_logic::test_route_ca_review_and_summary PASSED
+======================== 18 passed, 1 warning in 1.85s ========================
+```
+
+#### Regression Suite Verification:
+- Tests: `test_pii_sanitizer.py`, `test_tenant_isolation_ci.py`, `test_wallet_razorpay_quota.py`, `test_gst_invoicing_vault.py`.
+- Result: **79 passed out of 79 tests (100% pass)**.
