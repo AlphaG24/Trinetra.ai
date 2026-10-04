@@ -94,13 +94,24 @@
    - **Voice Cloning & Media Rights**: Requires express rights and explicit consent for any cloned voice. Deceptive impersonation, deepfakes, harassment, and unauthorized robocalls strictly prohibited. Commercial client-facing applications require commercial plan subscription.
 
 6. **LiveKit Cloud**:
-   - **Status**: `UNVERIFIED, check provider terms` (WebRTC infrastructure; verify whether audio/video tracks are buffered or retained in transit).
+   - **Status**: `VERIFIED (2026-10-04)`
+   - **Data Retention**: Zero Data Retention (ZDR) by default. Media packets are ephemeral — routed in real-time via SFU architecture with no buffering for storage. Only jitter buffering at protocol level.
+   - **In-Transit Encryption**: SRTP with DTLS-SRTP key exchanges enforced for all audio and video.
+   - **Optional Observability**: Agent Observability Insights stores transcripts and session audio for 30 days maximum; PII Redaction available. Must be explicitly enabled.
+   - **Model Inference (LiveKit Built-in)**: Zero data retention; prompts, audio, and model outputs never stored or used for training. Contractual ZDR commitment with underlying model providers.
 
 7. **Deepgram**:
    - **Status**: `UNVERIFIED, check provider terms` (Speech-to-Text; verify zero-data-retention (ZDR) configuration for streaming audio).
 
 8. **Twilio**:
-   - **Status**: `UNVERIFIED, check provider terms` (PSTN & WhatsApp Business API; verify Twilio Data Protection Addendum and messaging compliance terms).
+   - **Status**: `VERIFIED (2026-10-04)`
+   - **DPA Model**: Twilio acts as processor/sub-processor on Customer instructions. Acts as independent controller only for Account Data, Communications Usage Data, and Customer Content for its own legitimate business purposes.
+   - **Audits**: External independent annual security audits; audit reports available on written request with confidentiality controls.
+   - **Security Incidents**: Must notify Customer without undue delay upon discovery of a Security Incident.
+   - **International Transfers**: EU SCCs (Module 1/2/3), UK IDTA, Brazil SCCs, Twilio BCRs, Data Privacy Framework (EU-US, UK, Swiss). Irish law governs SCCs.
+   - **Data Deletion**: 30 days post-termination for stored Customer Content; 60 days for backup systems. SendGrid: 1 year on backup systems.
+   - **Sub-processors**: Public list maintained at twilio.com/legal/sub-processors; 30-day notice for infrastructure changes, 10-day notice for others.
+   - **PSTN + WhatsApp**: Confirmed. Provides E.164 phone numbers, PSTN voice/SMS, and WhatsApp Business API integration.
 
 9. **Supabase**:
    - **Status**: `UNVERIFIED, check provider terms` (PostgreSQL database; verify SOC2 Type II certification, HIPAA BAA availability, and encryption at rest).

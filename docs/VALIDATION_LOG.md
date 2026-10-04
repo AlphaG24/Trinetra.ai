@@ -816,5 +816,59 @@ Exit code: 0 (Zero TypeScript errors, 164 pages compiled)
    ```
 
 
+---
 
+## Task 10: Prepaid Wallet, Razorpay Idempotency and Spend Limits
 
+- **Date**: 2026-10-04
+- **Branch**: `feature/wallet-razorpay-quota`
+- **Commit**: `5b59402`
+- **Status**: `VERIFIED — 19/19 tests pass`
+- **Master Plan Reference**: Section 18.9 (Spend Limits, Non-Disconnection Mandate) and Section 18.10 (Reliability Score)
+
+### 1. What Was Built
+1. **DB Migration (UP)**: `wallets`, `wallet_transactions`, `processed_webhook_events` tables with full RLS, FK constraints, indexes, and `audit_logs` / `revenue_audit_logs` triggers.
+2. **`WalletService`** (`backend/app/services/wallet_service.py`):
+   - `get_or_create_wallet`: Provisions wallet with Rs2500 (250000 paisa) spend limit and Reliability Score 85.
+   - `credit_wallet` / `debit_wallet`: Double-entry ledger with immutable `wallet_transactions` rows.
+   - `check_pre_call_permission`: Gates new call initiation only. Active in-progress calls are NEVER disconnected (`ACTIVE_CALL_PROTECTED`). Exempts `developer_tester` and `admin` roles.
+   - `recalculate_reliability_score`: Transparent 4-factor breakdown (payment history, DND compliance, call quality, dispute rate). Visible to customer.
+   - `claim_emergency_minutes`: 50 free minutes for score > 80; 30-day cooldown; rejects if score <= 80.
+3. **`RazorpayWebhookService`** (`backend/app/services/razorpay_webhook_service.py`):
+   - `verify_webhook_signature`: Constant-time HMAC-SHA256 comparison.
+   - `process_webhook_event`: SHA-256 idempotency hash locks prevent duplicate crediting. Handles `payment.captured` (credit) and `refund.processed` (debit).
+4. **Router** (`backend/app/routers/wallet_router.py`): `GET /api/wallet/balance`, `POST /api/wallet/pre-call-check`, `POST /api/webhooks/razorpay`.
+5. **`main.py`** updated with `wallet_router` and `webhook_router`.
+
+### 2. Test Results (Authoritative)
+```
+============================= test session starts =============================
+collected 19 items
+TestWalletPrepaidLedger::test_wallet_provisioning_default_spend_limit PASSED
+TestWalletPrepaidLedger::test_wallet_credit_increments_balance_and_records_ledger PASSED
+TestWalletPrepaidLedger::test_wallet_debit_decrements_balance_and_records_spend PASSED
+TestPreCallGatingAndNonDisconnection::test_zero_in_call_disconnection_active_call_protected PASSED
+TestPreCallGatingAndNonDisconnection::test_spend_limit_blocks_subsequent_calls PASSED
+TestPreCallGatingAndNonDisconnection::test_zero_balance_blocks_subsequent_calls_without_emergency PASSED
+TestPreCallGatingAndNonDisconnection::test_developer_tester_role_is_exempt_from_spend_limits PASSED
+TestReliabilityScoreAndEmergencyMinutes::test_reliability_score_breakdown_transparent PASSED
+TestReliabilityScoreAndEmergencyMinutes::test_emergency_minutes_granted_when_score_above_80 PASSED
+TestReliabilityScoreAndEmergencyMinutes::test_emergency_minutes_rejected_when_score_below_or_equal_80 PASSED
+TestReliabilityScoreAndEmergencyMinutes::test_emergency_minutes_cooldown_enforced PASSED
+TestReliabilityScoreAndEmergencyMinutes::test_call_authorized_using_emergency_minutes_when_balance_zero PASSED
+TestRazorpayWebhookIdempotency::test_signature_verification_valid_and_invalid PASSED
+TestRazorpayWebhookIdempotency::test_idempotent_duplicate_event_deduplication PASSED
+TestRazorpayWebhookIdempotency::test_refund_processed_debits_organization_wallet PASSED
+TestWalletRouteLogicDirect::test_route_logic_wallet_balance_data_shape PASSED
+TestWalletRouteLogicDirect::test_route_logic_pre_call_check_active_call_always_allowed PASSED
+TestWalletRouteLogicDirect::test_route_logic_webhook_idempotency_first_and_duplicate PASSED
+TestWalletRouteLogicDirect::test_constants_match_master_plan_section_18 PASSED
+======================== 19 passed, 1 warning in 1.78s ========================
+```
+
+### 3. Notes on TestClient Bypass
+`starlette 0.35.1` + `httpx 0.28.1` are incompatible (`httpx` removed the `app=` kwarg from `Client.__init__`). Cannot upgrade either: `fastapi 0.109.0` pins `starlette<0.36`; `google-genai` pins `httpx>=0.28.1`. HTTP route tests are replaced by direct service-layer invocation (class `TestWalletRouteLogicDirect`) — same pattern used by all 9 prior passing test suites.
+
+### 4. Provider Verification Status
+- **Twilio DPA**: VERIFIED (2026-10-04) — processor/sub-processor model; annual independent audits; SCCs, BCRs, Data Privacy Framework transfer mechanisms; 30-day data deletion post-termination.
+- **LiveKit Cloud**: VERIFIED (2026-10-04) — Zero Data Retention by default; SRTP/DTLS-SRTP in-transit encryption; ephemeral media; optional Agent Observability 30-day retention window; PII Redaction available.
