@@ -955,3 +955,65 @@ backend/tests/test_direct_invoice_route_logic::test_route_ca_review_and_summary 
 #### Regression Suite Verification:
 - Tests: `test_pii_sanitizer.py`, `test_tenant_isolation_ci.py`, `test_wallet_razorpay_quota.py`, `test_gst_invoicing_vault.py`.
 - Result: **79 passed out of 79 tests (100% pass)**.
+
+---
+
+## Task 12: Virtual Number Lifecycle (Grace, Hold & Missed Digests)
+
+- **Date**: 2026-10-04
+- **Branch**: `feature/number-lifecycle-grace`
+- **Commit**: `e1f2d22`
+- **Status**: `IMPLEMENTED, pending carrier quarantine verification`
+- **Mandate**: Master Plan Section 18.7 (Authoritative Overrides).
+- **Governing Standard**:
+  - No 90-Day Cooling: Immediate neutral unavailable message.
+  - 15-Day Grace Period: Retention of ownership, alternate-day reminders.
+  - 14-Day Administrative Hold: Configurable hold before permanent release.
+  - Carrier quarantine rules: `UNVERIFIED, check provider terms`.
+
+### 1. Implementation Summary
+1. **Database Schema & RLS Migrations**:
+   - `supabase/migrations/20261004200000_create_number_lifecycle_and_missed_calls.sql` (UP)
+   - `supabase/migrations/20261004200000_create_number_lifecycle_and_missed_calls_down.sql` (DOWN)
+   - Updated `phone_numbers` status constraint to include `grace_period`, `hold_period`, and `quarantined`.
+   - Added lifecycle columns: `expired_at`, `grace_period_ends_at`, `hold_period_ends_at`, `missed_calls_count`, `reactivated_at`, `reactivation_token`, and `last_reminder_sent_at`.
+   - Created `number_lifecycle_missed_calls` table tracking inbound calls during grace/hold with PII-masked caller numbers (`+91 98XXXXX210`).
+   - Created `number_lifecycle_digests` table storing daily missed-call counts, unique callers, and secure reactivation links.
+   - Row Level Security (RLS) policies enforcing strict organization tenant isolation.
+2. **Number Lifecycle Service (`backend/app/services/number_lifecycle_service.py`)**:
+   - `expire_number`: Transitions active number into 15-day grace period; sets `grace_period_ends_at = now + 15d` and `hold_period_ends_at = now + 29d`; generates cryptographic `reactivation_token`.
+   - `check_inbound_call_lifecycle`: Fast intercept on inbound calls for numbers in grace or hold period. Returns neutral unavailable TwiML (`The number you have dialed is currently unavailable. Please try again later.`), logs missed call record, and increments `missed_calls_count`.
+   - `process_lifecycle_transitions`: Automated transition engine advancing expired grace numbers to hold period, and expired hold numbers to released.
+   - `generate_daily_missed_call_digest`: Aggregates 24-hour missed call volume, unique callers, and formats owner summary with one-click reactivation URL.
+   - `reactivate_number`: One-click reactivation restoring number from grace or hold period back to active status upon renewal/top-up. Enforces tenant boundary.
+3. **Telephony Webhook Intercept (`backend/voice_router.py`)**:
+   - `handle_twilio_voice_webhook` checks inbound numbers against lifecycle states before agent assignment; immediately returns neutral unavailable XML without spawning WebRTC rooms or agent workers.
+4. **FastAPI Router (`backend/app/routers/number_lifecycle_router.py`)**:
+   - Mounted in `backend/main.py` at `/api/numbers/lifecycle`.
+   - Endpoints:
+     - `POST /api/numbers/lifecycle/{id}/expire`
+     - `POST /api/numbers/lifecycle/{id}/reactivate`
+     - `GET /api/numbers/lifecycle/{id}/digest`
+     - `POST /api/numbers/lifecycle/process-transitions`
+     - `GET /api/numbers/lifecycle/neutral-unavailable-twiml`
+
+### 2. Test Results (Authoritative)
+```
+backend/tests/test_number_lifecycle_grace.py::TestNumberLifecycleTransitions::test_expire_number_enters_15_day_grace PASSED
+backend/tests/test_number_lifecycle_grace.py::TestNumberLifecycleTransitions::test_inbound_call_neutral_message_and_missed_call_logging PASSED
+backend/tests/test_number_lifecycle_grace.py::TestNumberLifecycleTransitions::test_active_number_does_not_intercept_calls PASSED
+backend/tests/test_number_lifecycle_grace.py::TestNumberLifecycleTransitions::test_hold_period_neutral_message_and_missed_call_logging PASSED
+backend/tests/test_number_lifecycle_grace.py::TestNumberLifecycleTransitions::test_automated_lifecycle_transitions PASSED
+backend/tests/test_number_lifecycle_grace.py::TestReactivationWorkflow::test_reactivate_during_grace_period PASSED
+backend/tests/test_number_lifecycle_grace.py::TestReactivationWorkflow::test_reactivate_during_hold_period PASSED
+backend/tests/test_number_lifecycle_grace.py::TestReactivationWorkflow::test_reactivate_rejected_if_tenant_mismatch PASSED
+backend/tests/test_number_lifecycle_grace.py::TestReactivationWorkflow::test_reactivate_rejected_if_released PASSED
+backend/tests/test_number_lifecycle_grace.py::TestDailyMissedCallDigest::test_generate_daily_missed_call_digest PASSED
+backend/tests/test_number_lifecycle_grace.py::TestDirectNumberLifecycleRouteLogic::test_route_expire_and_reactivate PASSED
+backend/tests/test_number_lifecycle_grace.py::TestDirectNumberLifecycleRouteLogic::test_route_digest_and_transitions PASSED
+======================== 12 passed, 1 warning in 1.66s ========================
+```
+
+#### Regression Suite Verification:
+- Tests: `test_pii_sanitizer.py`, `test_wallet_razorpay_quota.py`, `test_gst_invoicing_vault.py`, `test_number_lifecycle_grace.py`.
+- Result: **62 passed out of 62 tests (100% pass)**.
