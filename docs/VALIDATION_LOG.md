@@ -1468,3 +1468,61 @@ backend/tests/test_observability_monitoring.py::test_router_get_monitoring_statu
 - Tests: `test_gst_invoicing_vault.py`, `test_number_lifecycle_grace.py`, `test_byon_credential_vault.py`, `test_support_ticket_system.py`, `test_encrypted_kyc_vault.py`, `test_essential_admin_panel.py`, `test_compliance_dpa_runbook.py`, `test_observability_monitoring.py`, `test_pii_sanitizer.py`.
 - Result: **187 passed out of 187 tests (100% pass)** in 2.26s.
 
+---
+
+## Task 19: Automated Backup & Restore Drill Engine & Runbook
+
+- **Date**: 2026-10-04
+- **Branch**: `feature/backup-restore-drill`
+- **Commit**: `0c0ab8f`
+- **Status**: DONE
+- **Mandate**: Master Plan Section 18.15 Item 17 & Section 18.2 Non-Destructive Direct-Database Safeguards.
+- **Governing Standard**:
+  - Point-in-Time Recovery (PITR) and disaster recovery runbook defining RPO <= 1 hour and RTO <= 4 hours.
+  - Deterministic SHA-256 cryptographic checksums generated for all backup snapshot archives, with tamper and corruption detection.
+  - Synthetic restore drill execution validated in an isolated synthetic schema without write access to live production database tables.
+  - Comprehensive schema, foreign key invariant, and row count checks across all 10 core multi-tenant tables (`user_profiles`, `agents`, `voice_calls`, `phone_numbers`, `wallets`, `wallet_transactions`, `invoices`, `byon_credentials`, `support_tickets`, `kyc_records`).
+  - Command-line runner (`backend/scripts/backup_restore_drill.py`) and FastAPI endpoints (`GET /api/backup/drill-status`, `POST /api/backup/run-synthetic-drill`) with admin role and step-up auth validation.
+
+### 1. Implementation Summary
+1. **Disaster Recovery Runbook (`docs/operations/BACKUP_RESTORE_DRILL_RUNBOOK.md`)**:
+   - Comprehensive operational manual detailing RPO/RTO metrics, infrastructure architecture, continuous WAL streaming, off-site AES-256-GCM encrypted snapshot storage, automated validation steps, and PITR execution steps.
+2. **Backup & Restore Service (`backend/app/services/backup_restore_service.py`)**:
+   - `create_synthetic_snapshot`: Generates multi-table synthetic archive with deterministic SHA-256 checksum.
+   - `verify_checksum`: Detects archive payload tampering or corruption.
+   - `simulate_synthetic_restore`: Validates 10 core tables, foreign key constraints, row counts, and RPO/RTO thresholds in an isolated sandbox.
+   - `run_drill`: Executes drill and records immutable audit log in `compliance_audit_logs`.
+   - `get_latest_drill_status`: Returns current RPO/RTO compliance and integrity state.
+3. **CLI Runner (`backend/scripts/backup_restore_drill.py`)**:
+   - Standalone CLI runner with cp1252-safe ASCII output formatting for continuous automated validation and operational drills.
+4. **FastAPI Router (`backend/app/routers/backup_router.py`)**:
+   - `GET /api/backup/drill-status`: Health and compliance probe for disaster recovery.
+   - `POST /api/backup/run-synthetic-drill`: Privileged administrative drill trigger requiring `x-admin-role: admin` and step-up token validation. Mounted in `backend/main.py`.
+
+### 2. Test Results (Authoritative)
+```
+backend/tests/test_backup_restore_drill.py::TestBackupSnapshotAndChecksum::test_calculate_sha256_deterministic PASSED
+backend/tests/test_backup_restore_drill.py::TestBackupSnapshotAndChecksum::test_create_synthetic_snapshot_structure PASSED
+backend/tests/test_backup_restore_drill.py::TestBackupSnapshotAndChecksum::test_checksum_verification_valid PASSED
+backend/tests/test_backup_restore_drill.py::TestBackupSnapshotAndChecksum::test_checksum_verification_detects_tampering PASSED
+backend/tests/test_backup_restore_drill.py::TestSyntheticRestoreSimulation::test_successful_synthetic_restore PASSED
+backend/tests/test_backup_restore_drill.py::TestSyntheticRestoreSimulation::test_missing_core_tables_fails_restore PASSED
+backend/tests/test_backup_restore_drill.py::TestSyntheticRestoreSimulation::test_foreign_key_violation_fails_restore PASSED
+backend/tests/test_backup_restore_drill.py::TestSyntheticRestoreSimulation::test_checksum_mismatch_fails_restore PASSED
+backend/tests/test_backup_restore_drill.py::TestRPOAndRTOThresholds::test_rpo_compliant_when_within_1_hour PASSED
+backend/tests/test_backup_restore_drill.py::TestRPOAndRTOThresholds::test_rpo_exceeded_flagged PASSED
+backend/tests/test_backup_restore_drill.py::TestRPOAndRTOThresholds::test_run_drill_persists_audit_entry PASSED
+backend/tests/test_backup_restore_drill.py::TestBackupRouterEndpoints::test_get_drill_status PASSED
+backend/tests/test_backup_restore_drill.py::TestBackupRouterEndpoints::test_run_synthetic_drill_admin_success PASSED
+backend/tests/test_backup_restore_drill.py::TestBackupRouterEndpoints::test_run_synthetic_drill_non_admin_forbidden PASSED
+backend/tests/test_backup_restore_drill.py::TestBackupRouterEndpoints::test_run_synthetic_drill_with_valid_step_up_token PASSED
+backend/tests/test_backup_restore_drill.py::TestBackupRouterEndpoints::test_run_synthetic_drill_with_invalid_step_up_token PASSED
+backend/tests/test_backup_restore_drill.py::TestRunbookDocumentation::test_runbook_file_exists_and_complete PASSED
+======================== 17 passed, 1 warning in 4.47s ========================
+```
+
+#### Regression Suite Verification:
+- Tests: `test_gst_invoicing_vault.py`, `test_number_lifecycle_grace.py`, `test_byon_credential_vault.py`, `test_support_ticket_system.py`, `test_encrypted_kyc_vault.py`, `test_essential_admin_panel.py`, `test_compliance_dpa_runbook.py`, `test_observability_monitoring.py`, `test_backup_restore_drill.py`, `test_pii_sanitizer.py`.
+- Result: **204 passed out of 204 tests (100% pass)** in 5.29s.
+
+
