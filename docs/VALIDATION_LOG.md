@@ -1407,5 +1407,64 @@ backend/tests/test_compliance_dpa_runbook.py::TestDirectComplianceRouteLogic::te
 `
 
 #### Regression Suite Verification:
-- Tests: 	est_pii_sanitizer.py, 	est_wallet_razorpay_quota.py, 	est_gst_invoicing_vault.py, 	est_number_lifecycle_grace.py, 	est_byon_credential_vault.py, 	est_support_ticket_system.py, 	est_encrypted_kyc_vault.py, 	est_essential_admin_panel.py, 	est_compliance_dpa_runbook.py.
+- Tests: `test_pii_sanitizer.py`, `test_wallet_razorpay_quota.py`, `test_gst_invoicing_vault.py`, `test_number_lifecycle_grace.py`, `test_byon_credential_vault.py`, `test_support_ticket_system.py`, `test_encrypted_kyc_vault.py`, `test_essential_admin_panel.py`, `test_compliance_dpa_runbook.py`.
 - Result: **189 passed out of 189 tests (100% pass)** in 2.20s.
+
+---
+
+## Task 18: Observability (Sentry, BetterStack, Healthchecks.io)
+
+- **Date**: 2026-10-04
+- **Branch**: `feature/observability-monitoring`
+- **Commit**: `9f936c3`
+- **Status**: DONE
+- **Mandate**: Master Plan Section 18.15 Item 16 & Section 18 PII Scrubbing Mandates.
+- **Governing Standard**:
+  - Live health, readiness, and liveness probes (`/health`, `/healthz`, `/ready`, `/readyz`, `/live`, `/livez`) providing database connectivity metrics, system uptime, and degraded HTTP 503 triggers.
+  - Sentry exception monitoring integration with mandatory zero-PII pre-send hook (`sentry_before_send`) masking phone numbers, national IDs (Aadhaar, PAN, SSN), JWTs, API keys, and email identifiers.
+  - BetterStack structured log streaming with automated PII redactor ensuring telemetry payloads are sanitized prior to outbound network dispatch.
+  - Healthchecks.io synthetic heartbeat monitoring for critical background workers: `cleanup` (retention minimization), `scheduler` (callback dispatcher), and `pool_expand` (virtual phone number inventory monitor).
+  - Programmatic API access to observability controls via `POST /api/observability/cron-heartbeat`, `POST /api/observability/log`, and `GET /api/observability/status`.
+
+### 1. Implementation Summary
+1. **Observability Service (`backend/app/services/observability_service.py`)**:
+   - `check_health`: Live probe of application state and database latency with 503 degradation.
+   - `check_ready`: Orchestrator readiness check.
+   - `check_live`: Process liveness check.
+   - `init_sentry`: Initializes Sentry monitoring with `before_send=sentry_before_send` and `send_default_pii=False`.
+   - `emit_betterstack_log`: Structured log emitter with pre-transmission PII redactor (`PIIScrubber.scrub_text`, `PIIScrubber.scrub_dict`).
+   - `send_cron_heartbeat`: Liveness ping dispatcher for `cleanup`, `scheduler`, and `pool_expand` to Healthchecks.io.
+   - `get_monitoring_status`: Operational report of Sentry, BetterStack, and Healthchecks.io configuration.
+2. **Observability Router (`backend/app/routers/observability_router.py`)**:
+   - Mounted at `/health`, `/healthz`, `/ready`, `/readyz`, `/live`, `/livez`, and `/api/observability/*`.
+3. **PII Sanitizer Expansion (`backend/app/services/pii_scrubber.py`)**:
+   - Added regex patterns and redactions for Indian PAN (`[A-Z]{5}[0-9]{4}[A-Z]`) and email addresses.
+   - Added top-level `message` and `logentry` sanitization to `sentry_before_send`.
+   - Added `PIIScrubber` wrapper class.
+
+### 2. Test Results (Authoritative)
+```
+backend/tests/test_observability_monitoring.py::test_check_health_healthy PASSED
+backend/tests/test_observability_monitoring.py::test_check_health_degraded_on_db_exception PASSED
+backend/tests/test_observability_monitoring.py::test_check_ready_and_live PASSED
+backend/tests/test_observability_monitoring.py::test_init_sentry_without_dsn PASSED
+backend/tests/test_observability_monitoring.py::test_sentry_before_send_scrubs_pii PASSED
+backend/tests/test_observability_monitoring.py::test_betterstack_log_dry_run_scrubs_pii PASSED
+backend/tests/test_observability_monitoring.py::test_healthchecks_cron_rejects_unmonitored_job PASSED
+backend/tests/test_observability_monitoring.py::test_healthchecks_cron_dry_run_when_unconfigured PASSED
+backend/tests/test_observability_monitoring.py::test_healthchecks_cron_ping_dispatched PASSED
+backend/tests/test_observability_monitoring.py::test_get_monitoring_status PASSED
+backend/tests/test_observability_monitoring.py::test_router_get_health_healthy PASSED
+backend/tests/test_observability_monitoring.py::test_router_get_health_degraded_returns_503 PASSED
+backend/tests/test_observability_monitoring.py::test_router_get_readiness PASSED
+backend/tests/test_observability_monitoring.py::test_router_get_liveness PASSED
+backend/tests/test_observability_monitoring.py::test_router_trigger_cron_heartbeat PASSED
+backend/tests/test_observability_monitoring.py::test_router_emit_log_event PASSED
+backend/tests/test_observability_monitoring.py::test_router_get_monitoring_status PASSED
+======================== 17 passed, 1 warning in 1.69s ========================
+```
+
+#### Regression Suite Verification:
+- Tests: `test_gst_invoicing_vault.py`, `test_number_lifecycle_grace.py`, `test_byon_credential_vault.py`, `test_support_ticket_system.py`, `test_encrypted_kyc_vault.py`, `test_essential_admin_panel.py`, `test_compliance_dpa_runbook.py`, `test_observability_monitoring.py`, `test_pii_sanitizer.py`.
+- Result: **187 passed out of 187 tests (100% pass)** in 2.26s.
+
