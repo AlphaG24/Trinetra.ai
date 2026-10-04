@@ -93,6 +93,46 @@ export async function PUT(request: Request) {
       return NextResponse.json({ error: 'Invalid config payload' }, { status: 400 })
     }
 
+    // Master Plan Section 18.4 Step-Up Auth Enforcement
+    const pricingKeys = new Set([
+      'trial_price_paisa', 'starter_price_paisa', 'professional_price_paisa',
+      'enterprise_price_paisa', 'inbound_number_cost_paisa', 'overage_per_minute_paisa',
+    ])
+    const hasPricingUpdates = Object.keys(updates).some((k) => pricingKeys.has(k))
+    const isCredentialRotation = Boolean(body.is_rotation)
+
+    if (hasPricingUpdates || isCredentialRotation) {
+      const stepUpToken = request.headers.get('x-step-up-token') || body.step_up_token
+      const targetAction = isCredentialRotation ? 'credential_update' : 'price_change'
+
+      const secret = process.env.STEP_UP_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.JWT_SECRET || 'trinetra-admin-step-up-secret-key-32b!'
+      let isStepUpValid = false
+
+      if (stepUpToken && stepUpToken.includes('.')) {
+        try {
+          const crypto = await import('crypto')
+          const [payloadB64, sigB64] = stepUpToken.split('.')
+          const expectedSig = crypto.createHmac('sha256', Buffer.from(secret, 'utf-8')).update(payloadB64).digest('base64url')
+          if (sigB64 === expectedSig) {
+            const payload = JSON.parse(Buffer.from(payloadB64, 'base64url').toString('utf-8'))
+            if (payload.sub === user.id && (payload.action === targetAction || payload.action === '*') && Math.floor(Date.now() / 1000) <= payload.exp) {
+              isStepUpValid = true
+            }
+          }
+        } catch {
+          isStepUpValid = false
+        }
+      }
+
+      if (!isStepUpValid) {
+        return NextResponse.json({
+          error: `Step-up authentication required: privileged operation '${targetAction}' requires recent re-authentication.`,
+          step_up_required: true,
+          action: targetAction,
+        }, { status: 403 })
+      }
+    }
+
     // Fetch current config state for old_value tracking — use service role to bypass RLS
     const adminClientForRead = getAdminClient()
     const { data: currentConfigs } = await adminClientForRead

@@ -684,7 +684,136 @@ Exit code: 0 (Zero TypeScript errors, 163 pages built)
    - Confirm that Org Alpha cannot read, write, or delete Org Beta's agents, numbers, calls, leads, appointments, campaigns, integrations, contacts, or tickets.
 3. **Verify Appointment Tool Scoping**:
    - Run `pytest backend/tests/test_tenant_isolation_ci.py -k TestVoiceAgentAppointmentIsolation -v`.
-   - Confirm that appointment lookup and reschedule strictly enforce `organization_id`.
+---
+
+## Task 9: Admin 30-Min Idle Sessions, Mandatory MFA & Privileged Step-Up Auth
+
+- **Date**: 2026-10-04
+- **Branch**: `feature/admin-sessions-stepup`
+- **Status**: `IMPLEMENTED, pending legal review`
+- **Mandate**: Master Plan Section 18.4 (Authoritative Overrides).
+
+### 1. Implementation Summary
+1. **30-Minute Idle Session Timeout**:
+   - Implemented `AdminAuthService.validate_admin_session` in `backend/app/services/admin_auth_service.py`.
+   - Admin idle session timeout strictly capped at 1,800 seconds (30 minutes), definitively replacing legacy 24-hour timeouts.
+   - Tested that sessions active at 10m (600s) and 29m (1740s) remain valid; sessions idle for >= 1801s are immediately rejected with `SESSION_EXPIRED` (HTTP 401).
+2. **Mandatory MFA for Privileged Roles**:
+   - `admin` and `developer_tester` accounts require verified Multi-Factor Authentication (MFA / TOTP) to maintain active admin sessions.
+   - Sessions lacking MFA verification are rejected with `MFA_REQUIRED` (HTTP 403).
+   - Re-verified that `mfa_requirement` resides in `NON_EXEMPTIBLE_PRIMITIVES` and cannot be exempted by any role.
+   - Customer role is strictly denied administrative session initialization.
+3. **Pure Python RFC 6238 TOTP Engine**:
+   - Pure Python implementation of RFC 6238 Time-Based One-Time Password generator and verifier with zero external dependency risks.
+   - Built-in +/- 30s clock drift tolerance for mobile authenticators.
+4. **Cryptographic Privileged Step-Up Re-Authentication**:
+   - Short-lived HMAC-SHA256 signed Step-Up tokens (`issue_step_up_token` / `verify_step_up_token`) with 300-second (5-minute) expiration ceiling.
+   - Mandatory re-authentication required before:
+     1. KYC document decryption/view (`kyc_view`)
+     2. Wallet balance manual adjustments (`wallet_adjust`)
+     3. Global pricing and plan changes (`price_change`)
+     4. Telephony and platform credential changes / rotations (`credential_update`)
+     5. Number release override (`number_release_override`)
+   - Rejects tampered signatures, expired tokens, action mismatches, and user mismatches.
+5. **KYC Document Privacy**:
+   - `developer_tester` accounts are strictly forbidden from viewing or downloading customer KYC documents.
+   - KYC document access restricted to verified `admin` users possessing an active step-up token for `kyc_view`.
+   - Immutable audit log records written on every step-up challenge, privileged action, and KYC view.
+6. **Frontend Idle Watcher & API Guard**:
+   - Upgraded `frontend/hooks/useAdminAuth.js` to track user activity (`mousemove`, `keydown`, `click`, `scroll`, `touchstart`) and auto-expire idle sessions at 30 minutes.
+   - Created `frontend/src/components/admin/AdminIdleWatcher.tsx` client component mounted in `frontend/src/app/(admin)/layout.tsx` providing inactivity countdown warnings (5m remaining) and auto-logout redirect.
+   - Created Next.js API route `frontend/src/app/api/admin/step-up/route.ts` for challenge issuance and audit logging.
+   - Guarded `frontend/src/app/api/admin/system-config/route.ts` to require valid step-up auth for pricing updates and key rotations.
+
+### 2. Real Test Output
+
+#### Task 9 Test Suite:
+Command:
+```powershell
+backend\.venv\Scripts\python.exe -m pytest backend/tests/test_admin_sessions_stepup.py -v
+```
+Output:
+```
+============================= test session starts =============================
+platform win32 -- Python 3.11.9, pytest-9.1.1, pluggy-1.6.0
+collected 27 items
+
+backend/tests/test_admin_sessions_stepup.py::TestAdminIdleTimeout::test_timeout_constant_is_1800_seconds PASSED [  3%]
+backend/tests/test_admin_sessions_stepup.py::TestAdminIdleTimeout::test_active_session_within_30_minutes PASSED [  7%]
+backend/tests/test_admin_sessions_stepup.py::TestAdminIdleTimeout::test_expired_session_beyond_30_minutes PASSED [ 11%]
+backend/tests/test_admin_sessions_stepup.py::TestMandatoryMFA::test_admin_without_mfa_is_rejected PASSED [ 14%]
+backend/tests/test_admin_sessions_stepup.py::TestMandatoryMFA::test_developer_tester_without_mfa_is_rejected PASSED [ 18%]
+backend/tests/test_admin_sessions_stepup.py::TestMandatoryMFA::test_customer_role_denied_admin_session PASSED [ 22%]
+backend/tests/test_admin_sessions_stepup.py::TestMandatoryMFA::test_mfa_is_non_exemptible_in_central_policy PASSED [ 25%]
+backend/tests/test_admin_sessions_stepup.py::TestRFC6238TOTP::test_totp_code_generation_format PASSED [ 29%]
+backend/tests/test_admin_sessions_stepup.py::TestRFC6238TOTP::test_totp_code_verification_success PASSED [ 33%]
+backend/tests/test_admin_sessions_stepup.py::TestRFC6238TOTP::test_totp_clock_drift_tolerance PASSED [ 37%]
+backend/tests/test_admin_sessions_stepup.py::TestRFC6238TOTP::test_totp_rejection_of_invalid_code PASSED [ 40%]
+backend/tests/test_admin_sessions_stepup.py::TestStepUpAuthToken::test_token_validity_constant_is_300_seconds PASSED [ 44%]
+backend/tests/test_admin_sessions_stepup.py::TestStepUpAuthToken::test_step_up_token_issuance_and_verification PASSED [ 48%]
+backend/tests/test_admin_sessions_stepup.py::TestStepUpAuthToken::test_step_up_token_expiration PASSED [ 51%]
+backend/tests/test_admin_sessions_stepup.py::TestStepUpAuthToken::test_step_up_token_tampering_rejected PASSED [ 55%]
+backend/tests/test_admin_sessions_stepup.py::TestStepUpAuthToken::test_step_up_token_user_mismatch_rejected PASSED [ 59%]
+backend/tests/test_admin_sessions_stepup.py::TestStepUpAuthToken::test_step_up_token_action_mismatch_rejected PASSED [ 62%]
+backend/tests/test_admin_sessions_stepup.py::TestPrivilegedOperationsAndKYC::test_developer_tester_forbidden_from_kyc PASSED [ 66%]
+backend/tests/test_admin_sessions_stepup.py::TestPrivilegedOperationsAndKYC::test_admin_kyc_view_requires_step_up PASSED [ 70%]
+backend/tests/test_admin_sessions_stepup.py::TestPrivilegedOperationsAndKYC::test_admin_kyc_view_authorized_with_audit_log PASSED [ 74%]
+backend/tests/test_admin_sessions_stepup.py::TestPrivilegedOperationsAndKYC::test_wallet_adjustment_requires_step_up_and_logs PASSED [ 77%]
+backend/tests/test_admin_sessions_stepup.py::TestPrivilegedOperationsAndKYC::test_pricing_and_credential_updates_require_step_up PASSED [ 81%]
+backend/tests/test_admin_sessions_stepup.py::TestAdminAuthFastAPIRoutes::test_route_session_verify_active PASSED [ 85%]
+backend/tests/test_admin_sessions_stepup.py::TestAdminAuthFastAPIRoutes::test_route_session_verify_expired PASSED [ 88%]
+backend/tests/test_admin_sessions_stepup.py::TestAdminAuthFastAPIRoutes::test_route_session_verify_mfa_required PASSED [ 92%]
+backend/tests/test_admin_sessions_stepup.py::TestAdminAuthFastAPIRoutes::test_route_step_up_challenge_success_and_use PASSED [ 96%]
+backend/tests/test_admin_sessions_stepup.py::TestAdminAuthFastAPIRoutes::test_route_kyc_view_developer_tester_forbidden PASSED [100%]
+
+======================= 27 passed, 6 warnings in 16.40s =======================
+```
+
+#### Frozen Compliance Files Verification:
+```
+backend\.venv\Scripts\python.exe scripts/verify_frozen_files.py
+==================================================================
+ TRINETRA AI - FROZEN COMPLIANCE FILES INTEGRITY CHECK: PASSED
+==================================================================
+ [PASS] backend/app/services/disclosure_service.py
+ [PASS] backend/app/services/outbound_safety_guardrails.py
+ [PASS] backend/app/services/ai/prompt_guard.py
+ [PASS] frontend/src/lib/safety/promptGuard.ts
+==================================================================
+Exit code: 0
+```
+
+#### Hardcoded Gender Scanner Check:
+```
+backend/tests/test_a1d_gender_resolver.py: 70 passed in 8.09s (100% pass rate)
+```
+
+#### Full Backend Test Suite:
+```
+====================== 393 passed, 8 warnings in 26.04s =======================
+```
+
+#### Frontend Next.js Production Build Validation:
+```
+npm run build --prefix frontend
+✓ Compiled successfully in 37.2s
+✓ Generating static pages using 11 workers (164/164) in 7.5s
+Exit code: 0 (Zero TypeScript errors, 164 pages compiled)
+```
+
+### 3. Reviewer Verification Steps
+1. **Verify Idle Timeout**:
+   ```powershell
+   backend\.venv\Scripts\python.exe -m pytest backend/tests/test_admin_sessions_stepup.py -k TestAdminIdleTimeout -v
+   ```
+2. **Verify Mandatory MFA**:
+   ```powershell
+   backend\.venv\Scripts\python.exe -m pytest backend/tests/test_admin_sessions_stepup.py -k TestMandatoryMFA -v
+   ```
+3. **Verify KYC Step-Up Gate & Developer/Tester Prohibition**:
+   ```powershell
+   backend\.venv\Scripts\python.exe -m pytest backend/tests/test_admin_sessions_stepup.py -k TestPrivilegedOperationsAndKYC -v
+   ```
 
 
 

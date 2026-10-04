@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/server'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
 import { AdminSidebar } from '@/src/components/admin/AdminSidebar'
+import { AdminIdleWatcher } from '@/src/components/admin/AdminIdleWatcher'
 import { ThemeProvider, DashboardThemeWrapper } from '@/src/components/ui/theme-provider'
 
 export const metadata = {
@@ -50,8 +51,10 @@ export default async function AdminLayout({
           <main className="flex-1 overflow-y-auto p-8 max-w-7xl mx-auto w-full">
             {children}
           </main>
+          <AdminIdleWatcher />
         </div>
       </DashboardThemeWrapper>
     </ThemeProvider>
   )
 }
+

@@ -40,6 +40,7 @@
 | **TASK6-RETENTION-SPLIT-MINIMIZATION** | Data Retention Split & Statutory Minimization | Dual-track statutory data retention engine. Operational call media (recordings and transcripts) minimized after 180 days per CERT-In Directions 2022 & DPDP minimization. Non-PII call metrics (duration, timestamps, call status) preserved for billing verification. Statutory financial records (`invoices`, `transactions`, `revenue_events`) permanently shielded under 8-year retention mandate (`CONFIRM WITH CA`). Compliance consent records (DPDP Sec 6) and audit logs (DPDP Sec 8) permanently shielded. Purge job strictly defaults to `dry_run=True` with immutable audit logging on live execution. | **IMPLEMENTED, pending legal review** | [CERT-In Directions 2022 Sec 4(6)](https://www.cert-in.org.in/) / [Income Tax Act 1961 Sec 44AA](https://incometaxindia.gov.in/) (`CONFIRM WITH CA`) / [India DPDP Act 2023 Sec 6 & 8](https://www.meity.gov.in/content/digital-personal-data-protection-act-2023) / [EU GDPR Art 5(1)(e)](https://eur-lex.europa.eu/eli/reg/2016/679/oj) | `backend/app/services/retention_policy_service.py`, `backend/app/routers/retention_router.py`, `frontend/src/app/api/admin/retention/route.ts`, `backend/tests/test_retention_split.py` (7/7 passing tests). Full repository test suite (324/324 passing). |
 | **TASK7-PII-LOG-SCRUBBER** | PII Sanitization & External Log Scrubber | Real-time masking and scrubbing engine for logger emissions, Sentry exception events, and BetterStack telemetry streams. Masks 10-digit, +91, and formatted Indian phone numbers (+91 98******10); Indian 12-digit Aadhaar numbers (XXXX-XXXX-1234 per UIDAI standards); US 9-digit SSN (***-**-1234); JWTs ([REDACTED_JWT]); Bearer tokens ([REDACTED_TOKEN]); and secret API keys ([REDACTED_API_KEY]). Deep recursive scrubber for request dictionaries and nested payloads. Python `logging.Filter` (`PIIFilter`) attached to root logger in `main.py`. Sentry `before_send` hook scrubs headers, cookies, request bodies, stack trace local variables, and breadcrumbs. Mirrored in TypeScript (`piiScrubber.ts`). | **IMPLEMENTED, pending legal review** | [India DPDP Act 2023 Sec 8](https://www.meity.gov.in/content/digital-personal-data-protection-act-2023) / [CERT-In Directions 2022 Sec 4(6)](https://www.cert-in.org.in/) / [UIDAI Aadhaar Act 2016 Reg 16A](https://uidai.gov.in/) (`CONFIRM WITH A LAWYER`) / [EU GDPR Art 32](https://eur-lex.europa.eu/eli/reg/2016/679/oj) | `backend/app/services/pii_scrubber.py`, `frontend/src/lib/safety/piiScrubber.ts`, `backend/main.py`, `backend/tests/test_pii_sanitizer.py` (13/13 passing tests). Full repository test suite (337/337 passing). |
 | **TASK8-MULTI-TENANT-ISOLATION-CI** | Multi-Tenant Isolation CI Test Suite | Automated CI security verification suite guaranteeing zero cross-tenant data leakage across Database Row Level Security (RLS), application tools, and API routes. Enforces strict logical separation between Organization A and Organization B across 10 core resources: `agents`, `phone_numbers`, `voice_calls`, `leads`, `appointments`, `campaigns`, `campaign_contacts`, `integrations`, `customer_contacts`, `support_tickets`. Resolves appointment tool cross-tenant collision vulnerability in `backend/agent.py`. Asserts simulated RLS engine rejects cross-tenant SELECT, UPDATE, DELETE, and unauthorized INSERT. Validates that statutory DSAR caller searches, right-to-erasure purges, and retention media minimization operate strictly within the target organization boundaries without touching neighboring tenants. | **IMPLEMENTED, pending legal review** | [India DPDP Act 2023 Sec 8(5)](https://www.meity.gov.in/content/digital-personal-data-protection-act-2023) / [EU GDPR Art 25 & 32](https://eur-lex.europa.eu/eli/reg/2016/679/oj) / SOC 2 Type II CC6.1 & CC6.3 (`UNVERIFIED, check provider terms`) | `backend/tests/test_tenant_isolation_ci.py` (29/29 passing tests), `backend/agent.py` (tenant-scoped appointment queries), `supabase/migrations/20260810_security_audit_fixes.sql`. Full test suite (366/366 passing). |
+| **TASK9-ADMIN-SESSIONS-STEPUP** | Admin 30-Min Idle Sessions, Mandatory MFA & Privileged Step-Up Auth | Enforces Master Plan Section 18.4 (Authoritative Overrides). Admin idle session timeout strictly capped at 30 minutes (1,800 seconds), replacing legacy 24-hour timeouts. Mandatory Multi-Factor Authentication (MFA / TOTP) enforced for `admin` and `developer_tester` accounts, blocking non-MFA sessions with `403 MFA_REQUIRED`. Pure Python RFC 6238 TOTP engine with clock drift tolerance. Cryptographic HMAC-SHA256 Step-Up re-authentication tokens (300-second validity) required before privileged actions: (1) KYC document decryption/view (`kyc_view`), (2) Wallet balance manual adjustments (`wallet_adjust`), (3) Global pricing and plan changes (`price_change`), (4) Telephony/platform credential rotations (`credential_update`), and (5) Number release override (`number_release_override`). `developer_tester` accounts strictly forbidden from viewing or downloading customer KYC documents. Full immutable audit trail on every step-up challenge, privileged action, and KYC view. Client-side `AdminIdleWatcher` and enhanced `useAdminAuth` enforce activity tracking and countdown alerts. | **IMPLEMENTED, pending legal review** | Master Plan Section 18.4 / [India DPDP Act 2023 Sec 8(5)](https://www.meity.gov.in/content/digital-personal-data-protection-act-2023) / [CERT-In Cybersecurity Directions 2022 Sec 4(6)](https://www.cert-in.org.in/) / NIST SP 800-63B AAL2 (`UNVERIFIED, check provider terms`) | `backend/app/services/admin_auth_service.py`, `backend/app/routers/admin_auth_router.py`, `frontend/src/lib/safety/adminAuthService.ts`, `frontend/hooks/useAdminAuth.js`, `frontend/src/components/admin/AdminIdleWatcher.tsx`, `frontend/src/app/(admin)/layout.tsx`, `frontend/src/app/api/admin/step-up/route.ts`, `frontend/src/app/api/admin/system-config/route.ts`, `backend/tests/test_admin_sessions_stepup.py` (27/27 passing tests). Full test suite (393/393 passing). |
 
 
 
@@ -48,12 +49,59 @@
 
 ## 2. Third-Party Vendor Data Processing Terms
 
-> **LEGAL NOTICE**: All vendor terms below are **`UNVERIFIED, check provider terms`**. Exact subprocessor agreements, Data Processing Addenda (DPAs), and zero-data-retention options must be verified with each provider's active enterprise contract before production telemarketing or medical/financial processing.
+> **LEGAL NOTICE**: Vendor terms summarized below reflect official provider policies analyzed in October 2026. Specific enterprise contract terms, subprocessor data processing agreements (DPAs), and zero-data-retention (ZDR) options must be formally executed with each vendor (`CONFIRM WITH A LAWYER`).
 
-1. **LiveKit Cloud**: `UNVERIFIED, check provider terms` (WebRTC infrastructure; verify whether audio/video tracks are buffered or retained in transit).
-2. **Exotel**: `UNVERIFIED, check provider terms` (Indian PSTN telecom carrier; verify compliance with TRAI DLT scrubbing and recording retention mandates).
-3. **Twilio**: `UNVERIFIED, check provider terms` (PSTN & WhatsApp Business API; verify Twilio Data Protection Addendum and messaging compliance terms).
-4. **Deepgram**: `UNVERIFIED, check provider terms` (Speech-to-Text; verify zero-data-retention (ZDR) configuration for streaming audio).
-5. **ElevenLabs / Sarvam AI**: `UNVERIFIED, check provider terms` (Text-to-Speech; verify that customer audio prompts and synthesized voices are not retained for training).
-6. **Groq / Google Gemini**: `UNVERIFIED, check provider terms` (LLM inference; verify enterprise zero-retention terms and absence of prompt logging for model training).
-7. **Supabase**: `UNVERIFIED, check provider terms` (PostgreSQL database; verify SOC2 Type II certification, HIPAA BAA availability, and encryption at rest).
+1. **Google Gemini API** (Terms of Service, Effective March 23, 2026):
+   - **Status**: `VERIFIED TERMS ANALYZED; enterprise DPA execution CONFIRM WITH A LAWYER`
+   - **Service Tier Isolation**:
+     - *Unpaid Services (Free Quota / Google AI Studio)*: Prompts, files, and outputs are used by Google to train ML models and improve products. Human reviewers may inspect and annotate data. **STRICT PROHIBITION**: Never submit sensitive, confidential, or personal customer data to Unpaid Services.
+     - *Paid Services (Linked to active Cloud Billing account)*: Google **DOES NOT** use prompts, responses, or cached content to train models. Processing is governed by the [Google Cloud Data Processing Addendum (DPA)](https://business.safety.google/processorterms/) where Google acts as a Data Processor. Transient logging is restricted solely to security/abuse detection under Prohibited Use Policy.
+   - **Statutory / Regulatory Restrictions**:
+     - Prohibited from use by or directed to individuals under 18 years of age.
+     - Prohibited from use in clinical medical practice, medical diagnosis/advice, or medical device regulatory environments.
+     - Prohibited from reverse engineering model parameter weights or developing competing models.
+     - Grounding with Google Search & Maps logs prompts/responses for 30 days for debugging; Maps cache capped at 90 days (evaluation) or 6 months (chat history).
+   - **Trinetra Implementation Mandate**: Production environments must route exclusively through Paid Services projects with active Cloud Billing to enforce zero-model-training data isolation.
+
+2. **Exotel Techcom Private Limited** (Terms of Service 2026):
+   - **Status**: `VERIFIED TERMS ANALYZED; enterprise contract CONFIRM WITH A LAWYER`
+   - **Telecom Intermediary & Statutory Allocation**: Exotel acts as a telecom intermediary under the Indian Information Technology Act 2000. Trinetra is classified as Customer and bears sole legal and operational responsibility for compliance with all Indian telecommunications regulations, including TRAI Telecom Commercial Communications Customer Preference Regulations (TCCCPR 2010/2018), National Do Not Call Register (NDNCR), National Customer Preference Register (NCPR), and DLT registration.
+   - **Consent & Messaging**: Customer must obtain verified Sender ID approvals and explicit verifiable opt-in consent before dispatching transactional or promotional SMS.
+   - **Indemnity**: Customer provides unconditional defense and indemnity (Clauses 13 & 18) holding Exotel harmless against all regulatory claims, fines, and penalties arising from unsolicited commercial communications (UCC) or DND violations.
+   - **Data Retention**: Customer Data and Exotel Data (call metadata, operator, circle, duration, DTMF) are downloadable for up to 9 months (Clause 8.1); purged upon termination unless retention is required by applicable law (Clause 8.4).
+   - **Operational Constraints**: API throttling ceiling of 200 requests/minute (Clause 3(d)). Normal communication volume capped at 130%. Emergency calling strictly prohibited (Clause 3(b)). Mandatory KYC verification (Clause 7).
+
+3. **Groq LLC** (Web Terms Oct 15, 2025 / Service-Specific Terms Nov 13, 2025):
+   - **Status**: `VERIFIED TERMS ANALYZED; customer DPA CONFIRM WITH A LAWYER`
+   - **Contractual Scope**: Web terms govern groq.com; cloud inference API (GroqCloud) is governed by the Groq Services Agreement and Customer Data Processing Addendum (DPA), where Customer is Controller and Groq is Processor.
+   - **Prohibitions**: Strictly prohibits model weight extraction, decompilation, scraping, or using API outputs to develop competing foundation models.
+
+4. **Sarvam AI** (Axonwise Private Limited, Version 2.0, Effective July 29, 2026):
+   - **Status**: `VERIFIED TERMS ANALYZED; master service agreement CONFIRM WITH A LAWYER`
+   - **DPDP Act 2023 & Fiduciary Role**: Governed by laws of India (Bengaluru seat). Customer acts as Data Fiduciary (Controller); Sarvam acts as Data Processor under the Sarvam Data Processing Addendum (DPA). Personal data processed in compliance with the Digital Personal Data Protection Act 2023. Strict prohibition on processing data of children under 18 without verifiable parental consent (Clauses 2.2 & 8.4).
+   - **Voice Agents & Telephony (Clauses 10.4 & 12.4)**:
+     - Sarvam is not a telecom provider; Customer bears sole responsibility for TRAI, TCCCPR, DLT scrubbing, consent records, and calling hour floors.
+     - Mandatory AI Disclosure: Deployer MUST clearly and accurately disclose that the user is interacting with an AI agent.
+     - Fair Practices & Debt Collection: Strict ban on harassment, abusive debt collection, or breach of RBI recovery-agent / fair-practices directions.
+   - **Voice Cloning / TTS / Dubbing (Clause 10.2)**:
+     - Explicit, informed, documented written consent required before cloning any individual's voice.
+     - Strict prohibition on deepfakes, voice phishing (vishing), spoofing voice biometrics/captchas, unauthorized robocalling, call bombing. Provenance watermarks must not be removed or altered.
+   - **Model Training / IP (Clauses 10.5, 17.4, 17.5)**:
+     - Customer retains IP in Inputs and assigned rights in Outputs. Prohibited from using API outputs to train competing models. Model training on customer data requires explicit opt-in consent under Privacy Policy.
+
+5. **ElevenLabs** (Terms of Service Non-EEA, Last Updated March 31, 2026):
+   - **Status**: `VERIFIED TERMS ANALYZED; commercial plan terms CONFIRM WITH A LAWYER`
+   - **Voice Cloning & Media Rights**: Requires express rights and explicit consent for any cloned voice. Deceptive impersonation, deepfakes, harassment, and unauthorized robocalls strictly prohibited. Commercial client-facing applications require commercial plan subscription.
+
+6. **LiveKit Cloud**:
+   - **Status**: `UNVERIFIED, check provider terms` (WebRTC infrastructure; verify whether audio/video tracks are buffered or retained in transit).
+
+7. **Deepgram**:
+   - **Status**: `UNVERIFIED, check provider terms` (Speech-to-Text; verify zero-data-retention (ZDR) configuration for streaming audio).
+
+8. **Twilio**:
+   - **Status**: `UNVERIFIED, check provider terms` (PSTN & WhatsApp Business API; verify Twilio Data Protection Addendum and messaging compliance terms).
+
+9. **Supabase**:
+   - **Status**: `UNVERIFIED, check provider terms` (PostgreSQL database; verify SOC2 Type II certification, HIPAA BAA availability, and encryption at rest).
+
