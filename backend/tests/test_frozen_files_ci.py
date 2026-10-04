@@ -16,6 +16,7 @@ from unittest.mock import patch
 # Adjust sys.path to find root scripts
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 MANIFEST_PATH = REPO_ROOT / "docs" / "compliance" / "FROZEN_FILES_MANIFEST.json"
+sys.path.insert(0, str(REPO_ROOT / "backend"))
 
 
 class TestFrozenFilesIntegrity:

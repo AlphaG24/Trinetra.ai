@@ -333,5 +333,89 @@ Overall Backend Repository Suite:
 2. Inspect `agent.py` lines 25–36 and 2050–2086 to verify that `compose_single_opening_greeting()` cannot be bypassed by raw dashboard text.
 3. Verify that `PROMOTIONAL_CALLING_HOURS_WINDOW` in `outbound_safety_guardrails.py` maintains hard floors 09:00–21:00 with TRAI citations.
 
+---
+
+## Task 5: Caller Rights (DSAR Search, Export, Erasure) & Mid-Call Escalation
+
+- **Date**: October 4, 2026
+- **Branch**: `feature/caller-rights-escalation`
+- **Status**: `IMPLEMENTED, pending legal review`
+- **Governing Standard**: India DPDP Act 2023 Sec 11 & 12, EU GDPR Art 15, 17, 20, 21, CCPA/CPRA Cal. Civ. Code § 1798.105, MASTER_PLAN.md Section 18.2 (Direct-database mode & dry-run default).
+
+### 1. Implementation Summary
+1. **Multi-Tenant Caller Data Search Across 5 Tables**:
+   - Searches `customer_contacts`, `voice_calls`, `leads`, `appointments`, and `campaign_contacts`.
+   - Multi-format phone variation normalizer (`normalize_phone_variations`) handling 10-digit mobile, `+91`, `91`, and `0` prefixes.
+   - Strict `organization_id` scoping ensures tenant isolation and prevents cross-organization data leakage.
+2. **Machine-Readable Export (JSON & Statutory DSAR CSV)**:
+   - Structured JSON format for programmatic portability (GDPR Art 20).
+   - Formal statutory CSV format for Data Subject Access Requests (DSAR) with DPDP/GDPR statutory header, organization ID, phone number, export timestamp, and section-by-section breakdown across all 5 tables.
+3. **Right to Erasure Safety Default (dry_run=True)**:
+   - Mandatory safeguard: `erase_caller_data` defaults strictly to `dry_run=True`.
+   - In dry-run mode, calculates and returns exact records to be affected across all 5 tables with zero database mutations applied.
+   - In live mode (`dry_run=False`), permanently scrubs PII: deletes `customer_contacts`, `leads`, and `campaign_contacts`; anonymizes `voice_calls` and `appointments` (preserving statutory billing call durations and financial audit records).
+   - Generates an immutable audit log entry in `audit_logs` storing the SHA-256 cryptographic hash of the phone number (never raw phone number).
+4. **Mid-Call Recording Decline & Human Escalation**:
+   - `decline_call_recording`: Sets `consent_outcome = "declined"`, records `recording_stopped_at`, and returns agent directives for unrecorded continuation or graceful disconnect.
+   - `transfer_to_human`: Sets `consent_outcome = "transferred"`, updates `call_status = "transferred"`, and routes caller to support representative (`UNVERIFIED, check provider terms` for carrier SIP trunk transfer).
+5. **Admin Routing & Next.js Endpoints**:
+   - FastAPI Router: `POST /api/caller-rights/search`, `POST /api/caller-rights/export`, `POST /api/caller-rights/delete`.
+   - Next.js Admin Route: `frontend/src/app/api/admin/caller-rights/route.ts` with `requireAdmin()` (validating via `supabase.auth.getUser()` per SEC-003 and checking admin role per API-001) wrapped in `safeApiHandler`.
+
+### 2. Test Execution Evidence
+
+#### Task 5 Test Suite (`backend/tests/test_caller_rights_service.py`):
+```
+backend/tests/test_caller_rights_service.py::TestPhoneNormalization::test_ten_digit_indian_number PASSED [  6%]
+backend/tests/test_caller_rights_service.py::TestPhoneNormalization::test_plus_91_prefixed_number PASSED [ 12%]
+backend/tests/test_caller_rights_service.py::TestPhoneNormalization::test_zero_prefixed_number PASSED [ 18%]
+backend/tests/test_caller_rights_service.py::TestPhoneNormalization::test_invalid_empty_input PASSED [ 25%]
+backend/tests/test_caller_rights_service.py::TestCallerRightsSearch::test_search_caller_data_across_five_tables PASSED [ 31%]
+backend/tests/test_caller_rights_service.py::TestCallerRightsSearch::test_search_requires_organization_id PASSED [ 37%]
+backend/tests/test_caller_rights_service.py::TestCallerRightsSearch::test_search_requires_phone_number PASSED [ 43%]
+backend/tests/test_caller_rights_service.py::TestCallerRightsExport::test_export_json_format PASSED [ 50%]
+backend/tests/test_caller_rights_service.py::TestCallerRightsExport::test_export_csv_format_statutory_dsar PASSED [ 56%]
+backend/tests/test_caller_rights_service.py::TestCallerRightsErasureSafeguards::test_erasure_defaults_to_dry_run_zero_mutations PASSED [ 62%]
+backend/tests/test_caller_rights_service.py::TestCallerRightsErasureSafeguards::test_erasure_live_execution_scrubs_pii_and_creates_audit_log PASSED [ 68%]
+backend/tests/test_caller_rights_service.py::TestMidCallEscalationAndRecordingDecline::test_handle_caller_recording_decline_unrecorded_continuation PASSED [ 75%]
+backend/tests/test_caller_rights_service.py::TestMidCallEscalationAndRecordingDecline::test_handle_caller_recording_decline_end_call_mode PASSED [ 81%]
+backend/tests/test_caller_rights_service.py::TestCallerRightsPydanticModels::test_search_request_validation PASSED [ 87%]
+backend/tests/test_caller_rights_service.py::TestCallerRightsPydanticModels::test_export_request_validation PASSED [ 93%]
+backend/tests/test_caller_rights_service.py::TestCallerRightsPydanticModels::test_erasure_request_defaults_dry_run_true PASSED [100%]
+
+============================= 16 passed in 0.46s ==============================
+```
+
+#### Frozen Files CI Integrity Check:
+```
+backend/tests/test_frozen_files_ci.py: 8 passed in 0.19s (100% pass rate)
+```
+
+#### Hardcoded Gender Scanner Check:
+```
+backend/tests/test_a1d_gender_resolver.py: 70 passed in 12.41s (100% pass rate)
+```
+
+#### Overall Repository Test Suite:
+```
+317 passed, 1 warning in 26.74s (100% pass rate)
+```
+
+#### Frontend TypeScript Build Validation:
+```
+npx tsc --noEmit
+Exit code: 0 (Zero type errors)
+```
+
+### 3. Reviewer Verification Steps
+1. **Verify Dry Run Zero-Mutation Guarantee**:
+   - Run `python -m pytest backend/tests/test_caller_rights_service.py -k test_erasure_defaults_to_dry_run_zero_mutations -v`.
+   - Confirm that `dry_run=True` reports `WOULD_ERASE` and produces zero delete/update database calls.
+2. **Verify Multi-Tenant Isolation**:
+   - Run `python -m pytest backend/tests/test_caller_rights_service.py -k test_search_caller_data_across_five_tables -v`.
+   - Inspect `CallerRightsService.search_caller_data` to ensure all queries include `.eq("organization_id", org_id)`.
+3. **Verify Machine-Readable Export**:
+   - Run `python -m pytest backend/tests/test_caller_rights_service.py -k test_export_csv_format_statutory_dsar -v`.
+
 
 
