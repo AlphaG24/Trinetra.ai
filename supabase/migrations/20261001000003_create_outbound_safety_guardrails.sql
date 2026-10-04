@@ -47,11 +47,13 @@ CREATE TABLE IF NOT EXISTS public.whatsapp_approved_templates (
 -- 4. Enable RLS on whatsapp_approved_templates (SEC-004)
 ALTER TABLE public.whatsapp_approved_templates ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Allow authenticated users to view approved templates" ON public.whatsapp_approved_templates;
 CREATE POLICY "Allow authenticated users to view approved templates"
     ON public.whatsapp_approved_templates FOR SELECT
     TO authenticated
     USING (is_active = true);
 
+DROP POLICY IF EXISTS "Service role full access on whatsapp_approved_templates" ON public.whatsapp_approved_templates;
 CREATE POLICY "Service role full access on whatsapp_approved_templates"
     ON public.whatsapp_approved_templates FOR ALL
     TO service_role

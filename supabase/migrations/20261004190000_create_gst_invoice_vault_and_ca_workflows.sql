@@ -8,65 +8,73 @@
 --   - Intra-state (9% CGST + 9% SGST) vs Inter-state (18% IGST)
 --
 -- Purely ADDITIVE migration:
--- 1. Creates `invoices` table with full GST tax breakdown, SHA-256 integrity hash.
+-- 1. Creates/Updates `invoices` table with full GST tax breakdown, SHA-256 integrity hash.
 -- 2. Creates `invoice_line_items` table with SAC codes and itemized taxes.
 -- 3. Creates `invoice_ca_reviews` audit trail table for CA sign-offs.
 -- 4. Enables Row Level Security (RLS) on all tables with tenant isolation policies.
 -- ==============================================================================
 
--- 1. Create `invoices` table
+-- 1. Ensure `invoices` table exists with base structure
 CREATE TABLE IF NOT EXISTS public.invoices (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     organization_id UUID NOT NULL REFERENCES public.organizations(id) ON DELETE RESTRICT,
     invoice_number VARCHAR(100) NOT NULL UNIQUE,
-    fiscal_year VARCHAR(20) NOT NULL,                -- e.g., '2026-2027'
-    invoice_date TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    due_date TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    payment_reference_id VARCHAR(255),               -- Razorpay payment ID or reference
-    transaction_type VARCHAR(50) NOT NULL DEFAULT 'wallet_topup'
-        CHECK (transaction_type IN ('wallet_topup', 'subscription', 'usage_overage', 'manual_credit')),
-    currency VARCHAR(10) NOT NULL DEFAULT 'INR',
-    
-    -- Supplier Details (Vaakriti)
-    supplier_name TEXT NOT NULL DEFAULT 'Vaakriti Technologies Private Limited',
-    supplier_gstin VARCHAR(15) NOT NULL DEFAULT '07AAAAA0000A1Z5',
-    supplier_state TEXT NOT NULL DEFAULT 'Delhi',
-    supplier_state_code VARCHAR(5) NOT NULL DEFAULT '07',
-    supplier_address JSONB NOT NULL DEFAULT '{"street": "Vaakriti Tower, Tech Park", "city": "New Delhi", "state": "Delhi", "pincode": "110001", "country": "IN"}'::jsonb,
-    
-    -- Customer / Buyer Details
-    customer_legal_name TEXT NOT NULL,
-    customer_gstin VARCHAR(15),                      -- NULL for unregistered B2C customers
-    customer_state TEXT NOT NULL,
-    customer_state_code VARCHAR(5) NOT NULL,
-    customer_billing_address JSONB NOT NULL DEFAULT '{}'::jsonb,
-    place_of_supply TEXT NOT NULL,
-    is_reverse_charge BOOLEAN NOT NULL DEFAULT FALSE,
-    
-    -- GST Amounts in Paisa
-    subtotal_paisa BIGINT NOT NULL,                  -- Taxable base value
-    cgst_rate_pct NUMERIC(5, 2) NOT NULL DEFAULT 0.00,
-    cgst_amount_paisa BIGINT NOT NULL DEFAULT 0,
-    sgst_rate_pct NUMERIC(5, 2) NOT NULL DEFAULT 0.00,
-    sgst_amount_paisa BIGINT NOT NULL DEFAULT 0,
-    igst_rate_pct NUMERIC(5, 2) NOT NULL DEFAULT 0.00,
-    igst_amount_paisa BIGINT NOT NULL DEFAULT 0,
-    total_tax_paisa BIGINT NOT NULL DEFAULT 0,
-    grand_total_paisa BIGINT NOT NULL,               -- subtotal + total_tax
-    
-    -- Status & Workflow
-    status VARCHAR(50) NOT NULL DEFAULT 'issued'
-        CHECK (status IN ('draft', 'issued', 'paid', 'cancelled', 'refunded')),
-    ca_review_status VARCHAR(50) NOT NULL DEFAULT 'pending'
-        CHECK (ca_review_status IN ('pending', 'approved', 'flagged', 'waived')),
-        
-    -- Vault & Tamper-Evident Hashing
-    pdf_storage_path TEXT,
-    integrity_hash VARCHAR(64) NOT NULL,            -- SHA-256 hash of invoice canonical payload
-    
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- 2. Additive columns for GST Invoicing Vault (Task 11)
+ALTER TABLE public.invoices
+    ADD COLUMN IF NOT EXISTS fiscal_year VARCHAR(20) DEFAULT '2026-2027',
+    ADD COLUMN IF NOT EXISTS invoice_date TIMESTAMPTZ DEFAULT NOW(),
+    ADD COLUMN IF NOT EXISTS due_date TIMESTAMPTZ DEFAULT NOW(),
+    ADD COLUMN IF NOT EXISTS payment_reference_id VARCHAR(255),
+    ADD COLUMN IF NOT EXISTS transaction_type VARCHAR(50) DEFAULT 'wallet_topup',
+    ADD COLUMN IF NOT EXISTS currency VARCHAR(10) DEFAULT 'INR',
+    ADD COLUMN IF NOT EXISTS supplier_name TEXT DEFAULT 'Vaakriti Technologies Private Limited',
+    ADD COLUMN IF NOT EXISTS supplier_gstin VARCHAR(15) DEFAULT '07AAAAA0000A1Z5',
+    ADD COLUMN IF NOT EXISTS supplier_state TEXT DEFAULT 'Delhi',
+    ADD COLUMN IF NOT EXISTS supplier_state_code VARCHAR(5) DEFAULT '07',
+    ADD COLUMN IF NOT EXISTS supplier_address JSONB DEFAULT '{"street": "Vaakriti Tower, Tech Park", "city": "New Delhi", "state": "Delhi", "pincode": "110001", "country": "IN"}'::jsonb,
+    ADD COLUMN IF NOT EXISTS customer_legal_name TEXT DEFAULT '',
+    ADD COLUMN IF NOT EXISTS customer_gstin VARCHAR(15),
+    ADD COLUMN IF NOT EXISTS customer_state TEXT DEFAULT '',
+    ADD COLUMN IF NOT EXISTS customer_state_code VARCHAR(5) DEFAULT '',
+    ADD COLUMN IF NOT EXISTS customer_billing_address JSONB DEFAULT '{}'::jsonb,
+    ADD COLUMN IF NOT EXISTS place_of_supply TEXT DEFAULT '',
+    ADD COLUMN IF NOT EXISTS is_reverse_charge BOOLEAN DEFAULT FALSE,
+    ADD COLUMN IF NOT EXISTS subtotal_paisa BIGINT DEFAULT 0,
+    ADD COLUMN IF NOT EXISTS cgst_rate_pct NUMERIC(5, 2) DEFAULT 0.00,
+    ADD COLUMN IF NOT EXISTS cgst_amount_paisa BIGINT DEFAULT 0,
+    ADD COLUMN IF NOT EXISTS sgst_rate_pct NUMERIC(5, 2) DEFAULT 0.00,
+    ADD COLUMN IF NOT EXISTS sgst_amount_paisa BIGINT DEFAULT 0,
+    ADD COLUMN IF NOT EXISTS igst_rate_pct NUMERIC(5, 2) DEFAULT 0.00,
+    ADD COLUMN IF NOT EXISTS igst_amount_paisa BIGINT DEFAULT 0,
+    ADD COLUMN IF NOT EXISTS total_tax_paisa BIGINT DEFAULT 0,
+    ADD COLUMN IF NOT EXISTS grand_total_paisa BIGINT DEFAULT 0,
+    ADD COLUMN IF NOT EXISTS ca_review_status VARCHAR(50) DEFAULT 'pending',
+    ADD COLUMN IF NOT EXISTS pdf_storage_path TEXT,
+    ADD COLUMN IF NOT EXISTS integrity_hash VARCHAR(64) DEFAULT '';
+
+-- 3. Constraints for transaction_type and ca_review_status
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'invoices_transaction_type_check'
+    ) THEN
+        ALTER TABLE public.invoices
+            ADD CONSTRAINT invoices_transaction_type_check
+            CHECK (transaction_type IN ('wallet_topup', 'subscription', 'usage_overage', 'manual_credit'));
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'invoices_ca_review_status_check'
+    ) THEN
+        ALTER TABLE public.invoices
+            ADD CONSTRAINT invoices_ca_review_status_check
+            CHECK (ca_review_status IN ('pending', 'approved', 'flagged', 'waived'));
+    END IF;
+END $$;
 
 -- Indexes for rapid lookup and tenant isolation
 CREATE INDEX IF NOT EXISTS idx_invoices_org_id ON public.invoices(organization_id, invoice_date DESC);
@@ -74,7 +82,7 @@ CREATE INDEX IF NOT EXISTS idx_invoices_invoice_no ON public.invoices(invoice_nu
 CREATE INDEX IF NOT EXISTS idx_invoices_ca_status ON public.invoices(ca_review_status, invoice_date DESC);
 CREATE INDEX IF NOT EXISTS idx_invoices_payment_ref ON public.invoices(payment_reference_id);
 
--- 2. Create `invoice_line_items` table
+-- 4. Create `invoice_line_items` table
 CREATE TABLE IF NOT EXISTS public.invoice_line_items (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     invoice_id UUID NOT NULL REFERENCES public.invoices(id) ON DELETE RESTRICT,
@@ -95,7 +103,7 @@ CREATE TABLE IF NOT EXISTS public.invoice_line_items (
 
 CREATE INDEX IF NOT EXISTS idx_invoice_lines_inv_id ON public.invoice_line_items(invoice_id);
 
--- 3. Create `invoice_ca_reviews` audit trail table
+-- 5. Create `invoice_ca_reviews` audit trail table
 CREATE TABLE IF NOT EXISTS public.invoice_ca_reviews (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     invoice_id UUID NOT NULL REFERENCES public.invoices(id) ON DELETE RESTRICT,
@@ -112,7 +120,7 @@ CREATE TABLE IF NOT EXISTS public.invoice_ca_reviews (
 CREATE INDEX IF NOT EXISTS idx_ca_reviews_inv_id ON public.invoice_ca_reviews(invoice_id, created_at DESC);
 
 -- ==============================================================================
--- 4. Enable Row Level Security (RLS) & Define Tenant Isolation Policies
+-- 6. Enable Row Level Security (RLS) & Define Tenant Isolation Policies
 -- ==============================================================================
 
 ALTER TABLE public.invoices ENABLE ROW LEVEL SECURITY;

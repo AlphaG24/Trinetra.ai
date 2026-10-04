@@ -52,11 +52,13 @@ CREATE TABLE IF NOT EXISTS public.call_disclosure_opt_out_acknowledgments (
 ALTER TABLE public.call_disclosure_opt_out_acknowledgments ENABLE ROW LEVEL SECURITY;
 
 -- 5. RLS Policies
+DROP POLICY IF EXISTS "Users can insert their own disclosure opt-out acknowledgments" ON public.call_disclosure_opt_out_acknowledgments;
 CREATE POLICY "Users can insert their own disclosure opt-out acknowledgments" 
 ON public.call_disclosure_opt_out_acknowledgments
 FOR INSERT 
 WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can view their own disclosure opt-out acknowledgments" ON public.call_disclosure_opt_out_acknowledgments;
 CREATE POLICY "Users can view their own disclosure opt-out acknowledgments" 
 ON public.call_disclosure_opt_out_acknowledgments
 FOR SELECT 
