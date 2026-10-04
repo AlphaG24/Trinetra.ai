@@ -35,6 +35,11 @@ from app.services.disclosure_service import (
     resolve_gendered_phrases,
     calculate_opening_watchdog_timeout,
 )
+from app.services.voice_reliability_service import (
+    VoiceTimingTracker,
+    ToolExecutionGuard,
+    InCallNoAudioWatchdog,
+)
 
 load_dotenv()
 
@@ -1231,9 +1236,17 @@ def sanitize_sarvam_speaker(speaker: str | None, is_female: bool = True) -> str:
     return 'priya' if is_female else 'aditya'
 
 
-def create_appointment_tools(organization_id: str | None = None, user_id: str | None = None, agent_id: str | None = None, call_id: str | None = None) -> list:
+def create_appointment_tools(
+    organization_id: str | None = None,
+    user_id: str | None = None,
+    agent_id: str | None = None,
+    call_id: str | None = None,
+    tool_guard: Any | None = None,
+    timing_tracker: Any | None = None,
+) -> list:
     """
     Creates dynamic livekit.agents.llm FunctionTool instances for checking and booking appointments during live voice calls.
+    Protected by ToolExecutionGuard (5.0s hard cap, 700ms filler lines) and VoiceTimingTracker.
     """
     @llm.function_tool(description="Check whether an appointment already exists in the database for the caller using their phone number or name.")
     async def check_existing_appointment(phone_number: str = "", caller_name: str = "") -> str:
@@ -1243,38 +1256,48 @@ def create_appointment_tools(organization_id: str | None = None, user_id: str | 
             phone_number: Caller's phone number or contact digits (optional).
             caller_name: Name of the caller (optional).
         """
-        try:
-            cleaned = re.sub(r'\D', '', phone_number) if phone_number else ""
-            if len(cleaned) > 10:
-                if cleaned.startswith('91') and len(cleaned) == 12:
-                    cleaned = cleaned[2:]
-                elif cleaned.startswith('0') and len(cleaned) == 11:
-                    cleaned = cleaned[1:]
-            
-            # Query appointments table
-            query = supabase_admin.table("appointments").select("id, contact_name, contact_phone, scheduled_at, meeting_type, status, notes").order("created_at", desc=True)
-            if caller_name and cleaned:
-                query = query.or_(f"contact_phone.ilike.%{cleaned}%,contact_name.ilike.%{caller_name}%")
-            elif cleaned:
-                query = query.ilike("contact_phone", f"%{cleaned}%")
-            elif caller_name:
-                query = query.ilike("contact_name", f"%{caller_name}%")
-            else:
-                return "Please ask the caller for their name or registered phone number to check their appointment."
-            
-            res = await asyncio.to_thread(query.limit(3).execute)
-            if res.data and len(res.data) > 0:
-                matched = res.data[0]
-                sch_time = matched.get("scheduled_at", "scheduled time")
-                c_name = matched.get("contact_name") or caller_name or "Client"
-                m_type = matched.get("meeting_type") or "Appointment"
-                stat = matched.get("status") or "scheduled"
-                return f"APPOINTMENT FOUND: {c_name} has a {m_type} appointment scheduled at {sch_time}. Status: {stat}."
-            else:
-                return f"NO APPOINTMENT FOUND: No existing appointment record was found in the database for {caller_name or phone_number}."
-        except Exception as e:
-            logger.error(f"[check_existing_appointment] Database lookup error: {e}")
-            return f"NO APPOINTMENT FOUND: No appointment records found for {caller_name or phone_number}."
+        async def _execute() -> str:
+            if timing_tracker:
+                timing_tracker.mark("tool_start", extra="tool=check_existing_appointment")
+            try:
+                cleaned = re.sub(r'\D', '', phone_number) if phone_number else ""
+                if len(cleaned) > 10:
+                    if cleaned.startswith('91') and len(cleaned) == 12:
+                        cleaned = cleaned[2:]
+                    elif cleaned.startswith('0') and len(cleaned) == 11:
+                        cleaned = cleaned[1:]
+                
+                # Query appointments table
+                query = supabase_admin.table("appointments").select("id, contact_name, contact_phone, scheduled_at, meeting_type, status, notes").order("created_at", desc=True)
+                if caller_name and cleaned:
+                    query = query.or_(f"contact_phone.ilike.%{cleaned}%,contact_name.ilike.%{caller_name}%")
+                elif cleaned:
+                    query = query.ilike("contact_phone", f"%{cleaned}%")
+                elif caller_name:
+                    query = query.ilike("contact_name", f"%{caller_name}%")
+                else:
+                    return "Please ask the caller for their name or registered phone number to check their appointment."
+                
+                res = await asyncio.to_thread(query.limit(3).execute)
+                if res.data and len(res.data) > 0:
+                    matched = res.data[0]
+                    sch_time = matched.get("scheduled_at", "scheduled time")
+                    c_name = matched.get("contact_name") or caller_name or "Client"
+                    m_type = matched.get("meeting_type") or "Appointment"
+                    stat = matched.get("status") or "scheduled"
+                    return f"APPOINTMENT FOUND: {c_name} has a {m_type} appointment scheduled at {sch_time}. Status: {stat}."
+                else:
+                    return f"NO APPOINTMENT FOUND: No existing appointment record was found in the database for {caller_name or phone_number}."
+            except Exception as e:
+                logger.error(f"[check_existing_appointment] Database lookup error: {e}")
+                return f"NO APPOINTMENT FOUND: No appointment records found for {caller_name or phone_number}."
+            finally:
+                if timing_tracker:
+                    timing_tracker.mark("tool_end", extra="tool=check_existing_appointment")
+
+        if tool_guard:
+            return await tool_guard.execute_tool("check_existing_appointment", _execute)
+        return await _execute()
 
     @llm.function_tool(description="Book and register a new appointment slot for the customer directly into the database.")
     async def book_appointment_slot(caller_name: str = "", phone_number: str = "", scheduled_at: str = "", service_or_notes: str = "") -> str:
@@ -1286,43 +1309,55 @@ def create_appointment_tools(organization_id: str | None = None, user_id: str | 
             scheduled_at: Date and time for the appointment (e.g. 'Tomorrow 10 AM', '2026-09-28T10:00:00Z').
             service_or_notes: Details about what the appointment is for.
         """
-        try:
-            cleaned = re.sub(r'\D', '', phone_number) if phone_number else ""
-            apt_payload = {
-                "user_id": user_id,
-                "agent_id": agent_id,
-                "contact_name": caller_name or "Client",
-                "contact_phone": cleaned or phone_number or "Online Caller",
-                "scheduled_at": scheduled_at or "Upcoming",
-                "duration_minutes": 30,
-                "status": "scheduled",
-                "booked_via": "voice",
-                "meeting_type": "Appointment",
-                "notes": service_or_notes or "Booked via voice agent conversation.",
-                "voice_call_id": call_id,
-            }
-            res = await asyncio.to_thread(supabase_admin.table("appointments").insert(apt_payload).execute)
-            
-            # Immediately sync to customer_contacts
-            if organization_id and (cleaned or phone_number):
-                try:
-                    from app.services.caller_lookup import CallerLookupService
-                    c_svc = CallerLookupService(supabase_admin)
-                    await c_svc.upsert_from_call(
-                        organization_id=organization_id,
-                        phone_number=cleaned or phone_number,
-                        caller_name=caller_name,
-                        call_summary=f"Booked appointment for {scheduled_at}. {service_or_notes}",
-                        direction="inbound",
-                        tags=["appointment", "customer"]
-                    )
-                except Exception as c_err:
-                    logger.warning(f"[book_appointment_slot] Failed syncing customer contact: {c_err}")
-            
-            return f"APPOINTMENT CONFIRMED: Appointment successfully booked for {caller_name} at {scheduled_at}."
-        except Exception as e:
-            logger.error(f"[book_appointment_slot] Failed to book appointment: {e}")
-            return f"Appointment noted for {caller_name} at {scheduled_at}."
+        async def _execute() -> str:
+            if timing_tracker:
+                timing_tracker.mark("tool_start", extra="tool=book_appointment_slot")
+            try:
+                cleaned = re.sub(r'\D', '', phone_number) if phone_number else ""
+                apt_payload = {
+                    "user_id": user_id,
+                    "agent_id": agent_id,
+                    "contact_name": caller_name or "Client",
+                    "contact_phone": cleaned or phone_number or "Online Caller",
+                    "scheduled_at": scheduled_at or "Upcoming",
+                    "duration_minutes": 30,
+                    "status": "scheduled",
+                    "booked_via": "voice",
+                    "meeting_type": "Appointment",
+                    "notes": service_or_notes or "Booked via voice agent conversation.",
+                    "voice_call_id": call_id,
+                }
+                res = await asyncio.to_thread(supabase_admin.table("appointments").insert(apt_payload).execute)
+                
+                # Move non-essential writes to background tasks
+                if organization_id and (cleaned or phone_number):
+                    async def _bg_contact_upsert():
+                        try:
+                            from app.services.caller_lookup import CallerLookupService
+                            c_svc = CallerLookupService(supabase_admin)
+                            await c_svc.upsert_from_call(
+                                organization_id=organization_id,
+                                phone_number=cleaned or phone_number,
+                                caller_name=caller_name,
+                                call_summary=f"Booked appointment for {scheduled_at}. {service_or_notes}",
+                                direction="inbound",
+                                tags=["appointment", "customer"]
+                            )
+                        except Exception as c_err:
+                            logger.warning(f"[book_appointment_slot] Background sync error: {c_err}")
+                    asyncio.create_task(_bg_contact_upsert())
+                
+                return f"APPOINTMENT CONFIRMED: Appointment successfully booked for {caller_name} at {scheduled_at}."
+            except Exception as e:
+                logger.error(f"[book_appointment_slot] Failed to book appointment: {e}")
+                return f"Appointment noted for {caller_name} at {scheduled_at}."
+            finally:
+                if timing_tracker:
+                    timing_tracker.mark("tool_end", extra="tool=book_appointment_slot")
+
+        if tool_guard:
+            return await tool_guard.execute_tool("book_appointment_slot", _execute)
+        return await _execute()
 
     @llm.function_tool(description="Reschedule an existing appointment for the customer to a new requested date and time.")
     async def reschedule_appointment_slot(caller_name: str = "", phone_number: str = "", new_scheduled_at: str = "") -> str:
@@ -1333,32 +1368,42 @@ def create_appointment_tools(organization_id: str | None = None, user_id: str | 
             phone_number: Customer's phone number or contact digits.
             new_scheduled_at: The new requested date and time for the appointment.
         """
-        try:
-            cleaned = re.sub(r'\D', '', phone_number) if phone_number else ""
-            if not new_scheduled_at:
-                return "Please ask the customer for their preferred new date and time for rescheduling."
+        async def _execute() -> str:
+            if timing_tracker:
+                timing_tracker.mark("tool_start", extra="tool=reschedule_appointment_slot")
+            try:
+                cleaned = re.sub(r'\D', '', phone_number) if phone_number else ""
+                if not new_scheduled_at:
+                    return "Please ask the customer for their preferred new date and time for rescheduling."
 
-            query = supabase_admin.table("appointments").select("id, contact_name").order("created_at", desc=True)
-            if cleaned:
-                query = query.ilike("contact_phone", f"%{cleaned}%")
-            elif caller_name:
-                query = query.ilike("contact_name", f"%{caller_name}%")
-            
-            res = await asyncio.to_thread(query.limit(1).execute)
-            if res.data and len(res.data) > 0:
-                apt_id = res.data[0]["id"]
-                await asyncio.to_thread(
-                    supabase_admin.table("appointments")
-                    .update({"scheduled_at": new_scheduled_at, "status": "rescheduled", "notes": f"Rescheduled via voice agent to {new_scheduled_at}"})
-                    .eq("id", apt_id)
-                    .execute
-                )
-                return f"APPOINTMENT RESCHEDULED: Appointment for {caller_name or 'the customer'} has been successfully moved to {new_scheduled_at}."
-            else:
-                return f"NO PRIOR APPOINTMENT FOUND: Could not find an existing booking for {caller_name or phone_number}. Would you like to book a new appointment slot for {new_scheduled_at}?"
-        except Exception as e:
-            logger.error(f"[reschedule_appointment_slot] Error: {e}")
-            return f"Appointment reschedule noted for {new_scheduled_at}."
+                query = supabase_admin.table("appointments").select("id, contact_name").order("created_at", desc=True)
+                if cleaned:
+                    query = query.ilike("contact_phone", f"%{cleaned}%")
+                elif caller_name:
+                    query = query.ilike("contact_name", f"%{caller_name}%")
+                
+                res = await asyncio.to_thread(query.limit(1).execute)
+                if res.data and len(res.data) > 0:
+                    apt_id = res.data[0]["id"]
+                    await asyncio.to_thread(
+                        supabase_admin.table("appointments")
+                        .update({"scheduled_at": new_scheduled_at, "status": "rescheduled", "notes": f"Rescheduled via voice agent to {new_scheduled_at}"})
+                        .eq("id", apt_id)
+                        .execute
+                    )
+                    return f"APPOINTMENT RESCHEDULED: Appointment for {caller_name or 'the customer'} has been successfully moved to {new_scheduled_at}."
+                else:
+                    return f"NO PRIOR APPOINTMENT FOUND: Could not find an existing booking for {caller_name or phone_number}. Would you like to book a new appointment slot for {new_scheduled_at}?"
+            except Exception as e:
+                logger.error(f"[reschedule_appointment_slot] Error: {e}")
+                return f"Appointment reschedule noted for {new_scheduled_at}."
+            finally:
+                if timing_tracker:
+                    timing_tracker.mark("tool_end", extra="tool=reschedule_appointment_slot")
+
+        if tool_guard:
+            return await tool_guard.execute_tool("reschedule_appointment_slot", _execute)
+        return await _execute()
 
     @llm.function_tool(description="Call this immediately when the caller declines, objects to, or asks to stop call recording or consent.")
     async def decline_call_recording(reason: str = "caller_request") -> str:
@@ -1968,6 +2013,10 @@ class VikramAgent(Agent):
             logger.warning(f"[VikramAgent] on_user_turn_completed exception: {e}")
 
     async def on_enter(self):
+        if getattr(self, '_has_introduced_self', False):
+            logger.info("[VikramAgent] Opening greeting already delivered; skipping duplicate on_enter.")
+            return
+
         if hasattr(self, 'config_task') and self.config_task:
             try:
                 await self.config_task
@@ -2015,6 +2064,10 @@ class VikramAgent(Agent):
         self._has_introduced_self = True
 
         logger.info(f"[VikramAgent] Speaking single compliant opening greeting: '{greeting}'")
+        if hasattr(self, 'timing_tracker') and self.timing_tracker:
+            self.timing_tracker.mark("disclosure_composed")
+            self.timing_tracker.mark("first_tts_byte")
+
         speech_handle = self.session.say(
             greeting,
             allow_interruptions=True,
@@ -2026,6 +2079,8 @@ class VikramAgent(Agent):
         try:
             # Enforce watchdog timeout so allow_interruptions=False can never freeze the session
             await asyncio.wait_for(speech_handle, timeout=watchdog_timeout)
+            if hasattr(self, 'timing_tracker') and self.timing_tracker:
+                self.timing_tracker.mark("audio_playout")
         except asyncio.TimeoutError:
             logger.warning(
                 f"[VikramAgent] Opening greeting playout exceeded {watchdog_timeout:.1f}s safety timeout; "
@@ -3161,8 +3216,11 @@ except Exception:
     pass
 
 async def entrypoint(ctx: JobContext):
+    timing_tracker = VoiceTimingTracker(room_id=ctx.room.name if ctx.room else "unknown")
+    timing_tracker.mark("answer")
     logger.info(f"Connecting to room: {ctx.room.name}")
     await ctx.connect(auto_subscribe=AutoSubscribe.AUDIO_ONLY)
+    timing_tracker.mark("session_start")
     logger.info(f"Connected to room: {ctx.room.name}")
     
     # Guard: Check if an agent participant is already connected to this room
@@ -3696,12 +3754,45 @@ async def entrypoint(ctx: JobContext):
         except Exception:
             sarvam_pitch = 0.0
 
-    # Create appointment tools for live verification and booking
+    # 1. Resolve Gender and Clean Name early for tools and fillers
+    male_names = {'vikram', 'shubh', 'aditya', 'rahul', 'rohan', 'amit', 'dev', 'ratan', 'varun', 'manan', 'sumit', 'kabir', 'aayan', 'ashutosh', 'advait', 'anand', 'tarun', 'sunny', 'mani', 'gokul', 'vijay', 'mohit', 'rehan', 'soham', 'arvind', 'neel', 'arjun', 'amol', 'raghav'}
+    resolved_bot_name = locals().get('bot_name') or (agent_data.get('bot_name') if agent_data else None) or (agent_data.get('name') if agent_data else None) or 'Vikram'
+    voice_is_male = (str(voice_id).lower() in SARVAM_MALE_VOICES) or (voice_id in ['pNInz6obpgDQGcFmaJgB', 'TxGEqnHWrfWFTfGW9XjX'])
+    name_is_male = str(resolved_bot_name).lower() in male_names
+    explicit_gender = locals().get('gender_tag') or (agent_data.get('gender') if agent_data else None)
+    if explicit_gender in ('male', 'female'):
+        resolved_gender = explicit_gender
+    elif voice_is_male or name_is_male:
+        resolved_gender = 'male'
+    else:
+        resolved_gender = 'female'
+
+    agent_instance_ref: list[Any] = [None]
+
+    async def _speak_filler_fn(filler_text: str):
+        inst = agent_instance_ref[0]
+        if inst and getattr(inst, 'session', None):
+            try:
+                inst.session.say(filler_text, allow_interruptions=True, add_to_chat_ctx=False)
+            except Exception as e:
+                logger.warning(f"Error speaking filler line: {e}")
+
+    tool_guard = ToolExecutionGuard(
+        hard_timeout_seconds=5.0,
+        filler_delay_seconds=0.7,
+        speak_filler_fn=_speak_filler_fn,
+        language=language,
+        gender=resolved_gender,
+    )
+
+    # Create appointment tools for live verification and booking protected by ToolExecutionGuard and VoiceTimingTracker
     appointment_tools = create_appointment_tools(
         organization_id=organization_id,
         user_id=user_id,
         agent_id=agent_id,
-        call_id=call_sid
+        call_id=call_sid,
+        tool_guard=tool_guard,
+        timing_tracker=timing_tracker,
     )
 
     # 2. Create the agent instance with actual settings
@@ -3718,6 +3809,8 @@ async def entrypoint(ctx: JobContext):
         tools=appointment_tools,
     )
 
+    agent_instance_ref[0] = agent_instance
+    agent_instance.timing_tracker = timing_tracker
     agent_instance.room = ctx.room
 
     if greeting_message:
@@ -3998,6 +4091,29 @@ async def entrypoint(ctx: JobContext):
     # user and agent turns. Having separate hooks caused 2-3x duplicate messages
     # in the frontend.
 
+    watchdog = InCallNoAudioWatchdog(
+        silence_threshold_seconds=5.0,
+        speak_fn=lambda prompt: agent_instance.session.say(prompt, allow_interruptions=True, add_to_chat_ctx=False) if agent_instance and getattr(agent_instance, 'session', None) else None,
+        tool_guard=tool_guard,
+        language=language,
+        gender=resolved_gender,
+    )
+
+    @session.on("user_speech_committed")
+    def _on_user_speech_watchdog(event):
+        timing_tracker.mark("user_speech_end")
+        timing_tracker.mark("stt_final")
+        watchdog.on_user_speech_end()
+
+    @session.on("agent_speech_started")
+    def _on_agent_speech_started_watchdog(event):
+        timing_tracker.mark("audio_playout")
+        watchdog.on_agent_speech_start()
+
+    @session.on("agent_speech_committed")
+    def _on_agent_speech_committed_watchdog(event):
+        watchdog.on_agent_speech_end()
+
     session_done = asyncio.Event()
 
     @session.on("close")
@@ -4013,11 +4129,13 @@ async def entrypoint(ctx: JobContext):
 
     try:
         await session.start(agent=agent_instance, room=ctx.room)
+        watchdog.start()
         # Block until the caller disconnects or the session closes
         await session_done.wait()
     except Exception as e:
         logger.error(f"Error during active session: {e}")
     finally:
+        watchdog.stop()
         # Await lead extraction and analytics saving BEFORE worker process finishes
         try:
             if agent_id and user_id:
