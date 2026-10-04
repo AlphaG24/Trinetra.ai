@@ -565,5 +565,127 @@ Exit code: 0 (Zero type errors)
 3. **Verify Aadhaar UIDAI Standard**:
    - Run `python -m pytest backend/tests/test_pii_sanitizer.py -k TestNationalIdSanitization -v`.
 
+---
+
+## Task 8: Multi-Tenant Isolation CI Test Suite
+
+- **Date**: 2026-10-04
+- **Branch**: `feature/tenant-isolation-ci`
+- **Status**: `IMPLEMENTED, pending legal review`
+- **Mandate**: Master Plan Section 18 (Authoritative Overrides).
+
+### 1. Implementation Summary
+1. **RLS Policy Static Analysis**:
+   - Automated parser in `backend/tests/test_tenant_isolation_ci.py` (`TestRLSPolicyStaticAnalysis`) scanning `supabase/migrations/20260810_security_audit_fixes.sql`.
+   - Asserts Row Level Security is explicitly ENABLED across 16 core platform tables:
+     `organizations`, `profiles`, `agents`, `voice_calls`, `leads`, `campaigns`, `campaign_contacts`, `phone_numbers`, `agent_phone_numbers`, `callbacks`, `customer_contacts`, `integrations`, `agent_integrations`, `support_tickets`, `consent_records`, `invoices`.
+   - Asserts each table's policy enforces tenant boundaries (`organization_id = (SELECT organization_id FROM public.profiles WHERE id = auth.uid())` or `user_id = auth.uid()`).
+2. **Simulated RLS Engine Multi-Tenant Isolation**:
+   - `SimulatedRLSClient` simulating dual tenants:
+     - Tenant Alpha (`org-alpha`, `user-alpha`)
+     - Tenant Beta (`org-beta`, `user-beta`)
+   - Verified that Tenant Alpha:
+     - Cannot SELECT Tenant Beta's agents, phone numbers, voice calls, leads, appointments, campaigns, campaign contacts, integrations, customer contacts, or support tickets.
+     - Cannot UPDATE Tenant Beta's records (0 rows affected).
+     - Cannot DELETE Tenant Beta's records (0 rows affected).
+     - Cannot INSERT records specifying Tenant Beta's `organization_id` (raises `PermissionError: RLS violation`).
+3. **Voice Agent Appointment Tool Scoping Fix & Tests**:
+   - Fixed appointment tools in `backend/agent.py` (`check_existing_appointment`, `book_appointment_slot`, `reschedule_appointment_slot`) to filter by `organization_id` / `user_id` / `agent_id`.
+   - Fixed pre-call prompt appointment lookup queries (`apt_query`) in `backend/agent.py` to enforce tenant isolation.
+   - Tested that callers with identical phone numbers in Org Alpha and Org Beta never see or mutate each other's appointment records.
+4. **Caller Rights & Retention Statutory Isolation**:
+   - Verified `CallerRightsService.search_caller_data` returns strictly Org Alpha's records; Org Beta's records for the same phone number are completely excluded.
+   - Verified `CallerRightsService.erase_caller_data` executes erasure only on Org Alpha, leaving Org Beta records untouched.
+   - Verified `RetentionPolicyService.execute_retention_purge` scrubs only Org Alpha's expired operational media, leaving Org Beta untouched.
+5. **API Endpoint Route Security**:
+   - Asserted that phone number release / unassign / renew routes reject cross-tenant manipulation with HTTP 403 Forbidden.
+   - Asserted that support ticket routes reject cross-tenant access with HTTP 403 Forbidden.
+   - Asserted that voice webhooks match inbound phone numbers strictly to the assigned tenant organization.
+
+### 2. Real Test Output
+
+#### Multi-Tenant Isolation CI Test Suite:
+Command:
+```powershell
+backend\.venv\Scripts\pytest backend\tests\test_tenant_isolation_ci.py -v
+```
+Output:
+```
+============================= test session starts =============================
+platform win32 -- Python 3.11.9, pytest-9.1.1, pluggy-1.6.0 -- C:\Users\Ketan singh\trinetra-workspace\trinetra-fresh\backend\.venv\Scripts\python.exe
+cachedir: .pytest_cache
+rootdir: C:\Users\Ketan singh\trinetra-workspace\trinetra-fresh
+plugins: anyio-4.13.0, asyncio-1.4.0
+asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 29 items
+
+backend/tests/test_tenant_isolation_ci.py::TestRLSPolicyStaticAnalysis::test_migration_file_exists PASSED [  3%]
+backend/tests/test_tenant_isolation_ci.py::TestRLSPolicyStaticAnalysis::test_all_core_tables_have_rls_enabled PASSED [  6%]
+backend/tests/test_tenant_isolation_ci.py::TestRLSPolicyStaticAnalysis::test_agents_table_rls_policy_enforces_tenant_boundary PASSED [ 10%]
+backend/tests/test_tenant_isolation_ci.py::TestRLSPolicyStaticAnalysis::test_voice_calls_table_rls_policy_enforces_tenant_boundary PASSED [ 13%]
+backend/tests/test_tenant_isolation_ci.py::TestRLSPolicyStaticAnalysis::test_campaigns_table_rls_policy_enforces_tenant_boundary PASSED [ 17%]
+backend/tests/test_tenant_isolation_ci.py::TestRLSPolicyStaticAnalysis::test_phone_numbers_table_rls_policy_enforces_tenant_boundary PASSED [ 20%]
+backend/tests/test_tenant_isolation_ci.py::TestRLSPolicyStaticAnalysis::test_customer_contacts_table_rls_policy_enforces_tenant_boundary PASSED [ 24%]
+backend/tests/test_tenant_isolation_ci.py::TestRLSPolicyStaticAnalysis::test_integrations_table_rls_policy_enforces_tenant_boundary PASSED [ 27%]
+backend/tests/test_tenant_isolation_ci.py::TestMultiTenantQueryIsolation::test_org_alpha_cannot_select_org_beta_agents PASSED [ 31%]
+backend/tests/test_tenant_isolation_ci.py::TestMultiTenantQueryIsolation::test_org_alpha_cannot_select_org_beta_phone_numbers PASSED [ 34%]
+backend/tests/test_tenant_isolation_ci.py::TestMultiTenantQueryIsolation::test_org_alpha_cannot_select_org_beta_voice_calls PASSED [ 37%]
+backend/tests/test_tenant_isolation_ci.py::TestMultiTenantQueryIsolation::test_org_alpha_cannot_select_org_beta_leads PASSED [ 41%]
+backend/tests/test_tenant_isolation_ci.py::TestMultiTenantQueryIsolation::test_org_alpha_cannot_select_org_beta_appointments PASSED [ 44%]
+backend/tests/test_tenant_isolation_ci.py::TestMultiTenantQueryIsolation::test_org_alpha_cannot_select_org_beta_campaigns_and_contacts PASSED [ 48%]
+backend/tests/test_tenant_isolation_ci.py::TestMultiTenantQueryIsolation::test_org_alpha_cannot_select_org_beta_integrations PASSED [ 51%]
+backend/tests/test_tenant_isolation_ci.py::TestMultiTenantQueryIsolation::test_org_alpha_cannot_select_org_beta_customer_contacts PASSED [ 55%]
+backend/tests/test_tenant_isolation_ci.py::TestMultiTenantQueryIsolation::test_org_alpha_cannot_select_org_beta_support_tickets PASSED [ 58%]
+backend/tests/test_tenant_isolation_ci.py::TestMultiTenantQueryIsolation::test_org_alpha_cannot_update_org_beta_record PASSED [ 62%]
+backend/tests/test_tenant_isolation_ci.py::TestMultiTenantQueryIsolation::test_org_alpha_cannot_delete_org_beta_record PASSED [ 65%]
+backend/tests/test_tenant_isolation_ci.py::TestMultiTenantQueryIsolation::test_org_alpha_cannot_insert_record_into_org_beta PASSED [ 68%]
+backend/tests/test_tenant_isolation_ci.py::TestVoiceAgentAppointmentIsolation::test_check_existing_appointment_isolates_by_organization PASSED [ 72%]
+backend/tests/test_tenant_isolation_ci.py::TestVoiceAgentAppointmentIsolation::test_reschedule_appointment_isolates_by_organization PASSED [ 75%]
+backend/tests/test_tenant_isolation_ci.py::TestVoiceAgentAppointmentIsolation::test_book_appointment_slot_stamps_tenant_organization_id PASSED [ 79%]
+backend/tests/test_tenant_isolation_ci.py::TestCallerRightsAndRetentionMultiTenantIsolation::test_caller_search_strictly_returns_only_target_org PASSED [ 82%]
+backend/tests/test_tenant_isolation_ci.py::TestCallerRightsAndRetentionMultiTenantIsolation::test_caller_erasure_in_org_a_preserves_org_b_records PASSED [ 86%]
+backend/tests/test_tenant_isolation_ci.py::TestCallerRightsAndRetentionMultiTenantIsolation::test_retention_policy_in_org_a_preserves_org_b_media PASSED [ 89%]
+backend/tests/test_tenant_isolation_ci.py::TestAPIRouteMultiTenantEnforcement::test_phone_number_route_rejects_cross_tenant_manipulation PASSED [ 93%]
+backend/tests/test_tenant_isolation_ci.py::TestAPIRouteMultiTenantEnforcement::test_support_ticket_route_rejects_cross_tenant_access PASSED [ 96%]
+backend/tests/test_tenant_isolation_ci.py::TestAPIRouteMultiTenantEnforcement::test_voice_webhook_tenant_matching PASSED [100%]
+
+======================= 29 passed, 2 warnings in 15.49s =======================
+```
+
+#### Frozen Compliance Files Check:
+```
+backend/tests/test_frozen_files_ci.py: 8 passed in 0.19s (100% pass rate)
+```
+
+#### Hardcoded Gender Scanner Check:
+```
+backend/tests/test_a1d_gender_resolver.py: 70 passed in 11.25s (100% pass rate)
+```
+
+#### Full Backend Test Suite:
+```
+====================== 366 passed, 3 warnings in 29.86s ======================
+```
+
+#### Frontend Next.js Production Build Validation:
+```
+npm run build --prefix frontend
+✓ Generating static pages using 11 workers (163/163) in 6.4s
+Exit code: 0 (Zero TypeScript errors, 163 pages built)
+```
+
+### 3. Reviewer Verification Steps
+1. **Run Multi-Tenant Test Suite**:
+   ```powershell
+   backend\.venv\Scripts\pytest backend\tests\test_tenant_isolation_ci.py -v
+   ```
+2. **Verify Cross-Tenant Query Isolation**:
+   - Run `pytest backend/tests/test_tenant_isolation_ci.py -k TestMultiTenantQueryIsolation -v`.
+   - Confirm that Org Alpha cannot read, write, or delete Org Beta's agents, numbers, calls, leads, appointments, campaigns, integrations, contacts, or tickets.
+3. **Verify Appointment Tool Scoping**:
+   - Run `pytest backend/tests/test_tenant_isolation_ci.py -k TestVoiceAgentAppointmentIsolation -v`.
+   - Confirm that appointment lookup and reschedule strictly enforce `organization_id`.
+
+
 
 

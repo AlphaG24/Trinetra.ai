@@ -1267,8 +1267,15 @@ def create_appointment_tools(
                     elif cleaned.startswith('0') and len(cleaned) == 11:
                         cleaned = cleaned[1:]
                 
-                # Query appointments table
+                # Query appointments table with strict tenant isolation
                 query = supabase_admin.table("appointments").select("id, contact_name, contact_phone, scheduled_at, meeting_type, status, notes").order("created_at", desc=True)
+                if organization_id:
+                    query = query.eq("organization_id", organization_id)
+                elif user_id:
+                    query = query.eq("user_id", user_id)
+                elif agent_id:
+                    query = query.eq("agent_id", agent_id)
+
                 if caller_name and cleaned:
                     query = query.or_(f"contact_phone.ilike.%{cleaned}%,contact_name.ilike.%{caller_name}%")
                 elif cleaned:
@@ -1317,6 +1324,7 @@ def create_appointment_tools(
                 apt_payload = {
                     "user_id": user_id,
                     "agent_id": agent_id,
+                    "organization_id": organization_id,
                     "contact_name": caller_name or "Client",
                     "contact_phone": cleaned or phone_number or "Online Caller",
                     "scheduled_at": scheduled_at or "Upcoming",
@@ -1377,6 +1385,13 @@ def create_appointment_tools(
                     return "Please ask the customer for their preferred new date and time for rescheduling."
 
                 query = supabase_admin.table("appointments").select("id, contact_name").order("created_at", desc=True)
+                if organization_id:
+                    query = query.eq("organization_id", organization_id)
+                elif user_id:
+                    query = query.eq("user_id", user_id)
+                elif agent_id:
+                    query = query.eq("agent_id", agent_id)
+
                 if cleaned:
                     query = query.ilike("contact_phone", f"%{cleaned}%")
                 elif caller_name:
@@ -3597,13 +3612,18 @@ async def entrypoint(ctx: JobContext):
                         logger.warning(f"Fast caller lookup timed out or failed in EP: {lookup_err}")
 
 
-                # 10. Lookup Existing Appointment Records in DB
+                # 10. Lookup Existing Appointment Records in DB with tenant isolation
                 try:
                     apt_query = supabase_admin.table("appointments").select("contact_name, contact_phone, scheduled_at, meeting_type, status").order("created_at", desc=True)
+                    if organization_id:
+                        apt_query = apt_query.eq("organization_id", organization_id)
+                    elif user_id:
+                        apt_query = apt_query.eq("user_id", user_id)
+
                     if caller_number and caller_number != "Unknown":
                         apt_query = apt_query.ilike("contact_phone", f"%{caller_number}%")
                     elif user_id:
-                        apt_query = apt_query.eq("user_id", user_id).limit(5)
+                        apt_query = apt_query.limit(5)
                     else:
                         apt_query = apt_query.limit(3)
                     
@@ -4612,13 +4632,18 @@ async def run_agent(room_name: str, agent_id: str | None = None, contact_id: str
                     except Exception as lookup_err:
                         logger.error(f"Failed to lookup caller: {lookup_err}")
 
-                # 10. Lookup Existing Appointment Records in DB
+                # 10. Lookup Existing Appointment Records in DB with tenant isolation
                 try:
                     apt_query = supabase_admin.table("appointments").select("contact_name, contact_phone, scheduled_at, meeting_type, status").order("created_at", desc=True)
+                    if organization_id:
+                        apt_query = apt_query.eq("organization_id", organization_id)
+                    elif user_id:
+                        apt_query = apt_query.eq("user_id", user_id)
+
                     if caller_number and caller_number != "Unknown":
                         apt_query = apt_query.ilike("contact_phone", f"%{caller_number}%")
                     elif user_id:
-                        apt_query = apt_query.eq("user_id", user_id).limit(5)
+                        apt_query = apt_query.limit(5)
                     else:
                         apt_query = apt_query.limit(3)
                     
