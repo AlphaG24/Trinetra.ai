@@ -6,6 +6,12 @@
 
 rules:
 
+  - id: SEC-000
+    name: "Mandatory Session Startup Directive"
+    severity: critical
+    description: "At the start of every session read docs/MASTER_PLAN.md (Section 18 wins), docs/PROGRESS.md and docs/compliance/COMPLIANCE_REGISTER.md. Follow the working rules. Never claim done without real test output. Stop and ask on conflicts or before any migration or destructive job."
+    pattern: "At the start of every session read docs/MASTER_PLAN.md (Section 18 wins), docs/PROGRESS.md and docs/compliance/COMPLIANCE_REGISTER.md. Follow the working rules. Never claim done without real test output. Stop and ask on conflicts or before any migration or destructive job."
+
   - id: SEC-011
     name: "Immutable Security & Regulatory Compliance Guardrails"
     severity: critical

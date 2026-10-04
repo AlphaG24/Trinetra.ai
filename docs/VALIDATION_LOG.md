@@ -9,7 +9,7 @@
 
 - **Date**: 2026-10-04
 - **Branch**: `feature/voice-reliability-stall-fix`
-- **Status**: `IMPLEMENTED, pending legal review`
+- **Status**: `IMPLEMENTED; live validation PENDING`
 - **Target Metrics**: First audio ~3.0s, per-reply latency ~2.0s, tool execution timeout <= 5.0s, filler threshold = 700ms, mid-call dead air watchdog = 5.0s.
 
 ### 1. Problem Description & Root Cause
@@ -32,16 +32,21 @@
    - Converted non-essential contact upserts to asynchronous background tasks via `asyncio.create_task()`.
    - Connected `InCallNoAudioWatchdog` to session events (`user_speech_committed`, `agent_speech_started`, `agent_speech_committed`) with start/stop lifecycle management.
    - Enforced single opening greeting protection in `on_enter` using `_has_introduced_self` guard.
+3. **`backend/scripts/summarize_voice_timing.py`**:
+   - CLI utility parsing real console / file logs for `[VoiceTiming]` markers and producing per-stage breakdown tables.
 
-### 3. Latency Metrics: Before vs. After
-| Stage / Metric | Before Fix | After Fix (Target) | Status |
-| :--- | :--- | :--- | :--- |
-| **First Audio Playout** | 3.8s – 5.2s (blocking contact queries) | **2.6s – 3.1s** (parallelized config/lookup) | **ACHIEVED** |
-| **Plain Turn Response** | 2.1s – 2.9s | **1.8s – 2.1s** | **ACHIEVED** |
-| **Tool Execution Response (Normal)** | 2.4s – 4.5s (blocking sync contact upsert) | **1.2s – 1.8s** (background upsert) | **ACHIEVED** |
-| **Slow Tool (>700ms) User Experience** | Silent freeze (caller hung up) | **Filler at 700ms**, smooth bridge | **ELIMINATED STALL** |
-| **Frozen Tool (>5.0s)** | Indefinite call freeze | **Hard cap at 5.0s** + fallback speech | **ELIMINATED STALL** |
-| **Mid-call Dead Air Watchdog** | None (call remained frozen) | **5.0s detection**, retry + recovery prompt | **PROTECTED** |
+### 3. Latency Metrics & Measurements
+*Note: Real telephony production numbers require a live test call log. Stages not yet captured from live calls are strictly labeled **NOT YET MEASURED**.*
+
+| Metric / Stage | Target Bound | Automated Test Measured Value | Live Telephony Measured Value | Status |
+| :--- | :--- | :--- | :--- | :--- |
+| **Tool Execution Timeout Cap** | <= 5000 ms | **200.0 ms** (test configured hard cap) | **5000.0 ms** (configured in agent.py) | **VERIFIED IN AUTOMATED TESTS** |
+| **Conversational Filler Trigger** | ~700 ms | **100.0 ms** (test configured delay) | **700.0 ms** (configured in agent.py) | **VERIFIED IN AUTOMATED TESTS** |
+| **In-Call Silence Watchdog** | ~5000 ms | **200.0 ms** (test configured threshold) | **5000.0 ms** (configured in agent.py) | **VERIFIED IN AUTOMATED TESTS** |
+| **Opening Playout Once Guard** | 1 playout | **1 playout** (on_enter duplicate suppressed) | **NOT YET MEASURED** | **VERIFIED IN AUTOMATED TESTS** |
+| **First Audio Playout (Live)** | ~3000 ms | N/A (unit tests mock audio hardware) | **NOT YET MEASURED** | Awaiting Live Call Log |
+| **Per-Turn Reply Latency (Live)**| ~2000 ms | N/A (unit tests mock audio hardware) | **NOT YET MEASURED** | Awaiting Live Call Log |
+| **Database Contact Backgrounding**| Non-blocking | **< 1.0 ms** dispatch overhead | **NOT YET MEASURED** | **VERIFIED IN AUTOMATED TESTS** |
 
 ### 4. Real Test Output
 Execution command:
@@ -100,3 +105,9 @@ Output:
 5. **Simulate Mid-Call Dead Air**:
    - Remain completely silent for > 5 seconds after agent finishes speaking.
    - Observe watchdog trigger retry, then speak: *"Ji, kya aap mujhe sun pa rahe hain? Kahiye, main aapki kya madad kar sakti hoon?"*.
+6. **Generate Per-Stage Measured Summary**:
+   - Pipe live call logs or run:
+     ```powershell
+     backend\.venv\Scripts\python.exe backend\scripts\summarize_voice_timing.py call_output.log
+     ```
+   - Verifies all 13 stages and outputs the real measured latency table.
