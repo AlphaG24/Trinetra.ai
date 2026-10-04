@@ -27,6 +27,7 @@ from typing import Dict, Any, Optional, Tuple
 
 from database import supabase_admin
 from app.services.wallet_service import WalletService
+from app.services.invoice_vault_service import InvoiceVaultService
 
 logger = logging.getLogger("RazorpayWebhookService")
 
@@ -37,6 +38,7 @@ class RazorpayWebhookService:
     def __init__(self, supabase_client=None):
         self.supabase = supabase_client or supabase_admin
         self.wallet_service = WalletService(supabase_client=self.supabase)
+        self.invoice_service = InvoiceVaultService(supabase_client=self.supabase)
 
     # -------------------------------------------------------------------------
     # 1. Cryptographic Signature Verification
@@ -162,6 +164,25 @@ class RazorpayWebhookService:
                 result_details["wallet_credited"] = True
                 result_details["credited_amount_paisa"] = amount_paisa
                 result_details["new_balance_paisa"] = wallet.get("balance_paisa")
+
+                # Auto-generate GST invoice in vault (Master Plan Section 18.10 & B6)
+                try:
+                    invoice = self.invoice_service.create_invoice_for_wallet_topup(
+                        organization_id=org_id,
+                        amount_paisa=amount_paisa,
+                        payment_reference_id=payment_id,
+                        customer_legal_name=notes.get("legal_name") or notes.get("customer_name"),
+                        customer_gstin=notes.get("gstin"),
+                        customer_state=notes.get("state"),
+                        customer_state_code=notes.get("state_code"),
+                        transaction_type="wallet_topup",
+                    )
+                    result_details["invoice_generated"] = True
+                    result_details["invoice_number"] = invoice.get("invoice_number")
+                except Exception as inv_err:
+                    logger.warning(f"Could not auto-generate invoice for payment {payment_id}: {inv_err}")
+                    result_details["invoice_generated"] = False
+                    result_details["invoice_error"] = str(inv_err)
             else:
                 result_details["wallet_credited"] = False
                 result_details["note"] = "No organization_id found in payment notes."

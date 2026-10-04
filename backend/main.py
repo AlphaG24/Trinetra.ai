@@ -39,6 +39,7 @@ from app.routers.caller_rights_router import router as caller_rights_router
 from app.routers.retention_router import router as retention_router
 from app.routers.admin_auth_router import admin_auth_router
 from app.routers.wallet_router import wallet_router, webhook_router
+from app.routers.invoice_router import invoice_router
 
 app = FastAPI(title="Trinetra API")
 
@@ -99,6 +100,7 @@ app.include_router(retention_router)
 app.include_router(admin_auth_router)
 app.include_router(wallet_router)
 app.include_router(webhook_router)
+app.include_router(invoice_router)
 
 @app.on_event("startup")
 async def app_startup():
