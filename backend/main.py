@@ -15,6 +15,9 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(name)s] %(levelna
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
+from app.services.pii_scrubber import attach_pii_filter
+attach_pii_filter()
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from voice_router import (

@@ -486,5 +486,84 @@ Exit code: 0 (Zero type errors)
 3. **Verify API Policy Endpoint**:
    - Inspect `GET /api/retention/policies` output to confirm all statutory periods and legal citations match the compliance register.
 
+---
+
+## Task 7: PII Sanitizer & External Log Scrubber
+
+- **Date**: October 4, 2026
+- **Branch**: `feature/pii-log-scrubber`
+- **Status**: `IMPLEMENTED, pending legal review`
+- **Governing Standard**: India DPDP Act 2023 Sec 8, CERT-In Directions 2022 Sec 4(6), UIDAI Aadhaar Act 2016 Reg 16A (`CONFIRM WITH A LAWYER`), EU GDPR Art 32.
+
+### 1. Implementation Summary
+1. **Centralized PII Sanitization Engine (`backend/app/services/pii_scrubber.py`)**:
+   - **Phone Number Masking**: Masking across 10-digit mobile, `+91`, `91`, and formatted variants (e.g., `+91 98******10`), preventing exposure in logs.
+   - **Aadhaar Masking**: Preserves only the last 4 digits (`XXXX-XXXX-1234`) pursuant to UIDAI masking regulations.
+   - **SSN Masking**: Preserves only the last 4 digits (`***-**-1234`).
+   - **Credential & Token Redaction**: Redacts Bearer tokens (`Bearer [REDACTED_TOKEN]`), JWT strings (`[REDACTED_JWT]`), and provider API keys (`[REDACTED_API_KEY]`).
+2. **Recursive Data Payload Scrubber**:
+   - `sanitize_data` scrubs nested dictionaries, lists, and tuples.
+   - Replaces sensitive dictionary keys (`password`, `secret`, `token`, `service_role_key`, `authorization`, `cookie`) with `[REDACTED]`.
+3. **Logging Subsystem Integration (`PIIFilter`)**:
+   - `PIIFilter` attached to the root logger in `backend/main.py`.
+   - Automatically sanitizes all `LogRecord` messages, dictionary parameters, and string arguments before they reach console or file handlers.
+4. **External Telemetry Scrubbers (Sentry & BetterStack)**:
+   - **Sentry**: `sentry_before_send` hook strips Authorization headers, cookies, query string tokens, request bodies, stack frame local variables, breadcrumb messages, and user IP addresses from exception payloads.
+   - **BetterStack**: `betterstack_log_formatter` generates cleansed JSON payloads for log stream ingestion.
+5. **Client-Side TypeScript Utility (`frontend/src/lib/safety/piiScrubber.ts`)**:
+   - Mirrored client/server scrubber utility for Next.js error boundaries and client telemetry.
+
+### 2. Test Execution Evidence
+
+#### Task 7 Test Suite (`backend/tests/test_pii_sanitizer.py`):
+```
+backend/tests/test_pii_sanitizer.py::TestPhoneSanitization::test_indian_10_digit_mobile PASSED [  7%]
+backend/tests/test_pii_sanitizer.py::TestPhoneSanitization::test_indian_plus_91_prefix PASSED [ 15%]
+backend/tests/test_pii_sanitizer.py::TestPhoneSanitization::test_indian_formatted_with_spaces PASSED [ 23%]
+backend/tests/test_pii_sanitizer.py::TestNationalIdSanitization::test_aadhaar_with_spaces PASSED [ 30%]
+backend/tests/test_pii_sanitizer.py::TestNationalIdSanitization::test_aadhaar_continuous_digits PASSED [ 38%]
+backend/tests/test_pii_sanitizer.py::TestNationalIdSanitization::test_us_ssn_number PASSED [ 46%]
+backend/tests/test_pii_sanitizer.py::TestTokenAndKeyRedaction::test_bearer_token_redaction PASSED [ 53%]
+backend/tests/test_pii_sanitizer.py::TestTokenAndKeyRedaction::test_jwt_token_redaction PASSED [ 61%]
+backend/tests/test_pii_sanitizer.py::TestTokenAndKeyRedaction::test_known_api_keys_redaction PASSED [ 69%]
+backend/tests/test_pii_sanitizer.py::TestDictionarySanitization::test_sensitive_keys_redacted PASSED [ 76%]
+backend/tests/test_pii_sanitizer.py::TestLoggingFilterIntegration::test_pii_filter_scrubs_log_records PASSED [ 84%]
+backend/tests/test_pii_sanitizer.py::TestSentryBeforeSendHook::test_sentry_before_send_cleanses_event PASSED [ 92%]
+backend/tests/test_pii_sanitizer.py::TestBetterStackLogFormatter::test_formatter_produces_sanitized_payload PASSED [100%]
+
+============================= 13 passed in 0.06s ==============================
+```
+
+#### Frozen Files CI Integrity Check:
+```
+backend/tests/test_frozen_files_ci.py: 8 passed in 0.20s (100% pass rate)
+```
+
+#### Hardcoded Gender Scanner Check:
+```
+backend/tests/test_a1d_gender_resolver.py: 70 passed in 11.33s (100% pass rate)
+```
+
+#### Overall Repository Test Suite:
+```
+337 passed, 1 warning in 26.04s (100% pass rate)
+```
+
+#### Frontend TypeScript Build Validation:
+```
+npx tsc --noEmit
+Exit code: 0 (Zero type errors)
+```
+
+### 3. Reviewer Verification Steps
+1. **Verify Log Filter Masking**:
+   - Run `python -m pytest backend/tests/test_pii_sanitizer.py -k test_pii_filter_scrubs_log_records -v`.
+   - Confirm that raw phone numbers and API keys in logger statements are masked before reaching output handlers.
+2. **Verify Sentry Scrubber**:
+   - Run `python -m pytest backend/tests/test_pii_sanitizer.py -k test_sentry_before_send_cleanses_event -v`.
+   - Confirm that Authorization headers, cookies, exception text, and breadcrumbs are sanitized.
+3. **Verify Aadhaar UIDAI Standard**:
+   - Run `python -m pytest backend/tests/test_pii_sanitizer.py -k TestNationalIdSanitization -v`.
+
 
 
