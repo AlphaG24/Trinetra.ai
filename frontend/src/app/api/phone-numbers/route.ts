@@ -23,6 +23,7 @@ export async function GET(request: Request) {
         const adminClient = getAdminClient();
 
         // Fetch phone_numbers table records for this user/organization
+        // Include active, grace_period, and hold_period numbers owned by this org
         let query = adminClient
             .from("phone_numbers")
             .select(`
@@ -35,7 +36,7 @@ export async function GET(request: Request) {
                     )
                 )
             `)
-            .eq("is_assigned", true)
+            .neq("status", "released")
             .order("created_at", { ascending: false });
 
         if (orgId) {
@@ -50,15 +51,20 @@ export async function GET(request: Request) {
             console.error('[API] Database Error in phone_numbers:', dbError);
         }
 
-        const formattedNumbers = (phone_numbers || []).map((num: any) => ({
-            ...num,
-            status: num.status || "active",
-            assigned_agents: (num.assigned_agents || []).map((assignment: any) => ({
-                agent_id: assignment.agent_id,
-                agent_name: assignment.agents?.name || "Unknown",
-                is_primary: assignment.is_primary
-            }))
-        }));
+        const formattedNumbers = (phone_numbers || []).map((num: any) => {
+            const rawStatus = num.status || "active";
+            const isGraceOrHold = rawStatus === "grace_period" || rawStatus === "hold_period";
+            return {
+                ...num,
+                status: rawStatus,
+                is_assigned: isGraceOrHold ? false : Boolean(num.is_assigned),
+                assigned_agents: isGraceOrHold ? [] : (num.assigned_agents || []).map((assignment: any) => ({
+                    agent_id: assignment.agent_id,
+                    agent_name: assignment.agents?.name || "Unknown",
+                    is_primary: assignment.is_primary
+                }))
+            };
+        });
 
         let baseLimit = 0;
         const tier = profile.plan_tier?.toLowerCase() || 'free';

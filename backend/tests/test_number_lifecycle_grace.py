@@ -89,6 +89,10 @@ class MockQueryBuilder:
         self._update_payload = payload
         return self
 
+    def delete(self):
+        self._action = "delete"
+        return self
+
     def execute(self):
         if self._action == "insert":
             if isinstance(self._insert_payload, list):
@@ -109,6 +113,15 @@ class MockQueryBuilder:
                     row.update(self._update_payload)
                     matching.append(dict(row))
             return MagicMock(data=matching)
+
+        elif self._action == "delete":
+            initial_len = len(self.table_data)
+            self.table_data[:] = [
+                row for row in self.table_data
+                if not all(row.get(col) == val for col, val in self.filters)
+            ]
+            deleted_count = initial_len - len(self.table_data)
+            return MagicMock(data=[{"count": deleted_count}])
 
         else:  # select
             results = []
@@ -140,8 +153,11 @@ class MockSupabaseClient:
     def __init__(self):
         self.tables = {
             "phone_numbers": [],
+            "agents": [],
+            "agent_phone_numbers": [],
             "number_lifecycle_missed_calls": [],
             "number_lifecycle_digests": [],
+            "phone_number_pool": [],
         }
 
     def table(self, table_name: str):
@@ -186,6 +202,54 @@ class TestNumberLifecycleTransitions:
         # Exactly 29 days total (15d grace + 14d hold)
         total_delta = (hold_ends - expired_at).days
         assert total_delta == TOTAL_LIFECYCLE_DAYS
+
+    def test_expire_number_revokes_agent_assignment(self):
+        """Asserts expiration unlinks agent_phone_numbers, clears agents.phone_number, and unsets is_assigned."""
+        mock_db = MockSupabaseClient()
+        num_id = "phone-uuid-revoke-01"
+        agent_id = "agent-uuid-01"
+        phone_num = "+919876500000"
+        org_id = "org-beta"
+
+        # Active phone assigned to agent
+        mock_db.tables["phone_numbers"].append({
+            "id": num_id,
+            "organization_id": org_id,
+            "phone_number": phone_num,
+            "status": "active",
+            "is_assigned": True,
+            "assigned_agent_id": agent_id,
+        })
+        mock_db.tables["agents"].append({
+            "id": agent_id,
+            "organization_id": org_id,
+            "phone_number": phone_num,
+            "telephony_provider": "twilio",
+        })
+        mock_db.tables["agent_phone_numbers"].append({
+            "agent_id": agent_id,
+            "phone_number_id": num_id,
+            "is_primary": True,
+        })
+
+        service = NumberLifecycleService(supabase_client=mock_db)
+        res = service.expire_number(phone_number_id=num_id, organization_id=org_id)
+
+        # 1. Phone number transitioned to grace_period and unassigned
+        assert res["status"] == "grace_period"
+        assert res["is_assigned"] is False
+        assert res["assigned_agent_id"] is None
+
+        # 2. Junction table unlinked
+        matching_junction = [
+            row for row in mock_db.tables["agent_phone_numbers"]
+            if row.get("phone_number_id") == num_id
+        ]
+        assert len(matching_junction) == 0
+
+        # 3. Agent phone number cleared
+        agent_row = next(a for a in mock_db.tables["agents"] if a["id"] == agent_id)
+        assert agent_row["phone_number"] is None
 
     def test_inbound_call_neutral_message_and_missed_call_logging(self):
         """Asserts caller hears neutral unavailable message and call is logged as missed."""

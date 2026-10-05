@@ -83,6 +83,7 @@ class NumberLifecycleService:
     ) -> Dict[str, Any]:
         """
         Marks an active number as expired, transitioning it immediately into 15-day grace period.
+        Revokes and disconnects it from any connected agent per Master Plan Section 18.7.
         """
         now = datetime.now(timezone.utc)
         grace_ends = now + timedelta(days=GRACE_PERIOD_DAYS)
@@ -90,8 +91,25 @@ class NumberLifecycleService:
         hold_ends = grace_ends + timedelta(days=hold_days)
         reactivation_token = secrets.token_urlsafe(32)
 
+        # 1. Fetch current phone number record to resolve phone string and tenant
+        num_query = self.supabase.table("phone_numbers").select("*").eq("id", phone_number_id)
+        if organization_id:
+            num_query = num_query.eq("organization_id", organization_id)
+        num_res = num_query.execute()
+
+        if not num_res.data or len(num_res.data) == 0:
+            raise ValueError(f"Phone number not found or not owned by org: {phone_number_id}")
+
+        num_data = num_res.data[0]
+        phone_str = num_data.get("phone_number")
+        assigned_agent_id = num_data.get("assigned_agent_id")
+        resolved_org_id = num_data.get("organization_id") or organization_id
+
+        # 2. Update phone_numbers table
         update_payload = {
             "status": "grace_period",
+            "is_assigned": False,
+            "assigned_agent_id": None,
             "expired_at": now.isoformat(),
             "grace_period_ends_at": grace_ends.isoformat(),
             "hold_period_ends_at": hold_ends.isoformat(),
@@ -100,16 +118,47 @@ class NumberLifecycleService:
             "updated_at": now.isoformat(),
         }
 
-        query = self.supabase.table("phone_numbers").update(update_payload).eq("id", phone_number_id)
-        if organization_id:
-            query = query.eq("organization_id", organization_id)
-        res = query.execute()
+        res = self.supabase.table("phone_numbers").update(update_payload).eq("id", phone_number_id).execute()
 
-        if not res.data or len(res.data) == 0:
-            raise ValueError(f"Phone number not found or not owned by org: {phone_number_id}")
+        # 3. REVOCATION: Unlink from agent_phone_numbers junction table
+        try:
+            self.supabase.table("agent_phone_numbers").delete().eq("phone_number_id", phone_number_id).execute()
+        except Exception as e:
+            logger.warning(f"Error unlinking agent_phone_numbers for {phone_number_id}: {e}")
 
-        logger.info(f"Number {phone_number_id} entered 15-day grace period until {grace_ends.isoformat()}")
-        return res.data[0]
+        # 4. REVOCATION: Clear phone_number on agents table
+        if phone_str:
+            try:
+                self.supabase.table("agents").update({
+                    "phone_number": None,
+                    "telephony_provider": "simulated"
+                }).eq("phone_number", phone_str).execute()
+            except Exception as e:
+                logger.warning(f"Error clearing agents.phone_number for {phone_str}: {e}")
+
+        if assigned_agent_id:
+            try:
+                self.supabase.table("agents").update({
+                    "phone_number": None,
+                    "telephony_provider": "simulated"
+                }).eq("id", assigned_agent_id).execute()
+            except Exception as e:
+                logger.warning(f"Error clearing agent {assigned_agent_id}: {e}")
+
+        # 5. Also sync phone_number_pool if number exists there
+        try:
+            self.supabase.table("phone_number_pool").update({
+                "assigned_agent_id": None,
+                "updated_at": now.isoformat()
+            }).eq("phone_number", phone_str).execute()
+        except Exception as e:
+            logger.debug(f"Note on pool sync: {e}")
+
+        logger.info(
+            f"Number {phone_number_id} ({phone_str}) entered 15-day grace period until {grace_ends.isoformat()}. "
+            f"Revoked from all agents."
+        )
+        return res.data[0] if res.data else update_payload
 
     # -------------------------------------------------------------------------
     # 2. Inbound Webhook Call Check & Missed Call Logging
@@ -189,12 +238,47 @@ class NumberLifecycleService:
     def process_lifecycle_transitions(self) -> Dict[str, Any]:
         """
         Background transition engine:
+        - Scans 'active' numbers with expired renewal_date or exceeded validity and moves them to 'grace_period'.
         - Moves numbers from grace_period to hold_period once grace_period_ends_at is passed.
         - Moves numbers from hold_period to released / quarantined once hold_period_ends_at is passed.
         """
         now = datetime.now(timezone.utc)
         now_iso = now.isoformat()
 
+        # 1. Sweep active numbers whose validity/renewal has expired
+        res_active = (
+            self.supabase.table("phone_numbers")
+            .select("id, organization_id, phone_number, renewal_date, provisioned_at, validity_days")
+            .eq("status", "active")
+            .execute()
+        )
+        active_numbers = res_active.data or []
+        moved_to_grace = []
+
+        for num in active_numbers:
+            expired = False
+            # Check renewal_date
+            renewal_str = num.get("renewal_date")
+            if renewal_str:
+                renewal_dt = datetime.fromisoformat(renewal_str.replace("Z", "+00:00"))
+                if now >= renewal_dt:
+                    expired = True
+            # Check provisioned_at + validity_days (fallback if renewal_date not set)
+            elif num.get("provisioned_at"):
+                prov_dt = datetime.fromisoformat(num["provisioned_at"].replace("Z", "+00:00"))
+                validity = num.get("validity_days") or 30
+                if now >= (prov_dt + timedelta(days=validity)):
+                    expired = True
+
+            if expired:
+                try:
+                    self.expire_number(num["id"], organization_id=num.get("organization_id"))
+                    moved_to_grace.append(num["id"])
+                    logger.info(f"[Cron] Active number {num.get('phone_number')} (id: {num['id']}) expired -> transitioned to grace_period.")
+                except Exception as e:
+                    logger.error(f"[Cron] Failed to expire active number {num['id']}: {e}")
+
+        # 2. Check Grace -> Hold
         res_grace = (
             self.supabase.table("phone_numbers")
             .select("id, organization_id, phone_number, grace_period_ends_at, hold_period_ends_at")
@@ -214,7 +298,6 @@ class NumberLifecycleService:
         moved_to_hold = []
         moved_to_released = []
 
-        # Check Grace -> Hold
         for num in grace_numbers:
             ends_at_str = num.get("grace_period_ends_at")
             if ends_at_str:
@@ -226,7 +309,7 @@ class NumberLifecycleService:
                     }).eq("id", num["id"]).execute()
                     moved_to_hold.append(num["id"])
 
-        # Check Hold -> Released / Quarantined
+        # 3. Check Hold -> Released / Quarantined
         for num in hold_numbers:
             ends_at_str = num.get("hold_period_ends_at")
             if ends_at_str:
@@ -241,6 +324,8 @@ class NumberLifecycleService:
 
         return {
             "processed_at": now_iso,
+            "moved_to_grace_count": len(moved_to_grace),
+            "moved_to_grace_ids": moved_to_grace,
             "moved_to_hold_count": len(moved_to_hold),
             "moved_to_hold_ids": moved_to_hold,
             "moved_to_released_count": len(moved_to_released),

@@ -58,7 +58,10 @@ export function AgentDetailPageClient({
     if (!initialAgent) return null;
     const rawName = initialAgent.name || '';
     const displayName = cleanName(rawName);
-    const primaryAssigned = initialAgent.agent_phone_numbers?.find((ap: any) => ap.is_primary) || initialAgent.agent_phone_numbers?.[0];
+    const activeAssignments = (initialAgent.agent_phone_numbers || []).filter(
+      (ap: any) => !ap.phone_numbers?.status || ap.phone_numbers?.status === 'active'
+    );
+    const primaryAssigned = activeAssignments.find((ap: any) => ap.is_primary) || activeAssignments[0];
     const assignedPhoneNumber = primaryAssigned?.phone_numbers?.phone_number || null;
     return {
       ...initialAgent,
@@ -221,7 +224,8 @@ export function AgentDetailPageClient({
           agent_phone_numbers (
             is_primary,
             phone_numbers (
-              phone_number
+              phone_number,
+              status
             )
           )
         `)
@@ -252,8 +256,11 @@ export function AgentDetailPageClient({
         .replace(/\s*-\s*Demo\s*$/i, ' (Demo)')  // prettify " - Demo" suffix
         .replace(/\s*-\s*Trial\s*$/i, ' (Trial)') // prettify " - Trial" suffix
 
-      // Resolve phone number if assigned
-      const primaryAssigned = agentData.agent_phone_numbers?.find((ap: any) => ap.is_primary) || agentData.agent_phone_numbers?.[0];
+      // Resolve phone number if assigned (only consider active status)
+      const activeAssignments = (agentData.agent_phone_numbers || []).filter(
+        (ap: any) => !ap.phone_numbers?.status || ap.phone_numbers?.status === 'active'
+      );
+      const primaryAssigned = activeAssignments.find((ap: any) => ap.is_primary) || activeAssignments[0];
       const assignedPhoneNumber = primaryAssigned?.phone_numbers?.phone_number || null;
 
       setAgent({

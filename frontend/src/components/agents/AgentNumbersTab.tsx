@@ -11,6 +11,7 @@ interface AgentNumbersTabProps {
 export function AgentNumbersTab({ agentId, organizationId }: AgentNumbersTabProps) {
   const [numbers, setNumbers] = useState<any[]>([]);
   const [unassignedPool, setUnassignedPool] = useState<any[]>([]);
+  const [gracePeriodNumbers, setGracePeriodNumbers] = useState<any[]>([]);
   const [selectedNumberId, setSelectedNumberId] = useState("");
   const [assigning, setAssigning] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -25,17 +26,21 @@ export function AgentNumbersTab({ agentId, organizationId }: AgentNumbersTabProp
       if (!res.ok) throw new Error("Failed to fetch numbers");
       const data = await res.json();
       
-      // Filter numbers assigned to this agent
+      // Filter numbers assigned to this agent (only active numbers)
       const numbersList = data.data?.phone_numbers || data.data || [];
       const assigned = Array.isArray(numbersList) 
-        ? numbersList.filter((n: any) => n.assigned_agents?.some((a: any) => a.agent_id === agentId))
+        ? numbersList.filter((n: any) => n.status === 'active' && n.assigned_agents?.some((a: any) => a.agent_id === agentId))
         : [];
       const unassigned = Array.isArray(numbersList)
-        ? numbersList.filter((n: any) => !n.assigned_agents || n.assigned_agents.length === 0)
+        ? numbersList.filter((n: any) => n.status === 'active' && (!n.assigned_agents || n.assigned_agents.length === 0))
+        : [];
+      const inGrace = Array.isArray(numbersList)
+        ? numbersList.filter((n: any) => n.status === 'grace_period' || n.status === 'hold_period')
         : [];
 
       setNumbers(assigned);
       setUnassignedPool(unassigned);
+      setGracePeriodNumbers(inGrace);
       if (unassigned.length > 0) {
         setSelectedNumberId(unassigned[0].id);
       }
@@ -115,6 +120,23 @@ export function AgentNumbersTab({ agentId, organizationId }: AgentNumbersTabProp
         <p className="text-[var(--muted)] text-sm max-w-sm mb-6 leading-relaxed">
           This agent does not have any assigned phone numbers. Assign an existing pool number below or provision a new one centrally.
         </p>
+
+        {gracePeriodNumbers.length > 0 && (
+          <div className="w-full max-w-md p-4 rounded-xl border border-amber-500/30 bg-amber-500/10 text-left space-y-1 mb-6">
+            <p className="text-xs font-bold text-amber-400 flex items-center gap-1.5">
+              <Info className="w-4 h-4" /> Phone Number in 15-Day Grace Period
+            </p>
+            <p className="text-[11px] text-[var(--muted)]">
+              Your number <span className="font-mono text-amber-300 font-semibold">{gracePeriodNumbers[0].phone_number}</span> expired and has been disconnected. Callers will hear a neutral &ldquo;currently unavailable&rdquo; message.
+            </p>
+            <Link
+              href="/dashboard/phone-numbers"
+              className="text-[11px] font-bold text-amber-400 hover:text-amber-300 underline block pt-1"
+            >
+              Go to Phone Numbers to Renew →
+            </Link>
+          </div>
+        )}
 
         {unassignedPool.length > 0 ? (
           <div className="w-full max-w-md p-5 rounded-2xl border border-[var(--border)] bg-[var(--card-bg)] space-y-4 text-left shadow-lg">
