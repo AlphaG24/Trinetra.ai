@@ -35,7 +35,7 @@ All decisions made in this project. This is the single source of truth.
 | P4 | Outcome-based plans | Admin-editable per-outcome pricing (e.g., ₹49/appointment); prepaid wallet |
 | P5 | Plans are exclusively chosen per customer | Not a both-ways toggle |
 | P6 | Overage rate | ₹10–₹12/min (final value in admin panel) |
-| P7 | Free emergency minutes | [SUPERSEDED by Section 18] 50 free overage minutes before charging default (editable via admin dashboard), limited to every user, can't use every month, admin can check and block or edit those minutes. Free minutes used only when user Reliability Score > 80. "Reliability Score" replaces "credit score" everywhere; rules visible to the user. |
+| P7 | Free emergency minutes | 50 free overdraft buffer minutes when quota reaches 100%, strictly requiring Reliability Score > 80 and 30-day cooldown; admin-editable; audit logged; zero mid-call disconnect. "Reliability Score" replaces "credit score" everywhere; rules transparent and visible to the user. |
 | P8 | Spend limit | ₹2,500 default; admin can override per customer |
 | P9 | Onboarding fee | Not active now; enabled via admin toggle; shown in pricing plan editor |
 | P10 | Number limits | Pooled across all customer numbers; no per-number cap |
@@ -46,45 +46,45 @@ All decisions made in this project. This is the single source of truth.
 | # | Decision | Locked Value |
 |:---|:---|:---|
 | N1 | Active period | 30 days |
-| N2 | Grace period | 15 days (number stopped working; alternate day reminders) |
-| N3 | Cooling period | [SUPERSEDED by Section 18] No 90-day cooling. At expiry, callers hear neutral "currently unavailable" message; owner keeps number through 15-day grace, then configurable hold (default 14 days) before release. Missed calls counted and summarized to owner with reactivate link. |
+| N2 | Grace period | 15 days (number stops answering agent calls; callers hear neutral "currently unavailable" message; alternate day reminders; owner retains number) |
+| N3 | Expiry & Hold period | No 90-day cooling. At expiry, callers hear neutral "currently unavailable" message; owner keeps number through 15-day grace, then configurable administrative hold (default 14 days) before permanent pool release. Missed calls logged, counted, and summarized to owner with reactivation link. |
 | N4 | Reminder schedule | Day 1, 7, 14, 21, 28 via email + WhatsApp |
-| N5 | Re-activation during cooling | Allowed for a one-time fee + immediate renewal |
+| N5 | Re-activation during grace/hold | Allowed via one-click reactivation link + immediate renewal |
 | N6 | Auto-pool expansion | Triggered when available numbers < 10 |
 | N7 | Telephony providers | Exotel (India), Twilio (Global) |
 | N8 | CLI policy | Never spoof; display assigned virtual number only |
-| N9 | Call forwarding | CFU (unconditional) default; porting premium . Need special system in both admin panel and show this ticket in support panel so that user can select and just request without writing it . Also add some other important tickets with their description to improve quality of support.|
+| N9 | Call forwarding | CFU (unconditional) default; porting premium. Support ticket system in admin panel and support panel with pre-configured request types.|
 
 ### 1.3 KYC & Compliance
 
 | # | Decision | Locked Value |
 |:---|:---|:---|
 | K1 | KYC required at | Number purchase only (not at signup, not for dashboard) |
-| K2 | KYC documents | Country-specific (India: Aadhaar/PAN/GST; Global: Passport/National ID/Company Registration) |
-| K3 | KYC storage | AES-256 at rest, TLS in transit |
-| K4 | KYC access | [SUPERSEDED by Section 18] Restricted to admin role only with re-authentication; developer_tester cannot view KYC documents. Short-lived signed URLs, every view audit-logged. |
+| K2 | KYC documents | Country-specific (India: Masked Aadhaar/PAN/GST; Global: Passport/National ID/Company Registration). Raw Aadhaar images/numbers NOT stored by default (CONFIRM WITH A LAWYER). |
+| K3 | KYC storage | AES-256 at rest, TLS 1.3 in transit |
+| K4 | KYC access | Restricted strictly to admin role with privileged step-up re-authentication; developer_tester accounts forbidden from viewing. Short-lived signed URLs (<= 15 min), every view immutably audit-logged. |
 | K5 | KYC auto-sync | From purchase flow to profile page (upload once, use everywhere) |
-| K6 | AI disclosure | Mandatory at call start; logged in `voice_calls.disclosure_played` |
-| K7 | Call recording consent | Mandatory prompt; call not recorded without consent |
+| K6 | AI disclosure | Mandatory at call start ("Arika from Trinetra, an AI assistant"); logged in `voice_calls.disclosure_played` |
+| K7 | Call recording consent | Mandatory prompt ("service quality notice"); call not recorded without consent |
 | K8 | Data residency | India data in Mumbai; global data in nearest region |
-| K9 | Data retention | Call audio: 90–180 days; Financial records: 8 years (anonymized after 180 days) |
+| K9 | Data retention | Statutory billing records kept for full statutory tax period (CONFIRM WITH CA); customer deal records/transcripts minimized after 90–180 days; audit logs immutable and never deleted. |
 
 ### 1.4 Access Control
 
 | # | Decision | Locked Value |
 |:---|:---|:---|
-| A1 | Roles | Two only: `admin` and `developer_tester` |
-| A2 | MFA | Required for admin; optional for users |
-| A3 | Session timeout | Admin: 24h idle; Users: 7 days |
+| A1 | Roles | Three roles: `customer`, `developer_tester`, `admin`. All exemptions handled in central policy function; developer_tester excluded from business metrics. |
+| A2 | MFA | Required for admin and developer_tester; optional for customers |
+| A3 | Session timeout | Admin: 30 minutes idle timeout with step-up re-authentication for sensitive actions; Users: 7 days |
 | A4 | Audit logging | Every KYC view, price change, wallet adjust logged |
-| A5 | Rate limits | Login: 5/10min; API: 60/min/user; Calls: 5/min/number ( editable per user via admin ) as if any user have call center this rate minit may affect their working system|
+| A5 | Rate limits | Login: 5/10min; API: 60/min/user; Calls: 5/min/number (editable per user via admin for call center workloads) |
 
 ### 1.5 Monitoring & Operations
 
 | # | Decision | Locked Value |
 |:---|:---|:---|
 | M1 | Uptime monitoring | BetterStack (chosen over Uptime Kuma, Vercel CLI, PostHog) |
-| M2 | Error tracking | Sentry (backend + frontend) |
+| M2 | Error tracking | Sentry (backend + frontend) with strict pre-transmission PII scrubber |
 | M3 | Cron monitoring | Healthchecks.io |
 | M4 | Admin dashboard | Single-pane-of-glass for ops, billing, monitoring, audit |
 | M5 | Alerts | Telegram + email for P1 incidents |
@@ -93,12 +93,12 @@ All decisions made in this project. This is the single source of truth.
 
 | # | Decision | Locked Value |
 |:---|:---|:---|
-| B1 | Wallet model | Prepaid; funded via UPI (India) / card (Global) |
+| B1 | Wallet model | Prepaid wallet; funded via Razorpay (UPI, cards, netbanking) for launch. Zero card numbers stored. Stripe and global tax engines deferred post-launch. |
 | B2 | Subscription charge | Separate from wallet; auto-debit or manual |
-| B3 | Failed payment flow | 3 retries over 3 days → 7-day grace → suspend → cooling |
-| B4 | Invoice delivery | Email + WhatsApp (India) / email (Global) or any linked app where user can download invoice |
+| B3 | Failed payment flow | 3 retries over 3 days → 15-day grace → administrative hold → release |
+| B4 | Invoice delivery | Email + WhatsApp (India) + permanent in-app invoice vault |
 | B5 | Credit rollover | 180 days (per refund policy revision) |
-| B6 | GST invoicing | Auto-generated with GSTIN |
+| B6 | GST invoicing | Auto-generated official GST tax invoices (VAK/ series) reviewed by CA (CONFIRM WITH CA) |
 
 ---
 
@@ -124,7 +124,7 @@ External Services:
   ├── Exotel (India telephony) + Twilio (Global)
   ├── Sarvam AI (Indic TTS/STT) + ElevenLabs (Global TTS)
   ├── Groq (LLM, low latency)
-  ├── Razorpay (India payments) + Stripe (Global)
+  ├── Razorpay (Launch payments; Stripe deferred post-launch)
   ├── BetterStack (uptime) + Sentry (errors) + Healthchecks.io (cron)
   └── Redis/Upstash (caching + rate limiting)
 ```
@@ -137,13 +137,13 @@ External Services:
 
 The system enforces **region-specific rules automatically** based on customer location and called-party number.
 
-| Region | KYC Required | DND/Consent Rule | Cooling Period | Recording Consent | Retention |
+| Region | KYC Required | DND/Consent Rule | Expiry Handling (Grace & Hold) | Recording Consent | Retention |
 |:---|:---|:---|:---|:---|:---|
-| **India** | Aadhaar/PAN/GST | TRAI TCCCPR; DND scrub; 09:00–21:00 | 90 days | Audible disclosure required | 8 years (financial) |
-| **USA** | Business EIN/ID | TCPA written consent; 08:00–21:00 local | Varies by state | 2-party consent states require explicit opt-in | 7 years (IRS) |
-| **EU/UK** | Company registration | GDPR consent; PECR | 30–90 days | Explicit opt-in for recording | 6–10 years |
-| **Middle East** | National ID/Trade License | Varies by country | 60–90 days | Disclosure required | 5–7 years |
-| **SEA** | Local business ID | Varies (Singapore PDPA, Indonesia PDP Law) | Varies | Consent required | 5–10 years |
+| **India** | Masked Aadhaar/PAN/GST (raw Aadhaar prohibited) | TRAI TCCCPR; DND scrub; 09:00–21:00 | 15d grace + 14d hold (no 90d cooling; neutral unavailable message) | Audible disclosure required | Statutory billing: tax statutory period (CONFIRM WITH CA); deals: 90–180d |
+| **USA** | Business EIN/ID | TCPA written consent; 08:00–21:00 local | 15d grace + hold (neutral unavailable message; UNVERIFIED, check provider terms) | 2-party consent states require explicit opt-in | Statutory billing: IRS period; deals: 90–180d |
+| **EU/UK** | Company registration | GDPR consent; PECR | 15d grace + hold (neutral unavailable message; UNVERIFIED, check provider terms) | Explicit opt-in for recording | Statutory billing: statutory period; deals: 90–180d |
+| **Middle East** | National ID/Trade License | Varies by country | 15d grace + hold (neutral unavailable message; UNVERIFIED, check provider terms) | Disclosure required | Statutory billing: statutory period; deals: 90–180d |
+| **SEA** | Local business ID | Varies (Singapore PDPA, Indonesia PDP Law) | 15d grace + hold (neutral unavailable message; UNVERIFIED, check provider terms) | Consent required | Statutory billing: statutory period; deals: 90–180d |
 
 **Implementation:** A `regions` table stores rules; the system looks up rules at call time based on `+country_code`. Admin can override per customer.
 
@@ -166,13 +166,13 @@ Each phase ends with a **validation gate**. Do not proceed until the gate passes
 | 1.4 | PII redaction in all logs (Python + Next.js) | Search logs for digits → phone numbers masked |
 | 1.5 | Create `audit_logs` table + logging for all admin actions | KYC view, price edit, wallet adjust → logged with IP + timestamp |
 | 1.6 | MFA (TOTP) for admin account | Login from new device → TOTP challenge required |
-| 1.7 | Session timeout: admin 24h, user 7d | Idle timeout verified |
+| 1.7 | Session timeout: admin 30m idle, user 7d | Idle timeout verified |
 | 1.8 | Sentry DSN fixed (backend + frontend) | Triggered error appears in Sentry within 60s |
 | 1.9 | BetterStack monitors live (5 endpoints) | All green on status page |
 | 1.10 | Healthchecks.io for 3 cron jobs (cleanup, scheduler, pool expand) | Job stops → alert fires |
 | 1.11 | Rate limiting: login (5/10min), API (60/min/user), calls (5/min/number) | 429 after threshold |
 | 1.12 | `spend_limit` column added (default 2500) | Admin can override per customer |
-| 1.13 | Region-aware KYC schema (India: PAN/Aadhaar/GST; Global: passport/company ID) | Test account in each region can submit correct docs |
+| 1.13 | Region-aware KYC schema (India: PAN/Masked Aadhaar/GST; Global: passport/company ID) | Test account in each region can submit correct docs |
 
 **✅ Phase 1 Gate:** Full security audit runs with zero high-severity findings. All compliance logs verifiable.
 
@@ -184,18 +184,18 @@ Each phase ends with a **validation gate**. Do not proceed until the gate passes
 | # | Task | Validation Criteria |
 |:---|:---|:---|
 | 2.1 | `wallets` table: user_id, balance, currency, last_topup | Balance reflects after top-up |
-| 2.2 | UPI checkout (Razorpay India) + Card (Stripe Global) | ₹1,000 / $10 test payment succeeds |
+| 2.2 | Razorpay checkout (UPI, cards, netbanking; Stripe deferred) | ₹1,000 test payment succeeds |
 | 2.3 | Real-time overage deduction from wallet | Simulated call → balance decrements at correct rate |
-| 2.4 | Spend limit enforcement (₹2,500 default, admin override) | Set to ₹500 → agent pauses after threshold |
-| 2.5 | Free emergency minutes (50) credit on 100% quota hit | Simulate → 50 min added, message sent |
+| 2.4 | Spend limit enforcement (₹2,500 default, admin override) | Set to ₹500 → subsequent calls blocked with notice; active call never cut |
+| 2.5 | Free emergency minutes (50) credit on 100% quota hit (Reliability Score > 80, 30d cooldown) | Simulate → 50 min added, audit logged; zero in-call disconnect |
 | 2.6 | Thoughtful "we care" message on free-minute trigger (multi-language) | Email + WhatsApp received |
 | 2.7 | Credit pack purchase flow (admin-defined packs) | Manual purchase adds minutes to balance |
 | 2.8 | Subscription renewal (auto-debit + manual) | Both paths tested |
 | 2.9 | Outcome-based plan engine | Calendar event created → ₹49 deducted |
 | 2.10 | Free trial (10 min) + ₹99 trial (50 min, 7d) | Both enforce their limits |
-| 2.11 | Invoice PDF with GSTIN + region-aware tax | Download + email delivery verified |
-| 2.12 | Invoice delivery: Email + WhatsApp (India) / Email (Global) | Received on both channels |
-| 2.13 | Failed payment flow: 3 retries → 7-day grace → suspend → cooling | Simulated failure follows correct sequence |
+| 2.11 | Invoice PDF with GSTIN + region-aware tax (VAK/ series) | Download + email delivery verified; reviewed by CA (CONFIRM WITH CA) |
+| 2.12 | Invoice delivery: Email + WhatsApp (India) + permanent in-app vault | Received on both channels and visible in dashboard |
+| 2.13 | Failed payment flow: 3 retries → 15-day grace → admin hold → release | Simulated failure follows correct sequence |
 | 2.14 | Admin pricing editor (create/edit/deactivate plans) | New plan appears in user-facing list |
 | 2.15 | Credit rollover 180 days (updated from 30) | Rolling expiry tested |
 | 2.16 | Admin toggle: onboarding fee (off by default) | Toggled on → appears in checkout |
@@ -209,18 +209,18 @@ Each phase ends with a **validation gate**. Do not proceed until the gate passes
 
 | # | Task | Validation Criteria |
 |:---|:---|:---|
-| 3.1 | Active period (30d) + Grace (15d) + Cooling (90d, region-configurable) | Compressed test passes |
+| 3.1 | Active period (30d) + Grace (15d) + Admin Hold (14d; no 90d cooling; neutral message) | Compressed test passes; neutral audio plays upon expiry |
 | 3.2 | Reminder sequence: Day 1, 7, 14, 21, 28 via email + WhatsApp | All 5 reminders received |
 | 3.3 | Dashboard countdown timer for expiry | Accurate countdown displayed |
 | 3.4 | Auto-purchase when pool < 10 numbers | Threshold triggers auto-order via Exotel/Twilio API |
-| 3.5 | Re-activation during cooling (one-time fee + renewal) | Reactivation succeeds with fee |
-| 3.6 | Pool status dashboard (Available/Assigned/Cooling counts) | Admin sees real-time counts |
+| 3.5 | Re-activation during grace/hold (one-click reactivation + renewal) | Reactivation succeeds without lost ownership |
+| 3.6 | Pool status dashboard (Available/Assigned/Grace/Hold counts) | Admin sees real-time counts |
 | 3.7 | Multi-provider number assignment (Exotel India / Twilio Global) | Region-based provider selection |
 | 3.8 | Pooled quota across all customer numbers | 3 numbers → 1,000 min shared |
 | 3.9 | CLI integrity check (never spoof) | Attempt to spoof → blocked with audit log |
-| 3.10 | CFU (call forwarding) setup wizard | Customer completes forwarding in 3 steps |
+| 3.10 | CFU (call forwarding) setup wizard & support ticket system | Customer completes forwarding or requests ticket |
 
-**✅ Phase 3 Gate:** Full lifecycle test from assignment → usage → expiry → cooling → re-allocation.
+**✅ Phase 3 Gate:** Full lifecycle test from assignment → usage → expiry → grace → hold → re-allocation.
 
 ---
 
@@ -229,15 +229,15 @@ Each phase ends with a **validation gate**. Do not proceed until the gate passes
 
 | # | Task | Validation Criteria |
 |:---|:---|:---|
-| 4.1 | KYC page in user profile with region-aware fields | India: PAN/Aadhaar/GST; Global: Passport/Company ID |
+| 4.1 | KYC page in user profile with region-aware fields (raw Aadhaar prohibited) | India: PAN/Masked Aadhaar/GST; Global: Passport/Company ID |
 | 4.2 | KYC required only at number purchase | Dashboard accessible without KYC |
 | 4.3 | Auto-sync: purchase-flow upload → profile | Same doc appears in both places |
 | 4.4 | AES-256 at rest, TLS 1.3 in transit | Verify via DB inspection |
-| 4.5 | Access restricted to `admin` + `developer_tester` | Non-admin gets 403 |
+| 4.5 | Access restricted strictly to `admin` with step-up auth (`developer_tester` forbidden) | Non-admin and developer_tester get 403 |
 | 4.6 | KYC status tracking: pending / verified / rejected / expired | Admin can flip; user sees correct label |
 | 4.7 | Provider API integration (Exotel KYC India; Twilio Trust Hub Global) | Real sandbox submission → approval flow |
-| 4.8 | KYC document retention: 5 years, then secure delete | Scheduled job deletes old docs |
-| 4.9 | Every KYC view logged in `audit_logs` | Admin views → audit row created |
+| 4.8 | KYC document retention: strictly assigned number duration + provider statutory rule | Scheduled job cleans expired docs |
+| 4.9 | Every KYC view logged in `audit_logs` | Admin views → immutable audit row created |
 | 4.10 | Alert on KYC expiry (KYC valid 2 years typical) | 30-day reminder before expiry |
 
 **✅ Phase 4 Gate:** Complete KYC flow end-to-end with both Exotel and Twilio sandboxes.
@@ -432,41 +432,37 @@ Every security file begins with a header:
 
 | File Path | Purpose |
 |:---|:---|
-| `backend/app/security/rate_limiter.py` | Rate limit enforcement |
-| `backend/app/security/pii_redactor.py` | PII masking in logs |
-| `backend/app/security/consent_manager.py` | Call consent + AI disclosure |
-| `backend/app/security/kyc_handler.py` | KYC encryption, access control |
-| `backend/app/security/audit_logger.py` | All admin action logging |
-| `frontend/src/middleware.ts` | Auth + rate limit + tenant isolation |
-| `backend/agent.py` (disclosure + consent sections only) | Call-start disclosure |
-| `.env.example` | All security env vars documented |
+| `backend/app/services/disclosure_service.py` | Mandatory AI disclosure & consent composition |
+| `backend/app/services/outbound_safety_guardrails.py` | Outbound compliance, DND scrubbing, calling hours floor |
+| `backend/app/services/ai/prompt_guard.py` | Prompt injection protection & hallucination guardrails |
+| `frontend/src/lib/safety/promptGuard.ts` | Frontend prompt safety guardrails |
+| `docs/compliance/FROZEN_FILES_MANIFEST.json` | Deterministic SHA-256 baseline hash manifest |
+
+*Note on Agent Architecture:* `backend/agent.py` is NOT partial-frozen. The agent cleanly imports frozen modules. Application brand names reside strictly in configuration constants, not inside frozen code files.
 
 **Step 3 — Baseline Hash File**
-`docs/FROZEN_HASHES.json` stores SHA-256 hashes:
+`docs/compliance/FROZEN_FILES_MANIFEST.json` stores deterministic SHA-256 hashes:
 ```json
 {
-  "backend/app/security/rate_limiter.py": "<sha256>",
-  "frontend/src/middleware.ts": "<sha256>",
-  "_meta": {
-    "frozen_date": "2026-10-02",
-    "frozen_by": "Ketan Singh Rathour",
-    "verification_command": "python scripts/verify_frozen.py"
+  "manifest_version": "1.0",
+  "files": {
+    "backend/app/services/disclosure_service.py": "<sha256>",
+    "backend/app/services/outbound_safety_guardrails.py": "<sha256>",
+    "backend/app/services/ai/prompt_guard.py": "<sha256>",
+    "frontend/src/lib/safety/promptGuard.ts": "<sha256>"
   }
 }
 ```
 
-**Step 4 — Pre-Commit Hook**
-`.git/hooks/pre-commit` blocks commits touching frozen files unless commit message contains `[UNFREEZE-APPROVED]`.
+**Step 4 — CI & Code Ownership Verification**
+GitHub Action `verify-frozen.yml` and `.github/CODEOWNERS` block unauthorized modifications. Any uncommitted or unauthorized edit fails the build.
 
-**Step 5 — CI Verification**
-GitHub Action `verify-frozen.yml` runs on every push. It compares current file hashes against the baseline and fails the build on mismatch.
-
-**Step 6 — Unfreezing Process (Owner Only)**
-1. Owner issues written instruction (email or signed doc)
-2. Developer updates the frozen file
-3. Developer regenerates `FROZEN_HASHES.json`
-4. Developer logs change in `docs/VALIDATION_LOG.md` with reason, approver, date
-5. Owner confirms; CI passes
+**Step 5 — Emergency Unfreezing Process (Owner Only)**
+1. Owner issues explicit written instruction
+2. Developer updates the module and runs tests
+3. Developer updates `docs/compliance/FROZEN_FILES_MANIFEST.json`
+4. Developer logs change in `docs/VALIDATION_LOG.md` with reason, approver, and date
+5. Owner reviews and approves; CI passes
 
 **Why this matters:** Rapid feature development often inadvertently weakens security. This rule prevents silent regressions.
 
@@ -474,30 +470,30 @@ GitHub Action `verify-frozen.yml` runs on every push. It compares current file h
 
 ### 🧪 Section 12.2: RULE #2 — Developer/Tester Exemptions
 
-**Rule:** The `developer_tester` role exists solely to build, test, and verify features. It must not be constrained by customer-facing limits, quotas, or billing rules.
+**Rule:** The `developer_tester` role exists solely to build, test, and verify features. All role exemptions pass through ONE central policy function (`evaluate_role_exemptions`). Security primitives are never bypassed.
 
 #### Exemptions Matrix
 
 | Rule | Customer | `developer_tester` | `admin` |
 |:---|:---:|:---:|:---:|
-| Spend limit (₹2,500 default) | ✅ Enforced | ❌ Unlimited | ❌ Unlimited |
-| Quota limits (minutes) | ✅ Enforced | ❌ Unlimited | ❌ Unlimited |
+| Spend limit (₹2,500 default) | ✅ Enforced | ❌ Unlimited (test only) | ❌ Unlimited |
+| Quota limits (minutes) | ✅ Enforced | ❌ Unlimited (test only) | ❌ Unlimited |
 | Rate limits (login/API/calls) | ✅ Enforced | ⚠️ 10x relaxed | ⚠️ 10x relaxed |
-| KYC requirement | ✅ Required | ❌ Auto-verified | ❌ Bypassed |
-| Number cooling period | ✅ Enforced | ❌ Bypassed | ❌ Bypassed |
-| Wallet balance required | ✅ Required | ❌ Auto-funded (₹1,00,000) | ❌ Auto-funded |
-| Invoice generation | ✅ Generated | ❌ Skipped | ❌ Skipped |
-| Free trial duration | ✅ Enforced | ❌ Unlimited | ❌ Unlimited |
+| KYC requirement | ✅ Required | ❌ Sandbox/test numbers only (never real numbers) | ❌ Sandbox only |
+| Number cooling / grace period | ✅ Enforced | ❌ Sandbox only | ❌ Sandbox only |
+| Wallet balance required | ✅ Required | ❌ Auto-funded sandbox | ❌ Auto-funded sandbox |
+| KYC Document Access | ✅ Own docs | ❌ **STRICTLY FORBIDDEN** | ✅ Re-auth Required |
+| Metric Tracking (MRR/ARR/Calls) | ✅ Included | ❌ **EXCLUDED FROM METRICS** | ❌ **EXCLUDED** |
 | AI disclosure at call start | ✅ Played | ✅ **Played** | ✅ Played |
 | PII redaction in logs | ✅ Enforced | ✅ **Enforced** | ✅ Enforced |
 | Audit logging | ✅ Enforced | ✅ **Enforced** | ✅ Enforced |
 | MFA | Optional | ✅ **Required** | ✅ Required |
 
-**Key principle:** Security primitives (disclosure, PII redaction, audit logging, MFA) are **never bypassed** — even for developer accounts. Only business limits are relaxed.
+**Key principle:** Security primitives (disclosure, PII redaction, audit logging, MFA) are **never bypassed** — even for developer or admin accounts. Test accounts are programmatically excluded from business revenue and statutory compliance metrics.
 
 **Implementation:**
-- `role` field in `user_profiles`: `customer` | `developer_tester` | `admin`
-- Rule-checking functions: `if user.role in ('admin', 'developer_tester'): skip_business_limit()`
+- `role` field in `profiles`: `customer` | `developer_tester` | `admin`
+- Central exemption function in `backend/app/services/role_policy_service.py` and `frontend/src/lib/safety/rolePolicy.ts`
 - Dev/test accounts visually distinct in admin panel (purple border, "TEST" badge)
 
 **Mandatory Test Accounts (create on Day 1):**
@@ -514,7 +510,7 @@ GitHub Action `verify-frozen.yml` runs on every push. It compares current file h
 
 ### 🚀 Section 12.3: RULE #3 — SEO & AI Discoverability
 
-**Rule:** Vaakriti must rank #1 on Google, Bing, and be cited by AI engines (ChatGPT, Claude, Perplexity, Gemini) for the target keywords. This is a first-class priority, not an afterthought.
+**Rule:** Maximize organic search discoverability and AI citation without unverified marketing claims. Zero speculative guarantees (avoid unsubstantiated claims like "10x cheaper", "rank #1", or unverified language claims). Use target benchmarks, not guarantees. Maintain a truthful `/llms.txt` listing features that exist today, clearly marking roadmap items.
 
 #### 12.3.1 Technical SEO (Phase 1 Deliverables)
 
@@ -698,22 +694,24 @@ psql $DATABASE_URL -c "SELECT table_name FROM information_schema.tables WHERE ta
 
 | # | Decision | v1.0 | v1.1 Update |
 |:---|:---|:---|:---|
-| P7 | Free emergency minutes | 50 min every month | 50 min **only if Credit Score > 80**; admin-editable; not automatic |
-| N2 | Grace period | Number works during grace | Number **stops working immediately**; alternate-day reminders |
+| P7 | Free emergency minutes | 50 min every month | 50 min **only if Reliability Score > 80**; admin-editable; not automatic |
+| N2 | Grace period | Number works during grace | Number **stops working immediately**; neutral unavailable audio; 15d grace + 14d hold |
 | N9 | Call forwarding | CFU + porting | + **Support ticket system** with predefined request types |
-| K9 | Data retention | 30–180 days | Call audio: **90–180 days**; financial: 8 years |
+| K9 | Data retention | 30–180 days | Call audio: **90–180 days**; financial: statutory tax period (CONFIRM WITH CA) |
 | A5 | Rate limits | Fixed values | **Admin-editable per user** (for call-center customers) |
-| B4 | Invoice delivery | Email + WhatsApp | + **In-app invoice vault** |
+| B4 | Invoice delivery | Email + WhatsApp | + **In-app invoice vault** (Razorpay launch) |
 | P2 | ₹99 trial | Full dashboard, 7d, 50 min | + **2 agents limit (admin-editable)** |
 
 ### 13.1 New Subsystems Introduced
 
-**Credit Score System:**
+**Reliability Score System (formerly Credit Score):**
+- Replaces "credit score" permanently across all UI, database schemas, and documentation
 - Starts at 50 for new users
 - +10 on-time payment / -20 late / -50 default
-- Score > 80 unlocks free emergency minutes
-- Visible in user profile with eligibility indicator
-- Admin can view/edit scores with audit logging
+- Score > 80 unlocks free emergency minutes (50-minute buffer)
+- Visible in user profile with transparent scoring rules and eligibility indicator
+- Admin can view/edit scores with full audit logging
+- Note: CONFIRM WITH A LAWYER regarding statutory and automated decision compliance
 
 **Support Ticket System:**
 - Predefined ticket types: Call Forwarding Setup, Number Porting, KYC Issue, Billing Dispute, Feature Request, Bug Report, Other
@@ -723,24 +721,22 @@ psql $DATABASE_URL -c "SELECT table_name FROM information_schema.tables WHERE ta
 
 **In-App Invoice Vault:**
 - All invoices stored permanently in user dashboard
-- Download PDF anytime
+- Download PDF anytime (GST-compliant invoice templates reviewed by CA)
 - Filterable by date, amount, plan
 - "Send to WhatsApp" / "Send to Email" buttons
 
 ---
 
-## 🌿 Section 14: Branch & Deployment Strategy [SUPERSEDED by Section 18]
+## 🌿 Section 14: Branch & Deployment Strategy
 
-> **SUPERSEDED NOTICE**: The branch topology and deployment workflow below are superseded in full by **Section 18: v1.2 Overrides (authoritative)**. Under Section 18: `production = main`, `dev = integration`, feature branches stem from `dev`, PRs require passing CI + owner approval, `git reset --hard` and force-push are strictly forbidden, and rollback is executed via `git revert` or previous build redeployment. Vercel production branch remains `main`.
-
-**Rule:** [SUPERSEDED by Section 18] `main` is production; `dev` is integration. All work happens on feature branches from `dev`.
+**Rule (aligned with Section 18.1):** `main` is production; `dev` is integration. All active development occurs on dedicated feature branches stemmed from `dev`.
 
 ### Branch Topology
 
 ```
-main (frozen, read-only, safe rollback)
+main (production — locked to Vercel production deployment)
   │
-  └── dev (production branch — auto-deploys)
+  └── dev (integration branch)
        │
        ├── feature/voice-pipeline-improvements
        ├── feature/security-phase-1
@@ -754,38 +750,38 @@ main (frozen, read-only, safe rollback)
 
 ### Workflow
 
-1. **Feature branch** from `dev`
-2. Commit + push feature branch
-3. PR → `dev`
-4. Review on Vercel preview deployment
-5. Merge to `dev`
-6. Vercel auto-deploys `dev` → production environment
-7. **Only after 30 days of stable production:** `dev` → `main` fast-forward (archival only)
+1. **Feature branch** created from `dev` (`git checkout -b feature/<name> dev`)
+2. Small, atomic commits with conventional commit messages
+3. Pull Request (PR) targeting `dev`
+4. Automated CI checks must pass (tests, frozen file integrity, typecheck, lint)
+5. Explicit owner review & approval required before merge
+6. Merge PR into `dev`
+7. After staging verification on `dev`, owner creates release PR from `dev` into `main`
+8. Merging into `main` triggers production release on Vercel
 
 ### Environment Mapping
 
 | Environment | Branch | Deployed To |
 |:---|:---|:---|
-| **Production (live customers)** | `dev` | Vercel production + Vultr |
+| **Production (live customers)** | `main` | Vercel production + Vultr |
+| **Integration / Staging** | `dev` | Integration / test environment |
 | **Preview (per PR)** | feature branches | Vercel preview URLs |
-| **Archival / Rollback** | `main` | Not deployed |
 | **Local dev** | feature branches | Localhost |
 
-### Vercel Configuration Change
+### Vercel Configuration
 
 In Vercel project settings:
-- **Production Branch:** `dev` (changed from `main`)
-- **Preview Branches:** All other branches
+- **Production Branch:** `main`
+- **Preview Branches:** `dev` and all feature branches
 
-### Safety Net
+### Zero-Destruction & Rollback Strategy
 
-`main` becomes a "known-good" archive. If `dev` catastrophically breaks:
-```bash
-git checkout dev
-git reset --hard origin/main
-git push --force origin dev
-```
-Restores production to the last verified stable state. Only the owner can execute this.
+**Strict Non-Negotiable Rule:**
+- **NEVER** run `git reset --hard` or `git push --force` on any branch.
+- If a build or commit in `dev` or `main` breaks, **Rollback Strategy**:
+  1. Primary: Execute `git revert <commit-sha>` to create a clean, traceable reverting commit.
+  2. Immediate production mitigation: Redeploy the previous known-good build artifact directly in the Vercel / hosting console.
+- Zero AI writes to remote DB; all DB changes are purely additive migrations with symmetric up/down scripts manually executed by the owner on staging.
 
 ### Domain & Database During Migration
 
@@ -854,7 +850,7 @@ Restores production to the last verified stable state. Only the owner can execut
 - **Do NOT rebrand yet** — defer to Phase 5.5
 
 ### Phase 2 — Additions
-- Credit Score subsystem (scoring rules + admin visibility)
+- Reliability Score subsystem (scoring rules + admin visibility)
 - In-app Invoice Vault (permanent storage + download)
 - Invoice delivery via Email + WhatsApp (India) + in-app
 
@@ -866,8 +862,8 @@ Restores production to the last verified stable state. Only the owner can execut
 ### Phase 4 — No changes (KYC + region-aware)
 
 ### Phase 5 — Additions
-- Admin panel: Credit Score dashboard, Rate Limit override UI, Ticket Queue, SEO dashboard
-- Revenue dashboard: MRR, ARR, churn, overage, credit score distribution
+- Admin panel: Reliability Score dashboard, Rate Limit override UI, Ticket Queue, SEO dashboard
+- Revenue dashboard: MRR, ARR, churn, overage, reliability score distribution
 
 ### Phase 5.5 — Rebranding Sprint (NEW — 3–4 days)
 Gate before public launch. Execute:
@@ -886,9 +882,9 @@ Marketing begins. SEO content publishing starts. Founding customer onboarding.
 ## ✍️ Section 17: Updated Sign-Off
 
 **Owner:** Ketan Singh Rathour
-**Plan Version:** 1.1 (Vaakriti Edition)
+**Plan Version:** 1.2 (Section 18 Authoritative Overrides Integrated)
 **Locked On:** October 2, 2026
-**Supersedes:** v1.0
+**Supersedes:** v1.0, v1.1
 
 **Governing Rules (Non-Negotiable):**
 1. Frozen Security Rules
@@ -896,10 +892,11 @@ Marketing begins. SEO content publishing starts. Founding customer onboarding.
 3. SEO & AI Discoverability Priority
 4. Complete Rebranding (Trinetra → Vaakriti)
 
-**Branch Strategy [SUPERSEDED by Section 18]:**
+**Branch Strategy (Section 18.1):**
+- `main` = production branch (locked to Vercel production)
 - `dev` = integration branch
-- `main` = production branch
-- Feature branches → PR → `dev`
+- Feature branches → PR → `dev` (requires green CI + owner approval)
+- Rollback via `git revert` or previous build redeploy (NO force push, NO reset --hard)
 
 **Domain Strategy:**
 - Primary: `vaakriti.com`
