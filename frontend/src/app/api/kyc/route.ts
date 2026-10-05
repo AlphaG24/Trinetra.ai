@@ -139,6 +139,29 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: insertErr.message }, { status: 500 })
     }
 
+    // Master Plan Section 18.6: Record statutory affirmative consent in immutable consent ledger
+    try {
+      const forwarded = req.headers.get('x-forwarded-for') || '127.0.0.1'
+      const clientIp = forwarded.split(',')[0].trim()
+      const userAgent = req.headers.get('user-agent') || 'Unknown'
+      const consentToken = crypto.createHash('sha256').update(`${user.id}_kyc_${Date.now()}_${checksum}`).digest('hex')
+
+      await admin.from('consent_records').insert({
+        user_id: user.id,
+        consent_type: 'kyc_document_vault',
+        consent_version: '1.0',
+        status: 'granted',
+        purpose_text: statutoryConsentText,
+        data_categories: ['identity_document', 'signatory_id', 'business_pan'],
+        ip_address: clientIp,
+        user_agent: userAgent,
+        consent_token: consentToken,
+        created_at: new Date().toISOString(),
+      })
+    } catch (consentErr) {
+      console.warn('[Consent Ledger] Failed to record KYC affirmative consent in consent_records:', consentErr)
+    }
+
     return NextResponse.json({
       success: true,
       message: 'KYC Document securely submitted for compliance review.',

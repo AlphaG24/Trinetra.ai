@@ -22,10 +22,14 @@ export async function GET() {
       return NextResponse.json({ error: 'Forbidden: Admin role required' }, { status: 403 })
     }
 
-    // 3. Fetch Consent Records with Profile Info
-    // Note: Since Supabase RLS policies might block fetching user profiles or consent records, 
-    // the system role handles it, but since admins have full access under policies:
-    const { data: records, error: recordsErr } = await supabase
+    // 3. Fetch Consent Records with Profile Info via adminClient (service role)
+    const { createClient: createAdminClient } = await import('@supabase/supabase-js')
+    const adminClient = createAdminClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    )
+
+    const { data: records, error: recordsErr } = await adminClient
       .from('consent_records')
       .select(`
         id,
@@ -49,7 +53,7 @@ export async function GET() {
     let profilesMap: Record<string, { full_name: string; email: string }> = {}
 
     if (userIds.length > 0) {
-      const { data: profiles, error: profsErr } = await supabase
+      const { data: profiles, error: profsErr } = await adminClient
         .from('profiles')
         .select('id, full_name, email')
         .in('id', userIds)

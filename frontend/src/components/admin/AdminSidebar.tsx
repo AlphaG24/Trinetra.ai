@@ -19,13 +19,15 @@ import {
   PhoneCall,
   Phone,
   KeyRound,
-  Lock
+  Lock,
+  UserCheck
 } from 'lucide-react'
 
 const navItems = [
   { name: 'Overview', href: '/admin', icon: LayoutDashboard },
   { name: 'Blog', href: '/admin/blog', icon: FileText },
   { name: 'Tenants', href: '/admin/tenants', icon: Building2 },
+  { name: 'KYC Verifications', href: '/admin/kyc', icon: UserCheck },
   { name: 'Agent Templates', href: '/admin/agents/templates', icon: Bot },
   { name: 'Marketplace', href: '/admin/marketplace', icon: Store },
   { name: 'Global Analytics', href: '/admin/analytics', icon: BarChart3 },
