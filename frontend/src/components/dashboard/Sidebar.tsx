@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, Bot, Users, Phone, Megaphone,
   BarChart3, CreditCard, Settings, HelpCircle, Pencil,
-  ChevronLeft, ChevronRight, Calendar, Target, PhoneCall
+  ChevronLeft, ChevronRight, Calendar, Target, PhoneCall, ShieldCheck
 } from 'lucide-react'
 
 import { useAuth } from '@/src/components/providers/AuthProvider'
@@ -15,7 +15,7 @@ import { useDashboardStore } from '@/src/store/dashboardStore'
 /**
  * Navigation items matching the dashboard structure:
  * Upper section: Overview, Agents, Calls, Leads, Appointments, Customers, Campaigns, Phone Numbers, Analytics, Billing
- * Lower section: Custom Agent (Deploy), Settings, Support
+ * Lower section: Custom Agent (Deploy), KYC Vault, Settings, Support
  */
 const topNavItems = [
   { label: 'Overview', href: '/dashboard', icon: LayoutDashboard },
@@ -32,6 +32,7 @@ const topNavItems = [
 
 const bottomNavItems = [
   { label: 'Custom Agent', href: '/dashboard/deploy', icon: Pencil },
+  { label: 'KYC Vault', href: '/dashboard/kyc', icon: ShieldCheck },
   { label: 'Settings', href: '/dashboard/settings', icon: Settings },
   { label: 'Support', href: '/dashboard/support', icon: HelpCircle },
 ]

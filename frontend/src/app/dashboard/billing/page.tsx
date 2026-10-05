@@ -23,7 +23,11 @@ import {
   Gift,
   Trash2,
   Bot,
-  AlertCircle
+  AlertCircle,
+  Wallet,
+  ShieldCheck as ShieldCheckIcon,
+  Sparkles,
+  RefreshCw
 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -41,10 +45,13 @@ interface UserLimits {
 interface Invoice {
   id: string
   invoice_number: string
-  subscription_amount: number
+  subscription_amount?: number
+  grand_total_paisa?: number
+  subtotal_paisa?: number
+  total_tax_paisa?: number
   status: string
   created_at: string
-  payment_method: string
+  payment_method?: string
   plan_tier?: string
   pdf_url?: string | null
 }
@@ -68,6 +75,15 @@ interface CartItem {
   price: number // in Rupees
 }
 
+interface WalletInfo {
+  balance_inr: number
+  spend_limit_inr: number
+  current_spend_inr: number
+  reliability_score: number
+  emergency_minutes_available: number
+  emergency_minutes_claimed_at: string | null
+}
+
 function BillingContent() {
   const router = useRouter()
 
@@ -80,46 +96,100 @@ function BillingContent() {
   const [showAllInvoices, setShowAllInvoices] = useState(false)
   const [availableBundles, setAvailableBundles] = useState<Bundle[]>([])
   
+  // Wallet State
+  const [wallet, setWallet] = useState<WalletInfo | null>(null)
+  const [topupLoading, setTopupLoading] = useState(false)
+  const [claimingMinutes, setClaimingMinutes] = useState(false)
+  const [customTopupAmount, setCustomTopupAmount] = useState('1000')
 
-  
   // Cart State
   const [cart, setCart] = useState<CartItem[]>([])
   const [useSameProfile, setUseSameProfile] = useState<boolean>(true)
 
-  useEffect(() => {
-    async function fetchBillingData() {
-      try {
-        setLoading(true)
-        const configRes = await fetch('/api/dashboard/config')
-        if (!configRes.ok) {
-          throw new Error('Failed to retrieve billing configuration')
-        }
-        const data = await configRes.json()
-        setUserLimits(data.user_limits)
-        setConfigs(data.configs || {})
-        setAvailableBundles(data.bundles || [])
+  const fetchBillingData = async () => {
+    try {
+      setLoading(true)
+      const configRes = await fetch('/api/dashboard/config')
+      if (!configRes.ok) {
+        throw new Error('Failed to retrieve billing configuration')
+      }
+      const data = await configRes.json()
+      setUserLimits(data.user_limits)
+      setConfigs(data.configs || {})
+      setAvailableBundles(data.bundles || [])
 
-        // Fetch Invoices
-        const invRes = await fetch('/api/billing/invoices', {
-          credentials: 'include'
-        })
-        if (invRes.ok) {
-          const invData = await invRes.json()
-          if (invData.invoices) {
-            setInvoices(invData.invoices)
+      // Fetch Invoices
+      const invRes = await fetch('/api/billing/invoices', {
+        credentials: 'include'
+      })
+      if (invRes.ok) {
+        const invData = await invRes.json()
+        if (invData.invoices) {
+          setInvoices(invData.invoices)
+        }
+      }
+
+      // Fetch Prepaid Wallet & Spend Limits
+      try {
+        const walletRes = await fetch('/api/billing/wallet')
+        if (walletRes.ok) {
+          const wData = await walletRes.json()
+          if (wData.wallet) {
+            setWallet(wData.wallet)
           }
         }
-
-
-      } catch (err: any) {
-        setError(err.message || 'Something went wrong')
-      } finally {
-        setLoading(false)
+      } catch (wErr) {
+        console.warn('Wallet fetch failed:', wErr)
       }
-    }
 
+    } catch (err: any) {
+      setError(err.message || 'Something went wrong')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
     fetchBillingData()
   }, [])
+
+  const handleQuickTopup = async (amount: number) => {
+    try {
+      setTopupLoading(true)
+      const res = await fetch('/api/billing/wallet', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'topup', amount_inr: amount }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to top up wallet')
+      toast.success(data.message || `Wallet topped up by ₹${amount.toLocaleString('en-IN')}!`)
+      fetchBillingData()
+    } catch (err: any) {
+      toast.error(err.message || 'Topup failed')
+    } finally {
+      setTopupLoading(false)
+    }
+  }
+
+  const handleClaimEmergencyMinutes = async () => {
+    try {
+      setClaimingMinutes(true)
+      const res = await fetch('/api/billing/wallet', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'claim_emergency_minutes' }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to claim emergency minutes')
+      toast.success('50 Emergency Minutes claimed successfully!')
+      fetchBillingData()
+    } catch (err: any) {
+      toast.error(err.message)
+    } finally {
+      setClaimingMinutes(false)
+    }
+  }
 
   useEffect(() => {
     const supabase = createClient()
@@ -172,7 +242,8 @@ function BillingContent() {
       console.error('Failed to download invoice:', err)
       toast.error('Failed to download PDF invoice. Downloading text receipt instead.')
       
-      const content = `INVOICE\n=======================\nInvoice Number: ${inv.invoice_number}\nDate: ${new Date(inv.created_at).toLocaleDateString()}\nPlan: ${inv.plan_tier || 'Subscription'}\nAmount: ₹${(inv.subscription_amount / 100).toFixed(2)}\nGST (18%): ₹0.00 (Included)\nTotal: ₹${(inv.subscription_amount / 100).toFixed(2)}\nStatus: ${inv.status}\nPayment Method: ${inv.payment_method}\n\nThank you for your business!`
+      const totalAmt = ((inv.grand_total_paisa ?? inv.subscription_amount ?? 0) / 100).toFixed(2)
+      const content = `INVOICE\n=======================\nInvoice Number: ${inv.invoice_number}\nDate: ${new Date(inv.created_at).toLocaleDateString()}\nPlan: ${inv.plan_tier || 'Subscription'}\nAmount: ₹${totalAmt}\nGST (18%): ₹0.00 (Included)\nTotal: ₹${totalAmt}\nStatus: ${inv.status}\nPayment Method: ${inv.payment_method || 'Razorpay'}\n\nThank you for your business!`
       
       const blob = new Blob([content], { type: 'text/plain' })
       const url = URL.createObjectURL(blob)
@@ -461,6 +532,119 @@ function BillingContent() {
         {/* Left Side: Product Selector list */}
         <div className="lg:col-span-2 space-y-8">
           
+          {/* 1. Prepaid Wallet & Spend Limits Card (Master Plan Section 18.9 & 18.10) */}
+          <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-6 shadow-sm space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[var(--border)] pb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-violet-500/10 border border-violet-500/20 flex items-center justify-center text-violet-400 shrink-0">
+                  <Wallet className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm text-[var(--heading)] font-display flex items-center gap-2">
+                    Prepaid Balance & Spend Limits
+                    <span className="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
+                      Active
+                    </span>
+                  </h3>
+                  <p className="text-xs text-[var(--muted)] mt-0.5">
+                    Prepaid wallet with instant auto-recharge, spend caps, and statutory GST tax invoices.
+                  </p>
+                </div>
+              </div>
+
+              <div className="text-right">
+                <span className="text-[10px] text-[var(--muted)] uppercase font-bold tracking-wider block">Wallet Balance</span>
+                <span className="text-2xl font-bold font-mono text-violet-400">
+                  ₹{(wallet?.balance_inr ?? 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </span>
+              </div>
+            </div>
+
+            {/* Quick Recharge Buttons */}
+            <div>
+              <label className="block text-[10px] font-bold font-montserrat text-[var(--muted)] uppercase tracking-wider mb-2.5">
+                Quick Wallet Top-Up (Instant UPI / Card)
+              </label>
+              <div className="flex flex-wrap items-center gap-2.5">
+                {[500, 1000, 2500, 5000].map((amt) => (
+                  <button
+                    key={amt}
+                    type="button"
+                    disabled={topupLoading}
+                    onClick={() => handleQuickTopup(amt)}
+                    className="px-4 py-2 rounded-xl border border-[var(--border)] hover:border-violet-500 bg-[var(--background)] hover:bg-violet-500/10 text-[var(--heading)] font-mono text-xs font-bold transition-all cursor-pointer disabled:opacity-50"
+                  >
+                    +₹{amt.toLocaleString('en-IN')}
+                  </button>
+                ))}
+                <div className="flex items-center gap-2 ml-auto">
+                  <input
+                    type="number"
+                    value={customTopupAmount}
+                    onChange={e => setCustomTopupAmount(e.target.value)}
+                    placeholder="Custom ₹"
+                    className="w-24 bg-[var(--background)] border border-[var(--border)] text-[var(--heading)] text-xs font-mono font-bold rounded-xl px-3 py-2 focus:outline-none focus:ring-1 focus:ring-violet-500"
+                  />
+                  <button
+                    type="button"
+                    disabled={topupLoading || !customTopupAmount || Number(customTopupAmount) <= 0}
+                    onClick={() => handleQuickTopup(Number(customTopupAmount))}
+                    className="px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white font-bold text-xs uppercase tracking-wider rounded-xl transition-all cursor-pointer disabled:opacity-50 shadow-sm"
+                  >
+                    {topupLoading ? 'Adding...' : 'Add Credits'}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Reliability Score & Emergency Minutes (Section 18.9) */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 border-t border-[var(--border)]">
+              <div className="p-4 rounded-xl bg-[var(--background)] border border-[var(--border)] flex items-center justify-between">
+                <div>
+                  <span className="text-[10px] text-[var(--muted)] uppercase font-bold tracking-wider block">
+                    Reliability Score
+                  </span>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className="text-xl font-bold font-mono text-[var(--heading)]">
+                      {wallet?.reliability_score ?? 85} / 100
+                    </span>
+                    <span className="text-[10px] text-emerald-400 font-semibold flex items-center gap-0.5">
+                      <ShieldCheckIcon className="w-3 h-3" />
+                      Good Standing
+                    </span>
+                  </div>
+                </div>
+                <div className="w-8 h-8 rounded-full border border-emerald-500/30 bg-emerald-500/10 flex items-center justify-center text-emerald-400 text-xs font-bold font-mono">
+                  ✓
+                </div>
+              </div>
+
+              <div className="p-4 rounded-xl bg-[var(--background)] border border-[var(--border)] flex items-center justify-between">
+                <div>
+                  <span className="text-[10px] text-[var(--muted)] uppercase font-bold tracking-wider block">
+                    Emergency Overdraft Protection
+                  </span>
+                  <p className="text-[10px] text-[var(--muted)] mt-0.5">
+                    {wallet?.emergency_minutes_available ? `${wallet.emergency_minutes_available} emergency mins active` : '50 free buffer minutes upon low balance'}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  disabled={claimingMinutes || (wallet?.emergency_minutes_available ?? 0) > 0}
+                  onClick={handleClaimEmergencyMinutes}
+                  className="px-3 py-1.5 bg-violet-600/20 hover:bg-violet-600/30 border border-violet-500/30 text-violet-300 font-bold text-[10px] uppercase tracking-wider rounded-lg transition-all cursor-pointer disabled:opacity-50 shrink-0"
+                >
+                  {claimingMinutes ? 'Claiming...' : (wallet?.emergency_minutes_available ? 'Claimed' : 'Claim 50 Mins')}
+                </button>
+              </div>
+            </div>
+
+            <p className="text-[10px] text-[var(--muted)] flex items-center gap-1.5">
+              <CheckCircle2 className="w-3.5 h-3.5 text-violet-400 shrink-0" />
+              <span>Zero Mid-Call Disconnect: Active in-progress calls are never terminated mid-sentence when limits are reached.</span>
+            </p>
+          </div>
+
           {/* Subscription Plans Banner */}
           <div>
             <h2 className="text-sm uppercase font-bold text-violet-500 tracking-wider mb-4 font-display">Subscription Upgrades</h2>
@@ -708,7 +892,7 @@ function BillingContent() {
                       {inv.invoice_number}
                     </td>
                     <td className="py-3 px-4 whitespace-nowrap font-mono font-medium">
-                      {formatPrice(inv.subscription_amount)}
+                      {formatPrice(inv.grand_total_paisa ?? inv.subscription_amount ?? 0)}
                     </td>
                     <td className="py-3 px-4 whitespace-nowrap">
                       <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${

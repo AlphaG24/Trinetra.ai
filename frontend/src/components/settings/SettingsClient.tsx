@@ -7,24 +7,25 @@ import { User, ShieldCheck, Bell, Sparkles } from 'lucide-react'
 // Tabs
 import { ProfileTab } from '@/src/components/settings/ProfileTab'
 import { SecurityTab } from '@/src/components/settings/SecurityTab'
+import { KYCTab } from '@/src/components/settings/KYCTab'
 import { NotificationsTab } from '@/src/components/settings/NotificationsTab'
 import { IntegrationsTab } from '@/src/components/settings/IntegrationsTab'
 
-type TabType = 'profile' | 'security' | 'notifications' | 'integrations'
+type TabType = 'profile' | 'security' | 'kyc' | 'notifications' | 'integrations'
 
 interface SettingsClientProps {
   initialTab?: string
 }
 
 export function SettingsClient({ initialTab = 'profile' }: SettingsClientProps) {
-  const validInitialTab: TabType = ['profile', 'security', 'notifications', 'integrations'].includes(initialTab)
+  const validInitialTab: TabType = ['profile', 'security', 'kyc', 'notifications', 'integrations'].includes(initialTab)
     ? (initialTab as TabType)
     : 'profile'
 
   const [activeTab, setActiveTab] = useState<TabType>(validInitialTab)
 
   useEffect(() => {
-    if (initialTab && ['profile', 'security', 'notifications', 'integrations'].includes(initialTab)) {
+    if (initialTab && ['profile', 'security', 'kyc', 'notifications', 'integrations'].includes(initialTab)) {
       setActiveTab(initialTab as TabType)
     }
   }, [initialTab])
@@ -32,6 +33,7 @@ export function SettingsClient({ initialTab = 'profile' }: SettingsClientProps) 
   const tabs = [
     { id: 'profile' as const, label: 'Profile Settings', icon: User },
     { id: 'security' as const, label: 'Security & Access', icon: ShieldCheck },
+    { id: 'kyc' as const, label: 'KYC & Compliance', icon: ShieldCheck },
     { id: 'notifications' as const, label: 'Notifications', icon: Bell },
     { id: 'integrations' as const, label: 'Integrations', icon: Sparkles },
   ]
@@ -42,6 +44,8 @@ export function SettingsClient({ initialTab = 'profile' }: SettingsClientProps) 
         return <ProfileTab />
       case 'security':
         return <SecurityTab />
+      case 'kyc':
+        return <KYCTab />
       case 'notifications':
         return <NotificationsTab />
       case 'integrations':
