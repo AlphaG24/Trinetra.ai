@@ -91,6 +91,11 @@ export function AgentOverviewTab({
 
   const [agentUsage, setAgentUsage] = useState<any>(null)
   const [usageLoading, setUsageLoading] = useState(true)
+  const [walletInfo, setWalletInfo] = useState<{
+    emergency_minutes_available: number;
+    reliability_score: number;
+  }>({ emergency_minutes_available: 0, reliability_score: 85 })
+  const [claimingEmergency, setClaimingEmergency] = useState(false)
 
   const supabase = createClient()
   const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null)
@@ -125,6 +130,20 @@ export function AgentOverviewTab({
     transcriptEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [transcripts])
 
+  const fetchWallet = useCallback(() => {
+    fetch('/api/billing/wallet')
+      .then(res => res.json())
+      .then(res => {
+        if (res.success && res.wallet) {
+          setWalletInfo({
+            emergency_minutes_available: res.wallet.emergency_minutes_available || 0,
+            reliability_score: res.wallet.reliability_score ?? 85
+          })
+        }
+      })
+      .catch(() => {})
+  }, [])
+
   const fetchUsage = useCallback(() => {
     setUsageLoading(true)
     fetch(`/api/usage/agent/${agent.id}`)
@@ -138,7 +157,28 @@ export function AgentOverviewTab({
 
   useEffect(() => {
     fetchUsage()
-  }, [fetchUsage])
+    fetchWallet()
+  }, [fetchUsage, fetchWallet])
+
+  const handleClaimEmergency = async () => {
+    setClaimingEmergency(true)
+    try {
+      const res = await fetch('/api/billing/wallet', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'claim_emergency_minutes' })
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to claim emergency minutes')
+      toast.success('50 Emergency Minutes buffer activated!')
+      fetchUsage()
+      fetchWallet()
+    } catch (err: any) {
+      toast.error(err.message || 'Could not claim emergency minutes')
+    } finally {
+      setClaimingEmergency(false)
+    }
+  }
 
   // Resolve agent-specific tier
   const getAgentTier = (agentData: any, profileData: any) => {
@@ -663,21 +703,67 @@ export function AgentOverviewTab({
               {usageLoading ? (
                 <div className="flex justify-center p-2"><Loader2 className="w-5 h-5 animate-spin text-[var(--muted)]" /></div>
               ) : agentUsage ? (
-                <div>
-                  <div className="flex justify-between items-center mb-2">
-                    <span className="text-xs font-montserrat font-bold text-[var(--heading)] uppercase">Monthly Minutes</span>
-                    <span className="text-xs font-mono text-[var(--muted)]">{agentUsage.used} / {agentUsage.limit === 0 ? '∞' : agentUsage.limit}</span>
-                  </div>
-                  <div className="w-full bg-[var(--background)] border border-[var(--border)] rounded-full h-2.5 overflow-hidden">
-                    <div 
-                      className={`h-full rounded-full transition-all duration-500 ${
-                        agentUsage.status === 'exceeded' ? 'bg-red-500' :
-                        agentUsage.status === 'warning' ? 'bg-amber-500' : 'bg-violet-500'
-                      }`}
-                      style={{ width: `${Math.min(100, agentUsage.percent || 0)}%` }}
-                    />
-                  </div>
-                </div>
+                (() => {
+                  const availableEmergency = agentUsage.emergency_minutes_available || walletInfo.emergency_minutes_available || 0;
+                  return (
+                    <div>
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="text-xs font-montserrat font-bold text-[var(--heading)] uppercase">Monthly Minutes</span>
+                        <span className="text-xs font-mono text-[var(--muted)]">
+                          {agentUsage.used} / {agentUsage.limit === 0 ? '∞' : agentUsage.limit} mins
+                          {availableEmergency > 0 ? (
+                            <span className="text-emerald-400 font-semibold ml-1">
+                              (+{availableEmergency}m buffer)
+                            </span>
+                          ) : null}
+                        </span>
+                      </div>
+                      <div className="w-full bg-[var(--background)] border border-[var(--border)] rounded-full h-2.5 overflow-hidden">
+                        <div 
+                          className={`h-full rounded-full transition-all duration-500 ${
+                            agentUsage.status === 'exceeded' && availableEmergency === 0 ? 'bg-red-500' :
+                            agentUsage.status === 'warning' ? 'bg-amber-500' : 'bg-violet-500'
+                          }`}
+                          style={{ width: `${Math.min(100, agentUsage.percent || 0)}%` }}
+                        />
+                      </div>
+
+                      {/* 50-Min Emergency Minutes Subsystem (Section 18.9) */}
+                      {availableEmergency > 0 ? (
+                        <div className="mt-3 p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/25 flex items-center justify-between text-xs">
+                          <div className="flex items-center gap-1.5">
+                            <Zap className="w-3.5 h-3.5 text-emerald-400" />
+                            <span className="text-emerald-400 font-bold text-[11px]">
+                              50m Emergency Buffer Active
+                            </span>
+                          </div>
+                          <span className="text-[10px] text-emerald-400/80 font-mono font-semibold">
+                            {availableEmergency} mins remaining
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="mt-3 p-2.5 rounded-xl bg-[var(--background)] border border-[var(--border)] flex items-center justify-between text-xs">
+                          <div className="flex flex-col text-left">
+                            <span className="text-[11px] font-bold text-[var(--heading)] flex items-center gap-1">
+                              <Zap className="w-3.5 h-3.5 text-amber-400" /> Free Emergency Buffer
+                            </span>
+                            <span className="text-[10px] text-[var(--muted)]">
+                              50m overdraft protection (Score: {walletInfo.reliability_score}/100)
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            disabled={claimingEmergency || walletInfo.reliability_score <= 80}
+                            onClick={handleClaimEmergency}
+                            className="px-2.5 py-1 bg-violet-600 hover:bg-violet-700 text-white font-bold text-[10px] uppercase tracking-wider rounded-lg transition shadow-sm cursor-pointer disabled:opacity-40 shrink-0"
+                          >
+                            {claimingEmergency ? 'Claiming...' : 'Claim 50m'}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()
               ) : (
                 <div className="text-xs text-[var(--muted)]">Usage data unavailable.</div>
               )}
