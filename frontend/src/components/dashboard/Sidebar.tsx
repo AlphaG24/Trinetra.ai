@@ -28,7 +28,6 @@ const topNavItems = [
   { label: 'Phone Numbers', href: '/dashboard/phone-numbers', icon: Phone },
   { label: 'Analytics', href: '/dashboard/analytics', icon: BarChart3 },
   { label: 'Billing', href: '/dashboard/billing', icon: CreditCard },
-  { label: 'KYC Vault', href: '/dashboard/kyc', icon: ShieldCheck },
 ]
 
 const bottomNavItems = [

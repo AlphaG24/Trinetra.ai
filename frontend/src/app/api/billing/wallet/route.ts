@@ -163,7 +163,7 @@ export async function POST(req: Request) {
       // Also create an official GST Tax Invoice (VAK/ Series per Task 11)
       const countRes = await adminClient.from('invoices').select('id', { count: 'exact' })
       const invCount = (countRes.count || 0) + 1
-      const invNumber = `VAK/2026-27/${String(invCount).padStart(6, '0')}`
+      const invNumber = `VAK/26-27/${String(invCount).padStart(5, '0')}`
 
       const taxablePaisa = Math.round(amountPaisa / 1.18)
       const taxPaisa = amountPaisa - taxablePaisa

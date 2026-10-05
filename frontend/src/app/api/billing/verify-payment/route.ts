@@ -611,12 +611,18 @@ export async function POST(request: Request) {
     }
     console.log('[Verify Payment] 1F LOG: User profile limits updated successfully in DB:', JSON.stringify(updates))
 
-    // 5. Create and save a single invoice with dynamic line items
+    // 5. Create and save a single invoice with dynamic line items (VAK/ series per Task 11)
+    const { count: totalInvoices } = await adminClient
+      .from('invoices')
+      .select('*', { count: 'exact', head: true })
+    const seq = (totalInvoices || 0) + 1
+    const vakInvoiceNumber = `VAK/26-27/${String(seq).padStart(5, '0')}`
+
     const { data: invoiceRecord, error: invoiceErr } = await adminClient
       .from('invoices')
       .insert({
         organization_id: profile.organization_id || null,
-        invoice_number: `TRI-INV-${Date.now()}`,
+        invoice_number: vakInvoiceNumber,
         period_start: new Date().toISOString(),
         period_end: new Date(Date.now() + 30 * 86400000).toISOString(),
         subscription_amount: totalPaidPaisa,
@@ -637,6 +643,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Failed to record invoice details' }, { status: 500 })
     }
     console.log('[Verify Payment] 1F LOG: Invoice record inserted successfully into DB:', invoiceRecord.invoice_number)
+
 
     // 6. Generate Invoice PDF buffer
     let pdfUrl = ''
@@ -734,7 +741,7 @@ export async function POST(request: Request) {
         subject: `Invoice ${invoiceRecord.invoice_number} from TRINETRAEDU-AI`,
         templateName: 'invoice',
         variables: {
-          invoice_number: invoiceRecord.invoice_number.replace('TRI-INV-', ''),
+          invoice_number: invoiceRecord.invoice_number,
           company_name: 'TRINETRAEDU-AI',
           company_address: 'India , Uttar Pradesh\\nKanpur Nagar , 208022',
           company_phone: '+91 9580619562',

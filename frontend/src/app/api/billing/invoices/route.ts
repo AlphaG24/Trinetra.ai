@@ -27,7 +27,18 @@ export async function GET(request: NextRequest) {
 
     console.log('[INVOICES API] Invoices found:', invoices?.length)
 
-    return NextResponse.json({ invoices: invoices || [] })
+    const mappedInvoices = (invoices || []).map((inv: any, idx: number) => {
+      let invNum = inv.invoice_number
+      if (invNum?.startsWith('TRI-')) {
+        invNum = `VAK/26-27/${String(idx + 1).padStart(5, '0')}`
+      }
+      return {
+        ...inv,
+        invoice_number: invNum,
+      }
+    })
+
+    return NextResponse.json({ invoices: mappedInvoices })
   } catch (error: any) {
     console.error('Error fetching invoices:', error)
     return NextResponse.json({ error: 'Failed to fetch invoices' }, { status: 500 })

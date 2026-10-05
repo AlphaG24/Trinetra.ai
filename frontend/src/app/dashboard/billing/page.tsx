@@ -131,7 +131,9 @@ function BillingContent() {
 
       // Fetch Prepaid Wallet & Spend Limits
       try {
-        const walletRes = await fetch('/api/billing/wallet')
+        const walletRes = await fetch('/api/billing/wallet', {
+          credentials: 'include'
+        })
         if (walletRes.ok) {
           const wData = await walletRes.json()
           if (wData.wallet) {
@@ -520,10 +522,123 @@ function BillingContent() {
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold tracking-tight text-[var(--heading)] font-display flex items-center gap-2">
-          <CreditCard className="w-6 h-6 text-violet-500" />
+          <CreditCard className="w-6 h-6 text-[var(--heading)]" />
           Subscription & Billing
         </h1>
         <p className="text-xs text-[var(--muted)] mt-1">Manage plans, provision dedicated numbers, or purchase bundle packs with bulk discounts.</p>
+      </div>
+
+      {/* 1. Prepaid Wallet & Spend Limits Engine (Master Plan Section 18.9 & 18.10) - Prominent Full Width */}
+      <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-6 shadow-sm space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[var(--border)] pb-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-zinc-900/10 dark:bg-white/10 border border-[var(--border)] flex items-center justify-center text-[var(--heading)] shrink-0">
+              <Wallet className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="font-bold text-sm text-[var(--heading)] font-display flex items-center gap-2">
+                Prepaid Balance & Spend Limits
+                <span className="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
+                  Active
+                </span>
+              </h3>
+              <p className="text-xs text-[var(--muted)] mt-0.5">
+                Prepaid wallet with instant auto-recharge, spend caps, and statutory GST tax invoices.
+              </p>
+            </div>
+          </div>
+
+          <div className="text-right">
+            <span className="text-[10px] text-[var(--muted)] uppercase font-bold tracking-wider block">Wallet Balance</span>
+            <span className="text-2xl font-bold font-mono text-[var(--heading)]">
+              ₹{(wallet?.balance_inr ?? 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </span>
+          </div>
+        </div>
+
+        {/* Quick Recharge Buttons */}
+        <div>
+          <label className="block text-[10px] font-bold font-montserrat text-[var(--muted)] uppercase tracking-wider mb-2.5">
+            Quick Wallet Top-Up (Instant UPI / Card)
+          </label>
+          <div className="flex flex-wrap items-center gap-2.5">
+            {[500, 1000, 2500, 5000].map((amt) => (
+              <button
+                key={amt}
+                type="button"
+                disabled={topupLoading}
+                onClick={() => handleQuickTopup(amt)}
+                className="px-4 py-2 rounded-xl border border-[var(--border)] hover:border-zinc-400 bg-[var(--background)] hover:bg-[var(--hover-bg)] text-[var(--heading)] font-mono text-xs font-bold transition-all cursor-pointer disabled:opacity-50"
+              >
+                +₹{amt.toLocaleString('en-IN')}
+              </button>
+            ))}
+            <div className="flex items-center gap-2 ml-auto">
+              <input
+                type="number"
+                value={customTopupAmount}
+                onChange={e => setCustomTopupAmount(e.target.value)}
+                placeholder="Custom ₹"
+                className="w-24 bg-[var(--background)] border border-[var(--border)] text-[var(--heading)] text-xs font-mono font-bold rounded-xl px-3 py-2 focus:outline-none focus:ring-1 focus:ring-zinc-400"
+              />
+              <button
+                type="button"
+                disabled={topupLoading || !customTopupAmount || Number(customTopupAmount) <= 0}
+                onClick={() => handleQuickTopup(Number(customTopupAmount))}
+                className="px-4 py-2 bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white border border-zinc-700/30 dark:border-zinc-300 font-bold text-xs uppercase tracking-wider rounded-xl transition-all cursor-pointer disabled:opacity-50 shadow-sm"
+              >
+                {topupLoading ? 'Adding...' : 'Add Credits'}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Reliability Score & Emergency Minutes (Section 18.9) */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 border-t border-[var(--border)]">
+          <div className="p-4 rounded-xl bg-[var(--background)] border border-[var(--border)] flex items-center justify-between">
+            <div>
+              <span className="text-[10px] text-[var(--muted)] uppercase font-bold tracking-wider block">
+                Reliability Score
+              </span>
+              <div className="flex items-center gap-2 mt-1">
+                <span className="text-xl font-bold font-mono text-[var(--heading)]">
+                  {wallet?.reliability_score ?? 85} / 100
+                </span>
+                <span className="text-[10px] text-emerald-400 font-semibold flex items-center gap-0.5">
+                  <ShieldCheckIcon className="w-3 h-3" />
+                  Good Standing
+                </span>
+              </div>
+            </div>
+            <div className="w-8 h-8 rounded-full border border-emerald-500/30 bg-emerald-500/10 flex items-center justify-center text-emerald-400 text-xs font-bold font-mono">
+              ✓
+            </div>
+          </div>
+
+          <div className="p-4 rounded-xl bg-[var(--background)] border border-[var(--border)] flex items-center justify-between">
+            <div>
+              <span className="text-[10px] text-[var(--muted)] uppercase font-bold tracking-wider block">
+                Emergency Overdraft Protection
+              </span>
+              <p className="text-[10px] text-[var(--muted)] mt-0.5">
+                {wallet?.emergency_minutes_available ? `${wallet.emergency_minutes_available} emergency mins active` : '50 free buffer minutes upon low balance'}
+              </p>
+            </div>
+            <button
+              type="button"
+              disabled={claimingMinutes || (wallet?.emergency_minutes_available ?? 0) > 0}
+              onClick={handleClaimEmergencyMinutes}
+              className="px-3 py-1.5 bg-zinc-900/10 hover:bg-zinc-900/20 dark:bg-white/10 dark:hover:bg-white/20 border border-[var(--border)] text-[var(--heading)] font-bold text-[10px] uppercase tracking-wider rounded-lg transition-all cursor-pointer disabled:opacity-50 shrink-0"
+            >
+              {claimingMinutes ? 'Claiming...' : (wallet?.emergency_minutes_available ? 'Claimed' : 'Claim 50 Mins')}
+            </button>
+          </div>
+        </div>
+
+        <p className="text-[10px] text-[var(--muted)] flex items-center gap-1.5">
+          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+          <span>Zero Mid-Call Disconnect: Active in-progress calls are never terminated mid-sentence when limits are reached.</span>
+        </p>
       </div>
 
       {/* Main Grid: Products on Left, Shopping Cart on Right */}
@@ -531,127 +646,14 @@ function BillingContent() {
         
         {/* Left Side: Product Selector list */}
         <div className="lg:col-span-2 space-y-8">
-          
-          {/* 1. Prepaid Wallet & Spend Limits Card (Master Plan Section 18.9 & 18.10) */}
-          <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-6 shadow-sm space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[var(--border)] pb-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-violet-500/10 border border-violet-500/20 flex items-center justify-center text-violet-400 shrink-0">
-                  <Wallet className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="font-bold text-sm text-[var(--heading)] font-display flex items-center gap-2">
-                    Prepaid Balance & Spend Limits
-                    <span className="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
-                      Active
-                    </span>
-                  </h3>
-                  <p className="text-xs text-[var(--muted)] mt-0.5">
-                    Prepaid wallet with instant auto-recharge, spend caps, and statutory GST tax invoices.
-                  </p>
-                </div>
-              </div>
-
-              <div className="text-right">
-                <span className="text-[10px] text-[var(--muted)] uppercase font-bold tracking-wider block">Wallet Balance</span>
-                <span className="text-2xl font-bold font-mono text-violet-400">
-                  ₹{(wallet?.balance_inr ?? 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </span>
-              </div>
-            </div>
-
-            {/* Quick Recharge Buttons */}
-            <div>
-              <label className="block text-[10px] font-bold font-montserrat text-[var(--muted)] uppercase tracking-wider mb-2.5">
-                Quick Wallet Top-Up (Instant UPI / Card)
-              </label>
-              <div className="flex flex-wrap items-center gap-2.5">
-                {[500, 1000, 2500, 5000].map((amt) => (
-                  <button
-                    key={amt}
-                    type="button"
-                    disabled={topupLoading}
-                    onClick={() => handleQuickTopup(amt)}
-                    className="px-4 py-2 rounded-xl border border-[var(--border)] hover:border-violet-500 bg-[var(--background)] hover:bg-violet-500/10 text-[var(--heading)] font-mono text-xs font-bold transition-all cursor-pointer disabled:opacity-50"
-                  >
-                    +₹{amt.toLocaleString('en-IN')}
-                  </button>
-                ))}
-                <div className="flex items-center gap-2 ml-auto">
-                  <input
-                    type="number"
-                    value={customTopupAmount}
-                    onChange={e => setCustomTopupAmount(e.target.value)}
-                    placeholder="Custom ₹"
-                    className="w-24 bg-[var(--background)] border border-[var(--border)] text-[var(--heading)] text-xs font-mono font-bold rounded-xl px-3 py-2 focus:outline-none focus:ring-1 focus:ring-violet-500"
-                  />
-                  <button
-                    type="button"
-                    disabled={topupLoading || !customTopupAmount || Number(customTopupAmount) <= 0}
-                    onClick={() => handleQuickTopup(Number(customTopupAmount))}
-                    className="px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white font-bold text-xs uppercase tracking-wider rounded-xl transition-all cursor-pointer disabled:opacity-50 shadow-sm"
-                  >
-                    {topupLoading ? 'Adding...' : 'Add Credits'}
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* Reliability Score & Emergency Minutes (Section 18.9) */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 border-t border-[var(--border)]">
-              <div className="p-4 rounded-xl bg-[var(--background)] border border-[var(--border)] flex items-center justify-between">
-                <div>
-                  <span className="text-[10px] text-[var(--muted)] uppercase font-bold tracking-wider block">
-                    Reliability Score
-                  </span>
-                  <div className="flex items-center gap-2 mt-1">
-                    <span className="text-xl font-bold font-mono text-[var(--heading)]">
-                      {wallet?.reliability_score ?? 85} / 100
-                    </span>
-                    <span className="text-[10px] text-emerald-400 font-semibold flex items-center gap-0.5">
-                      <ShieldCheckIcon className="w-3 h-3" />
-                      Good Standing
-                    </span>
-                  </div>
-                </div>
-                <div className="w-8 h-8 rounded-full border border-emerald-500/30 bg-emerald-500/10 flex items-center justify-center text-emerald-400 text-xs font-bold font-mono">
-                  ✓
-                </div>
-              </div>
-
-              <div className="p-4 rounded-xl bg-[var(--background)] border border-[var(--border)] flex items-center justify-between">
-                <div>
-                  <span className="text-[10px] text-[var(--muted)] uppercase font-bold tracking-wider block">
-                    Emergency Overdraft Protection
-                  </span>
-                  <p className="text-[10px] text-[var(--muted)] mt-0.5">
-                    {wallet?.emergency_minutes_available ? `${wallet.emergency_minutes_available} emergency mins active` : '50 free buffer minutes upon low balance'}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  disabled={claimingMinutes || (wallet?.emergency_minutes_available ?? 0) > 0}
-                  onClick={handleClaimEmergencyMinutes}
-                  className="px-3 py-1.5 bg-violet-600/20 hover:bg-violet-600/30 border border-violet-500/30 text-violet-300 font-bold text-[10px] uppercase tracking-wider rounded-lg transition-all cursor-pointer disabled:opacity-50 shrink-0"
-                >
-                  {claimingMinutes ? 'Claiming...' : (wallet?.emergency_minutes_available ? 'Claimed' : 'Claim 50 Mins')}
-                </button>
-              </div>
-            </div>
-
-            <p className="text-[10px] text-[var(--muted)] flex items-center gap-1.5">
-              <CheckCircle2 className="w-3.5 h-3.5 text-violet-400 shrink-0" />
-              <span>Zero Mid-Call Disconnect: Active in-progress calls are never terminated mid-sentence when limits are reached.</span>
-            </p>
-          </div>
 
           {/* Subscription Plans Banner */}
           <div>
-            <h2 className="text-sm uppercase font-bold text-violet-500 tracking-wider mb-4 font-display">Subscription Upgrades</h2>
+            <h2 className="text-sm uppercase font-bold text-[var(--heading)] tracking-wider mb-4 font-display">Subscription Upgrades</h2>
             <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-6 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-6 text-left">
               <div className="space-y-2">
                 <h3 className="font-bold text-sm text-[var(--heading)] font-display flex items-center gap-2">
-                  <Bot className="w-4 h-4 text-violet-400" />
+                  <Bot className="w-4 h-4 text-[var(--heading)]" />
                   Activate Premium Voice Agents
                 </h3>
                 <p className="text-xs text-[var(--muted)] leading-relaxed max-w-lg">
@@ -660,22 +662,21 @@ function BillingContent() {
               </div>
               <Link
                 href="/dashboard/marketplace"
-                className="px-5 py-2.5 bg-violet-600 hover:bg-violet-700 text-white font-bold text-xs uppercase tracking-wider rounded-xl transition-all cursor-pointer shadow-md shadow-violet-600/10 shrink-0 text-center"
+                className="px-5 py-2.5 bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white border border-zinc-700/30 dark:border-zinc-300 font-bold text-xs uppercase tracking-wider rounded-xl transition-all cursor-pointer shadow-sm shrink-0 text-center"
               >
                 Go to Marketplace
               </Link>
             </div>
           </div>
 
-
           {/* Special Bundles Pack */}
           {availableBundles.length > 0 && (
             <div>
-              <h2 className="text-sm uppercase font-bold text-violet-500 tracking-wider mb-4 font-display">Special Product Bundles</h2>
+              <h2 className="text-sm uppercase font-bold text-[var(--heading)] tracking-wider mb-4 font-display">Special Product Bundles</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {availableBundles.map((b) => (
                   <div key={b.id} className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-6 flex flex-col justify-between shadow-sm relative overflow-hidden">
-                    <div className="absolute top-3 right-3 px-2 py-0.5 bg-violet-500/10 border border-violet-500/20 text-violet-500 text-[8px] font-bold uppercase tracking-wider rounded-full">
+                    <div className="absolute top-3 right-3 px-2 py-0.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 text-[8px] font-bold uppercase tracking-wider rounded-full">
                       Save {b.discount_percent}%
                     </div>
 
@@ -700,8 +701,8 @@ function BillingContent() {
                             }
                             return (
                               <div key={idx} className="flex justify-between items-center capitalize">
-                                <span className="font-medium text-zinc-300">{label}</span>
-                                <span className="font-mono font-bold text-violet-400">x{p.quantity}</span>
+                                <span className="font-medium text-[var(--heading)]">{label}</span>
+                                <span className="font-mono font-bold text-[var(--heading)]">x{p.quantity}</span>
                               </div>
                             )
                           })
@@ -712,11 +713,11 @@ function BillingContent() {
                     <div className="mt-6 pt-4 border-t border-[var(--border)] flex items-center justify-between">
                       <div>
                         <span className="text-[10px] text-[var(--muted)] line-through block">₹{b.individual_price_paisa / 100}</span>
-                        <span className="text-lg font-bold font-display text-violet-500">₹{b.bundle_price_paisa / 100}</span>
+                        <span className="text-lg font-bold font-display text-[var(--heading)]">₹{b.bundle_price_paisa / 100}</span>
                       </div>
                       <button
                         onClick={() => addToCart('bundle', b.id, b.name, b.bundle_price_paisa / 100)}
-                        className="px-3 py-1.5 bg-violet-600 hover:bg-violet-700 text-white font-bold text-xs uppercase rounded-xl transition-all cursor-pointer"
+                        className="px-3 py-1.5 bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white border border-zinc-700/30 dark:border-zinc-300 font-bold text-xs uppercase rounded-xl transition-all cursor-pointer shadow-sm"
                       >
                         Add Pack
                       </button>
@@ -832,13 +833,13 @@ function BillingContent() {
 
                 <div className="flex justify-between items-baseline pt-4 border-t border-[var(--border)]">
                   <span className="text-xs font-bold text-[var(--heading)]">GRAND TOTAL:</span>
-                  <span className="text-xl font-bold font-display text-violet-500 font-mono">{formatRawRupees(cartPrices.total)}</span>
+                  <span className="text-xl font-bold font-display text-[var(--heading)] font-mono">{formatRawRupees(cartPrices.total)}</span>
                 </div>
 
                 <button
                   onClick={handleCartCheckout}
                   disabled={updatingPlan}
-                  className="mt-4 w-full py-3 bg-violet-600 hover:bg-violet-700 text-white font-bold text-xs uppercase tracking-wider rounded-xl transition-all cursor-pointer shadow-md disabled:opacity-50 flex items-center justify-center gap-1.5"
+                  className="mt-4 w-full py-3 bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white border border-zinc-700/30 dark:border-zinc-300 font-bold text-xs uppercase tracking-wider rounded-xl transition-all cursor-pointer shadow-sm disabled:opacity-50 flex items-center justify-center gap-1.5"
                 >
                   <span>{updatingPlan ? 'Initiating Checkout...' : 'Secure Razorpay Payment'}</span>
                   <ArrowUpRight className="w-4 h-4" />
@@ -854,7 +855,7 @@ function BillingContent() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
           <div>
             <h2 className="text-lg font-bold font-display text-[var(--heading)]">Payment & Invoice History</h2>
-            <p className="text-xs text-[var(--muted)] mt-0.5">Permanent record of all completed subscriptions, add-ons, and tax invoices.</p>
+            <p className="text-xs text-[var(--muted)] mt-0.5">Permanent record of all completed subscriptions, add-ons, and statutory GST tax invoices.</p>
           </div>
           <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 text-xs font-semibold self-start sm:self-auto">
             <CheckCircle2 className="w-3.5 h-3.5" />
@@ -889,7 +890,7 @@ function BillingContent() {
                       })}
                     </td>
                     <td className="py-3 px-4 whitespace-nowrap font-mono text-[10px]">
-                      {inv.invoice_number}
+                      {inv.invoice_number?.startsWith('TRI-') ? `VAK/26-27/${inv.invoice_number.slice(-5)}` : inv.invoice_number}
                     </td>
                     <td className="py-3 px-4 whitespace-nowrap font-mono font-medium">
                       {formatPrice(inv.grand_total_paisa ?? inv.subscription_amount ?? 0)}
@@ -906,7 +907,7 @@ function BillingContent() {
                     <td className="py-3 px-4 text-right">
                       <button 
                         onClick={() => handleDownload(inv)}
-                        className="inline-flex items-center gap-1.5 text-xs text-violet-500 hover:text-violet-400 font-bold transition-colors cursor-pointer"
+                        className="inline-flex items-center gap-1.5 text-xs text-[var(--heading)] hover:opacity-75 font-bold transition-colors cursor-pointer"
                       >
                         <Download className="w-3.5 h-3.5" />
                         Download
@@ -926,7 +927,7 @@ function BillingContent() {
           {invoices.length > 3 && (
             <button
               onClick={() => setShowAllInvoices(!showAllInvoices)}
-              className="text-xs text-violet-500 hover:text-violet-400 font-bold transition-all cursor-pointer bg-violet-500/5 hover:bg-violet-500/10 border border-violet-500/20 px-3 py-1.5 rounded-xl uppercase tracking-wider text-[10px]"
+              className="text-xs text-[var(--heading)] hover:bg-[var(--hover-bg)] border border-[var(--border)] px-3 py-1.5 rounded-xl uppercase tracking-wider text-[10px] font-bold transition-all cursor-pointer"
             >
               {showAllInvoices ? 'Show Less' : `Show All (${invoices.length})`}
             </button>
