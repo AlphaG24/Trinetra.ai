@@ -1575,5 +1575,53 @@ backend/tests/test_load_concurrency_benchmark.py::TestLoadBenchmarkReportDocumen
 - Tests: `test_gst_invoicing_vault.py`, `test_number_lifecycle_grace.py`, `test_byon_credential_vault.py`, `test_support_ticket_system.py`, `test_encrypted_kyc_vault.py`, `test_essential_admin_panel.py`, `test_compliance_dpa_runbook.py`, `test_observability_monitoring.py`, `test_backup_restore_drill.py`, `test_load_concurrency_benchmark.py`, `test_pii_sanitizer.py`.
 - Result: **215 passed out of 215 tests (100% pass)** in 3.77s.
 
+---
+
+## Task 21: Master Plan Section 18 Reconciliation, Virtual Number Revocation & Emergency Buffer Visibility
+
+- **Date**: 2026-10-05
+- **Branch**: `feature/number-revocation-and-masterplan-sync`
+- **Status**: `VERIFIED`
+- **Mandate**: Master Plan Section 18 (Authoritative Overrides), Section 18.7 (Number Lifecycle & Expiry Handling), Section 18.9 (Emergency Minutes & Reliability Score).
+
+### 1. Implementation Summary
+1. **Master Plan Alignment (Section 18 Overrides)**:
+   - Synchronized Sections 0-17 of `docs/MASTER_PLAN.md` with Section 18 authoritative overrides.
+   - Replaced "Credit Score" with "Reliability Score" throughout Sections 1, 4, 13, 16, and 17.
+   - Replaced superseded branching topology and removed forbidden destructive Git commands (`git reset --hard` and `git push --force`), codifying `main` as production (Vercel deployment) and `dev` as integration, with rollbacks executed via `git revert`.
+2. **Virtual Number Revocation & Grace Period Disconnection (Section 18.7)**:
+   - Updated `backend/app/services/number_lifecycle_service.py` (`expire_number` and `process_lifecycle_transitions`):
+     - Automatically unlinks expired numbers from `agent_phone_numbers` junction table.
+     - Sets `agents.phone_number = None` and `agents.telephony_provider = 'simulated'`.
+     - Sets `is_assigned = False` and `assigned_agent_id = None` on `phone_numbers`.
+     - Transitions status to `grace_period` (15 days) with neutral unavailable audio playback and missed call tracking.
+   - Updated `frontend/src/app/api/phone-numbers/[id]/assign/route.ts`:
+     - Added strict status validation rejecting assignment if number status is not `active` (HTTP 400).
+   - Updated `frontend/src/app/api/phone-numbers/route.ts`:
+     - Removed restrictive `.eq("is_assigned", true)` so owners can see and manage numbers in grace period and hold period.
+     - Stripped `assigned_agents` if status is `grace_period` or `hold_period`.
+   - Updated `frontend/src/app/dashboard/agents/[slug]/AgentDetailPageClient.tsx` and `frontend/src/components/agents/AgentNumbersTab.tsx`:
+     - Only active numbers are treated as connected to the agent.
+     - Displays grace period warning notice when a number has expired.
+   - Updated `frontend/src/components/phone-numbers/NumberCard.tsx`:
+     - Displays distinctive Grace Period (15d) / Hold Period (14d) badges and prominent "Renew Line" action.
+3. **50-Minute Emergency Buffer Visibility & Claim Flow (Section 18.9)**:
+   - Updated `frontend/src/components/agents/AgentOverviewTab.tsx`:
+     - Surfaced active 50-minute emergency buffer in monthly minutes: `{used} / {limit} mins (+{emergency}m buffer)`.
+     - Rendered active green buffer badge when emergency minutes are active.
+     - Rendered "+50 Free Emergency Buffer" card with one-click "Claim 50m" button for eligible users (Reliability Score > 80).
+   - Updated `frontend/src/components/dashboard/QuotaBanner.tsx`:
+     - Verified and queried `wallets.emergency_minutes_available`.
+     - Protects active calls from showing "Agents Paused" when emergency buffer is active.
+     - Replaced legacy Stripe reference with link to `/dashboard/billing`.
+
+### 2. Test Results (Authoritative)
+```
+backend/tests/test_number_lifecycle_grace.py: 13 passed in 1.77s
+backend/tests/test_wallet_razorpay_quota.py: 19 passed in 2.93s
+Total Suite: 32 passed, 0 failed, 1 warning
+Frontend Production Build: Compiled successfully (Exit Code 0)
+```
+
 
 
