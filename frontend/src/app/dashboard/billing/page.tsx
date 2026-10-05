@@ -156,20 +156,82 @@ function BillingContent() {
   }, [])
 
   const handleQuickTopup = async (amount: number) => {
+    if (!amount || amount < 100) {
+      toast.error('Minimum top-up amount is ₹100')
+      return
+    }
+
     try {
       setTopupLoading(true)
+
+      // 1. Create real Razorpay order on server
       const res = await fetch('/api/billing/wallet', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'topup', amount_inr: amount }),
+        credentials: 'include',
+        body: JSON.stringify({ action: 'create_order', amount_inr: amount }),
       })
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Failed to top up wallet')
-      toast.success(data.message || `Wallet topped up by ₹${amount.toLocaleString('en-IN')}!`)
-      fetchBillingData()
+      if (!res.ok) throw new Error(data.error || 'Failed to initiate wallet recharge')
+
+      // 2. Open Razorpay payment gateway
+      if (typeof window === 'undefined' || !(window as any).Razorpay) {
+        throw new Error('Payment gateway is loading. Please try again in a few seconds.')
+      }
+
+      const options = {
+        key: data.key,
+        amount: data.amount,
+        currency: data.currency || 'INR',
+        name: 'Trinetra AI',
+        description: `Prepaid Wallet Recharge (₹${amount.toLocaleString('en-IN')})`,
+        order_id: data.order_id,
+        prefill: {
+          email: data.user_email,
+          name: data.user_name
+        },
+        theme: {
+          color: '#18181b'
+        },
+        handler: async function (response: any) {
+          toast.info('Verifying transaction on server...')
+          try {
+            const verifyRes = await fetch('/api/billing/wallet', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'include',
+              body: JSON.stringify({
+                action: 'verify_topup',
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_signature: response.razorpay_signature,
+                amount_inr: amount
+              })
+            })
+            const verifyData = await verifyRes.json()
+            if (verifyRes.ok) {
+              toast.success(verifyData.message || `Wallet topped up by ₹${amount.toLocaleString('en-IN')}!`)
+              fetchBillingData()
+            } else {
+              toast.error(verifyData.error || 'Verification failed. Please contact billing support.')
+            }
+          } catch (vErr: any) {
+            toast.error(vErr.message || 'Payment verification failed')
+          } finally {
+            setTopupLoading(false)
+          }
+        },
+        modal: {
+          ondismiss: function () {
+            setTopupLoading(false)
+          }
+        }
+      }
+
+      const rzp = new (window as any).Razorpay(options)
+      rzp.open()
     } catch (err: any) {
-      toast.error(err.message || 'Topup failed')
-    } finally {
+      toast.error(err.message || 'Wallet topup initiation failed')
       setTopupLoading(false)
     }
   }
