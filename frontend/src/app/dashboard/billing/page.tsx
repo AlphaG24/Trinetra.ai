@@ -553,7 +553,7 @@ function BillingContent() {
         `${configs.starter_minutes || '500'} monthly minutes included`,
         'Up to 5 active production agents',
         'Custom system prompt configurations',
-        'Overage pricing of ₹2/min',
+        `Overage pricing of ₹${configs.overage_per_minute_paisa ? Math.round(parseInt(configs.overage_per_minute_paisa, 10) / 100) : 11}/min`,
         'Email & Telegram support alerts'
       ]
     },
@@ -568,7 +568,7 @@ function BillingContent() {
         `${configs.professional_minutes || '2,000'} monthly minutes included`,
         'Unlimited active voice agents',
         'Dedicated custom phone numbers',
-        'ElevenLabs cloned voices upload',
+        `Overage pricing of ₹${configs.overage_per_minute_paisa ? Math.round(parseInt(configs.overage_per_minute_paisa, 10) / 100) : 11}/min`,
         'WhatsApp templates & followups'
       ]
     }

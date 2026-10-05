@@ -276,12 +276,30 @@ export async function POST(req: Request) {
       const cgstPaisa = Math.round(taxPaisa / 2)
       const sgstPaisa = taxPaisa - cgstPaisa
 
-      await adminClient.from('invoices').insert({
+      const lineItems = [
+        {
+          sac_code: '998311',
+          description: `Prepaid Wallet Top-Up (₹${amountInrNum.toLocaleString('en-IN')})`,
+          amount_paisa: amountPaisa,
+          taxable_paisa: taxablePaisa,
+          cgst_paisa: cgstPaisa,
+          sgst_paisa: sgstPaisa,
+        },
+      ]
+
+      const { error: invErr } = await adminClient.from('invoices').insert({
         organization_id: orgId,
         invoice_number: invNumber,
         fiscal_year: '2026-2027',
         invoice_date: nowIso,
         due_date: nowIso,
+        period_start: nowIso,
+        period_end: new Date(Date.now() + 30 * 86400000).toISOString(),
+        subscription_amount: amountPaisa,
+        tax_amount: taxPaisa,
+        total_amount: amountPaisa,
+        line_items: lineItems,
+        payment_id: razorpay_payment_id,
         payment_reference_id: razorpay_payment_id,
         transaction_type: 'wallet_topup',
         currency: 'INR',
@@ -299,9 +317,14 @@ export async function POST(req: Request) {
         ca_review_status: 'pending',
         status: 'paid',
         payment_method: 'Razorpay UPI/Card/Netbanking',
+        paid_at: nowIso,
         created_at: nowIso,
         updated_at: nowIso,
       })
+
+      if (invErr) {
+        console.error('[Wallet Route] Failed to insert invoice record:', invErr)
+      }
 
       return NextResponse.json({
         success: true,
@@ -357,13 +380,33 @@ export async function POST(req: Request) {
       const cgstPaisa = Math.round(taxPaisa / 2)
       const sgstPaisa = taxPaisa - cgstPaisa
 
-      await adminClient.from('invoices').insert({
+      const fallbackLineItems = [
+        {
+          sac_code: '998311',
+          description: `Prepaid Wallet Top-Up (₹${amountInr.toLocaleString('en-IN')})`,
+          amount_paisa: amountPaisa,
+          taxable_paisa: taxablePaisa,
+          cgst_paisa: cgstPaisa,
+          sgst_paisa: sgstPaisa,
+        },
+      ]
+
+      const fallbackPaymentRef = `PAY-${Date.now()}`
+
+      const { error: fallbackInvErr } = await adminClient.from('invoices').insert({
         organization_id: orgId,
         invoice_number: invNumber,
         fiscal_year: '2026-2027',
         invoice_date: nowIso,
         due_date: nowIso,
-        payment_reference_id: `PAY-${Date.now()}`,
+        period_start: nowIso,
+        period_end: new Date(Date.now() + 30 * 86400000).toISOString(),
+        subscription_amount: amountPaisa,
+        tax_amount: taxPaisa,
+        total_amount: amountPaisa,
+        line_items: fallbackLineItems,
+        payment_id: fallbackPaymentRef,
+        payment_reference_id: fallbackPaymentRef,
         transaction_type: 'wallet_topup',
         currency: 'INR',
         supplier_name: 'Vaakriti Technologies Private Limited',
@@ -379,9 +422,14 @@ export async function POST(req: Request) {
         grand_total_paisa: amountPaisa,
         status: 'paid',
         payment_method: 'Razorpay Instant UPI/Card',
+        paid_at: nowIso,
         created_at: nowIso,
         updated_at: nowIso,
       })
+
+      if (fallbackInvErr) {
+        console.error('[Wallet Route] Failed to insert fallback invoice record:', fallbackInvErr)
+      }
 
       return NextResponse.json({
         success: true,

@@ -37,7 +37,7 @@ DEFAULT_SPEND_LIMIT_PAISA: int = 250000  # ₹2,500.00
 DEFAULT_RELIABILITY_SCORE: int = 85      # Starting score for standard verified accounts
 MAX_EMERGENCY_MINUTES: int = 50          # 50 free minutes
 EMERGENCY_MINUTES_COOLDOWN_DAYS: int = 30
-DEFAULT_OVERAGE_RATE_PER_MIN_PAISA: int = 1000  # ₹10.00 per minute
+DEFAULT_OVERAGE_RATE_PER_MIN_PAISA: int = 1100  # ₹11.00 per minute
 
 
 class WalletService:

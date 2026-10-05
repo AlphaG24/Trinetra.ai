@@ -54,7 +54,8 @@ export function AgentOverviewTab({
     callsToday: 0,
     minutesUsed: 0,
     leadsGenerated: 0,
-    avgDuration: 0.0
+    avgDuration: 0.0,
+    emergencyMinutes: 0
   })
   const [statsLoading, setStatsLoading] = useState(true)
   const [resettingAll, setResettingAll] = useState(false)
@@ -159,7 +160,7 @@ export function AgentOverviewTab({
   const agentTier = getAgentTier(agent, profile)
   const isDemo = agent.is_demo === true
 
-  // Per-agent quota resolution
+  // Per-agent quota resolution: prioritize agent's own custom limit over shared tier default
   let limit = 10
   let used = 0
   
@@ -167,9 +168,11 @@ export function AgentOverviewTab({
     limit = parseInt(sysConfig?.free_demo_minutes || '10', 10)
     used = profile?.demo_minutes_used ?? 0
   } else {
-    // 2. If it's a deployed agent (trial, starter, professional, pro, etc.):
-    if (agentTier === 'trial') {
-      limit = agent.config?.minutes_limit ?? parseInt(sysConfig?.trial_minutes || '100', 10)
+    const customAgentLimit = agent?.config?.minutes_limit ?? agent?.minutes_limit
+    if (customAgentLimit && Number(customAgentLimit) > 0) {
+      limit = Number(customAgentLimit)
+    } else if (agentTier === 'trial') {
+      limit = parseInt(sysConfig?.trial_minutes || '100', 10)
     } else if (agentTier === 'starter') {
       limit = parseInt(sysConfig?.starter_minutes || '500', 10)
     } else if (agentTier === 'professional' || agentTier === 'pro') {
@@ -181,6 +184,8 @@ export function AgentOverviewTab({
     }
     used = statsLoading ? 0 : stats.minutesUsed
   }
+
+  const emergencyMinutes = agentUsage?.emergency_minutes_available || stats.emergencyMinutes || 0
 
   const handleResetAll = async () => {
     if (!window.confirm("WARNING: This will reset ALL settings of the agent (including voice configs, greeting messages, fallbacks, and behavioral prompts) back to factory defaults. Your entire custom modifications will be overwritten. Do you want to proceed?")) {
@@ -250,13 +255,16 @@ export function AgentOverviewTab({
     if (showCallModal) {
       clearTranscripts()
       let remainingSecs = 0
-      if (agentUsage && agentUsage.limit > 0) {
-        remainingSecs = Math.max(0, (agentUsage.limit - agentUsage.used) * 60)
-      } else if (agentUsage && agentUsage.limit === 0) {
+      const effectiveLimit = (agentUsage && agentUsage.effective_limit)
+        ? agentUsage.effective_limit
+        : (limit + emergencyMinutes)
+
+      if (agentUsage && agentUsage.limit === 0) {
         // unlimited plan
         remainingSecs = 99999 * 60
+      } else if (effectiveLimit > 0) {
+        remainingSecs = Math.max(0, (effectiveLimit - used) * 60)
       } else {
-        // Fallback to frontend-computed values if backend data not loaded yet
         remainingSecs = Math.max(0, (limit - used) * 60)
       }
       setRemainingSeconds(remainingSecs)
@@ -265,7 +273,7 @@ export function AgentOverviewTab({
         setShowUpgradeModal(true)
       }
     }
-  }, [showCallModal, agentUsage, limit, used])
+  }, [showCallModal, agentUsage, limit, used, emergencyMinutes])
 
   // Track call connection state transitions
   useEffect(() => {
@@ -769,11 +777,24 @@ export function AgentOverviewTab({
               </div>
 
               {/* Remaining Quota indicator */}
-              <div className="bg-[var(--background)] border border-[var(--border)] rounded-2xl p-4 flex items-center justify-between">
-                <span className="text-xs text-[var(--body)] font-medium">Remaining Plan Minutes:</span>
-                <span className={`text-xs font-mono font-bold ${remainingSeconds < 120 ? 'text-amber-500 animate-pulse' : 'text-violet-500'}`}>
-                  {formatTime(remainingSeconds)}
-                </span>
+              <div className="bg-[var(--background)] border border-[var(--border)] rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-xs text-[var(--body)] font-medium">Remaining Plan Minutes:</span>
+                  {emergencyMinutes > 0 && (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-500 border border-amber-500/20">
+                      <ShieldCheck className="w-3.5 h-3.5 text-amber-500" />
+                      +{emergencyMinutes} Claimed Emergency Mins Buffer
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className={`text-xs font-mono font-bold ${remainingSeconds < 120 ? 'text-amber-500 animate-pulse' : 'text-violet-500'}`}>
+                    {formatTime(remainingSeconds)}
+                  </span>
+                  <span className="text-[10px] text-[var(--muted)] font-mono">
+                    (Quota: {limit}m{emergencyMinutes > 0 ? ` + ${emergencyMinutes}m buffer` : ''} • Used: {used}m)
+                  </span>
+                </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-5 gap-6">

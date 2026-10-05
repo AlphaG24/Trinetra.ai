@@ -71,10 +71,10 @@ export async function GET(request: NextRequest) {
       // 2. Generate on-the-fly if not found
       console.log(`[Invoice Download API] PDF not found in storage. Generating on the fly for: ${invoice.invoice_number}`)
       
-      const subtotalPaisa = invoice.subscription_amount || 0
-      const taxPaisa = invoice.tax_amount || 0
-      const finalTotalPaisa = invoice.total_amount || 0
-      const invoiceLines = invoice.line_items || []
+      const finalTotalPaisa = invoice.total_amount || invoice.grand_total_paisa || 0
+      const subtotalPaisa = invoice.subscription_amount || invoice.subtotal_paisa || Math.round(finalTotalPaisa / 1.18)
+      const taxPaisa = invoice.tax_amount || invoice.total_tax_paisa || (finalTotalPaisa - subtotalPaisa)
+      const invoiceLines = Array.isArray(invoice.line_items) ? invoice.line_items : []
 
       pdfBuffer = generateInvoicePdf({
         invoiceNumber: invoice.invoice_number,
@@ -87,20 +87,25 @@ export async function GET(request: NextRequest) {
         tax: (taxPaisa / 100).toFixed(2),
         total: (finalTotalPaisa / 100).toFixed(2),
         paymentMethod: invoice.payment_method || 'Razorpay',
-        transactionId: invoice.payment_id || 'N/A',
+        transactionId: invoice.payment_id || invoice.payment_reference_id || 'N/A',
         placeOfSupply: profile.state || 'IN',
         amountInWords: 'Rupees ' + (finalTotalPaisa / 100).toLocaleString('en-IN') + ' Only',
-        items: invoiceLines.map((line: any) => {
+        items: invoiceLines.length > 0 ? invoiceLines.map((line: any) => {
           const qty = line.quantity || 1
-          const rateVal = line.rate !== undefined ? line.rate : (line.amount || 0)
-          const amtVal = line.amount || 0
+          const amtVal = line.amount || line.amount_paisa || finalTotalPaisa
+          const rateVal = line.rate !== undefined ? line.rate : amtVal
           return {
             quantity: qty,
-            description: line.item || 'Service Activation',
+            description: line.item || line.description || 'Prepaid Wallet Recharge',
             rate: (rateVal / 100).toFixed(2),
             amount: (amtVal / 100).toFixed(2)
           }
-        })
+        }) : [{
+          quantity: 1,
+          description: 'Prepaid Wallet Top-Up',
+          rate: (finalTotalPaisa / 100).toFixed(2),
+          amount: (finalTotalPaisa / 100).toFixed(2)
+        }]
       })
 
       // Try uploading to cache for future requests
