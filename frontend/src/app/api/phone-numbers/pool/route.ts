@@ -21,18 +21,35 @@ export async function GET() {
 
     const adminClient = getAdminClient();
 
-    // Retrieve all available numbers from the pool
+    // Retrieve only genuine unallocated, active inventory numbers from the pool
+    // Master Plan Section 18.7: Exclude any numbers owned by tenants, in grace_period, or in hold_period
     const { data: availableNumbers, error } = await adminClient
       .from('phone_numbers')
       .select('*')
       .eq('is_assigned', false)
+      .eq('status', 'active')
+      .is('organization_id', null)
+      .is('assigned_org_id', null)
       .order('created_at', { ascending: false })
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    return NextResponse.json({ success: true, data: availableNumbers || [] })
+    // Filter out any numbers whose pack validity has expired without renewal
+    const now = new Date()
+    const validPoolNumbers = (availableNumbers || []).filter((num: any) => {
+      if (num.renewal_date && new Date(num.renewal_date) < now) return false;
+      if (num.provisioned_at) {
+        const provDate = new Date(num.provisioned_at);
+        const validityDays = num.validity_days || 30;
+        const expiryDate = new Date(provDate.getTime() + validityDays * 24 * 60 * 60 * 1000);
+        if (now > expiryDate) return false;
+      }
+      return true;
+    });
+
+    return NextResponse.json({ success: true, data: validPoolNumbers })
   } catch (error: any) {
     return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 })
   }

@@ -42,7 +42,13 @@ export default async function ToolOrAgentPage({ params }: PageProps) {
         agent_phone_numbers (
           is_primary,
           phone_numbers (
-            phone_number
+            id,
+            phone_number,
+            status,
+            organization_id,
+            renewal_date,
+            validity_days,
+            provisioned_at
           )
         )
       `)
@@ -58,7 +64,13 @@ export default async function ToolOrAgentPage({ params }: PageProps) {
         agent_phone_numbers (
           is_primary,
           phone_numbers (
-            phone_number
+            id,
+            phone_number,
+            status,
+            organization_id,
+            renewal_date,
+            validity_days,
+            provisioned_at
           )
         )
       `)

@@ -54,18 +54,32 @@ export function AgentDetailPageClient({
       .replace(/\s*-\s*Trial\s*$/i, ' (Trial)')
   }
 
+  const isAssignmentActive = (ap: any) => {
+    if (!ap?.phone_numbers) return false;
+    const num = ap.phone_numbers;
+    if (num.status !== 'active') return false;
+    const now = new Date();
+    if (num.renewal_date && new Date(num.renewal_date) < now) return false;
+    if (num.provisioned_at) {
+      const provDate = new Date(num.provisioned_at);
+      const validityDays = num.validity_days || 30;
+      const expiryDate = new Date(provDate.getTime() + validityDays * 24 * 60 * 60 * 1000);
+      if (now > expiryDate) return false;
+    }
+    return true;
+  };
+
   const getInitialAgentState = () => {
     if (!initialAgent) return null;
     const rawName = initialAgent.name || '';
     const displayName = cleanName(rawName);
-    const activeAssignments = (initialAgent.agent_phone_numbers || []).filter(
-      (ap: any) => !ap.phone_numbers?.status || ap.phone_numbers?.status === 'active'
-    );
+    const activeAssignments = (initialAgent.agent_phone_numbers || []).filter(isAssignmentActive);
     const primaryAssigned = activeAssignments.find((ap: any) => ap.is_primary) || activeAssignments[0];
     const assignedPhoneNumber = primaryAssigned?.phone_numbers?.phone_number || null;
     return {
       ...initialAgent,
       phone_number: assignedPhoneNumber,
+      telephony_provider: assignedPhoneNumber ? initialAgent.telephony_provider : 'simulated',
       agent_name: displayName,
       raw_name: rawName,
     };
@@ -256,16 +270,15 @@ export function AgentDetailPageClient({
         .replace(/\s*-\s*Demo\s*$/i, ' (Demo)')  // prettify " - Demo" suffix
         .replace(/\s*-\s*Trial\s*$/i, ' (Trial)') // prettify " - Trial" suffix
 
-      // Resolve phone number if assigned (only consider active status)
-      const activeAssignments = (agentData.agent_phone_numbers || []).filter(
-        (ap: any) => !ap.phone_numbers?.status || ap.phone_numbers?.status === 'active'
-      );
+      // Resolve phone number if assigned (only consider active, unexpired status)
+      const activeAssignments = (agentData.agent_phone_numbers || []).filter(isAssignmentActive);
       const primaryAssigned = activeAssignments.find((ap: any) => ap.is_primary) || activeAssignments[0];
       const assignedPhoneNumber = primaryAssigned?.phone_numbers?.phone_number || null;
 
       setAgent({
         ...agentData,
         phone_number: assignedPhoneNumber,
+        telephony_provider: assignedPhoneNumber ? agentData.telephony_provider : 'simulated',
         agent_name: displayName,     // clean display name
         raw_name: rawName,           // keep original for API/dedup use
       })
