@@ -712,7 +712,7 @@ export function AgentOverviewTab({
                         <span className="text-xs font-mono text-[var(--muted)]">
                           {agentUsage.used} / {agentUsage.limit === 0 ? '∞' : agentUsage.limit} mins
                           {availableEmergency > 0 ? (
-                            <span className="text-emerald-400 font-semibold ml-1">
+                            <span className="text-emerald-700 dark:text-emerald-400 font-bold ml-1">
                               (+{availableEmergency}m buffer)
                             </span>
                           ) : null}
@@ -730,14 +730,14 @@ export function AgentOverviewTab({
 
                       {/* 50-Min Emergency Minutes Subsystem (Section 18.9) */}
                       {availableEmergency > 0 ? (
-                        <div className="mt-3 p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/25 flex items-center justify-between text-xs">
+                        <div className="mt-3 p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-300 dark:border-emerald-500/25 flex items-center justify-between text-xs shadow-xs">
                           <div className="flex items-center gap-1.5">
-                            <Zap className="w-3.5 h-3.5 text-emerald-400" />
-                            <span className="text-emerald-400 font-bold text-[11px]">
+                            <Zap className="w-3.5 h-3.5 text-emerald-700 dark:text-emerald-400" />
+                            <span className="text-emerald-800 dark:text-emerald-300 font-bold text-[11px]">
                               50m Emergency Buffer Active
                             </span>
                           </div>
-                          <span className="text-[10px] text-emerald-400/80 font-mono font-semibold">
+                          <span className="text-[10px] text-emerald-700 dark:text-emerald-400 font-mono font-bold">
                             {availableEmergency} mins remaining
                           </span>
                         </div>

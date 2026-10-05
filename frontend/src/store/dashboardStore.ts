@@ -15,6 +15,7 @@ export interface UserProfile {
   demo_minutes_limit?: number
   paid_minutes_used?: number
   paid_minutes_limit?: number
+  organization_id?: string | null
 }
 
 export interface Agent {
