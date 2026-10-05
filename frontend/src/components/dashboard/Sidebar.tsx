@@ -28,11 +28,11 @@ const topNavItems = [
   { label: 'Phone Numbers', href: '/dashboard/phone-numbers', icon: Phone },
   { label: 'Analytics', href: '/dashboard/analytics', icon: BarChart3 },
   { label: 'Billing', href: '/dashboard/billing', icon: CreditCard },
+  { label: 'KYC Vault', href: '/dashboard/kyc', icon: ShieldCheck },
 ]
 
 const bottomNavItems = [
   { label: 'Custom Agent', href: '/dashboard/deploy', icon: Pencil },
-  { label: 'KYC Vault', href: '/dashboard/kyc', icon: ShieldCheck },
   { label: 'Settings', href: '/dashboard/settings', icon: Settings },
   { label: 'Support', href: '/dashboard/support', icon: HelpCircle },
 ]
