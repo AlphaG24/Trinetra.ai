@@ -116,3 +116,5 @@ export function SettingsClient({ initialTab = 'profile' }: SettingsClientProps) 
     </div>
   )
 }
+
+export default SettingsClient
