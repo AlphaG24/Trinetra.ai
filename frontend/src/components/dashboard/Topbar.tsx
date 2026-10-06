@@ -94,6 +94,20 @@ export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
 
           const fetchNotifs = async () => {
             try {
+              const res = await fetch('/api/notifications')
+              if (res.ok) {
+                const data = await res.json()
+                const list = data.notifications || []
+                const count = data.unreadCount ?? list.filter((n: any) => !n.is_read).length
+                setNotifications(list.slice(0, 5))
+                setUnreadCount(count)
+                return
+              }
+            } catch {
+              // Fallback to client Supabase below
+            }
+
+            try {
               const { count } = await supabase
                 .from('notifications')
                 .select('*', { count: 'exact', head: true })
@@ -108,26 +122,7 @@ export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
                 .order('created_at', { ascending: false })
                 .limit(10)
               
-              if (notifs && notifs.length === 0) {
-                // Auto-seed welcome alert for new/empty user inbox
-                try {
-                  const welcomeNotif = {
-                    user_id: currentUser.id,
-                    title: '👋 Welcome to Trinetra AI',
-                    message: 'Your workspace is ready. Configure your voice agent or upload statutory KYC documents in Settings to activate live telephony.',
-                    type: 'welcome',
-                    action_url: '/dashboard/settings',
-                    action_text: 'Open Settings',
-                    is_read: false,
-                    created_at: new Date().toISOString()
-                  }
-                  await supabase.from('notifications').insert(welcomeNotif)
-                  setNotifications([welcomeNotif as any])
-                  setUnreadCount(1)
-                } catch {
-                  setNotifications([])
-                }
-              } else if (notifs) {
+              if (notifs) {
                 setNotifications(notifs.slice(0, 5))
               }
             } catch (err) {

@@ -75,6 +75,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const fetchProfile = useCallback(async (userId: string) => {
     try {
+      const res = await fetch('/api/profiles')
+      if (res.ok) {
+        const { profile: data } = await res.json()
+        if (data) {
+          setProfile(data)
+          setRole(data.role || null)
+          try {
+            sessionStorage.setItem(CACHE_KEY, JSON.stringify({ profile: data }))
+            if (data.role) {
+              sessionStorage.setItem('trinetra_user_role', data.role)
+            }
+          } catch {}
+          return
+        }
+      }
+    } catch {
+      // Fallback to client Supabase below
+    }
+
+    try {
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
