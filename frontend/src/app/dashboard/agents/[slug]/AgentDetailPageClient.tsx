@@ -39,11 +39,13 @@ interface CallLog {
 export function AgentDetailPageClient({ 
   agentId,
   initialAgent,
-  initialProfile
+  initialProfile,
+  initialCallLogs
 }: { 
   agentId: string
   initialAgent?: any
   initialProfile?: any
+  initialCallLogs?: CallLog[]
 }) {
   const router = useRouter()
   
@@ -56,7 +58,8 @@ export function AgentDetailPageClient({
 
   const isAssignmentActive = (ap: any) => {
     if (!ap?.phone_numbers) return false;
-    const num = ap.phone_numbers;
+    const num = Array.isArray(ap.phone_numbers) ? ap.phone_numbers[0] : ap.phone_numbers;
+    if (!num) return false;
     if (num.status !== 'active') return false;
     const now = new Date();
     if (num.renewal_date && new Date(num.renewal_date) < now) return false;
@@ -69,17 +72,50 @@ export function AgentDetailPageClient({
     return true;
   };
 
+  const getGracePeriodInfo = (assignments: any[]) => {
+    const graceAssignment = (assignments || []).find((ap: any) => {
+      const num = Array.isArray(ap?.phone_numbers) ? ap.phone_numbers[0] : ap?.phone_numbers;
+      if (!num) return false;
+      if (num.status === 'grace_period' || num.status === 'hold_period') return true;
+      const now = new Date();
+      if (num.renewal_date && new Date(num.renewal_date) < now) return true;
+      if (num.provisioned_at) {
+        const provDate = new Date(num.provisioned_at);
+        const validityDays = num.validity_days || 30;
+        const expiryDate = new Date(provDate.getTime() + validityDays * 24 * 60 * 60 * 1000);
+        if (now > expiryDate) return true;
+      }
+      return false;
+    });
+    if (!graceAssignment) return { lifecycleStatus: null, graceNumber: null };
+    const graceNumObj = Array.isArray(graceAssignment.phone_numbers) ? graceAssignment.phone_numbers[0] : graceAssignment.phone_numbers;
+    return {
+      lifecycleStatus: graceNumObj?.status === 'hold_period' ? 'hold_period' : 'grace_period',
+      graceNumber: graceNumObj?.phone_number || null,
+    };
+  };
+
   const getInitialAgentState = () => {
     if (!initialAgent) return null;
     const rawName = initialAgent.name || '';
     const displayName = cleanName(rawName);
-    const activeAssignments = (initialAgent.agent_phone_numbers || []).filter(isAssignmentActive);
+    const rawAssignments = initialAgent.agent_phone_numbers || [];
+    const activeAssignments = rawAssignments.filter(isAssignmentActive);
+    const { lifecycleStatus, graceNumber } = getGracePeriodInfo(rawAssignments);
     const primaryAssigned = activeAssignments.find((ap: any) => ap.is_primary) || activeAssignments[0];
-    const assignedPhoneNumber = primaryAssigned?.phone_numbers?.phone_number || null;
+    const rawNum = primaryAssigned?.phone_numbers;
+    const assignedPhoneFromJoin = (Array.isArray(rawNum) ? rawNum[0]?.phone_number : rawNum?.phone_number) || null;
+    const assignedPhoneNumber = assignedPhoneFromJoin;
+    const telephonyProvider = assignedPhoneNumber
+      ? (initialAgent.telephony_provider && initialAgent.telephony_provider !== 'simulated' ? initialAgent.telephony_provider : 'twilio')
+      : 'simulated';
+
     return {
       ...initialAgent,
       phone_number: assignedPhoneNumber,
-      telephony_provider: assignedPhoneNumber ? initialAgent.telephony_provider : 'simulated',
+      telephony_provider: telephonyProvider,
+      lifecycle_status: lifecycleStatus,
+      grace_number: graceNumber,
       agent_name: displayName,
       raw_name: rawName,
     };
@@ -88,7 +124,7 @@ export function AgentDetailPageClient({
   const [loading, setLoading] = useState(!initialAgent)
   const [agent, setAgent] = useState<any>(getInitialAgentState())
   const [profile, setProfile] = useState<any>(initialProfile || null)
-  const [callLogs, setCallLogs] = useState<CallLog[]>([])
+  const [callLogs, setCallLogs] = useState<CallLog[]>(initialCallLogs || [])
   const [sysConfig, setSysConfig] = useState<Record<string, string>>({})
   
   const [activeTab, setActiveTab] = useState('overview')
@@ -238,13 +274,14 @@ export function AgentDetailPageClient({
           agent_phone_numbers (
             is_primary,
             phone_numbers (
+              id,
               phone_number,
-              status
+              status,
+              renewal_date
             )
           )
         `)
         .or(`id.eq.${agentId},vapi_agent_id.eq.${agentId}`)
-        .eq('user_id', user.id)
         .maybeSingle()
 
       if (agentErr) throw agentErr
@@ -271,14 +308,23 @@ export function AgentDetailPageClient({
         .replace(/\s*-\s*Trial\s*$/i, ' (Trial)') // prettify " - Trial" suffix
 
       // Resolve phone number if assigned (only consider active, unexpired status)
-      const activeAssignments = (agentData.agent_phone_numbers || []).filter(isAssignmentActive);
+      const rawAssignments = agentData.agent_phone_numbers || [];
+      const activeAssignments = rawAssignments.filter(isAssignmentActive);
+      const { lifecycleStatus, graceNumber } = getGracePeriodInfo(rawAssignments);
       const primaryAssigned = activeAssignments.find((ap: any) => ap.is_primary) || activeAssignments[0];
-      const assignedPhoneNumber = primaryAssigned?.phone_numbers?.phone_number || null;
+      const rawNum = primaryAssigned?.phone_numbers;
+      const assignedPhoneFromJoin = (Array.isArray(rawNum) ? rawNum[0]?.phone_number : rawNum?.phone_number) || null;
+      const assignedPhoneNumber = assignedPhoneFromJoin;
+      const telephonyProvider = assignedPhoneNumber
+        ? (agentData.telephony_provider && agentData.telephony_provider !== 'simulated' ? agentData.telephony_provider : 'twilio')
+        : 'simulated';
 
       setAgent({
         ...agentData,
         phone_number: assignedPhoneNumber,
-        telephony_provider: assignedPhoneNumber ? agentData.telephony_provider : 'simulated',
+        telephony_provider: telephonyProvider,
+        lifecycle_status: lifecycleStatus,
+        grace_number: graceNumber,
         agent_name: displayName,     // clean display name
         raw_name: rawName,           // keep original for API/dedup use
       })
@@ -288,8 +334,8 @@ export function AgentDetailPageClient({
         .from('voice_calls')
         .select('id, duration_seconds, sentiment, transcript, recording_url, created_at')
         .eq('agent_id', agentData.id)
-        .eq('user_id', user.id)
         .order('created_at', { ascending: false })
+        .limit(30)
 
       if (logsErr) throw logsErr
       setCallLogs(logsData || [])
@@ -341,15 +387,15 @@ export function AgentDetailPageClient({
     loadConfig()
   }, [])
 
-  // Background polling heartbeat — silently refreshes every 30 seconds to conserve Supabase Disk IO
-  // Stops automatically when sessionExpired ref is set to true
+  // Background polling heartbeat — silently refreshes every 60 seconds to conserve Supabase Disk IO
+  // Suspended automatically when tab is hidden or session is expired
   useEffect(() => {
     if (!agentId) return
     const intervalId = setInterval(() => {
-      if (!sessionExpired.current) {
+      if (!sessionExpired.current && typeof document !== 'undefined' && document.visibilityState === 'visible') {
         fetchAgentData(true)
       }
-    }, 30000)
+    }, 60000)
     return () => clearInterval(intervalId)
   }, [agentId, fetchAgentData])
 

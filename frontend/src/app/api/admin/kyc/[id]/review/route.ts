@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/server'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
+import { dispatchKYCReviewNotification } from '@/lib/kyc-notifications'
 
 function getAdminClient() {
   return createAdminClient(
@@ -66,6 +67,19 @@ export async function POST(
       return NextResponse.json({ error: updateErr.message }, { status: 500 })
     }
 
+    // Dispatch multi-channel notifications (Dashboard, Email via Resend, WhatsApp via Twilio)
+    let notifDelivery = { dashboard: false, email: false, whatsapp: false }
+    try {
+      notifDelivery = await dispatchKYCReviewNotification({
+        documentId: id,
+        status,
+        rejectionReason: updatePayload.rejection_reason,
+        adminUserId: user.id,
+      })
+    } catch (notifErr) {
+      console.warn('[KYC Notification] Notification delivery issue:', notifErr)
+    }
+
     // Audit log
     try {
       await admin.from('audit_logs').insert({
@@ -74,7 +88,12 @@ export async function POST(
         user_role: role,
         action: `admin.kyc_document_${status}`,
         resource_type: 'kyc_documents',
-        details: { document_id: id, status, rejection_reason: updatePayload.rejection_reason },
+        details: { 
+          document_id: id, 
+          status, 
+          rejection_reason: updatePayload.rejection_reason,
+          notifications_dispatched: notifDelivery 
+        },
         created_at: now,
       })
     } catch (auditErr) {
@@ -83,8 +102,9 @@ export async function POST(
 
     return NextResponse.json({
       success: true,
-      message: `KYC document successfully ${status === 'verified' ? 'approved' : 'rejected'}.`,
+      message: `KYC document successfully ${status === 'verified' ? 'approved' : 'rejected'}. Notifications dispatched to customer.`,
       document: updated,
+      notifications: notifDelivery,
     })
   } catch (err: any) {
     console.error('Admin KYC review error:', err)

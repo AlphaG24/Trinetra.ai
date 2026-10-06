@@ -46,7 +46,7 @@ export async function GET() {
       // Build Queries
       let callsQuery = supabase
         .from('voice_calls')
-        .select('id', { count: 'exact', head: true })
+        .select('id', { count: 'estimated', head: true })
         .gte('created_at', startOfMonth.toISOString())
         
       if (orgId) {
@@ -59,7 +59,7 @@ export async function GET() {
       if (orgId || agentIds.length > 0) {
         interactionsQuery = supabase
           .from('interactions')
-          .select('id', { count: 'exact', head: true })
+          .select('id', { count: 'estimated', head: true })
           .gte('created_at', startOfMonth.toISOString())
           
         if (orgId) {
@@ -71,7 +71,7 @@ export async function GET() {
 
       let activeToolsQuery = supabase
         .from('agents')
-        .select('id', { count: 'exact', head: true })
+        .select('id', { count: 'estimated', head: true })
         .in('status', ['live', 'active'])
         
       if (orgId) {
@@ -82,12 +82,12 @@ export async function GET() {
 
       const totalLeadsQuery = supabase
         .from('leads')
-        .select('id', { count: 'exact', head: true })
+        .select('id', { count: 'estimated', head: true })
         .eq('user_id', user.id)
         
       const convertedLeadsQuery = supabase
         .from('leads')
-        .select('id', { count: 'exact', head: true })
+        .select('id', { count: 'estimated', head: true })
         .eq('user_id', user.id)
         .or('status.in.(converted,won,qualified),stage.in.(converted,won,qualified)')
 
@@ -165,7 +165,7 @@ export async function GET() {
       }))
 
       return { stats, activity, tools }
-    }, 30) // 30s TTL
+    }, 60) // 60s TTL
 
     return NextResponse.json(result)
   } catch (err: any) {

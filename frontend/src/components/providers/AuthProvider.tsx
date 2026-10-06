@@ -85,7 +85,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setProfile(data)
         setRole(data.role || null)
         try {
-          sessionStorage.setItem(CACHE_KEY, JSON.stringify({ user, profile: data }))
+          sessionStorage.setItem(CACHE_KEY, JSON.stringify({ profile: data }))
           if (data.role) {
             sessionStorage.setItem('trinetra_user_role', data.role)
           }
@@ -94,7 +94,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (err) {
       console.warn('[AuthProvider] Profile fetch error:', err)
     }
-  }, [supabase, user])
+  }, [supabase])
 
   const loadUser = useCallback(async () => {
     try {
@@ -120,13 +120,43 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [supabase, fetchProfile])
 
   useEffect(() => {
-    loadUser()
+    let isMounted = true
+
+    const init = async () => {
+      try {
+        const { data: { user: currentUser }, error } = await supabase.auth.getUser()
+        if (!isMounted) return
+
+        if (error || !currentUser) {
+          setUser(null)
+          setProfile(null)
+          setRole(null)
+          try {
+            sessionStorage.removeItem(CACHE_KEY)
+            sessionStorage.removeItem('trinetra_user_role')
+          } catch {}
+          return
+        }
+
+        setUser(currentUser)
+        await fetchProfile(currentUser.id)
+      } catch (err) {
+        console.warn('[AuthProvider] Init user error:', err)
+      } finally {
+        if (isMounted) setIsLoading(false)
+      }
+    }
+
+    init()
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event: any, session: any) => {
-        if (event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
+        if (!isMounted) return
+
+        if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
           if (session?.user) {
             setUser(session.user)
+            await fetchProfile(session.user.id)
           }
         }
         if (event === 'SIGNED_OUT') {
@@ -143,8 +173,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     )
 
-    return () => subscription.unsubscribe()
-  }, [supabase, loadUser, router])
+    return () => {
+      isMounted = false
+      subscription.unsubscribe()
+    }
+  }, [supabase, fetchProfile, router])
 
   const refreshProfile = useCallback(async () => {
     if (user?.id) {

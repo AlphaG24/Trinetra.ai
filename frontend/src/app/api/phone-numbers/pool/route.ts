@@ -36,20 +36,8 @@ export async function GET() {
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    // Filter out any numbers whose pack validity has expired without renewal
-    const now = new Date()
-    const validPoolNumbers = (availableNumbers || []).filter((num: any) => {
-      if (num.renewal_date && new Date(num.renewal_date) < now) return false;
-      if (num.provisioned_at) {
-        const provDate = new Date(num.provisioned_at);
-        const validityDays = num.validity_days || 30;
-        const expiryDate = new Date(provDate.getTime() + validityDays * 24 * 60 * 60 * 1000);
-        if (now > expiryDate) return false;
-      }
-      return true;
-    });
-
-    return NextResponse.json({ success: true, data: validPoolNumbers })
+    // Unallocated inventory numbers in the platform pool are available for assignment
+    return NextResponse.json({ success: true, data: availableNumbers || [] })
   } catch (error: any) {
     return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 })
   }

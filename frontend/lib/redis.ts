@@ -30,30 +30,48 @@ export const redis: Redis | null =
  * @param fetcher      Async function that returns fresh data from Supabase
  * @param ttlSeconds   Time-to-live in seconds (default 60)
  */
+// In-memory L1 cache to eliminate network hops on hot requests
+const l1Cache = new Map<string, { value: any; expiresAt: number }>()
+
 export async function cached<T>(
   key: string,
   fetcher: () => Promise<T>,
   ttlSeconds: number = 60
 ): Promise<T> {
-  if (!redis) return fetcher()
+  const now = Date.now()
 
-  try {
-    const hit = await redis.get<T>(key)
-    if (hit !== null && hit !== undefined) {
-      return hit
-    }
-  } catch (err) {
-    // Redis read failure — fall through to fetcher
-    console.warn(`[Redis] Cache read error for "${key}":`, err)
+  // 1. Check L1 in-memory cache
+  const l1Hit = l1Cache.get(key)
+  if (l1Hit && l1Hit.expiresAt > now) {
+    return l1Hit.value as T
   }
 
+  // 2. Check L2 Upstash Redis if configured
+  if (redis) {
+    try {
+      const hit = await redis.get<T>(key)
+      if (hit !== null && hit !== undefined) {
+        l1Cache.set(key, { value: hit, expiresAt: now + ttlSeconds * 1000 })
+        return hit
+      }
+    } catch (err) {
+      console.warn(`[Redis] Cache read error for "${key}":`, err)
+    }
+  }
+
+  // 3. Fallback to Supabase database fetcher
   const fresh = await fetcher()
 
-  try {
-    await redis.set(key, JSON.stringify(fresh), { ex: ttlSeconds })
-  } catch (err) {
-    // Non-fatal: data still returned fresh from Supabase
-    console.warn(`[Redis] Cache write error for "${key}":`, err)
+  // Store in L1
+  l1Cache.set(key, { value: fresh, expiresAt: now + ttlSeconds * 1000 })
+
+  // Store in L2
+  if (redis) {
+    try {
+      await redis.set(key, typeof fresh === 'string' ? fresh : JSON.stringify(fresh), { ex: ttlSeconds })
+    } catch (err) {
+      console.warn(`[Redis] Cache write error for "${key}":`, err)
+    }
   }
 
   return fresh

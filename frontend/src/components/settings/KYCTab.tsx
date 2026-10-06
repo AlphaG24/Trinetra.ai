@@ -299,9 +299,14 @@ export function KYCTab() {
                     <p className="text-[10px] text-zinc-400">
                       Submitted on {new Date(doc.created_at).toLocaleDateString('en-IN', { year: 'numeric', month: 'short', day: 'numeric' })}
                     </p>
-                    {doc.rejection_reason && (
+                    {doc.rejection_reason && doc.status === 'rejected' && (
                       <p className="text-[11px] text-rose-400 font-medium">
                         Reason: {doc.rejection_reason}
+                      </p>
+                    )}
+                    {doc.rejection_reason && doc.status === 'pending_review' && doc.rejection_reason.includes('[OCR') && (
+                      <p className="text-[11px] text-emerald-400 font-medium">
+                        {doc.rejection_reason}
                       </p>
                     )}
                   </div>

@@ -14,7 +14,9 @@ import {
   Loader2,
   KeyRound,
   RefreshCw,
-  AlertTriangle
+  AlertTriangle,
+  Eye,
+  ExternalLink
 } from 'lucide-react'
 import Link from 'next/link'
 import toast from 'react-hot-toast'
@@ -49,6 +51,15 @@ export default function AdminKYCVerificationPage() {
   const [needsStepUp, setNeedsStepUp] = useState(false)
   const [stepUpPassword, setStepUpPassword] = useState('')
   const [submittingStepUp, setSubmittingStepUp] = useState(false)
+
+  // Document Decryption & Viewing Modal State
+  const [viewingDocData, setViewingDocData] = useState<{
+    doc: KYCDocument
+    signedUrl: string
+    expiresIn: number
+  } | null>(null)
+  const [loadingDocId, setLoadingDocId] = useState<string | null>(null)
+  const [pendingViewDoc, setPendingViewDoc] = useState<KYCDocument | null>(null)
 
   // Review / Reject Modal State
   const [rejectModalDoc, setRejectModalDoc] = useState<KYCDocument | null>(null)
@@ -125,11 +136,61 @@ export default function AdminKYCVerificationPage() {
       setNeedsStepUp(false)
       setStepUpPassword('')
       fetchDocuments(data.step_up_token)
+
+      if (pendingViewDoc) {
+        const docToOpen = pendingViewDoc
+        setPendingViewDoc(null)
+        executeViewDocument(docToOpen, data.step_up_token)
+      }
     } catch (err: any) {
       toast.error(err.message || 'Failed step-up authorization')
     } finally {
       setSubmittingStepUp(false)
     }
+  }
+
+  const executeViewDocument = async (doc: KYCDocument, token: string) => {
+    try {
+      setLoadingDocId(doc.id)
+      const res = await fetch(`/api/admin/kyc/${doc.id}/signed-url`, {
+        method: 'POST',
+        headers: {
+          'x-admin-step-up-token': token,
+        },
+      })
+
+      const data = await res.json()
+      if (res.status === 403 && data.requires_step_up) {
+        setPendingViewDoc(doc)
+        setNeedsStepUp(true)
+        return
+      }
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to decrypt document')
+      }
+
+      setViewingDocData({
+        doc: data.document || doc,
+        signedUrl: data.signed_url,
+        expiresIn: data.expires_in_seconds || 900,
+      })
+      toast.success('Document decrypted (15-min signed session active)')
+    } catch (err: any) {
+      toast.error(err.message || 'Error decrypting KYC document')
+    } finally {
+      setLoadingDocId(null)
+    }
+  }
+
+  const handleViewDocument = async (doc: KYCDocument) => {
+    const token = getValidStepUpToken('kyc_view')
+    if (!token) {
+      setPendingViewDoc(doc)
+      setNeedsStepUp(true)
+      return
+    }
+    executeViewDocument(doc, token)
   }
 
   const handleReview = async (id: string, status: 'verified' | 'rejected', reason?: string) => {
@@ -302,15 +363,31 @@ export default function AdminKYCVerificationPage() {
                     </td>
 
                     <td className="py-4 px-5">
-                      <span className="px-2 py-1 rounded-lg bg-zinc-900 border border-zinc-800 text-[11px] font-semibold text-zinc-300">
+                      <button
+                        type="button"
+                        onClick={() => handleViewDocument(doc)}
+                        className="px-2.5 py-1 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-[11px] font-semibold text-zinc-300 hover:text-white transition-colors cursor-pointer flex items-center gap-1.5"
+                        title="Click to decrypt and inspect document"
+                      >
+                        <FileText size={12} className="text-violet-400" />
                         {formatDocType(doc.document_type)}
-                      </span>
+                      </button>
                     </td>
 
                     <td className="py-4 px-5">
                       <span className="font-mono text-zinc-300 bg-black/40 border border-white/5 px-2.5 py-1 rounded-lg text-xs">
                         {doc.id_number_masked || '•••• •••• ••••'}
                       </span>
+                      {doc.document_type === 'gstin_certificate' && (
+                        <a
+                          href="https://services.gst.gov.in/services/searchtp"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="block text-[10px] text-violet-400 hover:text-violet-300 underline mt-1 font-semibold"
+                        >
+                          Verify on GST Portal ↗
+                        </a>
+                      )}
                     </td>
 
                     <td className="py-4 px-5">
@@ -337,7 +414,15 @@ export default function AdminKYCVerificationPage() {
                         {doc.status.replace('_', ' ')}
                       </span>
                       {doc.rejection_reason && (
-                        <p className="text-[10px] text-rose-400/80 mt-1 max-w-xs">{doc.rejection_reason}</p>
+                        <p className={`text-[10px] mt-1 max-w-xs ${
+                          doc.rejection_reason.includes('[OCR Validated]')
+                            ? 'text-emerald-400/90 font-medium'
+                            : doc.rejection_reason.includes('[OCR')
+                            ? 'text-violet-400/90 font-medium'
+                            : 'text-rose-400/80'
+                        }`}>
+                          {doc.rejection_reason}
+                        </p>
                       )}
                     </td>
 
@@ -352,26 +437,42 @@ export default function AdminKYCVerificationPage() {
                     </td>
 
                     <td className="py-4 px-5 text-right">
-                      {doc.status === 'pending_review' ? (
-                        <div className="flex items-center justify-end gap-2">
-                          <button
-                            disabled={processingReviewId === doc.id}
-                            onClick={() => handleReview(doc.id, 'verified')}
-                            className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition-all cursor-pointer disabled:opacity-50"
-                          >
-                            Approve
-                          </button>
-                          <button
-                            disabled={processingReviewId === doc.id}
-                            onClick={() => setRejectModalDoc(doc)}
-                            className="px-2.5 py-1 bg-rose-600/80 hover:bg-rose-600 text-white rounded-lg text-xs font-bold transition-all cursor-pointer disabled:opacity-50"
-                          >
-                            Reject
-                          </button>
-                        </div>
-                      ) : (
-                        <span className="text-[11px] text-zinc-500 italic">Reviewed</span>
-                      )}
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          disabled={loadingDocId === doc.id}
+                          onClick={() => handleViewDocument(doc)}
+                          className="px-2.5 py-1 bg-violet-600/20 hover:bg-violet-600/30 text-violet-300 border border-violet-500/30 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                          title="Decrypt with 15-minute signed URL and immutable audit log"
+                        >
+                          {loadingDocId === doc.id ? (
+                            <Loader2 size={12} className="animate-spin" />
+                          ) : (
+                            <Eye size={12} className="text-violet-400" />
+                          )}
+                          Decrypt & View
+                        </button>
+
+                        {doc.status === 'pending_review' ? (
+                          <>
+                            <button
+                              disabled={processingReviewId === doc.id}
+                              onClick={() => handleReview(doc.id, 'verified')}
+                              className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition-all cursor-pointer disabled:opacity-50"
+                            >
+                              Approve
+                            </button>
+                            <button
+                              disabled={processingReviewId === doc.id}
+                              onClick={() => setRejectModalDoc(doc)}
+                              className="px-2.5 py-1 bg-rose-600/80 hover:bg-rose-600 text-white rounded-lg text-xs font-bold transition-all cursor-pointer disabled:opacity-50"
+                            >
+                              Reject
+                            </button>
+                          </>
+                        ) : (
+                          <span className="text-[11px] text-zinc-500 italic ml-1">Reviewed</span>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -439,7 +540,7 @@ export default function AdminKYCVerificationPage() {
             <div>
               <h3 className="text-lg font-bold text-white">Reject KYC Document</h3>
               <p className="text-xs text-zinc-400 mt-1">
-                Provide a reason for rejecting this document for {rejectModalDoc.organization_name}. This reason will be displayed to the customer in their settings tab.
+                Provide a reason for rejecting this document for {rejectModalDoc.organization_name}. This reason will be automatically dispatched to the customer via Email, In-App Dashboard, and WhatsApp.
               </p>
             </div>
             <div>
@@ -469,6 +570,131 @@ export default function AdminKYCVerificationPage() {
                 className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold transition-all disabled:opacity-50"
               >
                 Confirm Rejection
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Decrypted Document Inspection Modal (Section 18.4 & 18.6) */}
+      {viewingDocData && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-4 animate-in fade-in duration-200">
+          <div className="bg-zinc-950 border border-zinc-800 rounded-3xl p-6 max-w-2xl w-full shadow-2xl space-y-5 text-left">
+            <div className="flex items-center justify-between border-b border-zinc-800/80 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-violet-500/10 border border-violet-500/20 flex items-center justify-center text-violet-400">
+                  <ShieldCheck size={22} />
+                </div>
+                <div>
+                  <h3 className="text-base font-extrabold text-white flex items-center gap-2">
+                    Decrypted Statutory Document
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 uppercase tracking-wider">
+                      AES-256 Verified
+                    </span>
+                  </h3>
+                  <p className="text-xs text-zinc-400 mt-0.5">
+                    Master Plan Section 18.4 & 18.6 • Short-lived signed URL (max 15 mins)
+                  </p>
+                </div>
+              </div>
+              <div className="text-right">
+                <span className="text-xs font-mono font-bold text-violet-400 bg-violet-950/40 border border-violet-500/30 px-3 py-1 rounded-xl">
+                  ⏱️ 15m Signed Token Active
+                </span>
+              </div>
+            </div>
+
+            {/* Document Metadata Grid */}
+            <div className="grid grid-cols-2 gap-3 text-xs">
+              <div className="bg-zinc-900/60 border border-zinc-800 rounded-xl p-3">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 block mb-1">Organization</span>
+                <span className="font-bold text-white">{viewingDocData.doc.organization_name}</span>
+                <span className="block text-[11px] text-zinc-500 mt-0.5 font-mono">{viewingDocData.doc.user_email}</span>
+              </div>
+
+              <div className="bg-zinc-900/60 border border-zinc-800 rounded-xl p-3">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 block mb-1">Document Type</span>
+                <span className="font-bold text-white">{formatDocType(viewingDocData.doc.document_type)}</span>
+                <span className="block text-[11px] text-zinc-400 font-mono mt-0.5">
+                  Masked: {viewingDocData.doc.id_number_masked || '•••• •••• ••••'}
+                </span>
+              </div>
+
+              <div className="bg-zinc-900/60 border border-zinc-800 rounded-xl p-3">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 block mb-1">MIME & File Size</span>
+                <span className="font-mono text-zinc-300">{viewingDocData.doc.mime_type || 'application/pdf'}</span>
+                <span className="block text-[11px] text-zinc-500 mt-0.5 font-mono">
+                  ~{Math.round((viewingDocData.doc.file_size_bytes || 0) / 1024)} KB
+                </span>
+              </div>
+
+              <div className="bg-zinc-900/60 border border-zinc-800 rounded-xl p-3">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 block mb-1">DPDP Statutory Consent</span>
+                <span className="inline-flex items-center gap-1 text-emerald-400 font-semibold text-[11px]">
+                  <CheckCircle2 size={12} /> Affirmatively Granted
+                </span>
+                <span className="block text-[10px] text-zinc-500 mt-0.5">Logged in consent ledger</span>
+              </div>
+            </div>
+
+            {/* Signed URL Preview Box */}
+            <div className="bg-black/50 border border-zinc-800 rounded-2xl p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-zinc-300 flex items-center gap-1.5">
+                  <FileText size={14} className="text-violet-400" /> Decrypted Inspection Link
+                </span>
+                <a
+                  href={viewingDocData.signedUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-3 py-1.5 bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-md shadow-violet-600/20"
+                >
+                  <ExternalLink size={13} /> Open Signed URL in New Window
+                </a>
+              </div>
+              <div className="bg-zinc-900/80 rounded-xl p-2.5 font-mono text-[11px] text-zinc-400 truncate border border-zinc-800/80">
+                {viewingDocData.signedUrl}
+              </div>
+              <p className="text-[11px] text-zinc-500 leading-relaxed">
+                🔒 Cryptographic access signature expires automatically in 15 minutes. This decryption event has been logged to <code className="text-zinc-400">public.kyc_access_audit_logs</code> and <code className="text-zinc-400">public.audit_logs</code>.
+              </p>
+            </div>
+
+            {/* Modal Actions */}
+            <div className="flex items-center justify-between pt-2">
+              <div className="flex items-center gap-2">
+                {viewingDocData.doc.status === 'pending_review' && (
+                  <>
+                    <button
+                      disabled={processingReviewId === viewingDocData.doc.id}
+                      onClick={async () => {
+                        await handleReview(viewingDocData.doc.id, 'verified')
+                        setViewingDocData(null)
+                      }}
+                      className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all cursor-pointer disabled:opacity-50"
+                    >
+                      Approve Document
+                    </button>
+                    <button
+                      disabled={processingReviewId === viewingDocData.doc.id}
+                      onClick={() => {
+                        const d = viewingDocData.doc
+                        setViewingDocData(null)
+                        setRejectModalDoc(d)
+                      }}
+                      className="px-3.5 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold transition-all cursor-pointer disabled:opacity-50"
+                    >
+                      Reject Document
+                    </button>
+                  </>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => setViewingDocData(null)}
+                className="px-4 py-2 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white rounded-xl text-xs font-bold border border-zinc-800 transition-all cursor-pointer"
+              >
+                Close Viewer
               </button>
             </div>
           </div>

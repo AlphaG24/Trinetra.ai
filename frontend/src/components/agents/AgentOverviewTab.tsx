@@ -665,18 +665,20 @@ export function AgentOverviewTab({
               <AgentCallingStatus 
                 phoneNumber={agent.phone_number} 
                 providerType={agent.telephony_provider} 
+                lifecycleStatus={agent.lifecycle_status}
+                graceNumber={agent.grace_number}
               />
               
               <div className="pt-3 border-t border-[var(--border)] space-y-2">
                 <h4 className="text-[10px] uppercase tracking-wider font-montserrat font-bold text-[var(--muted)]">Requirements for Real Calls:</h4>
                 <ul className="text-xs text-[var(--body)] space-y-2 font-sans">
-                  <li className="flex items-center gap-2">
+                  <li className="flex items-center gap-2" suppressHydrationWarning>
                     <span className={`w-1.5 h-1.5 rounded-full ${agent.phone_number ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`} />
                     <span className={agent.phone_number ? 'text-[var(--heading)]' : 'text-[var(--muted)]'}>
                       Virtual Number Assigned {agent.phone_number ? '✅' : '❌'}
                     </span>
                   </li>
-                  <li className="flex items-center gap-2">
+                  <li className="flex items-center gap-2" suppressHydrationWarning>
                     <span className={`w-1.5 h-1.5 rounded-full ${agent.telephony_provider && agent.telephony_provider !== 'simulated' && agent.telephony_provider !== 'sandbox' ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`} />
                     <span className={agent.telephony_provider && agent.telephony_provider !== 'simulated' && agent.telephony_provider !== 'sandbox' ? 'text-[var(--heading)]' : 'text-[var(--muted)]'}>
                       Telephony Provider Active {agent.telephony_provider && agent.telephony_provider !== 'simulated' && agent.telephony_provider !== 'sandbox' ? '✅' : '❌'}

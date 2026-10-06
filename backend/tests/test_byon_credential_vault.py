@@ -247,7 +247,7 @@ class TestBYONVaultService:
         res = vault_service.store_carrier_credential(
             organization_id=org_id,
             carrier="twilio",
-            account_sid="AC1234567890abcdef1234567890abcdef",
+            account_sid="ACTEST_SYNTHETIC_00000000000000000000",
             auth_token="auth_tok_secret_998877665544332211",
             webhook_url="https://api.trinetra.ai/webhooks/voice/twilio",
         )
@@ -264,7 +264,7 @@ class TestBYONVaultService:
         assert len(db_rows) == 1
         stored = db_rows[0]
         assert stored["carrier"] == "twilio"
-        assert stored["account_sid"] == "AC1234567890abcdef1234567890abcdef"
+        assert stored["account_sid"] == "ACTEST_SYNTHETIC_00000000000000000000"
         assert "auth_tok_secret" not in stored["encrypted_auth_token"]
         assert stored["status"] == "active"
 

@@ -84,11 +84,24 @@ export default async function ToolOrAgentPage({ params }: PageProps) {
     return notFound()
   }
 
+  // Pre-fetch recent call logs for this agent
+  let initialCallLogs: any[] = []
+  if (baseAgent.id) {
+    const { data: calls } = await supabase
+      .from('voice_calls')
+      .select('id, duration_seconds, sentiment, transcript, recording_url, created_at')
+      .eq('agent_id', baseAgent.id)
+      .order('created_at', { ascending: false })
+      .limit(20)
+    initialCallLogs = calls || []
+  }
+
   return (
     <AgentDetailPageClient 
       agentId={baseAgent.id} 
       initialAgent={baseAgent} 
       initialProfile={profile} 
+      initialCallLogs={initialCallLogs}
     />
   )
 }

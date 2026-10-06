@@ -12,28 +12,16 @@ export default async function NotificationsPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const fiveMonthsAgo = new Date()
-  fiveMonthsAgo.setMonth(fiveMonthsAgo.getMonth() - 5)
-  const fiveMonthsAgoStr = fiveMonthsAgo.toISOString()
-
-  // Permanently delete notifications older than 5 months
-  try {
-    await supabase
-      .from('notifications')
-      .delete()
-      .eq('user_id', user.id)
-      .lt('created_at', fiveMonthsAgoStr)
-  } catch (err) {
-    console.error('Failed to permanently delete old notifications:', err)
-  }
-
-  const { data: notifications } = await supabase
+  const { data: notifications, error: notifError } = await supabase
     .from('notifications')
     .select('*')
     .eq('user_id', user.id)
-    .gte('created_at', fiveMonthsAgoStr)
     .order('created_at', { ascending: false })
     .limit(50)
+
+  if (notifError) {
+    console.error('[Notifications Page] Failed to fetch user notifications:', notifError)
+  }
 
   const mappedNotifications = (notifications || []).map((n: any) => ({
     id: n.id,

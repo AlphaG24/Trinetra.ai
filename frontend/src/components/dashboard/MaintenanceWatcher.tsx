@@ -29,7 +29,7 @@ export default function MaintenanceWatcher({
   const pathname = usePathname() || '/'
   const searchParams = useSearchParams()
   const { role } = useAuth()
-  const supabase = createClient()
+  const [supabase] = useState(() => createClient())
 
   const isAdmin = role === 'admin' || role === 'super_admin'
   const isAdminRoute = pathname.startsWith('/admin')
@@ -57,9 +57,8 @@ export default function MaintenanceWatcher({
     checkMaintenanceStatus()
 
     // Realtime subscription on system_config maintenance_mode row
-    const uniqueChannel = `maintenance_mode_global_${Math.random().toString(36).slice(2, 8)}`
     const channel = supabase
-      .channel(uniqueChannel)
+      .channel('maintenance_mode_global_stream')
       .on(
         'postgres_changes',
         {
@@ -75,17 +74,8 @@ export default function MaintenanceWatcher({
       )
       .subscribe()
 
-    // Re-check whenever tab returns to focus
-    const handleVisibility = () => {
-      if (document.visibilityState === 'visible') {
-        checkMaintenanceStatus()
-      }
-    }
-    document.addEventListener('visibilitychange', handleVisibility)
-
     return () => {
       supabase.removeChannel(channel)
-      document.removeEventListener('visibilitychange', handleVisibility)
     }
   }, [supabase, checkMaintenanceStatus])
 

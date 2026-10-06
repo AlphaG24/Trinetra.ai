@@ -45,7 +45,7 @@ class ObservabilityService:
         try:
             # Probe database using simple read query
             if hasattr(sb, "table"):
-                res = sb.table("system_configs").select("key").limit(1).execute()
+                res = sb.table("system_config").select("id").limit(1).execute()
                 db_latency_ms = round((time.time() - start_time) * 1000, 2)
             else:
                 db_status = "mocked"

@@ -390,6 +390,32 @@ class KYCVaultService:
 
         self.supabase.table("kyc_documents").update(update_payload).eq("id", document_id).execute()
 
+        # In-app dashboard notification
+        try:
+            doc_type_label = doc.get("document_type", "document").replace("_", " ").title()
+            title = "✅ KYC Verification Approved" if new_status == "verified" else "❌ KYC Verification Rejected"
+            msg = (
+                f"Your {doc_type_label} has been verified and approved by compliance."
+                if new_status == "verified"
+                else f"Your {doc_type_label} was rejected: {rejection_reason or 'Document does not meet statutory requirements'}."
+            )
+            self.supabase.table("notifications").insert({
+                "user_id": doc["user_id"],
+                "title": title,
+                "message": msg,
+                "type": f"kyc_{new_status}",
+                "action_url": "/dashboard/settings/kyc",
+                "action_text": "View KYC Status" if new_status == "verified" else "Re-upload Document",
+                "is_read": False,
+                "metadata": {
+                    "document_id": document_id,
+                    "status": new_status,
+                    "rejection_reason": rejection_reason,
+                }
+            }).execute()
+        except Exception as notif_err:
+            logger.warning(f"Failed to insert dashboard notification: {notif_err}")
+
         # Audit log
         self.record_audit_log(
             document_id=document_id,

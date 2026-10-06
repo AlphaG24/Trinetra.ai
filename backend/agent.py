@@ -1,6 +1,16 @@
 import os
 import sys
 import io
+import socket
+
+# Force IPv4 socket connections to bypass broken ISP/NAT64 IPv6 routes causing Windows semaphore timeouts
+_orig_getaddrinfo = socket.getaddrinfo
+def _getaddrinfo_ipv4_first(host, port, family=0, type=0, proto=0, flags=0):
+    if family == 0:
+        family = socket.AF_INET
+    return _orig_getaddrinfo(host, port, family, type, proto, flags)
+socket.getaddrinfo = _getaddrinfo_ipv4_first
+
 if sys.platform == 'win32':
     try:
         sys.stdout.reconfigure(encoding='utf-8')

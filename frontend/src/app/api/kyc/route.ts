@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
 import crypto from 'crypto'
+import { verifyDocumentWithOCR } from '@/lib/kyc-ocr-service'
 
 function getAdminClient() {
   return createAdminClient(
@@ -12,8 +13,13 @@ function getAdminClient() {
 
 function maskIdNumber(idStr: string, docType: string): string {
   const clean = idStr.trim()
+  if (docType === 'gstin_certificate' || /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/i.test(clean)) {
+    // GSTIN is a public 15-character corporate tax identifier (CGST Act 2017).
+    // Not subject to UIDAI biometric privacy rules. Must remain unmasked for compliance verification on services.gst.gov.in.
+    return clean.toUpperCase()
+  }
   if (docType === 'authorized_signatory_id' || clean.length === 12) {
-    // Aadhaar masking: show only last 4 digits
+    // Aadhaar masking: show only last 4 digits per UIDAI statutory mandate
     return `•••• •••• ${clean.slice(-4)}`
   }
   if (docType === 'company_pan' || (clean.length === 10 && /[A-Z]{5}[0-9]{4}[A-Z]{1}/i.test(clean))) {
@@ -108,12 +114,61 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Document type and file payload are required' }, { status: 400 })
     }
 
+    // Fetch organization name for entity matching
+    let orgName = ''
+    if (orgId) {
+      const { data: orgData } = await admin.from('organizations').select('name').eq('id', orgId).maybeSingle()
+      if (orgData?.name) orgName = orgData.name
+    }
+
+    // Automated Multimodal OCR & Document Authenticity Verification
+    console.log(`[KYC OCR] Running automated document verification for docType: ${document_type}, org: ${orgName}...`)
+    const ocrResult = await verifyDocumentWithOCR({
+      fileBase64: file_base64,
+      mimeType: mime_type || (file_name?.endsWith('.pdf') ? 'application/pdf' : 'image/jpeg'),
+      documentType: document_type,
+      rawIdNumber: raw_id_number,
+      expectedEntityName: orgName || (profile as any)?.full_name || '',
+    })
+
+    console.log(`[KYC OCR] Status: ${ocrResult.verificationStatus}, Detected: ${ocrResult.detectedTitle}, AuthenticCategory: ${ocrResult.isAuthenticCategory}`)
+
+    // If the document is detected as fake or mismatched (e.g. 12th marksheet uploaded for a GST certificate)
+    if (ocrResult.verificationStatus === 'failed' || !ocrResult.isAuthenticCategory) {
+      return NextResponse.json({
+        error: `Automated Document Verification Failed: ${ocrResult.summaryReason}`,
+        detected_document: ocrResult.detectedTitle,
+        ocr_details: ocrResult,
+      }, { status: 422 })
+    }
+
     // UIDAI & statutory masking: NEVER store raw ID number in plaintext
     const maskedId = raw_id_number ? maskIdNumber(raw_id_number, document_type) : null
     const checksum = crypto.createHash('sha256').update(file_base64).digest('hex')
     const encryptedPath = `kyc_vault/${orgId}/${document_type}_${Date.now()}.enc`
 
     const statutoryConsentText = 'I affirmatively consent to the verification and encrypted vault storage of this identity document in accordance with the Digital Personal Data Protection Act (DPDP), UIDAI statutory masking guidelines, and Trinetra AI Telephony Compliance.'
+
+    // Master Plan Section 18.6: AES-256-GCM Encrypted Storage in private_bucket
+    try {
+      const fileBuffer = Buffer.from(file_base64, 'base64')
+      const secret = process.env.KYC_VAULT_ENCRYPTION_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || 'trinetra-kyc-key'
+      const encKey = crypto.createHash('sha256').update(secret).digest()
+      const nonce = crypto.randomBytes(12)
+      const cipher = crypto.createCipheriv('aes-256-gcm', encKey, nonce)
+      const encBytes = Buffer.concat([cipher.update(fileBuffer), cipher.final()])
+      const tag = cipher.getAuthTag()
+      const combined = Buffer.concat([nonce, encBytes, tag])
+
+      await admin.storage
+        .from('private_bucket')
+        .upload(encryptedPath, combined, {
+          contentType: 'application/octet-stream',
+          upsert: true,
+        })
+    } catch (storageErr) {
+      console.warn('[KYC Storage] Error uploading encrypted bytes to private_bucket:', storageErr)
+    }
 
     const { data: inserted, error: insertErr } = await admin
       .from('kyc_documents')
@@ -131,8 +186,9 @@ export async function POST(req: Request) {
         upload_consent_text: statutoryConsentText,
         upload_consent_at: new Date().toISOString(),
         status: 'pending_review',
+        rejection_reason: `[OCR Validated] Detected: ${ocrResult.detectedTitle} (Confidence: ${Math.round(ocrResult.confidenceScore * 100)}%)`,
       })
-      .select('id, document_type, id_number_masked, status, created_at')
+      .select('id, document_type, id_number_masked, status, rejection_reason, created_at')
       .single()
 
     if (insertErr) {

@@ -25,6 +25,7 @@ Core Mandates:
 import os
 import secrets
 import logging
+import asyncio
 from datetime import datetime, timezone, timedelta
 from typing import Dict, Any, List, Optional, Tuple
 
@@ -51,6 +52,47 @@ NEUTRAL_TWIML_RESPONSE = (
 
 class NumberLifecycleService:
     """Enterprise management engine for virtual phone number lifecycle states."""
+
+    _running: bool = False
+    _worker_task: Optional[asyncio.Task] = None
+    _poll_interval_seconds: int = 1800  # Run every 30 minutes
+
+    @classmethod
+    def start_worker(cls):
+        """Start background lifecycle transition scheduler task."""
+        if cls._running:
+            logger.info("[NumberLifecycleService] Worker is already running.")
+            return
+
+        cls._running = True
+        cls._worker_task = asyncio.create_task(cls._worker_loop())
+        logger.info("[NumberLifecycleService] Background automated lifecycle worker started.")
+
+    @classmethod
+    def stop_worker(cls):
+        """Stop background worker."""
+        cls._running = False
+        if cls._worker_task:
+            cls._worker_task.cancel()
+            cls._worker_task = None
+        logger.info("[NumberLifecycleService] Background automated lifecycle worker stopped.")
+
+    @classmethod
+    async def _worker_loop(cls):
+        """Main polling loop for number lifecycle transitions."""
+        while cls._running:
+            try:
+                service = cls()
+                service.process_lifecycle_transitions()
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                logger.error(f"[NumberLifecycleService] Unexpected error in worker loop: {e}", exc_info=True)
+
+            try:
+                await asyncio.sleep(cls._poll_interval_seconds)
+            except asyncio.CancelledError:
+                break
 
     def __init__(self, supabase_client=None):
         self.supabase = supabase_client or supabase_admin
@@ -93,17 +135,28 @@ class NumberLifecycleService:
 
         # 1. Fetch current phone number record to resolve phone string and tenant
         num_query = self.supabase.table("phone_numbers").select("*").eq("id", phone_number_id)
-        if organization_id:
-            num_query = num_query.eq("organization_id", organization_id)
         num_res = num_query.execute()
 
         if not num_res.data or len(num_res.data) == 0:
-            raise ValueError(f"Phone number not found or not owned by org: {phone_number_id}")
+            raise ValueError(f"Phone number not found: {phone_number_id}")
 
         num_data = num_res.data[0]
         phone_str = num_data.get("phone_number")
         assigned_agent_id = num_data.get("assigned_agent_id")
         resolved_org_id = num_data.get("organization_id") or organization_id
+
+        # If org not directly on phone_number, attempt to find from agent junction
+        if not resolved_org_id:
+            try:
+                apn_res = self.supabase.table("agent_phone_numbers").select("agent_id").eq("phone_number_id", phone_number_id).limit(1).execute()
+                if apn_res.data and len(apn_res.data) > 0:
+                    found_agent_id = apn_res.data[0]["agent_id"]
+                    assigned_agent_id = assigned_agent_id or found_agent_id
+                    agent_res = self.supabase.table("agents").select("organization_id").eq("id", found_agent_id).limit(1).execute()
+                    if agent_res.data and len(agent_res.data) > 0:
+                        resolved_org_id = agent_res.data[0].get("organization_id")
+            except Exception as e:
+                logger.warning(f"Error checking agent org for {phone_number_id}: {e}")
 
         # 2. Update phone_numbers table
         update_payload = {
@@ -117,6 +170,9 @@ class NumberLifecycleService:
             "reactivation_token": reactivation_token,
             "updated_at": now.isoformat(),
         }
+        if resolved_org_id:
+            update_payload["organization_id"] = resolved_org_id
+            update_payload["assigned_org_id"] = resolved_org_id
 
         res = self.supabase.table("phone_numbers").update(update_payload).eq("id", phone_number_id).execute()
 
@@ -154,9 +210,56 @@ class NumberLifecycleService:
         except Exception as e:
             logger.debug(f"Note on pool sync: {e}")
 
+        # 6. IN-APP USER NOTIFICATION: Inform tenant that number entered 15-day grace period
+        target_user_ids = set()
+        if resolved_org_id:
+            try:
+                prof_res = self.supabase.table("profiles").select("id").eq("organization_id", resolved_org_id).execute()
+                for p in (prof_res.data or []):
+                    target_user_ids.add(p["id"])
+            except Exception as e:
+                logger.warning(f"Error querying profiles for org {resolved_org_id}: {e}")
+
+        # Also notify agent owner if present
+        if assigned_agent_id:
+            try:
+                agent_user = self.supabase.table("agents").select("user_id").eq("id", assigned_agent_id).limit(1).execute()
+                if agent_user.data and agent_user.data[0].get("user_id"):
+                    target_user_ids.add(agent_user.data[0]["user_id"])
+            except Exception:
+                pass
+
+        if not target_user_ids:
+            try:
+                admin_res = self.supabase.table("profiles").select("id").in_("role", ["super_admin", "admin"]).execute()
+                for p in (admin_res.data or []):
+                    target_user_ids.add(p["id"])
+            except Exception:
+                pass
+
+        formatted_grace_end = grace_ends.strftime("%d %b %Y")
+        for uid in target_user_ids:
+            try:
+                self.supabase.table("notifications").insert({
+                    "user_id": uid,
+                    "title": "Virtual Number Entered 15-Day Grace Period",
+                    "message": (
+                        f"Your virtual number {phone_str or ''} pack has expired and is now in a 15-day grace period until {formatted_grace_end}. "
+                        f"The number has been unlinked from your AI agent to prevent dropped calls. Please renew your number to restore live calling."
+                    ),
+                    "type": "warning",
+                    "action_url": "/dashboard/phone-numbers",
+                    "action_label": "Renew Number",
+                    "is_read": False,
+                    "created_at": now.isoformat(),
+                }).execute()
+                logger.info(f"Grace period notification created for user {uid} on number {phone_str}")
+            except Exception as e:
+                logger.warning(f"Error inserting grace notification for {uid}: {e}")
+
         logger.info(
             f"Number {phone_number_id} ({phone_str}) entered 15-day grace period until {grace_ends.isoformat()}. "
-            f"Revoked from all agents."
+            f"Revoked from all agents. User notifications sent."
         )
         return res.data[0] if res.data else update_payload
 
@@ -256,6 +359,20 @@ class NumberLifecycleService:
         moved_to_grace = []
 
         for num in active_numbers:
+            # Only expire numbers allocated to tenants or assigned to agents.
+            # Unallocated platform inventory remains active in the available pool.
+            is_allocated = bool(num.get("organization_id"))
+            if not is_allocated:
+                try:
+                    apn = self.supabase.table("agent_phone_numbers").select("agent_id").eq("phone_number_id", num["id"]).limit(1).execute()
+                    if apn.data and len(apn.data) > 0:
+                        is_allocated = True
+                except Exception:
+                    pass
+
+            if not is_allocated:
+                continue
+
             expired = False
             # Check renewal_date
             renewal_str = num.get("renewal_date")

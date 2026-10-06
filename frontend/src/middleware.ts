@@ -80,20 +80,27 @@ export async function middleware(request: NextRequest) {
 
   // Refresh user session with a timeout guard to prevent 504 gateway hangs
   let user = null
+  let authFailedOrTimedOut = false
   try {
     const userPromise = supabase.auth.getUser()
     const timeoutPromise = new Promise<{ data: { user: null }; error: Error }>((_, reject) =>
-      setTimeout(() => reject(new Error('Supabase Auth timeout')), 4000)
+      setTimeout(() => reject(new Error('Supabase Auth timeout')), 8000)
     )
 
     const result = await Promise.race([userPromise, timeoutPromise])
     user = result?.data?.user ?? null
   } catch (err) {
+    authFailedOrTimedOut = true
     console.warn('[Middleware] Auth check timed out or failed:', err instanceof Error ? err.message : err)
   }
 
   // Unauthenticated user trying to access protected area
+  // If user has auth cookies but auth call timed out due to high DB IO, do not trigger a redirect storm
   if (!user && isProtectedRoute) {
+    if (hasAuthCookie && authFailedOrTimedOut) {
+      console.warn('[Middleware] Allowing request through despite auth timeout due to active auth cookies')
+      return supabaseResponse
+    }
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     url.searchParams.set('redirect', currentPath)

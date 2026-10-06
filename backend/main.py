@@ -141,6 +141,13 @@ async def app_startup():
     except Exception as e:
         print(f"[Startup] Callback Scheduler Service start warning: {e}", flush=True)
 
+    try:
+        from app.services.number_lifecycle_service import NumberLifecycleService
+        NumberLifecycleService.start_worker()
+        print("[Startup] Automated Number Lifecycle Worker initiated.", flush=True)
+    except Exception as e:
+        print(f"[Startup] Number Lifecycle Service start warning: {e}", flush=True)
+
 @app.on_event("shutdown")
 async def app_shutdown():
     try:
@@ -148,6 +155,12 @@ async def app_shutdown():
         CallbackSchedulerService.stop_worker()
     except Exception as e:
         print(f"[Shutdown] Callback Scheduler Service stop warning: {e}", flush=True)
+
+    try:
+        from app.services.number_lifecycle_service import NumberLifecycleService
+        NumberLifecycleService.stop_worker()
+    except Exception as e:
+        print(f"[Shutdown] Number Lifecycle Service stop warning: {e}", flush=True)
 
 @app.api_route("/", methods=["GET", "HEAD"])
 def read_root():

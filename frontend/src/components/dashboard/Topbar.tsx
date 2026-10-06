@@ -121,8 +121,8 @@ export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
           fetchNotifsRef.current = fetchNotifs
           await fetchNotifs()
 
-          // Subscribe to Postgres changes on notifications table
-          const uniqueChannelName = `topbar-notifications-${currentUser.id}-${Math.random().toString(36).slice(2, 9)}`
+          // Subscribe to Postgres changes on notifications table with deterministic channel
+          const uniqueChannelName = `topbar-notifs-${currentUser.id}`
           channel = supabase
             .channel(uniqueChannelName)
             .on(
@@ -141,13 +141,11 @@ export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
 
           const handleCallCompleted = () => {
             fetchNotifs()
-            setTimeout(fetchNotifs, 3500)
-            setTimeout(fetchNotifs, 7000)
           }
           window.addEventListener('trinetra:call_completed', handleCallCompleted)
 
-          // Fallback periodic poll every 15s to guarantee fresh state
-          pollInterval = setInterval(fetchNotifs, 15000)
+          // Fallback background heartbeat poll every 60s (Realtime handles instant pushes)
+          pollInterval = setInterval(fetchNotifs, 60000)
 
           cleanupHandler = () => {
             if (channel) {
