@@ -35,6 +35,11 @@ export default function DashboardPage() {
   const { setProfile: setStoreProfile } = useDashboardStore()
 
   useEffect(() => {
+    // 1-second fail-safe timer so the header NEVER gets stuck on skeleton
+    const safetyTimer = setTimeout(() => {
+      setProfileLoading(false)
+    }, 1000)
+
     if (authProfile) {
       const fullProfile = {
         ...authProfile,
@@ -47,6 +52,8 @@ export default function DashboardPage() {
     } else if (!authLoading) {
       setProfileLoading(false)
     }
+
+    return () => clearTimeout(safetyTimer)
   }, [authProfile, authLoading, setStoreProfile])
 
   const { data: overviewData, error: overviewError, isLoading: overviewLoading, mutate: mutateOverview } = useSWR('/api/dashboard/overview', fetcher, {
@@ -205,9 +212,9 @@ export default function DashboardPage() {
     <div suppressHydrationWarning className="space-y-6 max-w-7xl mx-auto p-4 md:p-6">
       {/* 1. Welcome Header */}
       <WelcomeHeader
-        fullName={profile?.full_name}
-        isOnboardingComplete={profile?.onboarding_complete}
-        loading={profileLoading}
+        fullName={profile?.full_name || authProfile?.full_name || authUser?.email?.split('@')[0] || 'Partner'}
+        isOnboardingComplete={profile?.onboarding_complete ?? authProfile?.onboarding_complete ?? true}
+        loading={profileLoading && !authProfile && !authUser}
       />
 
       {/* Degraded State / Connection Warning Banner */}

@@ -185,7 +185,7 @@ export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
       if (cleanupHandler) cleanupHandler()
       if (pollInterval) clearInterval(pollInterval)
     }
-  }, [])
+  }, [authUser?.id, authProfile?.id])
 
   const handleSignOut = async () => {
     const supabase = createClient()
