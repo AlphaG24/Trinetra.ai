@@ -133,8 +133,14 @@ export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
           fetchNotifsRef.current = fetchNotifs
           await fetchNotifs()
 
-          // Subscribe to Postgres changes on notifications table with deterministic channel
-          const uniqueChannelName = `topbar-notifs-${currentUser.id}`
+          // Subscribe to Postgres changes on notifications table with unique channel instance
+          if (channel) {
+            try {
+              supabase.removeChannel(channel)
+            } catch {}
+          }
+
+          const uniqueChannelName = `topbar-notifs-${currentUser.id}-${Date.now()}`
           channel = supabase
             .channel(uniqueChannelName)
             .on(
@@ -161,7 +167,9 @@ export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
 
           cleanupHandler = () => {
             if (channel) {
-              supabase.removeChannel(channel)
+              try {
+                supabase.removeChannel(channel)
+              } catch {}
             }
             if (pollInterval) {
               clearInterval(pollInterval)

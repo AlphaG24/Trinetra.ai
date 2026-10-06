@@ -28,6 +28,7 @@ interface KYCDoc {
 export function KYCTab() {
   const [docs, setDocs] = useState<KYCDoc[]>([])
   const [overallStatus, setOverallStatus] = useState<string>('not_started')
+  const [complianceChecklist, setComplianceChecklist] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
 
@@ -46,6 +47,9 @@ export function KYCTab() {
         const data = await res.json()
         setDocs(data.documents || [])
         setOverallStatus(data.overallStatus || 'not_started')
+        if (data.complianceChecklist) {
+          setComplianceChecklist(data.complianceChecklist)
+        }
       }
     } catch (err) {
       console.error('Failed to load KYC docs:', err)
@@ -126,21 +130,38 @@ export function KYCTab() {
         return (
           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
             <CheckCircle2 className="w-3 h-3" />
-            Verified
+            Verified (Telecom Ready)
           </span>
         )
+      case 'action_required':
       case 'rejected':
         return (
           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-rose-500/10 text-rose-500 border border-rose-500/20">
             <AlertCircle className="w-3 h-3" />
-            Rejected
+            Action Required
           </span>
         )
-      default:
+      case 'pending_review':
+      case 'pending':
         return (
           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-amber-500/10 text-amber-500 border border-amber-500/20">
             <Clock className="w-3 h-3" />
             Under Review
+          </span>
+        )
+      case 'incomplete':
+      case 'missing':
+        return (
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-zinc-500/10 text-zinc-500 border border-zinc-500/20">
+            <Clock className="w-3 h-3" />
+            Pending Upload
+          </span>
+        )
+      default:
+        return (
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-zinc-500/10 text-zinc-400 border border-zinc-500/20">
+            <Clock className="w-3 h-3" />
+            Not Started
           </span>
         )
     }
@@ -166,6 +187,84 @@ export function KYCTab() {
         </div>
       </div>
 
+      {/* Mandatory Telecom Verification Checklist */}
+      <div className="bg-white dark:bg-[#0D0120] border border-zinc-200 dark:border-white/10 rounded-2xl p-5 shadow-sm space-y-4">
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <div>
+            <h5 className="text-xs font-bold uppercase tracking-wider text-zinc-900 dark:text-white flex items-center gap-2">
+              <ShieldCheck className="w-4 h-4 text-violet-500" />
+              Mandatory Telecom KYC Verification Checklist
+            </h5>
+            <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+              To buy or activate virtual phone numbers, Indian telecom regulations (TRAI & DoT) mandate verification of <strong className="text-zinc-700 dark:text-zinc-200">both</strong> requirements below:
+            </p>
+          </div>
+          {complianceChecklist?.canProcurePhoneNumbers ? (
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-500/20">
+              <CheckCircle2 className="w-4 h-4" /> Phone Number Purchase Unlocked
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold text-amber-600 dark:text-amber-400 bg-amber-500/10 border border-amber-500/20">
+              <AlertCircle className="w-4 h-4" /> Phone Numbers Locked (KYC Pending)
+            </span>
+          )}
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Requirement 1: Entity Proof */}
+          <div className={`p-4 rounded-xl border transition-all ${
+            complianceChecklist?.entity?.verified
+              ? 'bg-emerald-500/5 border-emerald-500/20'
+              : complianceChecklist?.entity?.status === 'rejected'
+              ? 'bg-rose-500/5 border-rose-500/20'
+              : 'bg-zinc-50 dark:bg-white/[0.02] border-zinc-200 dark:border-white/10'
+          }`}>
+            <div className="flex items-start justify-between gap-2">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-violet-500/10 text-violet-500">
+                    Mandatory 1
+                  </span>
+                  <span className="font-semibold text-xs text-zinc-900 dark:text-white">
+                    Entity / Business Proof
+                  </span>
+                </div>
+                <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-1">
+                  Company PAN Card, GSTIN Certificate, or Certificate of Incorporation
+                </p>
+              </div>
+              <div>{getStatusBadge(complianceChecklist?.entity?.status || 'missing')}</div>
+            </div>
+          </div>
+
+          {/* Requirement 2: Signatory Proof */}
+          <div className={`p-4 rounded-xl border transition-all ${
+            complianceChecklist?.signatory?.verified
+              ? 'bg-emerald-500/5 border-emerald-500/20'
+              : complianceChecklist?.signatory?.status === 'rejected'
+              ? 'bg-rose-500/5 border-rose-500/20'
+              : 'bg-zinc-50 dark:bg-white/[0.02] border-zinc-200 dark:border-white/10'
+          }`}>
+            <div className="flex items-start justify-between gap-2">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-violet-500/10 text-violet-500">
+                    Mandatory 2
+                  </span>
+                  <span className="font-semibold text-xs text-zinc-900 dark:text-white">
+                    Authorized Signatory ID
+                  </span>
+                </div>
+                <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-1">
+                  Masked Aadhaar Card or Passport of registered director/officer
+                </p>
+              </div>
+              <div>{getStatusBadge(complianceChecklist?.signatory?.status || 'missing')}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Main Grid: Upload on Left, History on Right */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Upload Form */}
@@ -185,12 +284,20 @@ export function KYCTab() {
                 onChange={e => setDocType(e.target.value)}
                 className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-white/10 text-zinc-900 dark:text-white text-xs font-semibold rounded-xl p-3 focus:outline-none focus:ring-1 focus:ring-violet-500"
               >
-                <option value="company_pan">Company / Business PAN Card</option>
-                <option value="gstin_certificate">GSTIN Registration Certificate</option>
-                <option value="authorized_signatory_id">Authorized Signatory ID (Aadhaar / Passport)</option>
-                <option value="incorporation_cert">Certificate of Incorporation</option>
-                <option value="utility_bill">Business Electricity / Telephone Utility Bill</option>
+                <option value="company_pan">Company / Business PAN Card (Mandatory Entity Proof)</option>
+                <option value="gstin_certificate">GSTIN Registration Certificate (Mandatory Entity Proof)</option>
+                <option value="authorized_signatory_id">Authorized Signatory ID - Aadhaar / Passport (Mandatory Signatory Proof)</option>
+                <option value="incorporation_cert">Certificate of Incorporation (Alternative Entity Proof)</option>
+                <option value="utility_bill">Business Electricity / Telephone Utility Bill (Supporting Address)</option>
               </select>
+              <p className="text-[10px] text-violet-600 dark:text-violet-400 mt-1 font-medium flex items-center gap-1">
+                <Info className="w-3 h-3" />
+                {docType === 'authorized_signatory_id'
+                  ? 'Satisfies Mandatory Requirement 2 (Authorized Signatory ID)'
+                  : docType === 'utility_bill'
+                  ? 'Supplemental address verification document'
+                  : 'Satisfies Mandatory Requirement 1 (Entity / Business Proof)'}
+              </p>
             </div>
 
             <div>

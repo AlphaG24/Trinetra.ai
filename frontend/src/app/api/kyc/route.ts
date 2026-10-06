@@ -63,13 +63,57 @@ export async function GET() {
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    const hasVerified = docs?.some(d => d.status === 'verified')
-    const hasRejected = docs?.some(d => d.status === 'rejected')
-    const overallStatus = hasVerified ? 'verified' : (hasRejected ? 'rejected' : (docs && docs.length > 0 ? 'pending_review' : 'not_started'))
+    const entityTypes = ['company_pan', 'gstin_certificate', 'incorporation_cert']
+    const signatoryTypes = ['authorized_signatory_id']
+
+    const allDocs = docs || []
+    // Entity Proof checks
+    const entityDocs = allDocs.filter(d => entityTypes.includes(d.document_type))
+    const hasVerifiedEntity = entityDocs.some(d => d.status === 'verified')
+    const hasPendingEntity = entityDocs.some(d => d.status === 'pending_review' || d.status === 'submitted')
+    const hasRejectedEntity = entityDocs.length > 0 && !hasVerifiedEntity && !hasPendingEntity
+
+    // Authorized Signatory ID checks
+    const signatoryDocs = allDocs.filter(d => signatoryTypes.includes(d.document_type))
+    const hasVerifiedSignatory = signatoryDocs.some(d => d.status === 'verified')
+    const hasPendingSignatory = signatoryDocs.some(d => d.status === 'pending_review' || d.status === 'submitted')
+    const hasRejectedSignatory = signatoryDocs.length > 0 && !hasVerifiedSignatory && !hasPendingSignatory
+
+    const canProcurePhoneNumbers = hasVerifiedEntity && hasVerifiedSignatory
+
+    let overallStatus = 'not_started'
+    if (canProcurePhoneNumbers) {
+      overallStatus = 'verified'
+    } else if (hasRejectedEntity || hasRejectedSignatory) {
+      overallStatus = 'action_required'
+    } else if (hasPendingEntity || hasPendingSignatory) {
+      overallStatus = 'pending_review'
+    } else if (allDocs.length > 0) {
+      overallStatus = 'incomplete'
+    }
+
+    const complianceChecklist = {
+      entity: {
+        isMandatory: true,
+        title: 'Entity / Business Proof',
+        description: 'Company PAN Card, GSTIN Certificate, or Incorporation Certificate',
+        verified: hasVerifiedEntity,
+        status: hasVerifiedEntity ? 'verified' : (hasPendingEntity ? 'pending_review' : (hasRejectedEntity ? 'rejected' : 'missing')),
+      },
+      signatory: {
+        isMandatory: true,
+        title: 'Authorized Signatory Proof',
+        description: 'Masked Aadhaar Card, Passport, or Voter ID of registered officer',
+        verified: hasVerifiedSignatory,
+        status: hasVerifiedSignatory ? 'verified' : (hasPendingSignatory ? 'pending_review' : (hasRejectedSignatory ? 'rejected' : 'missing')),
+      },
+      canProcurePhoneNumbers,
+    }
 
     return NextResponse.json({
-      documents: docs || [],
+      documents: allDocs,
       overallStatus,
+      complianceChecklist,
     })
   } catch (err: any) {
     console.error('KYC GET error:', err)

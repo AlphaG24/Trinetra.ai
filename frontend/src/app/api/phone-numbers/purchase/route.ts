@@ -45,6 +45,33 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "This phone number is already assigned to another organization" }, { status: 409 });
     }
 
+    // 1b. Statutory Telecom KYC Gate (TRAI & DoT regulations)
+    if (profile.role !== "developer_tester") {
+      const { data: kycDocs } = await adminClient
+        .from("kyc_documents")
+        .select("document_type, status")
+        .eq("organization_id", profile.organization_id)
+        .eq("status", "verified");
+
+      const entityTypes = ["company_pan", "gstin_certificate", "incorporation_cert"];
+      const hasVerifiedEntity = kycDocs?.some((d) => entityTypes.includes(d.document_type));
+      const hasVerifiedSignatory = kycDocs?.some((d) => d.document_type === "authorized_signatory_id");
+
+      if (!hasVerifiedEntity || !hasVerifiedSignatory) {
+        return NextResponse.json(
+          {
+            error: "Statutory Telecom KYC Required: Per TRAI & DoT regulations, you must have both a verified Entity Proof (Company PAN or GSTIN) and an Authorized Signatory ID before purchasing live phone numbers.",
+            kyc_required: true,
+            missing: {
+              entity: !hasVerifiedEntity,
+              signatory: !hasVerifiedSignatory,
+            },
+          },
+          { status: 403 }
+        );
+      }
+    }
+
     // 2. Load system payment configuration for Razorpay
     const { data: configs } = await adminClient.from("system_config").select("config_key, config_value");
     const config: Record<string, string> = {};

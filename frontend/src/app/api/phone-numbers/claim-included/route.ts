@@ -79,6 +79,33 @@ export async function POST(request: Request) {
       );
     }
 
+    // 2b. Statutory Telecom KYC Gate (TRAI & DoT regulations)
+    if (profile.role !== "developer_tester") {
+      const { data: kycDocs } = await adminClient
+        .from("kyc_documents")
+        .select("document_type, status")
+        .eq("organization_id", profile.organization_id)
+        .eq("status", "verified");
+
+      const entityTypes = ["company_pan", "gstin_certificate", "incorporation_cert"];
+      const hasVerifiedEntity = kycDocs?.some((d) => entityTypes.includes(d.document_type));
+      const hasVerifiedSignatory = kycDocs?.some((d) => d.document_type === "authorized_signatory_id");
+
+      if (!hasVerifiedEntity || !hasVerifiedSignatory) {
+        return NextResponse.json(
+          {
+            error: "Statutory Telecom KYC Required: Per TRAI & DoT regulations, you must have both a verified Entity Proof (Company PAN or GSTIN) and an Authorized Signatory ID before claiming live phone numbers.",
+            kyc_required: true,
+            missing: {
+              entity: !hasVerifiedEntity,
+              signatory: !hasVerifiedSignatory,
+            },
+          },
+          { status: 403 }
+        );
+      }
+    }
+
     // 3. Claim the number for this user's organization for ₹0 (included in plan)
     const updatePayload: Record<string, any> = {
       is_assigned: true,
