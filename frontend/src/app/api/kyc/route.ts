@@ -170,6 +170,26 @@ export async function POST(req: Request) {
       console.warn('[KYC Storage] Error uploading encrypted bytes to private_bucket:', storageErr)
     }
 
+    // Master Plan Section 18.6: OCR Auto-Approval or Triage
+    const isHighConfidence = ocrResult.verificationStatus === 'passed' && ocrResult.confidenceScore >= 0.75
+    const isAuthentic = ocrResult.isAuthenticCategory
+    
+    let initialStatus: 'verified' | 'pending_review' | 'rejected' = 'pending_review'
+    let verifiedAt: string | null = null
+    let reviewNote: string | null = null
+
+    if (isHighConfidence && isAuthentic) {
+      initialStatus = 'verified'
+      verifiedAt = new Date().toISOString()
+      reviewNote = `[Auto-Verified by OCR] Detected: ${ocrResult.detectedTitle} (Confidence: ${Math.round(ocrResult.confidenceScore * 100)}%)`
+    } else if (!isAuthentic || ocrResult.confidenceScore < 0.40) {
+      initialStatus = 'rejected'
+      reviewNote = ocrResult.summaryReason || 'Document category mismatch or low legibility detected by OCR.'
+    } else {
+      initialStatus = 'pending_review'
+      reviewNote = `[OCR Screened] Detected: ${ocrResult.detectedTitle} (Confidence: ${Math.round(ocrResult.confidenceScore * 100)}%). Awaiting compliance officer confirmation.`
+    }
+
     const { data: inserted, error: insertErr } = await admin
       .from('kyc_documents')
       .insert({
@@ -185,14 +205,40 @@ export async function POST(req: Request) {
         upload_consent_given: true,
         upload_consent_text: statutoryConsentText,
         upload_consent_at: new Date().toISOString(),
-        status: 'pending_review',
-        rejection_reason: `[OCR Validated] Detected: ${ocrResult.detectedTitle} (Confidence: ${Math.round(ocrResult.confidenceScore * 100)}%)`,
+        status: initialStatus,
+        verified_at: verifiedAt,
+        rejection_reason: reviewNote,
       })
-      .select('id, document_type, id_number_masked, status, rejection_reason, created_at')
+      .select('id, document_type, id_number_masked, status, rejection_reason, created_at, verified_at')
       .single()
 
     if (insertErr) {
       return NextResponse.json({ error: insertErr.message }, { status: 500 })
+    }
+
+    // Dispatch in-app and external notification immediately
+    try {
+      if (initialStatus === 'verified' || initialStatus === 'rejected') {
+        const { dispatchKYCReviewNotification } = await import('@/lib/kyc-notifications')
+        await dispatchKYCReviewNotification({
+          documentId: inserted.id,
+          status: initialStatus,
+          rejectionReason: reviewNote || undefined,
+          adminUserId: 'system_ocr_engine',
+        })
+      } else {
+        await admin.from('notifications').insert({
+          user_id: user.id,
+          title: '📋 KYC Document Vaulted',
+          message: `Your ${document_type.replace(/_/g, ' ')} has been safely stored with AES-256 encryption. OCR confidence: ${Math.round(ocrResult.confidenceScore * 100)}%. Awaiting compliance confirmation.`,
+          type: 'info',
+          action_url: '/dashboard/settings',
+          action_text: 'View Status',
+          is_read: false,
+        })
+      }
+    } catch (notifErr) {
+      console.warn('[KYC Notification Dispatch] Non-fatal error dispatching notification:', notifErr)
     }
 
     // Master Plan Section 18.6: Record statutory affirmative consent in immutable consent ledger
@@ -218,10 +264,18 @@ export async function POST(req: Request) {
       console.warn('[Consent Ledger] Failed to record KYC affirmative consent in consent_records:', consentErr)
     }
 
+    const message = initialStatus === 'verified'
+      ? `Document verified and approved automatically via OCR (${Math.round(ocrResult.confidenceScore * 100)}% match). Live telephony is now active!`
+      : (initialStatus === 'rejected'
+        ? `Document rejected: ${reviewNote}`
+        : 'Document securely vaulted and queued for statutory compliance verification.')
+
     return NextResponse.json({
       success: true,
-      message: 'KYC Document securely submitted for compliance review.',
+      status: initialStatus,
+      message,
       document: inserted,
+      ocr_details: ocrResult,
     })
   } catch (err: any) {
     console.error('KYC POST error:', err)
