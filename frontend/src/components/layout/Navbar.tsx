@@ -4,7 +4,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import Image from "next/image";
 import Link from "next/link";
-import { ChevronDown, GraduationCap } from "lucide-react";
+import { usePathname } from "next/navigation";
+import { ChevronDown, GraduationCap, Globe } from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -141,6 +142,158 @@ export function Navbar() {
     setProductsExpanded(false);
     setProductsMenuOpen(false);
   };
+
+  const pathname = usePathname();
+  const isLanding = pathname === "/";
+
+  if (isLanding) {
+    return (
+      <>
+        <header
+          className={`fixed top-0 left-0 right-0 z-50 h-[72px] transition-all duration-300 ${
+            scrolled
+              ? "bg-[#FAF7F2]/95 shadow-sm border-b border-[#E8DFC8]/80"
+              : "bg-[#FAF7F2]/80"
+          } backdrop-blur-md`}
+        >
+          <div className="max-w-7xl h-full mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between">
+            {/* Text-Only Brand Name as specified: vaakriti + वाक् · कृति */}
+            <Link href="/" className="flex flex-col items-start leading-none group select-none">
+              <span className="font-serif text-[26px] font-medium tracking-tight text-[#171513] group-hover:text-[#C65B32] transition-colors">
+                vaakriti
+              </span>
+              <span className="text-[10px] tracking-[0.25em] text-[#7A6D5D] mt-0.5 font-normal">
+                वाक् · कृति
+              </span>
+            </Link>
+
+            {/* Navigation links matching mockup */}
+            <nav className="hidden md:flex items-center gap-8">
+              <Link
+                href="/#platform"
+                className="text-[14px] font-medium text-[#42372E] hover:text-[#C2410C] transition-colors"
+              >
+                Platform
+              </Link>
+              <Link
+                href="/#solutions"
+                className="text-[14px] font-medium text-[#42372E] hover:text-[#C2410C] transition-colors"
+              >
+                Solutions
+              </Link>
+              <Link
+                href="/#industries"
+                className="text-[14px] font-medium text-[#42372E] hover:text-[#C2410C] transition-colors"
+              >
+                Industries
+              </Link>
+              <Link
+                href="/#resources"
+                className="text-[14px] font-medium text-[#42372E] hover:text-[#C2410C] transition-colors"
+              >
+                Resources
+              </Link>
+              <Link
+                href="/pricing"
+                className="text-[14px] font-medium text-[#42372E] hover:text-[#C2410C] transition-colors"
+              >
+                Pricing
+              </Link>
+            </nav>
+
+            {/* Right actions */}
+            <div className="hidden sm:flex items-center gap-4">
+              <div className="flex items-center gap-1 px-2.5 py-1 rounded-full border border-[#DDD3C2] text-xs font-medium text-[#4C4033] bg-[#F7F2E8] cursor-pointer">
+                <Globe className="w-3.5 h-3.5 text-[#7D7060]" />
+                <span>EN</span>
+                <ChevronDown className="w-3 h-3 text-[#7D7060]" />
+              </div>
+
+              <Link
+                href={user ? "/dashboard" : "/login"}
+                className="text-sm font-medium text-[#42372E] hover:text-[#C2410C] transition-colors"
+              >
+                {user ? "Dashboard" : "Login"}
+              </Link>
+
+              <Link
+                href={user ? "/dashboard" : "/signup"}
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-[#1C1714] text-[#FAF7F2] text-xs sm:text-sm font-medium hover:bg-[#C2410C] transition-all shadow-sm"
+              >
+                <span>Build an Agent</span>
+                <span>→</span>
+              </Link>
+            </div>
+
+            {/* Mobile hamburger */}
+            <button
+              onClick={toggleMenu}
+              className="sm:hidden p-2 text-[#42372E] hover:text-[#C2410C]"
+              aria-label="Toggle Navigation Menu"
+            >
+              <span className="block w-5 h-0.5 bg-current mb-1" />
+              <span className="block w-5 h-0.5 bg-current mb-1" />
+              <span className="block w-5 h-0.5 bg-current" />
+            </button>
+          </div>
+        </header>
+
+        {/* Mobile menu drawer for landing */}
+        {menuOpen && (
+          <div className="fixed inset-0 z-50 bg-[#FAF7F2] flex flex-col p-6 sm:hidden">
+            <div className="flex items-center justify-between pb-4 border-b border-[#E8DFC8]">
+              <Image
+                src="/vaakriti-logo.svg"
+                alt="Vaakriti"
+                width={140}
+                height={40}
+                className="h-8 w-auto"
+              />
+              <button
+                onClick={() => setMenuOpen(false)}
+                className="p-2 text-[#42372E]"
+              >
+                ✕
+              </button>
+            </div>
+            <nav className="flex flex-col gap-4 py-6 text-lg font-medium text-[#332A23]">
+              <Link href="/#platform" onClick={() => setMenuOpen(false)}>
+                Platform
+              </Link>
+              <Link href="/#solutions" onClick={() => setMenuOpen(false)}>
+                Solutions
+              </Link>
+              <Link href="/#industries" onClick={() => setMenuOpen(false)}>
+                Industries
+              </Link>
+              <Link href="/#resources" onClick={() => setMenuOpen(false)}>
+                Resources
+              </Link>
+              <Link href="/pricing" onClick={() => setMenuOpen(false)}>
+                Pricing
+              </Link>
+            </nav>
+            <div className="mt-auto flex flex-col gap-3">
+              <Link
+                href={user ? "/dashboard" : "/login"}
+                onClick={() => setMenuOpen(false)}
+                className="w-full text-center py-2.5 rounded-xl border border-[#DDD3C2] text-sm font-medium text-[#332A23]"
+              >
+                {user ? "Dashboard" : "Login"}
+              </Link>
+              <Link
+                href={user ? "/dashboard" : "/signup"}
+                onClick={() => setMenuOpen(false)}
+                className="w-full text-center py-2.5 rounded-xl bg-[#1C1714] text-[#FAF7F2] text-sm font-medium"
+              >
+                Build an Agent →
+              </Link>
+            </div>
+          </div>
+        )}
+      </>
+    );
+  }
 
   return (
     <>

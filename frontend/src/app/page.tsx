@@ -61,8 +61,8 @@ export default async function Home() {
           }),
         }}
       />
-      <Layout>
-        <div className="flex flex-col bg-trinetra-bg min-h-screen">
+      <Layout theme="vaakriti">
+        <div className="flex flex-col bg-[#FAF7F2] min-h-screen text-[#1C1714]">
 
         {/* Hero Section */}
         <Hero />

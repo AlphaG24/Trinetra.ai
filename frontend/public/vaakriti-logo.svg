@@ -1,0 +1,16 @@
+<svg viewBox="0 0 280 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <g transform="translate(10, 5) scale(0.48)">
+    <!-- Central soaring plume -->
+    <path d="M58 135 C58 115 62 90 70 70 C78 50 82 30 70 12 C68 9 65 7 62 10 C60 14 60 22 58 30 C56 42 50 62 48 85 C46 105 52 125 58 135Z" fill="#181513"/>
+    <!-- Upper right flame tip -->
+    <path d="M68 62 C74 48 84 32 92 38 C96 41 98 47 94 53 C88 65 78 78 72 88 C70 82 69 72 68 62Z" fill="#181513"/>
+    <!-- Middle right wing plume -->
+    <path d="M57 95 C68 85 86 70 94 82 C98 88 95 98 86 108 C76 118 64 125 57 132 C57 120 56 108 57 95Z" fill="#181513"/>
+    <!-- Upper left soaring wing -->
+    <path d="M54 130 C48 112 36 92 26 76 C20 66 18 52 24 45 C30 38 38 52 44 68 C50 84 52 106 54 130Z" fill="#181513"/>
+    <!-- Lower left accent feather -->
+    <path d="M52 135 C42 122 32 108 28 98 C24 90 28 84 34 86 C40 88 46 102 52 118 C52 125 52 130 52 135Z" fill="#181513"/>
+  </g>
+  <text x="82" y="44" font-family="'Playfair Display', Georgia, serif" font-size="34" font-weight="600" fill="#181513" letter-spacing="-0.5">vaakriti</text>
+  <text x="85" y="62" font-family="'Noto Serif Devanagari', 'Rozha One', serif" font-size="12" font-weight="400" fill="#7A7067" letter-spacing="2">वाक् • कृति</text>
+</svg>
