@@ -106,7 +106,7 @@ export async function POST(request: Request) {
     const planConfig: Record<string, { tier: string, minutes: number, days: number }> = {
       trial: {
         tier: 'trial',
-        minutes: parseInt(config.trial_minutes || '100', 10),
+        minutes: parseInt(config.trial_minutes || '50', 10),
         days: parseInt(config.trial_days || '7', 10)
       },
       starter: {

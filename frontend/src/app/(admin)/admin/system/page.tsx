@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { ApiKeyManager } from '@/components/admin/ApiKeyManager'
 import { 
   Sliders, Key, Send, CreditCard, RefreshCw, Save, Loader2, AlertTriangle,
-  Gift, DollarSign, ShieldAlert, Cpu, Percent, WrenchIcon, Globe
+  Gift, DollarSign, ShieldAlert, Cpu, Percent, WrenchIcon, Globe, Lock
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { createClient } from '@/lib/client'
@@ -24,11 +24,13 @@ export default function SystemConfigPage() {
     RAZORPAY_KEY_ID: '',
     RAZORPAY_KEY_SECRET: '',
     
-    // Default values for billing & plan features
+    // Default values for billing & plan features (Master Plan Section 1.1 Decision P1-P7)
     free_demo_minutes: '10',
-    trial_price_paisa: '9900',
-    trial_days: '7',
-    trial_minutes: '100',
+    trial_price_paisa: '9900', // P2: ₹99
+    trial_days: '7',           // P2: 7 days
+    trial_minutes: '50',       // P2: 50 min quota (editable via admin panel)
+    max_agents_trial: '2',     // P2: 2 agents limit (editable via admin panel)
+    trial_can_assign_numbers: 'true', // P2: can buy & assign numbers
     starter_price_paisa: '499900',
     starter_minutes: '500',
     professional_price_paisa: '1499900',
@@ -54,6 +56,10 @@ export default function SystemConfigPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [showRotateModal, setShowRotateModal] = useState(false)
+  const [stepUpModalOpen, setStepUpModalOpen] = useState(false)
+  const [stepUpPassword, setStepUpPassword] = useState('')
+  const [stepUpLoading, setStepUpLoading] = useState(false)
+  const [pendingSaveRotation, setPendingSaveRotation] = useState(false)
 
   useEffect(() => {
     async function loadConfigs() {
@@ -168,14 +174,30 @@ export default function SystemConfigPage() {
     toast.success(`Rotated ${key}. Click "Save All Changes" to persist.`)
   }
 
-  const handleSaveAll = async (isRotation = false) => {
+  const handleSaveAll = async (isRotation = false, stepUpToken?: string) => {
     try {
       setSaving(true)
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+      if (stepUpToken) {
+        headers['x-step-up-token'] = stepUpToken
+      }
+
       const res = await fetch('/api/admin/system-config', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ configs, is_rotation: isRotation }),
+        headers,
+        body: JSON.stringify({ configs, is_rotation: isRotation, step_up_token: stepUpToken }),
       })
+
+      if (res.status === 403) {
+        const json = await res.json()
+        if (json.step_up_required) {
+          setPendingSaveRotation(isRotation)
+          setStepUpModalOpen(true)
+          toast.error('Privileged action requires Super Admin re-authentication')
+          return
+        }
+        throw new Error(json.error || 'Access forbidden')
+      }
 
       if (!res.ok) {
         const json = await res.json()
@@ -184,10 +206,47 @@ export default function SystemConfigPage() {
 
       toast.success(isRotation ? 'All keys successfully rotated & persisted 🔄' : 'System configuration saved successfully 🚀')
       setShowRotateModal(false)
+      setStepUpModalOpen(false)
+      setStepUpPassword('')
     } catch (err: any) {
       toast.error(err.message || 'Save failed')
     } finally {
       setSaving(false)
+    }
+  }
+
+  const handleStepUpSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!stepUpPassword) {
+      toast.error('Please enter your admin password')
+      return
+    }
+
+    try {
+      setStepUpLoading(true)
+      const res = await fetch('/api/admin/step-up', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: pendingSaveRotation ? 'credential_update' : 'price_change',
+          credential: stepUpPassword,
+          credential_type: 'password'
+        })
+      })
+
+      const data = await res.json()
+      if (!res.ok) {
+        throw new Error(data.error || 'Step-up verification failed')
+      }
+
+      toast.success('Admin verified! Applying changes...')
+      setStepUpModalOpen(false)
+      setStepUpPassword('')
+      await handleSaveAll(pendingSaveRotation, data.token)
+    } catch (err: any) {
+      toast.error(err.message || 'Authentication failed')
+    } finally {
+      setStepUpLoading(false)
     }
   }
 
@@ -306,7 +365,7 @@ export default function SystemConfigPage() {
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Free Demo Minutes</label>
+                <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Free Demo Minutes (P1)</label>
                 <input 
                   type="number"
                   value={configs.free_demo_minutes || ''}
@@ -316,7 +375,7 @@ export default function SystemConfigPage() {
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Trial Price (₹)</label>
+                <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Trial Price (₹) (P2)</label>
                 <input 
                   type="number"
                   value={displayRupees(configs.trial_price_paisa || '0')}
@@ -329,24 +388,48 @@ export default function SystemConfigPage() {
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Trial Duration (Days)</label>
+                <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Trial Duration (Days) (P2)</label>
                 <input 
                   type="number"
                   value={configs.trial_days || ''}
                   onChange={(e) => handleChange('trial_days', e.target.value)}
                   className="w-full bg-black border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:border-violet-500 outline-none"
-                  min="0"
+                  min="1"
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Trial Included Minutes</label>
+                <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Trial Quota Mins (P2)</label>
                 <input 
                   type="number"
                   value={configs.trial_minutes || ''}
                   onChange={(e) => handleChange('trial_minutes', e.target.value)}
                   className="w-full bg-black border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:border-violet-500 outline-none"
-                  min="0"
+                  min="1"
                 />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Trial Max Agents (P2)</label>
+                <input 
+                  type="number"
+                  value={configs.max_agents_trial || '2'}
+                  onChange={(e) => handleChange('max_agents_trial', e.target.value)}
+                  className="w-full bg-black border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:border-violet-500 outline-none"
+                  min="1"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Trial Assign Numbers (P2)</label>
+                <select
+                  value={configs.trial_can_assign_numbers || 'true'}
+                  onChange={(e) => handleChange('trial_can_assign_numbers', e.target.value)}
+                  className="w-full bg-black border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:border-violet-500 outline-none cursor-pointer"
+                >
+                  <option value="true">Allowed (Can Buy & Assign)</option>
+                  <option value="false">Web-Call Only</option>
+                </select>
               </div>
             </div>
           </div>
@@ -518,9 +601,9 @@ export default function SystemConfigPage() {
             Agent Creation Limits
           </h2>
 
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             <div className="space-y-2">
-              <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Free Plan Limit</label>
+              <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Free (P1)</label>
               <input 
                 type="number"
                 value={configs.max_agents_free || ''}
@@ -530,7 +613,17 @@ export default function SystemConfigPage() {
               />
             </div>
             <div className="space-y-2">
-              <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Starter Plan Limit</label>
+              <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Trial (P2)</label>
+              <input 
+                type="number"
+                value={configs.max_agents_trial || '2'}
+                onChange={(e) => handleChange('max_agents_trial', e.target.value)}
+                className="w-full bg-black border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:border-violet-500 outline-none"
+                min="1"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Starter Plan</label>
               <input 
                 type="number"
                 value={configs.max_agents_starter || ''}
@@ -540,7 +633,7 @@ export default function SystemConfigPage() {
               />
             </div>
             <div className="space-y-2">
-              <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Pro Plan Limit</label>
+              <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Pro Plan</label>
               <input 
                 type="number"
                 value={configs.max_agents_professional || ''}
@@ -726,6 +819,62 @@ export default function SystemConfigPage() {
                 Confirm Rotation
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Step-Up Re-Authentication Modal (Master Plan Section 18.4 & 18.5) */}
+      {stepUpModalOpen && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-zinc-950 border border-violet-500/30 rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center gap-3 text-violet-400">
+              <Lock className="w-6 h-6 shrink-0" />
+              <div>
+                <h3 className="text-lg font-bold text-white">Privileged Step-Up Auth</h3>
+                <p className="text-xs text-zinc-400">Master Plan Section 18.4 Re-authentication</p>
+              </div>
+            </div>
+
+            <p className="text-xs text-zinc-300 leading-relaxed">
+              Modifying commercial pricing plans or rotating live credentials is a high-security action. Enter your admin password to proceed.
+            </p>
+
+            <form onSubmit={handleStepUpSubmit} className="space-y-4 pt-2">
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest block">Admin Password</label>
+                <input
+                  type="password"
+                  required
+                  autoFocus
+                  value={stepUpPassword}
+                  onChange={(e) => setStepUpPassword(e.target.value)}
+                  placeholder="Enter administrator password..."
+                  className="w-full bg-black border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white focus:border-violet-500 outline-none"
+                />
+              </div>
+
+              <div className="flex justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  disabled={stepUpLoading}
+                  onClick={() => {
+                    setStepUpModalOpen(false)
+                    setStepUpPassword('')
+                  }}
+                  className="px-4 py-2 rounded-xl text-xs font-bold text-zinc-400 hover:text-white bg-zinc-900 border border-zinc-800 cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={stepUpLoading || !stepUpPassword}
+                  className="px-4 py-2 rounded-xl text-xs font-bold bg-violet-600 hover:bg-violet-500 text-white flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                >
+                  {stepUpLoading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                  Verify & Persist
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

@@ -73,7 +73,7 @@ class UsageService:
             elif plan_tier == 'starter':
                 tier_limit = 500
             elif plan_tier == 'trial':
-                tier_limit = 100
+                tier_limit = await self._get_config("trial_minutes", 50)
             elif plan_tier == 'enterprise':
                 tier_limit = 10000
             else:
@@ -209,12 +209,13 @@ class UsageService:
             max_numbers = await self._get_config("max_phone_numbers_per_org", 10) + additional_phone_numbers
             
         monthly_minutes = await self._get_config(f"{plan_tier}_minutes", 0)
-        if plan_tier == 'trial':
-            monthly_minutes = 50
-        elif plan_tier == 'starter':
-            monthly_minutes = 500
-        elif plan_tier == 'professional':
-            monthly_minutes = 2000
+        if monthly_minutes == 0:
+            if plan_tier == 'trial':
+                monthly_minutes = await self._get_config("trial_minutes", 50)
+            elif plan_tier == 'starter':
+                monthly_minutes = 500
+            elif plan_tier == 'professional':
+                monthly_minutes = 2000
         
         # Count current usage
         agent_count = await self._count_agents(organization_id)

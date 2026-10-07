@@ -337,7 +337,7 @@ export function PricingSection({ config, agentType = 'voice', agentSlug = 'voice
   const freeDemoMinutes = config.free_demo_minutes || '10'
   const trialPrice = parseInt(config.trial_price_paisa || '9900', 10) / 100
   const trialDays = config.trial_days || '7'
-  const trialMinutes = config.trial_minutes || '100'
+  const trialMinutes = config.trial_minutes || '50'
 
   const starterPrice = (parseInt(config.starter_price_paisa || '499900', 10) / 100).toLocaleString('en-IN')
   const starterMinutes = config.starter_minutes || '500'

@@ -27,8 +27,8 @@ export async function GET() {
       .eq('id', user.id)
       .single()
 
-    if (!profile || profile.role !== 'super_admin') {
-      return NextResponse.json({ error: 'Forbidden: Super Admin role required' }, { status: 403 })
+    if (!profile || !['admin', 'super_admin'].includes(profile.role)) {
+      return NextResponse.json({ error: 'Forbidden: Admin or Super Admin role required' }, { status: 403 })
     }
 
     // 3. Query system_config table using service role to bypass RLS
@@ -73,7 +73,7 @@ export async function PUT(request: Request) {
       .eq('id', user.id)
       .single()
 
-    if (!profile || profile.role !== 'super_admin') {
+    if (!profile || !['admin', 'super_admin'].includes(profile.role)) {
       // Audit log unauthorized attempt
       try {
         await supabase.from('audit_logs').insert({
@@ -84,7 +84,7 @@ export async function PUT(request: Request) {
           resource_type: 'system_config',
         })
       } catch {}
-      return NextResponse.json({ error: 'Forbidden: Super Admin role required' }, { status: 403 })
+      return NextResponse.json({ error: 'Forbidden: Admin or Super Admin role required' }, { status: 403 })
     }
 
     // 3. Upsert entries into system_config
@@ -93,12 +93,23 @@ export async function PUT(request: Request) {
       return NextResponse.json({ error: 'Invalid config payload' }, { status: 400 })
     }
 
+    // Fetch current config state for old_value tracking and change detection
+    const adminClientForRead = getAdminClient()
+    const { data: currentConfigs } = await adminClientForRead
+      .from('system_config')
+      .select('config_key, config_value')
+
+    const currentMap: Record<string, string> = {}
+    currentConfigs?.forEach(item => {
+      currentMap[item.config_key] = item.config_value
+    })
+
     // Master Plan Section 18.4 Step-Up Auth Enforcement
     const pricingKeys = new Set([
       'trial_price_paisa', 'starter_price_paisa', 'professional_price_paisa',
       'enterprise_price_paisa', 'inbound_number_cost_paisa', 'overage_per_minute_paisa',
     ])
-    const hasPricingUpdates = Object.keys(updates).some((k) => pricingKeys.has(k))
+    const hasPricingUpdates = Object.keys(updates).some((k) => pricingKeys.has(k) && currentMap[k] !== undefined && updates[k] !== currentMap[k])
     const isCredentialRotation = Boolean(body.is_rotation)
 
     if (hasPricingUpdates || isCredentialRotation) {
@@ -133,22 +144,11 @@ export async function PUT(request: Request) {
       }
     }
 
-    // Fetch current config state for old_value tracking — use service role to bypass RLS
-    const adminClientForRead = getAdminClient()
-    const { data: currentConfigs } = await adminClientForRead
-      .from('system_config')
-      .select('config_key, config_value')
-
-    const currentMap: Record<string, string> = {}
-    currentConfigs?.forEach(item => {
-      currentMap[item.config_key] = item.config_value
-    })
-
     // Perform validation checks
     const integerKeys = [
       'free_demo_minutes', 'trial_days', 'trial_minutes', 
       'starter_minutes', 'professional_minutes', 'enterprise_minutes',
-      'max_agents_free', 'max_agents_starter', 'max_agents_professional'
+      'max_agents_free', 'max_agents_trial', 'max_agents_starter', 'max_agents_professional'
     ]
 
     const nonNegativeKeys = [
