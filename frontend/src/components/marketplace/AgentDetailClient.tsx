@@ -142,7 +142,7 @@ export function AgentDetailClient({ service, config }: AgentDetailClientProps) {
         router.push(`/login?redirect=${encodeURIComponent(`/marketplace/${service.slug}`)}`)
         return
       }
-      router.push('/dashboard/onboarding?plan=trial')
+      router.push(`/dashboard/checkout?plan=trial&agent=${service.slug}`)
     } catch (err) {
       console.error(err)
       toast.error("An error occurred. Please try again.")

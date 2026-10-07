@@ -1,4 +1,10 @@
 import type { NextConfig } from "next";
+import dns from "node:dns";
+
+// Force IPv4 DNS order to bypass broken ISP/NAT64 IPv6 routes causing 30s timeouts on Supabase
+try {
+  dns.setDefaultResultOrder("ipv4first");
+} catch {}
 
 // ============================================================================
 // SECURITY: Content Security Policy
@@ -88,6 +94,11 @@ const nextConfig: NextConfig = {
   async redirects() {
     return [
       {
+        source: '/dashboard/numbers',
+        destination: '/dashboard/phone-numbers',
+        permanent: true,
+      },
+      {
         source: '/pricing',
         destination: '/contact',
         permanent: false,
@@ -95,6 +106,11 @@ const nextConfig: NextConfig = {
       {
         source: '/dashboard/deploy-agent',
         destination: '/dashboard/deploy',
+        permanent: false,
+      },
+      {
+        source: '/dashboard/integrations',
+        destination: '/dashboard/settings?tab=integrations',
         permanent: false,
       },
     ];
@@ -110,10 +126,10 @@ const nextConfig: NextConfig = {
   async headers() {
     const isProd = process.env.NODE_ENV === 'production';
     const securityHeaders = [
-      // SECURITY: Prevent clickjacking
+      // SECURITY: Prevent clickjacking while allowing same-origin document preview
       {
         key: 'X-Frame-Options',
-        value: 'DENY'
+        value: 'SAMEORIGIN'
       },
       // SECURITY: Prevent MIME-type sniffing
       {

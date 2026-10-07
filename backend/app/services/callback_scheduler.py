@@ -19,7 +19,7 @@ class CallbackSchedulerService:
     """
     _running: bool = False
     _worker_task: Optional[asyncio.Task] = None
-    _poll_interval_seconds: int = 15
+    _poll_interval_seconds: int = int(os.getenv("CALLBACK_POLL_INTERVAL_SECONDS", "60"))
 
     @classmethod
     def start_worker(cls):
@@ -68,7 +68,7 @@ class CallbackSchedulerService:
         try:
             res = await asyncio.to_thread(
                 supabase_admin.table("callbacks")
-                .select("*")
+                .select("id, organization_id, agent_id, prospect_phone, prospect_name, notes, attempt_count, max_attempts, scheduled_at")
                 .eq("status", "scheduled")
                 .lte("scheduled_at", now_utc)
                 .order("scheduled_at", desc=False)

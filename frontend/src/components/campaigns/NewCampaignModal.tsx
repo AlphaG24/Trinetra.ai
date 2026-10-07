@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { X, Upload, Megaphone, Loader2 } from 'lucide-react'
+import { X, Upload, Megaphone, Loader2, Download, ShieldCheck } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { createClient } from '@/utils/supabase/client'
 
@@ -25,6 +25,9 @@ export function NewCampaignModal({ isOpen, onClose, onSuccess }: NewCampaignModa
   const [endHours, setEndHours] = useState('18:00')
   const [scheduledStart, setScheduledStart] = useState('')
   const [file, setFile] = useState<File | null>(null)
+  const [consentAttestation, setConsentAttestation] = useState(false)
+  const [purpose, setPurpose] = useState<'promotional' | 'service' | 'transactional'>('promotional')
+  const [purposeAttestation, setPurposeAttestation] = useState(false)
   
   const [agents, setAgents] = useState<Agent[]>([])
   const [loadingAgents, setLoadingAgents] = useState(true)
@@ -106,15 +109,30 @@ export function NewCampaignModal({ isOpen, onClose, onSuccess }: NewCampaignModa
     if (!name.trim()) return toast.error('Campaign name is required')
     if (!agentId) return toast.error('Please select an agent')
     if (!file) return toast.error('Please upload a contact list')
+    if (!consentAttestation) {
+      return toast.error('You must certify affirmative consent attestation before creating this campaign [CONFIRM WITH A LAWYER]')
+    }
+    if (purpose !== 'promotional' && !purposeAttestation) {
+      return toast.error('You must certify the statutory purpose attestation for non-promotional campaigns [CONFIRM WITH A LAWYER]')
+    }
 
     try {
       setSubmitting(true)
       const formData = new FormData()
       formData.append('name', name)
       formData.append('agentId', agentId)
+      formData.append('purpose', purpose)
+      if (purpose !== 'promotional') {
+        formData.append('purpose_attestation', 'true')
+      }
       formData.append('timezone', timezone)
       formData.append('calling_hours_start', startHours)
       formData.append('calling_hours_end', endHours)
+      formData.append('consent_attestation', 'true')
+      formData.append(
+        'attestation_statement',
+        'I confirm and attest that I hold valid, verifiable affirmative consent for all contacts in this list under applicable statutory telecommunications regulations (including TRAI TCCCPR 2018 and TCPA). [CONFIRM WITH A LAWYER]'
+      )
       if (scheduledStart) {
         formData.append('scheduled_start', new Date(scheduledStart).toISOString())
       }
@@ -134,6 +152,9 @@ export function NewCampaignModal({ isOpen, onClose, onSuccess }: NewCampaignModa
         setName('')
         setFile(null)
         setScheduledStart('')
+        setConsentAttestation(false)
+        setPurpose('promotional')
+        setPurposeAttestation(false)
       } else {
         toast.error(data.error || 'Failed to create campaign')
       }
@@ -212,6 +233,56 @@ export function NewCampaignModal({ isOpen, onClose, onSuccess }: NewCampaignModa
             )}
           </div>
 
+          {/* Campaign Purpose Selector (TRAI TCCCPR 2018 / TCPA) */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-bold uppercase tracking-wider text-[var(--heading)] flex items-center justify-between">
+              <span>Campaign Purpose</span>
+              <span className="text-[10px] text-violet-400 font-normal">TRAI TCCCPR 2018 / TCPA</span>
+            </label>
+            <select
+              value={purpose}
+              onChange={(e) => {
+                const val = e.target.value as 'promotional' | 'service' | 'transactional'
+                setPurpose(val)
+                if (val === 'promotional') setPurposeAttestation(false)
+              }}
+              className="w-full bg-[var(--background)] border border-[var(--border)] rounded-xl px-4 py-2.5 text-sm text-[var(--heading)] focus:outline-none focus:border-violet-500 transition-all font-sans"
+            >
+              <option value="promotional">Promotional / Marketing (Restricted to 09:00 - 21:00 local time)</option>
+              <option value="service">Service Notification (Operational updates to existing customers)</option>
+              <option value="transactional">Transactional / Urgent (Time-sensitive alerts, OTPs, reminders)</option>
+            </select>
+            <p className="text-[10px] text-[var(--muted)]">
+              {purpose === 'promotional' 
+                ? 'Promotional calls are strictly restricted to 09:00-21:00 local time and require affirmative marketing consent.'
+                : 'Service and transactional calls are exempt from promotional curfew hours, but strictly cannot include marketing offers.'}
+            </p>
+          </div>
+
+          {/* Conditional Non-Promotional Purpose Attestation */}
+          {purpose !== 'promotional' && (
+            <div className="rounded-xl border border-amber-500/30 bg-amber-950/20 p-4 space-y-2 animate-in fade-in duration-200">
+              <div className="flex items-start gap-3">
+                <input
+                  id="purpose-attestation-checkbox"
+                  type="checkbox"
+                  checked={purposeAttestation}
+                  onChange={(e) => setPurposeAttestation(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 rounded border-amber-500 text-amber-600 focus:ring-amber-500 cursor-pointer"
+                />
+                <label 
+                  htmlFor="purpose-attestation-checkbox" 
+                  className="text-xs text-[var(--body)] leading-relaxed cursor-pointer select-none"
+                >
+                  <span className="font-semibold text-amber-300 block mb-0.5">
+                    Statutory Non-Promotional Purpose Certification
+                  </span>
+                  I solemnly certify that this campaign is strictly for genuine {purpose} communications and contains <strong>NO sales, marketing, or promotional offers</strong>. I acknowledge that misclassifying promotional telemarketing calls as service or transactional constitutes a statutory violation under TRAI TCCCPR 2018 Regulation 12 and FCC TCPA rules. <span className="text-amber-400 font-medium">[CONFIRM WITH A LAWYER]</span>
+                </label>
+              </div>
+            </div>
+          )}
+
           {/* Timezone and Calling Hours */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-1.5">
@@ -289,6 +360,42 @@ export function NewCampaignModal({ isOpen, onClose, onSuccess }: NewCampaignModa
                 {file ? `${(file.size / 1024).toFixed(1)} KB` : "Supports CSV or Excel spreadsheets containing phone numbers"}
               </p>
             </div>
+
+            {/* Download Sample CSV Template Link */}
+            <div className="flex items-center justify-between text-xs pt-1">
+              <span className="text-[var(--muted)]">Need the approved format?</span>
+              <a
+                href="/templates/campaign_contacts_sample.csv"
+                download="campaign_contacts_sample.csv"
+                className="inline-flex items-center gap-1.5 text-violet-400 hover:text-violet-300 font-medium hover:underline transition-colors"
+              >
+                <Download className="w-3.5 h-3.5" />
+                Download Sample CSV Template
+              </a>
+            </div>
+          </div>
+
+          {/* Statutory Affirmative Consent Attestation (TRAI TCCCPR 2018 / TCPA) */}
+          <div className="rounded-xl border border-violet-500/30 bg-violet-950/20 p-4 space-y-2">
+            <div className="flex items-start gap-3">
+              <input
+                id="consent-attestation-checkbox"
+                type="checkbox"
+                checked={consentAttestation}
+                onChange={(e) => setConsentAttestation(e.target.checked)}
+                className="mt-0.5 h-4 w-4 rounded border-violet-500 text-violet-600 focus:ring-violet-500 cursor-pointer"
+              />
+              <label 
+                htmlFor="consent-attestation-checkbox" 
+                className="text-xs text-[var(--body)] leading-relaxed cursor-pointer select-none"
+              >
+                <span className="font-semibold text-[var(--heading)] block mb-0.5 flex items-center gap-1.5">
+                  <ShieldCheck className="w-3.5 h-3.5 text-violet-400 shrink-0" />
+                  Affirmative Consent & Statutory Compliance Attestation
+                </span>
+                I confirm and attest that I hold valid, verifiable affirmative consent for all contacts in this list in compliance with statutory telecommunications regulations (TRAI TCCCPR 2018 Regulation 12 / TCPA 47 U.S.C. § 227). I acknowledge this upload will be logged with cryptographic SHA-256 fingerprinting. <span className="text-violet-400 font-medium">[CONFIRM WITH A LAWYER]</span>
+              </label>
+            </div>
           </div>
         </div>
 
@@ -303,7 +410,7 @@ export function NewCampaignModal({ isOpen, onClose, onSuccess }: NewCampaignModa
           </button>
           <button
             type="submit"
-            disabled={submitting || !agentId || !file}
+            disabled={submitting || !agentId || !file || !consentAttestation || (purpose !== 'promotional' && !purposeAttestation)}
             className="px-6 py-2.5 rounded-xl bg-violet-600 text-white hover:bg-violet-700 text-xs font-bold uppercase tracking-wider transition-all disabled:opacity-50 flex items-center gap-2 cursor-pointer"
           >
             {submitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}

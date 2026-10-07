@@ -16,8 +16,15 @@ from cryptography.hazmat.backends import default_backend
 logger = logging.getLogger("integration-executor")
 logger.setLevel(logging.INFO)
 
-SECRET_SEED = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or 'default-secret-key-seed-value'
+SECRET_SEED = os.getenv("ENCRYPTION_SECRET_SEED") or os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+if not SECRET_SEED:
+    if os.getenv("ENVIRONMENT") == "production" or os.getenv("NODE_ENV") == "production":
+        raise RuntimeError("FATAL SECURITY CONFIGURATION: ENCRYPTION_SECRET_SEED or SUPABASE_SERVICE_ROLE_KEY is required for integration encryption (SEC-001).")
+    logger.warning("No ENCRYPTION_SECRET_SEED or SUPABASE_SERVICE_ROLE_KEY found; using fallback development encryption key.")
+    SECRET_SEED = "trinetra-dev-local-encryption-seed"
+
 ENCRYPTION_KEY = hashlib.sha256(SECRET_SEED.encode('utf-8')).digest()
+
 
 def decrypt_val(encrypted_text: str) -> str:
     if not encrypted_text or not isinstance(encrypted_text, str):
@@ -245,6 +252,31 @@ class IntegrationExecutor:
                 continue
                 
             await self._dispatch(slug, "callback_scheduled", config, callback_data)
+
+    async def send_details_to_owner(self, agent_id: str, details: dict, org_id: str = None, user_id: str = None) -> bool:
+        """
+        In-call or post-call 'send details to owner' action.
+        Dispatches operational notification to business owner via active WhatsApp/Email/Telegram integrations.
+        Bypasses end-customer DND and consumer opt-in checks.
+        """
+        payload = {
+            **details,
+            "event_type": "send_to_owner",
+            "recipient_type": "owner",
+            "is_owner_notification": True
+        }
+        integrations = await self._get_agent_integrations(agent_id, org_id, user_id)
+        dispatched = False
+        for integration in integrations:
+            itype = integration.get("integration_types") or {}
+            slug = itype.get("slug")
+            config = integration.get("config") or {}
+            try:
+                await self._dispatch(slug, "send_to_owner", config, payload)
+                dispatched = True
+            except Exception as e:
+                logger.error(f"[send_details_to_owner] Error dispatching to {slug}: {e}")
+        return dispatched
 
     async def dispatch_post_call(self, agent_id: str, event_type: str, context: dict, data: dict, org_id: str = None, user_id: str = None):
         """
@@ -570,6 +602,24 @@ class IntegrationExecutor:
                     else:
                         template = "🗓️ Appointment Scheduled: {{contact_name}} - {{scheduled_at}}"
 
+                elif event_type == "send_to_owner":
+                    if slug == "whatsapp":
+                        template = (
+                            "🔔 *TRINETRA AI* | *In-Call Lead Details Alert*\n\n"
+                            "Your AI Agent has captured details during a live call:\n\n"
+                            "━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                            "👤 *Caller:* {{contact_name}} ({{contact_phone}})\n"
+                            "📝 *Details / Notes:*\n{{notes}}\n"
+                            "━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                            "_Operational notification to business owner._"
+                        )
+                    elif slug == "telegram":
+                        template = "🔔 *In-Call Alert*: {{contact_name}} ({{contact_phone}})\nNotes: {{notes}}"
+                    elif slug == "smtp-email":
+                        template = "<h3>In-Call Alert</h3><p>Caller: {{contact_name}} ({{contact_phone}})</p><p>{{notes}}</p>"
+                    else:
+                        template = "🔔 In-Call Alert: {{contact_name}} - {{notes}}"
+
                 else:
                     # Default call_completed event
                     if slug == "whatsapp":
@@ -601,7 +651,7 @@ class IntegrationExecutor:
             elif slug == "smtp-email":
                 await self._send_email(config, event_type, formatted_msg, data)
             elif slug == "whatsapp":
-                await self._send_whatsapp(config, formatted_msg, data)
+                await self._send_whatsapp(config, formatted_msg, {**data, "event_type": event_type})
             elif slug in ("calendar", "cal.com"):
                 await self._book_cal_com(config, data)
         except Exception as e:
@@ -624,16 +674,59 @@ class IntegrationExecutor:
                 logger.error(f"Telegram API error: {res.text}")
 
     async def _send_whatsapp(self, config: dict, message: str, data: dict = None) -> bool:
-        to_number = (data or {}).get("contact_phone") or (data or {}).get("prospect_phone") or config.get("target_phone")
+        data = data or {}
+        event_type = data.get("event_type", "")
+
+        # Item 2 / Phase 3: Distinguish operational owner alerts from customer communications
+        is_owner = (
+            data.get("recipient_type") == "owner"
+            or data.get("is_owner_notification", False)
+            or event_type in ("lead_captured", "callback_scheduled", "campaign_completed", "owner_alert", "send_to_owner")
+        )
+
+        if is_owner:
+            to_number = data.get("owner_phone") or config.get("target_phone") or data.get("contact_phone")
+        else:
+            to_number = data.get("contact_phone") or data.get("prospect_phone") or config.get("target_phone")
+
+        if not to_number:
+            logger.warning("WhatsApp dispatch skipped: no destination phone provided.")
+            return False
+
+        # Phase 3 Guard: DND, Opt-In, and Template validation ONLY apply to END CUSTOMERS
+        if not is_owner:
+            from app.services.outbound_safety_guardrails import check_internal_dnd, validate_whatsapp_outbound
+            from database import supabase_admin
+            
+            is_dnd = await check_internal_dnd(str(to_number), supabase_admin)
+            if is_dnd:
+                logger.warning(f"[WhatsApp Safety Guard] Blocked dispatch to customer {to_number}: Number is registered on DND/opt-out list.")
+                return False
+
+            is_proactive = bool(data.get("is_proactive", False))
+            whatsapp_opt_in = bool(data.get("whatsapp_opt_in", False))
+            template_name = data.get("template_name")
+
+            is_valid, reason = validate_whatsapp_outbound(
+                phone_number=str(to_number),
+                message_text=message,
+                template_name=template_name,
+                whatsapp_opt_in=whatsapp_opt_in,
+                is_proactive=is_proactive,
+                recipient_type="customer"
+            )
+            if not is_valid:
+                logger.warning(f"[WhatsApp Safety Guard] Blocked dispatch to customer {to_number}: {reason}")
+                return False
+        else:
+            logger.info(f"[WhatsApp Safety Guard] Operational owner notification permitted for {to_number} (event: {event_type})")
+
         twilio_sid = config.get("twilio_sid") or os.getenv("TWILIO_ACCOUNT_SID")
         auth_token = config.get("auth_token") or os.getenv("TWILIO_AUTH_TOKEN")
         from_number = config.get("phone_number") or config.get("from_number") or os.getenv("TWILIO_WHATSAPP_FROM") or os.getenv("TWILIO_PHONE_NUMBER")
 
         # 1. Twilio WhatsApp dispatch
         if twilio_sid and auth_token and from_number:
-            if not to_number:
-                logger.warning("Twilio WhatsApp dispatch skipped: no destination contact phone provided.")
-                return False
             from_whatsapp = format_whatsapp_number(from_number)
             to_whatsapp = format_whatsapp_number(to_number)
             if not to_whatsapp or to_whatsapp == "whatsapp:+":

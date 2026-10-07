@@ -47,7 +47,7 @@ export async function POST(
         // Try finding in phone_numbers table
         const { data: phoneRow } = await supabase
             .from("phone_numbers")
-            .select("id, organization_id, assigned_org_id, phone_number, provider")
+            .select("id, organization_id, assigned_org_id, phone_number, provider, status")
             .eq("id", phone_number_id)
             .maybeSingle();
 
@@ -65,6 +65,14 @@ export async function POST(
 
         if (!ownsNumber) {
             return NextResponse.json({ error: "Forbidden: You do not own this phone number" }, { status: 403 });
+        }
+
+        // Section 18.7 Guardrail: Expired or grace/hold numbers cannot be connected to an agent
+        const numStatus = (phoneNumberRecord as any).status || "active";
+        if (numStatus !== "active") {
+            return NextResponse.json({
+                error: `Cannot assign phone number: number is currently in '${numStatus}'. It must be renewed before assigning to an agent.`
+            }, { status: 400 });
         }
 
         // Verify agent ownership

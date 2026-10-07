@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { readFileSync } from 'fs'
 import { join } from 'path'
+import { validatePromptAiSafety } from '@/lib/safety/promptGuard'
 
 // Maps personality_type → fallback .txt filename (relative to backend/prompts/)
 const PROMPT_FILE_MAP: Record<string, string> = {
@@ -84,6 +85,13 @@ export async function PATCH(request: Request) {
       if (system_prompt !== undefined) {
         if (typeof system_prompt !== 'string' || system_prompt.trim().length === 0) {
           return NextResponse.json({ error: 'system_prompt cannot be empty' }, { status: 400 })
+        }
+        const { isValid, violations } = validatePromptAiSafety(system_prompt);
+        if (!isValid) {
+          return NextResponse.json({
+            error: 'Prompt safety violation: Directives instructing the agent to deny being an AI or claim to be human are prohibited.',
+            violations
+          }, { status: 400 });
         }
         updatePayload.system_prompt = system_prompt.trim()
       }

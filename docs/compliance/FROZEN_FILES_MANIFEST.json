@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "version": "1.0.0",
+  "generated_at": "2026-10-04T14:35:00Z",
+  "policy": "MASTER_PLAN.md Section 18.5 (Authoritative Overrides)",
+  "description": "Deterministic SHA-256 manifest of frozen statutory compliance and security files. Files are hashed with canonical newline normalization (LF) to guarantee cross-platform symmetry across Windows and Linux CI.",
+  "frozen_files": [
+    {
+      "path": "backend/app/services/disclosure_service.py",
+      "sha256": "e9580c12b7c6bece21a499089c9c020c0a7ad1c400787a24c6bfec5dad30bb37",
+      "regulatory_controls": ["PHASE1-DISC-01", "PHASE1-DISC-02", "PHASE1-PART-A", "PHASE1-PRIV-01"],
+      "status": "FROZEN_AND_VALIDATED"
+    },
+    {
+      "path": "backend/app/services/outbound_safety_guardrails.py",
+      "sha256": "86edbf54522d61570650c6ada0ac39870c616361b1e472e347f102dbb5fb5937",
+      "regulatory_controls": ["PHASE3-OUT-01", "PHASE3-OUT-02", "PHASE3-OUT-03", "PHASE3-OUT-04", "PHASE3-OUT-05"],
+      "status": "FROZEN_AND_VALIDATED"
+    },
+    {
+      "path": "backend/app/services/ai/prompt_guard.py",
+      "sha256": "ba4ccf1205ecef224e66c5317154cbe468e3f5f3c0967010b6295982010485a7",
+      "regulatory_controls": ["STEP0-AI-ID"],
+      "status": "FROZEN_AND_VALIDATED"
+    },
+    {
+      "path": "frontend/src/lib/safety/promptGuard.ts",
+      "sha256": "02f0dea341f94608867d67ca06b8417f9952f30e1e0ed4fc86c6d4576c480c74",
+      "regulatory_controls": ["STEP0-AI-ID"],
+      "status": "FROZEN_AND_VALIDATED"
+    }
+  ],
+  "excluded_pending_live_validation": [
+    "backend/app/services/voice_reliability_service.py",
+    "backend/agent.py"
+  ]
+}

@@ -39,7 +39,7 @@ export default function SystemConfigPage() {
     max_agents_starter: '3',
     max_agents_professional: '10',
     inbound_number_cost_paisa: '49900',
-    overage_per_minute_paisa: '200',
+    overage_per_minute_paisa: '1100',
     maintenance_mode: 'false',
 
     // International (USD) plan pricing & numbers

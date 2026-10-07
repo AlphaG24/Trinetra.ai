@@ -6,7 +6,8 @@ import { Inter, JetBrains_Mono, Playfair_Display, Montserrat, Merriweather } fro
 import localFont from 'next/font/local';
 import { Toaster } from "sonner";
 import { AuthProvider } from "@/src/components/providers/AuthProvider";
-import { MaintenanceWatcher } from "@/src/components/dashboard/MaintenanceWatcher";
+// Client wrapper that applies ssr:false for MaintenanceWatcher
+import { MaintenanceWatcherLoader } from '@/src/components/dashboard/MaintenanceWatcherLoader';
 
 const inter = Inter({
   subsets: ["latin"],
@@ -204,7 +205,7 @@ export default async function RootLayout({
         />
         <AuthProvider>
           <Suspense fallback={null}>
-            <MaintenanceWatcher initialMaintenanceMode={initialMaintenanceMode} />
+            <MaintenanceWatcherLoader initialMaintenanceMode={initialMaintenanceMode} />
           </Suspense>
           {children}
           <Toaster position="bottom-right" theme={initialTheme === 'light' ? 'light' : 'dark'} />

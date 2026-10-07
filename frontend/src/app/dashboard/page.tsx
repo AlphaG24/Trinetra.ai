@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/utils/supabase/client'
 import { WelcomeHeader } from '@/src/components/dashboard/WelcomeHeader'
@@ -13,6 +13,7 @@ import useSWR from 'swr'
 import { AgentComparisonWidget } from '@/src/components/agents/AgentComparisonWidget'
 import { useDashboardStore } from '@/src/store/dashboardStore'
 import { useAuth } from '@/src/components/providers/AuthProvider'
+import { AlertTriangle, RefreshCw } from 'lucide-react'
 const fetcher = (url: string) => fetch(url).then(res => res.json())
 
 interface UserProfile {
@@ -34,6 +35,11 @@ export default function DashboardPage() {
   const { setProfile: setStoreProfile } = useDashboardStore()
 
   useEffect(() => {
+    // 1-second fail-safe timer so the header NEVER gets stuck on skeleton
+    const safetyTimer = setTimeout(() => {
+      setProfileLoading(false)
+    }, 1000)
+
     if (authProfile) {
       const fullProfile = {
         ...authProfile,
@@ -46,13 +52,16 @@ export default function DashboardPage() {
     } else if (!authLoading) {
       setProfileLoading(false)
     }
+
+    return () => clearTimeout(safetyTimer)
   }, [authProfile, authLoading, setStoreProfile])
 
   const { data: overviewData, error: overviewError, isLoading: overviewLoading, mutate: mutateOverview } = useSWR('/api/dashboard/overview', fetcher, {
-    refreshInterval: 30000,
-    revalidateOnFocus: true,
+    refreshInterval: 0, // Disabled aggressive polling; manual refresh or user actions trigger updates
+    revalidateOnFocus: false, // Prevent query storm when switching browser tabs
     revalidateOnMount: true,
-    dedupingInterval: 2000, // short window so mutate() from delete immediately re-fetches
+    revalidateOnReconnect: true,
+    dedupingInterval: 30000, // 30s deduplication window
   })
 
   const init = async () => {
@@ -87,6 +96,14 @@ export default function DashboardPage() {
     }
   }
 
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const debouncedMutateOverview = useCallback(() => {
+    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current)
+    debounceTimerRef.current = setTimeout(() => {
+      mutateOverview()
+    }, 2000)
+  }, [mutateOverview])
+
   useEffect(() => {
     if (!authProfile && !authLoading) {
       init()
@@ -95,14 +112,15 @@ export default function DashboardPage() {
     const supabase = createClient()
     let activeChannel: any = null
     let dataChannel: any = null
+    let isMounted = true
 
     const subscribeToRealtime = async () => {
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
+      if (!user || !isMounted) return
 
-      // Profile updates
+      // Deterministic channel names to avoid connection leak in pooler
       activeChannel = supabase
-        .channel(`dashboard_profile_realtime_${Math.random().toString(36).substring(7)}`)
+        .channel(`dashboard_profile_${user.id}`)
         .on(
           'postgres_changes',
           {
@@ -112,6 +130,7 @@ export default function DashboardPage() {
             filter: `id=eq.${user.id}`,
           },
           (payload: any) => {
+            if (!isMounted) return
             const updatedProfile = payload.new as UserProfile
             setProfile(updatedProfile)
             setStoreProfile(updatedProfile as any)
@@ -119,9 +138,9 @@ export default function DashboardPage() {
         )
         .subscribe()
 
-      // Realtime KPI, Calls, Leads & Campaigns sync (Task 4.4)
+      // Realtime KPI, Calls, Leads & Campaigns sync (debounced to avoid query bursts)
       dataChannel = supabase
-        .channel(`dashboard_data_realtime_${Math.random().toString(36).substring(7)}`)
+        .channel(`dashboard_data_${user.id}`)
         .on(
           'postgres_changes',
           {
@@ -131,7 +150,7 @@ export default function DashboardPage() {
             filter: `user_id=eq.${user.id}`,
           },
           () => {
-            mutateOverview()
+            debouncedMutateOverview()
           }
         )
         .on(
@@ -143,7 +162,7 @@ export default function DashboardPage() {
             filter: `user_id=eq.${user.id}`,
           },
           () => {
-            mutateOverview()
+            debouncedMutateOverview()
           }
         )
         .on(
@@ -155,7 +174,7 @@ export default function DashboardPage() {
             filter: `user_id=eq.${user.id}`,
           },
           () => {
-            mutateOverview()
+            debouncedMutateOverview()
           }
         )
         .on(
@@ -167,7 +186,7 @@ export default function DashboardPage() {
             filter: `user_id=eq.${user.id}`,
           },
           () => {
-            mutateOverview()
+            debouncedMutateOverview()
           }
         )
         .subscribe()
@@ -176,6 +195,10 @@ export default function DashboardPage() {
     subscribeToRealtime()
 
     return () => {
+      isMounted = false
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current)
+      }
       if (activeChannel) {
         supabase.removeChannel(activeChannel)
       }
@@ -183,16 +206,34 @@ export default function DashboardPage() {
         supabase.removeChannel(dataChannel)
       }
     }
-  }, [mutateOverview])
+  }, [debouncedMutateOverview])
 
   return (
     <div suppressHydrationWarning className="space-y-6 max-w-7xl mx-auto p-4 md:p-6">
       {/* 1. Welcome Header */}
       <WelcomeHeader
-        fullName={profile?.full_name}
-        isOnboardingComplete={profile?.onboarding_complete}
-        loading={profileLoading}
+        fullName={profile?.full_name || authProfile?.full_name || authUser?.email?.split('@')[0] || 'Partner'}
+        isOnboardingComplete={profile?.onboarding_complete ?? authProfile?.onboarding_complete ?? true}
+        loading={profileLoading && !authProfile && !authUser}
       />
+
+      {/* Degraded State / Connection Warning Banner */}
+      {(overviewError || overviewData?.error) && (
+        <div className="flex items-center gap-3 p-4 bg-amber-500/10 border border-amber-500/30 rounded-2xl text-amber-300 text-sm">
+          <AlertTriangle className="w-5 h-5 flex-shrink-0 text-amber-400" />
+          <div className="flex-1">
+            <span className="font-semibold text-amber-200">Database telemetry is temporarily reconnecting.</span> You are viewing cached dashboard data while telemetry refreshes in the background.
+          </div>
+          <button
+            onClick={() => mutateOverview()}
+            disabled={overviewLoading}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 rounded-xl text-xs font-medium text-amber-200 transition-colors disabled:opacity-50"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${overviewLoading ? 'animate-spin' : ''}`} />
+            Retry
+          </button>
+        </div>
+      )}
 
       {/* 2. Trial & Demo Warnings */}
       {profile && (

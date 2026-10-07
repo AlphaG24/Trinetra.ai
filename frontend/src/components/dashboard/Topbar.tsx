@@ -94,6 +94,20 @@ export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
 
           const fetchNotifs = async () => {
             try {
+              const res = await fetch('/api/notifications')
+              if (res.ok) {
+                const data = await res.json()
+                const list = data.notifications || []
+                const count = data.unreadCount ?? list.filter((n: any) => !n.is_read).length
+                setNotifications(list.slice(0, 5))
+                setUnreadCount(count)
+                return
+              }
+            } catch {
+              // Fallback to client Supabase below
+            }
+
+            try {
               const { count } = await supabase
                 .from('notifications')
                 .select('*', { count: 'exact', head: true })
@@ -109,9 +123,7 @@ export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
                 .limit(10)
               
               if (notifs) {
-                const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000
-                const recentList = notifs.filter((n: any) => !n.is_read || new Date(n.created_at).getTime() >= sevenDaysAgo).slice(0, 5)
-                setNotifications(recentList)
+                setNotifications(notifs.slice(0, 5))
               }
             } catch (err) {
               console.error('Error fetching notifications:', err)
@@ -121,8 +133,14 @@ export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
           fetchNotifsRef.current = fetchNotifs
           await fetchNotifs()
 
-          // Subscribe to Postgres changes on notifications table
-          const uniqueChannelName = `topbar-notifications-${currentUser.id}-${Math.random().toString(36).slice(2, 9)}`
+          // Subscribe to Postgres changes on notifications table with unique channel instance
+          if (channel) {
+            try {
+              supabase.removeChannel(channel)
+            } catch {}
+          }
+
+          const uniqueChannelName = `topbar-notifs-${currentUser.id}-${Date.now()}`
           channel = supabase
             .channel(uniqueChannelName)
             .on(
@@ -141,17 +159,17 @@ export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
 
           const handleCallCompleted = () => {
             fetchNotifs()
-            setTimeout(fetchNotifs, 3500)
-            setTimeout(fetchNotifs, 7000)
           }
           window.addEventListener('trinetra:call_completed', handleCallCompleted)
 
-          // Fallback periodic poll every 15s to guarantee fresh state
-          pollInterval = setInterval(fetchNotifs, 15000)
+          // Fallback background heartbeat poll every 60s (Realtime handles instant pushes)
+          pollInterval = setInterval(fetchNotifs, 60000)
 
           cleanupHandler = () => {
             if (channel) {
-              supabase.removeChannel(channel)
+              try {
+                supabase.removeChannel(channel)
+              } catch {}
             }
             if (pollInterval) {
               clearInterval(pollInterval)
@@ -170,7 +188,7 @@ export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
       if (cleanupHandler) cleanupHandler()
       if (pollInterval) clearInterval(pollInterval)
     }
-  }, [])
+  }, [authUser?.id, authProfile?.id])
 
   const handleSignOut = async () => {
     const supabase = createClient()

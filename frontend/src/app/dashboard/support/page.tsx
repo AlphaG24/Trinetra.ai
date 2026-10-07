@@ -390,6 +390,7 @@ export default function SupportPage() {
                     onChange={(e) => setCategory(e.target.value)}
                     className="w-full px-3 py-2.5 bg-[var(--background)] border border-[var(--border)] rounded-xl text-xs text-[var(--heading)] cursor-pointer focus:outline-none"
                   >
+                    <option value="cfu_forwarding">Call Forwarding (CFU) Setup</option>
                     <option value="general">General Inquiry</option>
                     <option value="billing">Billing & Pricing</option>
                     <option value="agent_issue">Voice Agent Concerns</option>

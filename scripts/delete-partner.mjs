@@ -5,9 +5,20 @@
 import { createClient } from '@supabase/supabase-js'
 import 'dotenv/config'
 
-const email = process.argv[2]
+const email = process.argv.filter(arg => !arg.startsWith('--'))[2]
 if (!email) {
-  console.error('Usage: node scripts/delete-partner.mjs <email>')
+  console.error('Usage: node scripts/delete-partner.mjs <email> --confirm')
+  process.exit(1)
+}
+
+if (!process.argv.includes('--confirm')) {
+  console.error('⚠️  SAFETY GUARD: To prevent accidental production deletions, pass --confirm to proceed.')
+  console.error('Example: node scripts/delete-partner.mjs test@example.com --confirm')
+  process.exit(1)
+}
+
+if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+  console.error('❌ Error: NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY is not defined in environment.')
   process.exit(1)
 }
 
@@ -15,6 +26,7 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY
 )
+
 
 console.log(`\n🔍 Looking up user with email: ${email}`)
 

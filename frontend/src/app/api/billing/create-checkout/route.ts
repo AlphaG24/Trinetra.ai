@@ -63,6 +63,23 @@ export async function POST(request: Request) {
     }
     const numberPrice = parseInt(config.inbound_number_cost_paisa || '49900', 10)
 
+    // Verify strictly one-time trial restriction
+    const hasTrial = items.some(item => item.type === 'subscription' && (item.key === 'trial' || item.key.endsWith('_trial')))
+    if (hasTrial) {
+      const { data: userProfile } = await adminClient
+        .from('profiles')
+        .select('plan_tier, trial_started_at')
+        .eq('id', user.id)
+        .maybeSingle()
+
+      if (userProfile && (userProfile.plan_tier === 'starter' || userProfile.plan_tier === 'professional' || userProfile.trial_started_at)) {
+        return NextResponse.json({
+          error: 'The ₹99 7-Day Trial is a strictly one-time evaluation pack for new accounts. Your account has already utilized a trial or is on a paid plan. Please select a Starter or Professional plan.'
+        }, { status: 400 })
+      }
+    }
+
+
     // Calculate dynamic cart pricing
     let subtotal = 0
     let discount = 0
@@ -92,7 +109,16 @@ export async function POST(request: Request) {
 
     for (const item of items) {
       if (item.type === 'subscription') {
-        const itemPrice = subscriptionPrices[item.key] || 0
+        let tierKey = item.key.toLowerCase()
+        if (tierKey.includes('professional') || tierKey.includes('pro')) {
+          tierKey = 'professional'
+        } else if (tierKey.includes('starter')) {
+          tierKey = 'starter'
+        } else if (tierKey.includes('trial')) {
+          tierKey = 'trial'
+        }
+
+        const itemPrice = subscriptionPrices[tierKey] || subscriptionPrices[item.key] || 0
         const itemSubtotal = itemPrice * item.quantity
         const itemDiscount = Math.round(itemSubtotal * (agentDiscountPercent / 100))
         

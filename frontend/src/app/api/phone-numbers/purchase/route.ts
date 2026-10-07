@@ -22,6 +22,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "User has no organization assigned" }, { status: 400 });
     }
 
+    // Gating for Free Trial Tier (Master Plan Decision P1: No number purchase on free trial tier)
+    const userPlanTier = ((profile as any).plan_tier || "free").toLowerCase();
+    if (userPlanTier === "free" && profile.role !== "developer_tester" && profile.role !== "admin") {
+      return NextResponse.json(
+        { error: "Phone number purchase is not available on the free trial tier. Please upgrade to the ₹99 Trial or a paid plan." },
+        { status: 403 }
+      );
+    }
+
     const body = await request.json().catch(() => null);
     if (!body || !body.number_id) {
       return NextResponse.json({ error: "Missing number_id" }, { status: 400 });
@@ -43,6 +52,33 @@ export async function POST(request: Request) {
 
     if (poolNumber.is_assigned || poolNumber.organization_id || poolNumber.assigned_org_id) {
       return NextResponse.json({ error: "This phone number is already assigned to another organization" }, { status: 409 });
+    }
+
+    // 1b. Statutory Telecom KYC Gate (TRAI & DoT regulations)
+    if (profile.role !== "developer_tester") {
+      const { data: kycDocs } = await adminClient
+        .from("kyc_documents")
+        .select("document_type, status")
+        .eq("organization_id", profile.organization_id)
+        .eq("status", "verified");
+
+      const entityTypes = ["company_pan", "gstin_certificate", "incorporation_cert"];
+      const hasVerifiedEntity = kycDocs?.some((d) => entityTypes.includes(d.document_type));
+      const hasVerifiedSignatory = kycDocs?.some((d) => d.document_type === "authorized_signatory_id");
+
+      if (!hasVerifiedEntity || !hasVerifiedSignatory) {
+        return NextResponse.json(
+          {
+            error: "Statutory Telecom KYC Required: Per TRAI & DoT regulations, you must have both a verified Entity Proof (Company PAN or GSTIN) and an Authorized Signatory ID before purchasing live phone numbers.",
+            kyc_required: true,
+            missing: {
+              entity: !hasVerifiedEntity,
+              signatory: !hasVerifiedSignatory,
+            },
+          },
+          { status: 403 }
+        );
+      }
     }
 
     // 2. Load system payment configuration for Razorpay

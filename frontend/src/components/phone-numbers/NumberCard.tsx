@@ -82,10 +82,20 @@ export function NumberCard({
     <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl shadow-sm hover:border-violet-500/40 hover:shadow-md transition-all duration-150 p-5 flex flex-col justify-between text-left">
       <div>
         {/* Top Row: Status and Provider */}
+        {/* Top Row: Status and Provider */}
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
-            <div className={`w-2 h-2 rounded-full ${phoneNumber.status === 'available' ? 'bg-emerald-500' : phoneNumber.status === 'active' ? 'bg-green-500' : 'bg-amber-500'}`} />
-            <span className="text-xs font-semibold text-[var(--muted)] capitalize">{phoneNumber.status}</span>
+            <div className={`w-2 h-2 rounded-full ${
+              phoneNumber.status === 'available' ? 'bg-emerald-500' :
+              phoneNumber.status === 'active' ? 'bg-green-500' :
+              phoneNumber.status === 'grace_period' ? 'bg-amber-500 animate-pulse' :
+              phoneNumber.status === 'hold_period' ? 'bg-rose-500' : 'bg-slate-500'
+            }`} />
+            <span className="text-xs font-semibold text-[var(--muted)] capitalize">
+              {phoneNumber.status === 'grace_period' ? 'Grace Period (15d)' :
+               phoneNumber.status === 'hold_period' ? 'Hold Period (14d)' :
+               phoneNumber.status}
+            </span>
           </div>
           <div className="px-2 py-0.5 rounded-full bg-[var(--secondary)] text-[10px] font-bold uppercase tracking-wider text-[var(--muted)]">
             {phoneNumber.provider === 'exotel' ? 'Exotel' : phoneNumber.provider === 'sarvam' ? 'Sarvam AI' : phoneNumber.provider === 'twilio' ? 'Twilio' : phoneNumber.provider || 'Provider'}
@@ -119,13 +129,22 @@ export function NumberCard({
           </div>
         </div>
 
-        {/* Assigned Agents or Pool badge */}
+        {/* Assigned Agents or Pool / Grace badge */}
         <div className="mb-4 min-h-[40px]">
           {isPoolItem ? (
             <div className="text-xs text-[var(--muted)]">
               <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full">
                 Ready for Instant Assignment
               </span>
+            </div>
+          ) : phoneNumber.status === 'grace_period' || phoneNumber.status === 'hold_period' ? (
+            <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs text-amber-300 space-y-1">
+              <span className="font-bold flex items-center gap-1 text-[11px]">
+                ⚠️ Disconnected (Grace Period)
+              </span>
+              <p className="text-[10px] text-[var(--muted)] leading-tight">
+                Disconnected from agent. Callers hear a neutral &ldquo;unavailable&rdquo; message. Renew to restore inbound calling.
+              </p>
             </div>
           ) : phoneNumber.assigned_agents && phoneNumber.assigned_agents.length > 0 ? (
             <div>
@@ -216,21 +235,32 @@ export function NumberCard({
           )
         ) : (
           <div className="flex items-center gap-2">
-            {onRenew && (
+            {(phoneNumber.status === 'grace_period' || phoneNumber.status === 'hold_period') && onRenew ? (
               <button
                 onClick={() => onRenew(phoneNumber.id)}
-                className="text-xs font-bold text-violet-400 hover:underline"
+                className="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-black font-extrabold text-xs uppercase tracking-wider transition-all shadow-md cursor-pointer"
               >
-                Renew
+                Renew Line
               </button>
-            )}
-            {onManage && (
-              <button 
-                onClick={() => onManage(phoneNumber.id)}
-                className="px-3 py-1 rounded-lg bg-[var(--secondary)] hover:bg-[var(--border)] text-xs font-bold text-[var(--heading)] transition-all"
-              >
-                Manage
-              </button>
+            ) : (
+              <>
+                {onRenew && (
+                  <button
+                    onClick={() => onRenew(phoneNumber.id)}
+                    className="text-xs font-bold text-violet-400 hover:underline cursor-pointer"
+                  >
+                    Renew
+                  </button>
+                )}
+                {onManage && (
+                  <button 
+                    onClick={() => onManage(phoneNumber.id)}
+                    className="px-3 py-1 rounded-lg bg-[var(--secondary)] hover:bg-[var(--border)] text-xs font-bold text-[var(--heading)] transition-all cursor-pointer"
+                  >
+                    Manage
+                  </button>
+                )}
+              </>
             )}
           </div>
         )}

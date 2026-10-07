@@ -42,29 +42,7 @@ export async function GET(
       .or(`organization_id.eq.${profile?.organization_id || user.id},user_id.eq.${user.id}`)
       .gte('created_at', todayStart.toISOString());
 
-    // 4. Query Minutes Used This Month
-    const monthStart = new Date();
-    monthStart.setDate(1);
-    monthStart.setHours(0, 0, 0, 0);
-
-    const { data: monthCalls, error: errMonthCalls } = await supabase
-      .from('voice_calls')
-      .select('duration_seconds')
-      .eq('agent_id', agentId)
-      .or(`organization_id.eq.${profile?.organization_id || user.id},user_id.eq.${user.id}`)
-      .gte('created_at', monthStart.toISOString());
-
-    const totalSeconds = monthCalls?.reduce((acc, c) => acc + (c.duration_seconds || 0), 0) || 0;
-    const minutesUsed = Math.round(totalSeconds / 60);
-
-    // 5. Query Leads Generated
-    const { count: leadsGenerated, error: errLeads } = await supabase
-      .from('leads')
-      .select('id', { count: 'exact', head: true })
-      .eq('agent_id', agentId)
-      .eq('user_id', user.id); // Leads are user_id bound in RLS
-
-    // 6. Query Avg Call Duration
+    // 4. Query Avg Call Duration and total duration for this specific agent
     const { data: allCalls, error: errAllCalls } = await supabase
       .from('voice_calls')
       .select('duration_seconds')
@@ -74,12 +52,39 @@ export async function GET(
     const allSeconds = allCalls?.reduce((acc, c) => acc + (c.duration_seconds || 0), 0) || 0;
     const avgDurationSeconds = allCalls && allCalls.length > 0 ? allSeconds / allCalls.length : 0;
     const avgDuration = (avgDurationSeconds / 60).toFixed(1);
+    const agentCallMinutes = Math.ceil(allSeconds / 60);
+
+    const { data: agentData } = await supabase
+      .from('agents')
+      .select('minutes_used, user_id, is_demo')
+      .eq('id', agentId)
+      .maybeSingle();
+
+    // Use agent-specific call logs minutes or recorded agent minutes (do not mix with other agents)
+    const minutesUsed = agentCallMinutes > 0 ? agentCallMinutes : (agentData?.minutes_used || 0);
+
+    // 5. Query Leads Generated
+    const { count: leadsGenerated, error: errLeads } = await supabase
+      .from('leads')
+      .select('id', { count: 'exact', head: true })
+      .eq('agent_id', agentId)
+      .eq('user_id', user.id); // Leads are user_id bound in RLS
+
+    // 6. Query organization wallet for claimed emergency minutes buffer
+    const { data: walletData } = await supabase
+      .from('wallets')
+      .select('emergency_minutes_available')
+      .eq('organization_id', profile.organization_id)
+      .maybeSingle();
+
+    const emergencyMinutes = walletData?.emergency_minutes_available || 0;
 
     return NextResponse.json({
       callsToday: callsToday || 0,
       minutesUsed: minutesUsed || 0,
       leadsGenerated: leadsGenerated || 0,
-      avgDuration: parseFloat(avgDuration) || 0.0
+      avgDuration: parseFloat(avgDuration) || 0.0,
+      emergencyMinutes: emergencyMinutes
     });
   } catch (error: any) {
     console.error("[Stats API] Error:", error);

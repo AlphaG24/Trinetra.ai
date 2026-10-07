@@ -14,6 +14,7 @@ import asyncio
 import logging
 import os
 from typing import Dict, Optional
+from app.services.ai.prompt_guard import enforce_prompt_ai_guard
 
 logger = logging.getLogger("prompt-service")
 
@@ -154,4 +155,4 @@ class PromptService:
         if personality_style:
             prompt += personality_style
 
-        return prompt
+        return enforce_prompt_ai_guard(prompt)

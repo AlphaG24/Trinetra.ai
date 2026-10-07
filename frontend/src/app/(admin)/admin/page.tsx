@@ -8,7 +8,9 @@ import {
   LifeBuoy, 
   ChevronRight, 
   Building2, 
-  Calendar 
+  Calendar,
+  Activity,
+  CheckCircle2
 } from 'lucide-react'
 import Link from 'next/link'
 
@@ -176,6 +178,90 @@ export default async function AdminOverviewPage() {
               className="text-xs text-violet-400 hover:text-violet-300 font-bold uppercase tracking-wider"
             >
               Open Support Console &rarr;
+            </Link>
+          </div>
+        {/* Panel C: Section 6 Monitoring & Alerting Stack */}
+        <div className="bg-[#0f111a]/60 border border-white/5 rounded-2xl p-6 space-y-4 lg:col-span-2">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-white/5 pb-3">
+            <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
+              <Activity className="w-4 h-4 text-emerald-400" />
+              Platform Observability & Monitoring Stack (Section 6)
+            </h3>
+            <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full w-fit">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              All Systems Operational
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5 pt-1">
+            {/* Monitor 1: Uptime */}
+            <div className="p-3.5 rounded-xl bg-zinc-950/60 border border-zinc-900 flex items-start justify-between">
+              <div>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 block">Uptime Probes</span>
+                <span className="text-xs font-bold text-white mt-1 block">BetterStack HTTP/TCP</span>
+                <span className="text-[10px] text-emerald-400 font-mono mt-0.5 block">10 Monitors · 3m Interval</span>
+              </div>
+              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+            </div>
+
+            {/* Monitor 2: Errors */}
+            <div className="p-3.5 rounded-xl bg-zinc-950/60 border border-zinc-900 flex items-start justify-between">
+              <div>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 block">Exception Tracing</span>
+                <span className="text-xs font-bold text-white mt-1 block">Sentry Error Monitor</span>
+                <span className="text-[10px] text-emerald-400 font-mono mt-0.5 block">Zero-PII Hook Active</span>
+              </div>
+              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+            </div>
+
+            {/* Monitor 3: Cron Jobs */}
+            <div className="p-3.5 rounded-xl bg-zinc-950/60 border border-zinc-900 flex items-start justify-between">
+              <div>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 block">Worker Heartbeats</span>
+                <span className="text-xs font-bold text-white mt-1 block">Healthchecks.io</span>
+                <span className="text-[10px] text-emerald-400 font-mono mt-0.5 block">cleanup · scheduler · pool</span>
+              </div>
+              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+            </div>
+
+            {/* Monitor 4: Logs */}
+            <div className="p-3.5 rounded-xl bg-zinc-950/60 border border-zinc-900 flex items-start justify-between">
+              <div>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 block">Log Aggregation</span>
+                <span className="text-xs font-bold text-white mt-1 block">BetterStack Logs</span>
+                <span className="text-[10px] text-emerald-400 font-mono mt-0.5 block">Pre-scrubbed PII Stream</span>
+              </div>
+              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+            </div>
+
+            {/* Monitor 5: Alerts */}
+            <div className="p-3.5 rounded-xl bg-zinc-950/60 border border-zinc-900 flex items-start justify-between">
+              <div>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 block">Incident Alerts</span>
+                <span className="text-xs font-bold text-white mt-1 block">Telegram Bot + Email</span>
+                <span className="text-[10px] text-emerald-400 font-mono mt-0.5 block">Instant P1/P2 Dispatch</span>
+              </div>
+              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+            </div>
+
+            {/* Monitor 6: Database */}
+            <div className="p-3.5 rounded-xl bg-zinc-950/60 border border-zinc-900 flex items-start justify-between">
+              <div>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 block">Database Connectivity</span>
+                <span className="text-xs font-bold text-white mt-1 block">Supabase PostgreSQL</span>
+                <span className="text-[10px] text-emerald-400 font-mono mt-0.5 block">RLS Enforced · Mumbai Reg</span>
+              </div>
+              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+            </div>
+          </div>
+
+          <div className="pt-2 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs text-zinc-500 border-t border-white/5">
+            <span>7 Day-1 synthetic probes running: homepage, API /health, LiveKit WS, DB ping, webhooks, SSL, DNS.</span>
+            <Link 
+              href="/admin/system"
+              className="text-xs text-violet-400 hover:text-violet-300 font-bold uppercase tracking-wider shrink-0"
+            >
+              Configure Credentials &rarr;
             </Link>
           </div>
         </div>

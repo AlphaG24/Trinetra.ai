@@ -33,27 +33,26 @@ export function ProfileTab() {
     async function loadProfile() {
       try {
         setLoading(true)
-        const supabase = createClient()
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) return
-
         const res = await fetch('/api/profiles')
         if (!res.ok) throw new Error('Failed to load profile')
         const data = await res.json()
         const prof = data.profile
 
-        setProfile((prev) => ({
-          ...prev,
-          fullName: prof?.full_name || '',
-          email: user.email || '',
-          companyName: prof?.company_name || '',
-          industry: prof?.business_type || 'Other',
-          country: prof?.country || 'Other',
-          theme: prof?.theme || globalTheme,
-        }))
+        if (prof) {
+          setProfile((prev) => ({
+            ...prev,
+            fullName: prof.full_name || '',
+            email: prof.email || '',
+            phone: prof.phone || '',
+            companyName: prof.company_name || '',
+            industry: prof.business_type || 'Other',
+            country: prof.country || 'Other',
+            theme: prof.theme || globalTheme,
+          }))
 
-        if (prof?.avatar_url) {
-          setAvatarUrl(prof.avatar_url)
+          if (prof.avatar_url) {
+            setAvatarUrl(prof.avatar_url)
+          }
         }
       } catch (err) {
         console.error('Error loading settings profile:', err)

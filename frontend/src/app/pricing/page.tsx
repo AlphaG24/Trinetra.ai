@@ -36,7 +36,7 @@ const FAQS = [
   {
     question: "What does the setup fee cover?",
     answer:
-      "The one-time setup fee covers initial agent configuration, knowledge base training, custom prompt engineering, testing, deployment, and your onboarding sessions. It's a one-time charge - no recurring setup costs.",
+      "The onboarding setup fee is currently waived during our launch phase. Initial agent configuration, voice prompt tuning, testing, and your onboarding sessions are included with your subscription.",
   },
   {
     question: "What happens if I exceed my plan limits?",
@@ -56,7 +56,7 @@ const FAQS = [
   {
     question: "Is there a free trial?",
     answer:
-      "We don't offer a free trial, but we provide a thorough demo during your onboarding call so you can see exactly how your agent will work before going live.",
+      "Yes! You can get started immediately with our Free Trial (1 agent, 10 minutes of web calls, zero credit card required). For full dashboard access including dedicated phone numbers and 50 call minutes, you can activate the ₹99 7-Day Trial.",
   },
   {
     question: "Can I cancel my subscription?",

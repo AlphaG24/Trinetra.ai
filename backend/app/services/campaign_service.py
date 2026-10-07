@@ -101,12 +101,54 @@ class CampaignService:
         name: str,
         file_content: bytes,
         filename: str,
+        purpose: str = "promotional",
         calling_hours_start: str = "10:00",
         calling_hours_end: str = "18:00",
         timezone_str: str = "Asia/Kolkata",
-        scheduled_start: Optional[str] = None
+        scheduled_start: Optional[str] = None,
+        consent_attestation: bool = False,
+        attestation_statement: Optional[str] = None,
+        purpose_attestation: bool = False,
+        user_id: Optional[str] = None,
+        user_email: Optional[str] = None
     ) -> Dict:
-        logger.info(f"Creating campaign: {name} (org: {organization_id})")
+        logger.info(f"Creating campaign: {name} (org: {organization_id}, purpose: {purpose})")
+
+        # Mandatory affirmative consent attestation check [CONFIRM WITH A LAWYER]
+        if not consent_attestation:
+            raise ValueError(
+                "Mandatory statutory attestation missing: You must certify that you have verifiable affirmative consent "
+                "for all contacts before creating a campaign. [CONFIRM WITH A LAWYER]"
+            )
+
+        # Mandatory purpose attestation for non-promotional campaigns [CONFIRM WITH A LAWYER]
+        norm_purpose = str(purpose).strip().lower()
+        if norm_purpose not in ("promotional", "service", "transactional"):
+            norm_purpose = "promotional"
+
+        if norm_purpose != "promotional" and not purpose_attestation:
+            raise ValueError(
+                f"Statutory purpose attestation missing: '{norm_purpose}' campaigns require explicit affirmative "
+                "certification that calls contain no marketing or sales content under TRAI TCCCPR 2018 / TCPA. [CONFIRM WITH A LAWYER]"
+            )
+
+        import hashlib
+        file_hash = hashlib.sha256(file_content).hexdigest()
+        statement_text = attestation_statement or (
+            "I confirm and attest that I hold valid, verifiable affirmative consent for all contacts in this list "
+            "under applicable statutory telecommunications regulations (including TRAI TCCCPR 2018 and TCPA). [CONFIRM WITH A LAWYER]"
+        )
+        attestation_meta = {
+            "attested": True,
+            "purpose": norm_purpose,
+            "purpose_attested": bool(purpose_attestation),
+            "statement": statement_text,
+            "file_hash_sha256": file_hash,
+            "filename": filename,
+            "user_id": user_id,
+            "user_email": user_email,
+            "attested_at": datetime.now(timezone.utc).isoformat()
+        }
         
         # Check if agent is a free demo agent
         agent_res = await asyncio.to_thread(
@@ -148,8 +190,12 @@ class CampaignService:
             logger.warning(f"Failed to upload spreadsheet to storage bucket: {storage_err}. Falling back to local mock URL.")
             contact_list_url = f"https://mock-storage.trinetraedu-ai.com/{storage_path}"
 
-        # 3. Parse spreadsheet content
+        # 3. Parse spreadsheet content & enforce Phase 3 Per-Contact Consent Guard
+        from app.services.outbound_safety_guardrails import validate_contact_consent, classify_campaign_purpose
         contacts = []
+        skipped_contacts = []
+        resolved_purpose = classify_campaign_purpose(purpose, name)
+
         if filename.endswith(".csv"):
             try:
                 decoded = file_content.decode("utf-8-sig")
@@ -178,6 +224,16 @@ class CampaignService:
                     # Find notes
                     notes_key = next((k for k in ["notes", "note", "description", "remarks", "comment"] if k in row_norm), None)
                     notes = row_norm[notes_key] if notes_key else ""
+
+                    # Phase 3 Guard: Validate per-contact consent flag & source
+                    is_consented, c_source, reject_reason = validate_contact_consent(row)
+                    if not is_consented:
+                        skipped_contacts.append({
+                            "phone": phone,
+                            "full_name": full_name,
+                            "reason": reject_reason or "Missing required consent flag or consent source [CONFIRM WITH A LAWYER]"
+                        })
+                        continue
                     
                     contacts.append({
                         "campaign_id": campaign_id,
@@ -185,7 +241,10 @@ class CampaignService:
                         "phone": phone,
                         "company_name": company,
                         "notes": notes,
-                        "call_status": "pending"
+                        "call_status": "pending",
+                        "consent_flag": True,
+                        "consent_source": c_source,
+                        "consent_timestamp": datetime.now(timezone.utc).isoformat()
                     })
             except Exception as csv_err:
                 logger.error(f"Failed to parse CSV: {csv_err}")
@@ -196,7 +255,8 @@ class CampaignService:
                 sheet = wb.active
                 
                 # Fetch header row
-                headers = [str(cell.value).lower().replace("_", "").replace(" ", "") if cell.value else "" for cell in sheet[1]]
+                raw_headers = [str(cell.value) if cell.value is not None else "" for cell in sheet[1]]
+                headers = [h.lower().replace("_", "").replace(" ", "") for h in raw_headers]
                 
                 phone_idx = next((i for i, h in enumerate(headers) if h in ["phone", "phonenumber", "mobile", "mobilenumber", "contact", "contactnumber"]), None)
                 if phone_idx is None:
@@ -219,6 +279,17 @@ class CampaignService:
                     full_name = str(row_vals[name_idx]) if (name_idx is not None and len(row_vals) > name_idx and row_vals[name_idx]) else ""
                     company = str(row_vals[company_idx]) if (company_idx is not None and len(row_vals) > company_idx and row_vals[company_idx]) else ""
                     notes = str(row_vals[notes_idx]) if (notes_idx is not None and len(row_vals) > notes_idx and row_vals[notes_idx]) else ""
+
+                    # Build row dictionary for consent validation
+                    row_dict = {headers[i]: row_vals[i] for i in range(len(headers)) if i < len(row_vals) and row_vals[i] is not None}
+                    is_consented, c_source, reject_reason = validate_contact_consent(row_dict)
+                    if not is_consented:
+                        skipped_contacts.append({
+                            "phone": phone,
+                            "full_name": full_name,
+                            "reason": reject_reason or "Missing required consent flag or consent source [CONFIRM WITH A LAWYER]"
+                        })
+                        continue
                     
                     contacts.append({
                         "campaign_id": campaign_id,
@@ -226,13 +297,21 @@ class CampaignService:
                         "phone": phone,
                         "company_name": company,
                         "notes": notes,
-                        "call_status": "pending"
+                        "call_status": "pending",
+                        "consent_flag": True,
+                        "consent_source": c_source,
+                        "consent_timestamp": datetime.now(timezone.utc).isoformat()
                     })
             except Exception as xlsx_err:
                 logger.error(f"Failed to parse Excel: {xlsx_err}")
                 raise ValueError(f"Failed to parse Excel file: {xlsx_err}")
 
         if not contacts:
+            if skipped_contacts:
+                raise ValueError(
+                    f"All {len(skipped_contacts)} contact(s) were skipped due to missing consent flags or sources. "
+                    f"Outbound safety rules require 'consent' (true/yes/1) and 'consent_source' on every contact. [CONFIRM WITH A LAWYER]"
+                )
             raise ValueError("No valid contacts with phone numbers found in the uploaded file.")
 
         # 4. Insert Campaign row in DB
@@ -241,6 +320,7 @@ class CampaignService:
             "organization_id": organization_id,
             "agent_id": agent_id,
             "name": name,
+            "purpose": resolved_purpose,
             "status": "ready",
             "contact_list_url": contact_list_url,
             "total_contacts": len(contacts),
@@ -250,12 +330,40 @@ class CampaignService:
             "calling_hours_start": calling_hours_start,
             "calling_hours_end": calling_hours_end,
             "timezone": timezone_str,
-            "scheduled_start": scheduled_start
+            "scheduled_start": scheduled_start,
+            "consent_attestation": attestation_meta
         }
         
         await asyncio.to_thread(
             supabase_admin.table("campaigns").insert(campaign_payload).execute
         )
+
+        # Record audit log entry for affirmative consent attestation
+        try:
+            audit_entry = {
+                "user_id": user_id,
+                "action": "campaign_contact_consent_attestation",
+                "resource_type": "campaign",
+                "resource_id": campaign_id,
+                "new_values": {
+                    "campaign_id": campaign_id,
+                    "campaign_name": name,
+                    "organization_id": organization_id,
+                    "filename": filename,
+                    "file_sha256": file_hash,
+                    "total_contacts": len(contacts),
+                    "skipped_contacts": len(skipped_contacts),
+                    "attestation_statement": statement_text,
+                    "attested_at": attestation_meta["attested_at"]
+                }
+            }
+            if user_email:
+                audit_entry["user_email"] = user_email
+            await asyncio.to_thread(
+                supabase_admin.table("audit_logs").insert(audit_entry).execute
+            )
+        except Exception as audit_err:
+            logger.warning(f"Failed to record consent attestation audit log: {audit_err}")
         
         # 5. Bulk insert contacts in batches of 500
         logger.info(f"Saving {len(contacts)} contacts for campaign {campaign_id}")
@@ -266,7 +374,10 @@ class CampaignService:
                 supabase_admin.table("campaign_contacts").insert(batch).execute
             )
 
-        return campaign_payload
+        res_payload = dict(campaign_payload)
+        res_payload["skipped_contacts_count"] = len(skipped_contacts)
+        res_payload["skipped_contacts"] = skipped_contacts
+        return res_payload
 
     @staticmethod
     async def start_campaign(campaign_id: str) -> Dict:
@@ -539,6 +650,38 @@ class CampaignService:
             )
             logger.info(f"[Campaign] Skipped DND number: {contact['phone']}")
             return True  # Return True to continue the calling loop
+
+        # Phase 3 Guard: Contact local time calling window (09:00 - 21:00 hard floor for promotional)
+        from app.services.outbound_safety_guardrails import is_allowed_calling_time, classify_campaign_purpose
+        purpose = classify_campaign_purpose(campaign_data.get("purpose"), campaign_data.get("name"))
+        is_callback = bool(contact.get("is_requested_callback", False))
+        req_callback_time = contact.get("requested_callback_time")
+        
+        is_allowed, time_reason, _ = is_allowed_calling_time(
+            contact_phone=contact["phone"],
+            campaign_purpose=purpose,
+            owner_start_str=campaign_data.get("calling_hours_start") or "10:00",
+            owner_end_str=campaign_data.get("calling_hours_end") or "18:00",
+            contact_timezone=contact.get("timezone") or campaign_data.get("timezone"),
+            is_requested_callback=is_callback,
+            requested_callback_time=req_callback_time
+        )
+        if not is_allowed:
+            logger.info(f"[Campaign Safety Guard] Postponing contact {contact['phone']}: {time_reason}")
+            # Contact is outside legal calling hours; leave in pending for when hours open
+            return False
+
+        # Phase 3 Guard: Promotional campaigns require verified affirmative consent flag [CONFIRM WITH A LAWYER]
+        if purpose == "promotional" and not contact.get("consent_flag"):
+            await asyncio.to_thread(
+                supabase_admin.table("campaign_contacts").update({
+                    "call_status": "skipped_no_consent",
+                    "notes": "Skipped pre-dial: Missing affirmative contact consent flag or source [CONFIRM WITH A LAWYER]",
+                    "last_attempt_at": datetime.now(timezone.utc).isoformat()
+                }).eq("id", contact_id).execute
+            )
+            logger.warning(f"[Campaign Safety Guard] Skipped non-consented contact {contact['phone']} (call_status='skipped_no_consent')")
+            return True
         
         # 2. Update to dialing state
         await asyncio.to_thread(
@@ -980,6 +1123,110 @@ class CampaignService:
             "duration_mins": duration_mins
         }
 
+    @staticmethod
+    async def get_pre_send_report(campaign_id: str) -> Dict[str, Any]:
+        """
+        Generates pre-send campaign compliance and safety report:
+        Calculates pass/fail counts across consent, DND, calling window, and phone formats.
+        """
+        from app.services.outbound_safety_guardrails import generate_pre_send_campaign_report
+
+        camp_res = await asyncio.to_thread(
+            supabase_admin.table("campaigns").select("*").eq("id", campaign_id).single().execute
+        )
+        if not camp_res.data:
+            raise ValueError(f"Campaign '{campaign_id}' not found")
+
+        contacts_res = await asyncio.to_thread(
+            supabase_admin.table("campaign_contacts")
+            .select("*")
+            .eq("campaign_id", campaign_id)
+            .execute
+        )
+        contacts = contacts_res.data or []
+
+        return await generate_pre_send_campaign_report(
+            campaign=camp_res.data,
+            contacts=contacts,
+            supabase_client=supabase_admin
+        )
+
+    @staticmethod
+    async def get_active_campaigns_consent_audit() -> Dict[str, Any]:
+        """
+        Generates an audit report on running/active campaigns and contact consent breakdown.
+        Provides regulatory oversight for active campaigns dialed under TRAI TCCCPR 2018. [CONFIRM WITH A LAWYER]
+        """
+        try:
+            try:
+                campaigns_res = await asyncio.to_thread(
+                    supabase_admin.table("campaigns")
+                    .select("id, name, status, purpose, total_contacts, created_at, consent_attestation")
+                    .in_("status", ["running", "in_progress", "active", "ready", "paused"])
+                    .execute
+                )
+            except Exception:
+                # Fallback if consent_attestation migration hasn't been executed on remote DB yet
+                campaigns_res = await asyncio.to_thread(
+                    supabase_admin.table("campaigns")
+                    .select("id, name, status, purpose, total_contacts, created_at")
+                    .in_("status", ["running", "in_progress", "active", "ready", "paused"])
+                    .execute
+                )
+            campaigns = campaigns_res.data or []
+            
+            report = {
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "total_active_campaigns": len(campaigns),
+                "campaigns": []
+            }
+            
+            for c in campaigns:
+                c_id = c["id"]
+                try:
+                    contacts_res = await asyncio.to_thread(
+                        supabase_admin.table("campaign_contacts")
+                        .select("call_status, consent_flag")
+                        .eq("campaign_id", c_id)
+                        .execute
+                    )
+                except Exception:
+                    contacts_res = await asyncio.to_thread(
+                        supabase_admin.table("campaign_contacts")
+                        .select("call_status")
+                        .eq("campaign_id", c_id)
+                        .execute
+                    )
+                contacts = contacts_res.data or []
+                status_counts: Dict[str, int] = {}
+                consented_count = 0
+                unconsented_count = 0
+                for ct in contacts:
+                    st = ct.get("call_status", "unknown")
+                    status_counts[st] = status_counts.get(st, 0) + 1
+                    if ct.get("consent_flag"):
+                        consented_count += 1
+                    else:
+                        unconsented_count += 1
+                
+                report["campaigns"].append({
+                    "campaign_id": c_id,
+                    "name": c.get("name"),
+                    "status": c.get("status"),
+                    "purpose": c.get("purpose"),
+                    "has_attestation": bool(c.get("consent_attestation")),
+                    "total_contacts": len(contacts),
+                    "consented_contacts": consented_count,
+                    "unconsented_contacts": unconsented_count,
+                    "status_breakdown": status_counts,
+                    "legacy_unconsented_action": "Safe: skipped pre-dial with 'skipped_no_consent' status [CONFIRM WITH A LAWYER]"
+                })
+                
+            return report
+        except Exception as e:
+            logger.error(f"Error generating active campaigns consent audit: {e}")
+            return {"error": str(e), "total_active_campaigns": 0, "campaigns": []}
+
 
 async def simulate_call_completion(
     call_sid: str,
@@ -1024,3 +1271,4 @@ async def simulate_call_completion(
         )
     except Exception as e:
         logger.error(f"[Simulated Call] Failed to run simulate_call_completion: {e}")
+

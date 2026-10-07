@@ -2,7 +2,6 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { useState, useEffect } from 'react'
 import { 
   LayoutDashboard, 
   FileText, 
@@ -19,13 +18,15 @@ import {
   PhoneCall,
   Phone,
   KeyRound,
-  Lock
+  Lock,
+  UserCheck
 } from 'lucide-react'
 
 const navItems = [
   { name: 'Overview', href: '/admin', icon: LayoutDashboard },
   { name: 'Blog', href: '/admin/blog', icon: FileText },
   { name: 'Tenants', href: '/admin/tenants', icon: Building2 },
+  { name: 'KYC Verifications', href: '/admin/kyc', icon: UserCheck },
   { name: 'Agent Templates', href: '/admin/agents/templates', icon: Bot },
   { name: 'Marketplace', href: '/admin/marketplace', icon: Store },
   { name: 'Global Analytics', href: '/admin/analytics', icon: BarChart3 },
@@ -42,11 +43,6 @@ const navItems = [
 
 export function AdminSidebar() {
   const pathname = usePathname()
-  const [mounted, setMounted] = useState(false)
-
-  useEffect(() => {
-    setMounted(true)
-  }, [])
 
   return (
     <aside className="w-64 bg-zinc-950 border-r border-zinc-800/80 min-h-screen flex flex-col justify-between p-4 selection:bg-violet-500/30">
@@ -71,7 +67,7 @@ export function AdminSidebar() {
         <nav className="space-y-1">
           {navItems.map((item) => {
             const Icon = item.icon
-            const isActive = mounted && (pathname === item.href || (item.href !== '/admin' && pathname?.startsWith(item.href)))
+            const isActive = pathname === item.href || (item.href !== '/admin' && (pathname?.startsWith(item.href) ?? false))
 
             return (
               <Link

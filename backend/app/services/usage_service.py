@@ -15,7 +15,7 @@ class UsageService:
         """Check if an agent has exceeded its minutes limit"""
         res = await asyncio.to_thread(
             self.supabase.table("agents")
-            .select("id, name, organization_id, minutes_limit, minutes_used, status, config")
+            .select("id, name, organization_id, user_id, minutes_limit, minutes_used, status, config, is_demo")
             .eq("id", agent_id).single().execute
         )
         
@@ -25,78 +25,110 @@ class UsageService:
         a = res.data
         db_limit = a.get("minutes_limit", 0) or 0
         org_id = a.get("organization_id")
+        user_id = a.get("user_id")
         config = a.get("config", {}) or {}
-        
-        # Calculate dynamic minutes used by this agent this month from voice_calls
-        start_of_month = datetime.utcnow().replace(day=1, hour=0, minute=0, second=0).isoformat()
-        try:
-            calls_res = await asyncio.to_thread(
-                self.supabase.table("voice_calls")
-                .select("duration_seconds")
-                .eq("agent_id", agent_id)
-                .gte("created_at", start_of_month).execute
-            )
-            import math
-            used = sum(max(1, math.ceil((c.get("duration_seconds", 0) or 0) / 60)) for c in (calls_res.data or []) if (c.get("duration_seconds", 0) or 0) > 0)
-            
-            # Sync back to agents table so the cached value in the DB matches
-            await asyncio.to_thread(
-                self.supabase.table("agents").update({"minutes_used": used}).eq("id", agent_id).execute
-            )
-        except Exception as e:
-            logger.error(f"Failed to fetch dynamic minutes for agent {agent_id}: {e}")
-            used = a.get("minutes_used", 0) or 0
-        
-        # 1. Resolve from agent config
-        config_limit = config.get("minutes_limit")
-        config_tier = config.get("plan_tier")
-        
-        resolved_limit = db_limit
-        if config_limit is not None:
-            resolved_limit = max(resolved_limit, int(config_limit))
-            
-        if config_tier:
-            tier_lower = str(config_tier).lower()
-            if tier_lower in ('pro', 'professional'):
-                resolved_limit = max(resolved_limit, 2000)
-            elif tier_lower == 'starter':
-                resolved_limit = max(resolved_limit, 500)
-            elif tier_lower == 'trial':
-                resolved_limit = max(resolved_limit, 100)
-            elif tier_lower == 'enterprise':
-                resolved_limit = max(resolved_limit, 10000)
-                
-        # 2. Fallback to profiles table if organization_id is present
-        if org_id and resolved_limit <= 100: # Only fallback if we haven't resolved a higher tier limit yet
+        is_demo = a.get("is_demo", False) or (config.get("plan_tier") == "free_demo")
+
+        # Fetch owner profile to respect persistent billing cycle quota
+        profile = {}
+        if user_id:
             try:
                 prof_res = await asyncio.to_thread(
                     self.supabase.table("profiles")
-                    .select("plan_tier")
+                    .select("plan_tier, paid_minutes_limit, paid_minutes_used, demo_minutes_limit, demo_minutes_used")
+                    .eq("id", user_id).execute
+                )
+                if prof_res.data:
+                    profile = prof_res.data[0]
+            except Exception as pe:
+                logger.warning(f"Error fetching profile for user {user_id}: {pe}")
+        elif org_id:
+            try:
+                prof_res = await asyncio.to_thread(
+                    self.supabase.table("profiles")
+                    .select("plan_tier, paid_minutes_limit, paid_minutes_used, demo_minutes_limit, demo_minutes_used")
                     .eq("organization_id", org_id).execute
                 )
                 if prof_res.data:
-                    plan_tier = (prof_res.data[0].get("plan_tier") or "free").lower()
-                    if plan_tier in ('pro', 'professional'):
-                        tier_limit = 2000
-                    elif plan_tier == 'starter':
-                        tier_limit = 500
-                    elif plan_tier == 'trial':
-                        tier_limit = 100
-                    elif plan_tier == 'enterprise':
-                        tier_limit = 10000
-                    else:
-                        tier_limit = 10
-                    resolved_limit = max(resolved_limit, tier_limit)
-            except Exception as e:
-                logger.error(f"Failed to fetch profile plan tier in check_agent_minutes: {e}")
+                    profile = prof_res.data[0]
+            except Exception as pe:
+                logger.warning(f"Error fetching profile for org {org_id}: {pe}")
 
-        if resolved_limit == 0:
-            return {"status": "unlimited", "used": used, "limit": resolved_limit, "percent": 0}
+        plan_tier = (profile.get("plan_tier") or config.get("plan_tier") or "free").lower()
+
+        # 1. Resolve limits: Prioritize agent-specific configuration over shared org profile
+        agent_custom_limit = None
+        if config.get("minutes_limit") is not None and int(config["minutes_limit"]) > 0:
+            agent_custom_limit = int(config["minutes_limit"])
+        elif db_limit > 0:
+            agent_custom_limit = db_limit
+
+        if is_demo:
+            resolved_limit = profile.get("demo_minutes_limit", 10)
+        elif agent_custom_limit is not None:
+            resolved_limit = agent_custom_limit
+        else:
+            if plan_tier in ('pro', 'professional'):
+                tier_limit = 2000
+            elif plan_tier == 'starter':
+                tier_limit = 500
+            elif plan_tier == 'trial':
+                tier_limit = 100
+            elif plan_tier == 'enterprise':
+                tier_limit = 10000
+            else:
+                tier_limit = 10
+            
+            resolved_limit = max(profile.get("paid_minutes_limit", 0) or 0, tier_limit)
+
+        # 2. Check organization wallet for claimed emergency minutes buffer
+        emergency_minutes = 0
+        if org_id:
+            try:
+                wallet_res = await asyncio.to_thread(
+                    self.supabase.table("wallets")
+                    .select("emergency_minutes_available")
+                    .eq("organization_id", org_id).execute
+                )
+                if wallet_res.data:
+                    emergency_minutes = wallet_res.data[0].get("emergency_minutes_available", 0) or 0
+            except Exception as we:
+                logger.warning(f"Error fetching wallet for org {org_id}: {we}")
+
+        effective_limit = resolved_limit + emergency_minutes
+
+        # 3. Resolve Used minutes specific to this agent from call logs
+        if is_demo:
+            used = profile.get("demo_minutes_used", 0) or a.get("minutes_used", 0) or 0
+        else:
+            try:
+                call_res = await asyncio.to_thread(
+                    self.supabase.table("voice_calls")
+                    .select("duration_seconds")
+                    .eq("agent_id", agent_id).execute
+                )
+                agent_seconds = sum(c.get("duration_seconds", 0) or 0 for c in (call_res.data or []))
+                agent_call_mins = (agent_seconds + 59) // 60
+                used = agent_call_mins if agent_call_mins > 0 else (a.get("minutes_used", 0) or 0)
+            except Exception as ce:
+                logger.warning(f"Error calculating call seconds for agent {agent_id}: {ce}")
+                used = a.get("minutes_used", 0) or 0
+
+        if effective_limit == 0:
+            return {
+                "status": "unlimited",
+                "used": used,
+                "limit": resolved_limit,
+                "effective_limit": effective_limit,
+                "emergency_minutes_available": emergency_minutes,
+                "percent": 0,
+                "agent_name": a.get("name")
+            }
         
-        percent = round((used / resolved_limit) * 100, 1)
+        percent = round((used / effective_limit) * 100, 1)
         
-        # Determine status
-        if used >= resolved_limit:
+        # Determine status (emergency minutes protect agent from being paused)
+        if used >= effective_limit:
             status = "exceeded"
             await self._pause_agent(agent_id)
         elif percent >= 80:
@@ -109,6 +141,8 @@ class UsageService:
             "status": status,
             "used": used,
             "limit": resolved_limit,
+            "effective_limit": effective_limit,
+            "emergency_minutes_available": emergency_minutes,
             "percent": percent,
             "agent_name": a.get("name")
         }
@@ -157,7 +191,7 @@ class UsageService:
         base_agents = 1
         base_numbers = 0
         if plan_tier == 'trial':
-            base_agents = 3
+            base_agents = 2
             base_numbers = 1
         elif plan_tier == 'starter':
             base_agents = 5
@@ -176,7 +210,7 @@ class UsageService:
             
         monthly_minutes = await self._get_config(f"{plan_tier}_minutes", 0)
         if plan_tier == 'trial':
-            monthly_minutes = 100
+            monthly_minutes = 50
         elif plan_tier == 'starter':
             monthly_minutes = 500
         elif plan_tier == 'professional':

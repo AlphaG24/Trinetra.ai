@@ -1,5 +1,6 @@
 import { createClient } from "@/utils/supabase/server";
 import { NextResponse } from "next/server";
+import { validatePromptAiSafety } from "@/lib/safety/promptGuard";
 
 export async function PATCH(
   request: Request,
@@ -17,11 +18,32 @@ export async function PATCH(
 
     const body = await request.json();
 
+    // Safety Guard: Prohibit prompts or greetings instructing the agent to deny being AI or claim to be human
+    if (body.system_prompt) {
+      const { isValid, violations } = validatePromptAiSafety(body.system_prompt);
+      if (!isValid) {
+        return NextResponse.json({
+          error: "Prompt safety violation: Directives instructing the agent to deny being an AI or claim to be human are prohibited.",
+          violations,
+        }, { status: 400 });
+      }
+    }
+
+    if (body.greeting_message) {
+      const { isValid, violations } = validatePromptAiSafety(body.greeting_message);
+      if (!isValid) {
+        return NextResponse.json({
+          error: "Greeting safety violation: Greetings cannot instruct the agent to deny being an AI or claim to be human.",
+          violations,
+        }, { status: 400 });
+      }
+    }
+
     // 2. Allowed whitelist columns
     const allowedKeys = [
       'name', 'role', 'voice_provider', 'voice_id', 'cloned_voice_id', 'voice_speed', 'voice_pitch',
       'system_prompt', 'temperature', 'max_tokens', 'greeting_message', 'fallback_message', 'ending_message',
-      'personality', 'personalities', 'primary_language'
+      'personality', 'personalities', 'primary_language', 'disclosure_config', 'gender'
     ];
 
     const updates: Record<string, any> = {};
@@ -29,6 +51,17 @@ export async function PATCH(
       if (key in body) {
         updates[key] = body[key];
       }
+    }
+
+    // Sync gender into disclosure_config for robust cross-environment access
+    if (body.gender !== undefined) {
+      const currentDisc = (typeof body.disclosure_config === 'object' && body.disclosure_config !== null) 
+        ? body.disclosure_config 
+        : {};
+      updates.disclosure_config = {
+        ...currentDisc,
+        gender: body.gender
+      };
     }
 
     // Auto-synchronize system prompt if personalities was updated and no explicit system_prompt was sent
@@ -177,13 +210,28 @@ export async function PATCH(
     }
 
     // Ensure the updated agent belongs to this user
-    const { data: updatedAgent, error: updateError } = await supabase
+    let { data: updatedAgent, error: updateError } = await supabase
       .from('agents')
       .update(updates)
       .eq('id', agentId)
       .eq('user_id', user.id)
       .select()
       .single();
+
+    if (updateError && updateError.message && updateError.message.includes("'gender'")) {
+      // Graceful fallback if column is not yet applied in DB schema
+      const fallbackUpdates = { ...updates };
+      delete fallbackUpdates.gender;
+      const retryResult = await supabase
+        .from('agents')
+        .update(fallbackUpdates)
+        .eq('id', agentId)
+        .eq('user_id', user.id)
+        .select()
+        .single();
+      updatedAgent = retryResult.data;
+      updateError = retryResult.error;
+    }
 
     if (updateError) {
       console.error("[Agent Update API] Error:", updateError);

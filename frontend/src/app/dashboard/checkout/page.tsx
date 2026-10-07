@@ -497,7 +497,7 @@ function CheckoutContent() {
                 </div>
                 <button
                   onClick={() => addToCart('phone_number', 'phone_number', 'Extra Virtual Phone Number', phonePrice)}
-                  className="px-3 py-1.5 bg-zinc-900 border border-zinc-800 hover:bg-zinc-800 text-[var(--heading)] font-bold text-xs uppercase rounded-xl transition-all cursor-pointer"
+                  className="px-3.5 py-1.5 bg-violet-600 hover:bg-violet-700 text-white font-bold text-xs uppercase rounded-xl transition-all cursor-pointer shadow-sm"
                 >
                   Add Number
                 </button>

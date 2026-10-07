@@ -13,7 +13,11 @@ __pycache__/
 recordings/
 *.mp3
 *.wav
-test_*.py
-test_*.json
-mock_*.json
+/test_*.py
+/test_*.json
+/mock_*.json
+!tests/
+!tests/**
+tests/**/__pycache__/
 !.env.example
+

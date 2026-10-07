@@ -1144,6 +1144,18 @@ async def handle_twilio_voice_webhook(
 
         print(f"[Twilio Webhook] Received call: {call_sid} | From: {from_number} -> To: {to_number} | Direction: {direction} | Status: {call_status}", flush=True)
 
+        # Task 12: Check if dialed number is in grace_period or hold_period (Master Plan Section 18.7)
+        if direction == "inbound":
+            try:
+                from app.services.number_lifecycle_service import NumberLifecycleService
+                lifecycle_service = NumberLifecycleService()
+                is_lifecycle, neutral_twiml, _ = lifecycle_service.check_inbound_call_lifecycle(to_number, from_number)
+                if is_lifecycle:
+                    print(f"[Twilio Webhook] Inbound call intercepted by Number Lifecycle ({to_number} is in grace/hold period). Playing neutral message.", flush=True)
+                    return Response(content=neutral_twiml, media_type="application/xml")
+            except Exception as nl_err:
+                print(f"[Twilio Webhook] Number lifecycle check error: {nl_err}", flush=True)
+
         # 1. Fast path: Extract agent_id & contact_id from query params
         agent_id = request.query_params.get("agent_id")
         contact_id = request.query_params.get("contact_id")

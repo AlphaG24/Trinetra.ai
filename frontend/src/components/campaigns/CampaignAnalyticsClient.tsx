@@ -131,11 +131,11 @@ export function CampaignAnalyticsClient({ campaignId }: CampaignAnalyticsClientP
 
   // Outcome Chart Data mapping
   const outcomeData = [
-    { name: 'Answered', value: data.call_stats.answered },
-    { name: 'No Answer', value: data.call_stats.no_answer },
-    { name: 'Busy', value: data.call_stats.busy },
-    { name: 'Failed', value: data.call_stats.failed },
-    { name: 'DND Skipped', value: data.contact_stats.dnd },
+    { name: 'Answered', value: data.call_stats?.answered || 0 },
+    { name: 'No Answer', value: data.call_stats?.no_answer || 0 },
+    { name: 'Busy', value: data.call_stats?.busy || 0 },
+    { name: 'Failed', value: data.call_stats?.failed || 0 },
+    { name: 'DND Skipped', value: data.contact_stats?.dnd || 0 },
   ].filter(item => item.value > 0)
 
   const OUTCOME_COLORS = {
@@ -148,9 +148,9 @@ export function CampaignAnalyticsClient({ campaignId }: CampaignAnalyticsClientP
 
   // Sentiment Chart Data mapping
   const sentimentData = [
-    { name: 'Positive', value: data.sentiment_distribution.positive },
-    { name: 'Neutral', value: data.sentiment_distribution.neutral },
-    { name: 'Negative', value: data.sentiment_distribution.negative },
+    { name: 'Positive', value: data.sentiment_distribution?.positive || 0 },
+    { name: 'Neutral', value: data.sentiment_distribution?.neutral || 0 },
+    { name: 'Negative', value: data.sentiment_distribution?.negative || 0 },
   ]
 
   const SENTIMENT_COLORS = {

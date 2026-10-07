@@ -86,6 +86,10 @@ export default function PhoneNumbersPage() {
   const [submittingBid, setSubmittingBid] = useState(false);
   const [claimingBidId, setClaimingBidId] = useState<string | null>(null);
 
+  // Statutory Telecom KYC Compliance Gate State
+  const [kycCompliance, setKycCompliance] = useState<any>(null);
+  const [showKycRequiredModal, setShowKycRequiredModal] = useState(false);
+
   const handleOpenBidModal = (num: any) => {
     setBidModalNumber(num);
     const minRequiredPaisa = num.current_bid_paisa 
@@ -215,13 +219,41 @@ export default function PhoneNumbersPage() {
     }
   };
 
+  const fetchKycCompliance = async () => {
+    try {
+      const res = await fetch("/api/kyc");
+      if (res.ok) {
+        const data = await res.json();
+        if (data.complianceChecklist) {
+          setKycCompliance(data.complianceChecklist);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to fetch KYC compliance in PhoneNumbersPage:", err);
+    }
+  };
+
   useEffect(() => {
     fetchPurchasedNumbers();
     fetchPoolNumbers();
     fetchAgents();
+    fetchKycCompliance();
   }, []);
 
   const handleClaimIncludedNumber = async (poolNum: any) => {
+    // Free Trial Tier Gate (Decision P1: No number purchase/claim on free tier)
+    const userPlanTier = ((profile as any)?.plan_tier || "free").toLowerCase();
+    if (userPlanTier === "free" && (profile as any)?.role !== "developer_tester" && (profile as any)?.role !== "admin") {
+      toast.error("Virtual phone numbers require ₹99 Trial or a paid plan.");
+      return;
+    }
+
+    // Statutory KYC Gate
+    if (kycCompliance && !kycCompliance.canProcurePhoneNumbers && (profile as any)?.role !== "developer_tester") {
+      setShowKycRequiredModal(true);
+      return;
+    }
+
     try {
       setBuyingId(poolNum.id);
       const res = await fetch("/api/phone-numbers/claim-included", {
@@ -231,7 +263,13 @@ export default function PhoneNumbersPage() {
       });
 
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to claim included number");
+      if (!res.ok) {
+        if (data.kyc_required) {
+          setShowKycRequiredModal(true);
+          return;
+        }
+        throw new Error(data.error || "Failed to claim included number");
+      }
 
       toast.success(data.message || "Phone line secured successfully with your plan!");
       fetchPurchasedNumbers();
@@ -244,6 +282,19 @@ export default function PhoneNumbersPage() {
   };
 
   const handleBuyPoolNumber = async (poolNum: any) => {
+    // Free Trial Tier Gate (Decision P1: No number purchase on free tier)
+    const userPlanTier = ((profile as any)?.plan_tier || "free").toLowerCase();
+    if (userPlanTier === "free" && (profile as any)?.role !== "developer_tester" && (profile as any)?.role !== "admin") {
+      toast.error("Phone number purchase is not available on the free trial tier. Please upgrade to the ₹99 Trial or a paid plan.");
+      return;
+    }
+
+    // Statutory KYC Gate
+    if (kycCompliance && !kycCompliance.canProcurePhoneNumbers && (profile as any)?.role !== "developer_tester") {
+      setShowKycRequiredModal(true);
+      return;
+    }
+
     const isAtLimit = Array.isArray(numbers) ? numbers.length >= maxLimit : false;
     if (isAtLimit) {
       toast.error(`You have reached the maximum limit of ${maxLimit} numbers.`);
@@ -259,7 +310,13 @@ export default function PhoneNumbersPage() {
       });
 
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to initialize purchase");
+      if (!res.ok) {
+        if (data.kyc_required) {
+          setShowKycRequiredModal(true);
+          return;
+        }
+        throw new Error(data.error || "Failed to initialize purchase");
+      }
 
       const scriptLoaded = await loadRazorpayScript();
       if (!scriptLoaded) {
@@ -486,6 +543,36 @@ export default function PhoneNumbersPage() {
         </div>
       </div>
 
+      {/* Statutory Telecom KYC Compliance Notice Banner */}
+      {kycCompliance && !kycCompliance.canProcurePhoneNumbers && (profile as any)?.role !== "developer_tester" && (
+        <div className="mb-8 p-4 md:p-5 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-start gap-3.5">
+            <div className="p-2.5 rounded-xl bg-amber-500/10 text-amber-500 shrink-0 mt-0.5">
+              <AlertCircle size={20} />
+            </div>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h4 className="text-sm font-bold text-[var(--heading)]">
+                  Statutory Telecom KYC Verification Required
+                </h4>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/30">
+                  Mandatory For Phone Lines
+                </span>
+              </div>
+              <p className="text-xs text-[var(--muted)] mt-1 max-w-2xl leading-relaxed">
+                Under Indian Telecom regulations (TRAI &amp; DoT), live virtual phone lines require <strong className="text-[var(--heading)]">1 verified Entity Proof (Company PAN or GSTIN)</strong> and <strong className="text-[var(--heading)]">1 verified Authorized Signatory ID</strong>. Live purchasing and claiming are locked until both are verified.
+              </p>
+            </div>
+          </div>
+          <Link
+            href="/dashboard/settings?tab=kyc"
+            className="px-4 py-2.5 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white rounded-xl text-xs font-bold transition-all shrink-0 flex items-center justify-center gap-1.5 shadow-md shadow-violet-600/20 whitespace-nowrap"
+          >
+            Upload Mandatory Documents &rarr;
+          </Link>
+        </div>
+      )}
+
       {/* SECTION 1: AVAILABLE NUMBERS FROM SHARED POOL */}
       <div className="mb-12">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-[var(--border)] pb-3 mb-6 gap-3">
@@ -545,7 +632,16 @@ export default function PhoneNumbersPage() {
           </div>
         </div>
 
-        {Array.isArray(numbers) && numbers.length < maxLimit && (
+        {((profile as any)?.plan_tier || "free").toLowerCase() === "free" && (profile as any)?.role !== "developer_tester" ? (
+          <div className="mb-6 px-5 py-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20 flex flex-col justify-center">
+            <h4 className="text-sm font-bold text-[var(--heading)] flex items-center gap-2">
+              <Zap className="w-4 h-4 text-amber-400" /> Virtual Numbers Require ₹99 Trial or a Paid Plan
+            </h4>
+            <p className="text-xs text-[var(--muted)] mt-1">
+              Your free trial tier supports web-calls only. To purchase and assign dedicated virtual phone numbers to your AI agents, please upgrade your plan.
+            </p>
+          </div>
+        ) : Array.isArray(numbers) && numbers.length < maxLimit && (
           <div className="mb-6 px-5 py-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex flex-col justify-center">
             <h4 className="text-sm font-bold text-[var(--heading)]">
               You have {maxLimit - numbers.length} included phone {maxLimit - numbers.length === 1 ? "line" : "lines"} ready to claim!
@@ -775,6 +871,78 @@ export default function PhoneNumbersPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Statutory KYC Required Modal */}
+      {showKycRequiredModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-[#0D0120] border border-zinc-200 dark:border-white/10 rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-5 text-left">
+            <div className="flex items-start gap-3.5">
+              <div className="p-3 rounded-xl bg-amber-500/10 text-amber-500 shrink-0">
+                <AlertCircle size={24} />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-base font-bold text-zinc-900 dark:text-white">
+                  Statutory Telecom KYC Required
+                </h3>
+                <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1 leading-relaxed">
+                  Per Department of Telecommunications (DoT) &amp; TRAI regulations, live virtual phone lines cannot be assigned without 2 mandatory verified documents.
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-3 bg-zinc-50 dark:bg-white/[0.02] p-4 rounded-xl border border-zinc-200 dark:border-white/10 text-xs">
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="font-bold text-zinc-900 dark:text-white">1. Entity Proof (Mandatory)</span>
+                  <p className="text-[11px] text-zinc-500 dark:text-zinc-400">Company PAN Card or GSTIN Certificate</p>
+                </div>
+                <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                  kycCompliance?.entity?.verified
+                    ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20'
+                    : 'bg-rose-500/10 text-rose-500 border border-rose-500/20'
+                }`}>
+                  {kycCompliance?.entity?.verified ? 'Verified' : 'Action Required'}
+                </span>
+              </div>
+
+              <div className="border-t border-zinc-200 dark:border-white/5 pt-3 flex items-center justify-between">
+                <div>
+                  <span className="font-bold text-zinc-900 dark:text-white">2. Signatory ID (Mandatory)</span>
+                  <p className="text-[11px] text-zinc-500 dark:text-zinc-400">Masked Aadhaar Card or Passport</p>
+                </div>
+                <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                  kycCompliance?.signatory?.verified
+                    ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20'
+                    : 'bg-rose-500/10 text-rose-500 border border-rose-500/20'
+                }`}>
+                  {kycCompliance?.signatory?.verified ? 'Verified' : 'Action Required'}
+                </span>
+              </div>
+            </div>
+
+            <p className="text-[11px] text-zinc-500 dark:text-zinc-400 leading-relaxed">
+              Once both documents are verified in the KYC &amp; Compliance Vault, phone line procurement and claiming will immediately be unlocked.
+            </p>
+
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowKycRequiredModal(false)}
+                className="px-4 py-2 text-xs font-semibold text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white"
+              >
+                Close
+              </button>
+              <Link
+                href="/dashboard/settings?tab=kyc"
+                onClick={() => setShowKycRequiredModal(false)}
+                className="px-4 py-2.5 bg-gradient-to-r from-violet-600 to-indigo-600 text-white rounded-xl text-xs font-bold hover:opacity-90 transition-opacity flex items-center gap-1.5 shadow-md shadow-violet-600/20"
+              >
+                Upload Mandatory Documents &rarr;
+              </Link>
+            </div>
           </div>
         </div>
       )}

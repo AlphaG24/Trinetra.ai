@@ -24,7 +24,9 @@ import {
   Clock,
   ThumbsDown,
   ThumbsUp,
-  Minus
+  Minus,
+  ShieldCheck,
+  ShieldAlert
 } from 'lucide-react'
 import Link from 'next/link'
 import toast from 'react-hot-toast'
@@ -67,7 +69,55 @@ const TYPE_CONFIG: Record<string, { icon: any; color: string; label: string }> =
     color: 'text-rose-500 bg-rose-500/10 border-rose-500/20',
     label: 'System Alert'
   },
+  kyc_verified: {
+    icon: ShieldCheck,
+    color: 'text-emerald-500 bg-emerald-500/10 border-emerald-500/20',
+    label: 'KYC Verified'
+  },
+  kyc_rejected: {
+    icon: ShieldAlert,
+    color: 'text-rose-500 bg-rose-500/10 border-rose-500/20',
+    label: 'KYC Action Required'
+  },
+  success: {
+    icon: ShieldCheck,
+    color: 'text-emerald-500 bg-emerald-500/10 border-emerald-500/20',
+    label: 'Success'
+  },
+  warning: {
+    icon: AlertCircle,
+    color: 'text-amber-500 bg-amber-500/10 border-amber-500/20',
+    label: 'Warning'
+  },
+  error: {
+    icon: AlertCircle,
+    color: 'text-rose-500 bg-rose-500/10 border-rose-500/20',
+    label: 'Error'
+  },
+  info: {
+    icon: AlertCircle,
+    color: 'text-sky-500 bg-sky-500/10 border-sky-500/20',
+    label: 'Notice'
+  },
+  welcome: {
+    icon: Target,
+    color: 'text-violet-500 bg-violet-500/10 border-violet-500/20',
+    label: 'Welcome'
+  },
 }
+
+function resolveNotificationMeta(notif: NotificationItem) {
+  const title = (notif.title || '').toLowerCase()
+  const category = notif.payload?.category || notif.payload?.metadata?.category
+  if (notif.type === 'kyc_verified' || category === 'kyc_verified' || (title.includes('kyc') && title.includes('approved'))) {
+    return TYPE_CONFIG.kyc_verified
+  }
+  if (notif.type === 'kyc_rejected' || category === 'kyc_rejected' || (title.includes('kyc') && (title.includes('rejected') || title.includes('declined')))) {
+    return TYPE_CONFIG.kyc_rejected
+  }
+  return TYPE_CONFIG[notif.type] || TYPE_CONFIG.info || TYPE_CONFIG.call_completed
+}
+
 
 function parseCallData(notif: NotificationItem) {
   const isCall =
@@ -513,7 +563,7 @@ export function NotificationsPageClient({
           <div className="divide-y divide-zinc-200/80 dark:divide-white/5">
             {filteredNotifications.map((notif) => {
               const call = parseCallData(notif)
-              const meta = TYPE_CONFIG[notif.type] || TYPE_CONFIG['call_completed']
+              const meta = resolveNotificationMeta(notif)
               const isExpanded = expandedId === notif.id
               const isMarkingThis = markingId === notif.id
 

@@ -15,6 +15,9 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(name)s] %(levelna
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
+from app.services.pii_scrubber import attach_pii_filter
+attach_pii_filter()
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from voice_router import (
@@ -31,6 +34,22 @@ from app.routers.analytics_router import router as analytics_router
 from app.routers.integration_router import router as integration_router
 from app.routers.usage_router import router as usage_router
 from app.routers.blog_ai_router import router as blog_ai_router
+from app.routers.revenue_router import router as revenue_router
+from app.routers.caller_rights_router import router as caller_rights_router
+from app.routers.retention_router import router as retention_router
+from app.routers.admin_auth_router import admin_auth_router
+from app.routers.wallet_router import wallet_router, webhook_router
+from app.routers.invoice_router import invoice_router
+from app.routers.number_lifecycle_router import number_lifecycle_router
+from app.routers.byon_router import byon_router
+from app.routers.support_ticket_router import support_ticket_router
+from app.routers.kyc_router import kyc_router
+from app.routers.admin_operations_router import router as admin_operations_router
+from app.routers.compliance_router import compliance_router
+from app.routers.observability_router import observability_router
+from app.routers.backup_router import backup_router
+from app.routers.load_benchmark_router import load_benchmark_router
+from app.services.observability_service import ObservabilityService
 
 app = FastAPI(title="Trinetra API")
 
@@ -85,9 +104,30 @@ app.include_router(analytics_router)
 app.include_router(integration_router)
 app.include_router(usage_router)
 app.include_router(blog_ai_router)
+app.include_router(revenue_router)
+app.include_router(caller_rights_router)
+app.include_router(retention_router)
+app.include_router(admin_auth_router)
+app.include_router(wallet_router)
+app.include_router(webhook_router)
+app.include_router(invoice_router)
+app.include_router(number_lifecycle_router)
+app.include_router(byon_router)
+app.include_router(support_ticket_router)
+app.include_router(kyc_router)
+app.include_router(admin_operations_router)
+app.include_router(compliance_router)
+app.include_router(observability_router)
+app.include_router(backup_router)
+app.include_router(load_benchmark_router)
 
 @app.on_event("startup")
 async def app_startup():
+    try:
+        ObservabilityService.init_sentry()
+    except Exception as e:
+        print(f"[Startup] Observability Sentry init warning: {e}", flush=True)
+
     try:
         from agent import run_agent
         print("[Startup] Agent runner pre-warmed successfully.", flush=True)
@@ -101,6 +141,13 @@ async def app_startup():
     except Exception as e:
         print(f"[Startup] Callback Scheduler Service start warning: {e}", flush=True)
 
+    try:
+        from app.services.number_lifecycle_service import NumberLifecycleService
+        NumberLifecycleService.start_worker()
+        print("[Startup] Automated Number Lifecycle Worker initiated.", flush=True)
+    except Exception as e:
+        print(f"[Startup] Number Lifecycle Service start warning: {e}", flush=True)
+
 @app.on_event("shutdown")
 async def app_shutdown():
     try:
@@ -108,6 +155,12 @@ async def app_shutdown():
         CallbackSchedulerService.stop_worker()
     except Exception as e:
         print(f"[Shutdown] Callback Scheduler Service stop warning: {e}", flush=True)
+
+    try:
+        from app.services.number_lifecycle_service import NumberLifecycleService
+        NumberLifecycleService.stop_worker()
+    except Exception as e:
+        print(f"[Shutdown] Number Lifecycle Service stop warning: {e}", flush=True)
 
 @app.api_route("/", methods=["GET", "HEAD"])
 def read_root():
