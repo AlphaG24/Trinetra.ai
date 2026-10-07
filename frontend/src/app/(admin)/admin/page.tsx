@@ -180,6 +180,8 @@ export default async function AdminOverviewPage() {
               Open Support Console &rarr;
             </Link>
           </div>
+        </div>
+
         {/* Panel C: Section 6 Monitoring & Alerting Stack */}
         <div className="bg-[#0f111a]/60 border border-white/5 rounded-2xl p-6 space-y-4 lg:col-span-2">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-white/5 pb-3">
