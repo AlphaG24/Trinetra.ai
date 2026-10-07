@@ -1,24 +1,24 @@
-import { createClient } from '@/utils/supabase/server'
-import { 
-  Shield, 
-  Users, 
-  Bot, 
-  PhoneCall, 
-  Clock, 
-  LifeBuoy, 
-  ChevronRight, 
-  Building2, 
+import { createClient } from "@/utils/supabase/server";
+import {
+  Shield,
+  Users,
+  Bot,
+  PhoneCall,
+  Clock,
+  LifeBuoy,
+  ChevronRight,
+  Building2,
   Calendar,
   Activity,
-  CheckCircle2
-} from 'lucide-react'
-import Link from 'next/link'
+  CheckCircle2,
+} from "lucide-react";
+import Link from "next/link";
 
-export const dynamic = 'force-dynamic'
-export const revalidate = 0
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export default async function AdminOverviewPage() {
-  const supabase = await createClient()
+  const supabase = await createClient();
 
   // Fetch counts and metrics in parallel
   const [
@@ -27,20 +27,31 @@ export default async function AdminOverviewPage() {
     { data: callsData },
     { count: leadsCount },
     { data: recentTenants },
-    { data: openTickets }
+    { data: openTickets },
   ] = await Promise.all([
-    supabase.from('organizations').select('*', { count: 'exact', head: true }),
-    supabase.from('agents').select('*', { count: 'exact', head: true }),
-    supabase.from('voice_calls').select('duration_seconds'),
-    supabase.from('leads').select('*', { count: 'exact', head: true }),
-    supabase.from('organizations').select('*').order('created_at', { ascending: false }).limit(5),
-    supabase.from('support_tickets').select('*').eq('status', 'open').order('created_at', { ascending: false }).limit(5)
-  ])
+    supabase.from("organizations").select("*", { count: "exact", head: true }),
+    supabase.from("agents").select("*", { count: "exact", head: true }),
+    supabase.from("voice_calls").select("duration_seconds"),
+    supabase.from("leads").select("*", { count: "exact", head: true }),
+    supabase
+      .from("organizations")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(5),
+    supabase
+      .from("support_tickets")
+      .select("*")
+      .eq("status", "open")
+      .order("created_at", { ascending: false })
+      .limit(5),
+  ]);
 
   // Calculate call minutes
-  const totalCalls = callsData?.length || 0
-  const totalSeconds = callsData?.reduce((acc, call) => acc + (call.duration_seconds || 0), 0) || 0
-  const totalMinutes = Math.round(totalSeconds / 60)
+  const totalCalls = callsData?.length || 0;
+  const totalSeconds =
+    callsData?.reduce((acc, call) => acc + (call.duration_seconds || 0), 0) ||
+    0;
+  const totalMinutes = Math.round(totalSeconds / 60);
 
   return (
     <div className="space-y-8 animate-in fade-in duration-300">
@@ -58,58 +69,77 @@ export default async function AdminOverviewPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-zinc-950/60 border border-zinc-800/80 rounded-2xl p-6 space-y-2">
           <div className="flex items-center justify-between text-zinc-400">
-            <span className="text-xs font-semibold uppercase tracking-wider">Active Tenants</span>
+            <span className="text-xs font-semibold uppercase tracking-wider">
+              Active Tenants
+            </span>
             <Users className="w-4 h-4 text-violet-400" />
           </div>
-          <div className="text-3xl font-extrabold text-white">{tenantsCount || 0}</div>
+          <div className="text-3xl font-extrabold text-white">
+            {tenantsCount || 0}
+          </div>
           <p className="text-[11px] text-zinc-500">Registered organizations</p>
         </div>
 
         <div className="bg-zinc-950/60 border border-zinc-800/80 rounded-2xl p-6 space-y-2">
           <div className="flex items-center justify-between text-zinc-400">
-            <span className="text-xs font-semibold uppercase tracking-wider">Deployed Agents</span>
+            <span className="text-xs font-semibold uppercase tracking-wider">
+              Deployed Agents
+            </span>
             <Bot className="w-4 h-4 text-emerald-400" />
           </div>
-          <div className="text-3xl font-extrabold text-white">{agentsCount || 0}</div>
+          <div className="text-3xl font-extrabold text-white">
+            {agentsCount || 0}
+          </div>
           <p className="text-[11px] text-zinc-500">Voice & AI agents live</p>
         </div>
 
         <div className="bg-zinc-950/60 border border-zinc-800/80 rounded-2xl p-6 space-y-2">
           <div className="flex items-center justify-between text-zinc-400">
-            <span className="text-xs font-semibold uppercase tracking-wider">Total Calls</span>
+            <span className="text-xs font-semibold uppercase tracking-wider">
+              Total Calls
+            </span>
             <PhoneCall className="w-4 h-4 text-sky-400" />
           </div>
           <div className="text-3xl font-extrabold text-white">
-            {totalCalls} <span className="text-xs text-zinc-500 font-normal">({totalMinutes} min)</span>
+            {totalCalls}{" "}
+            <span className="text-xs text-zinc-500 font-normal">
+              ({totalMinutes} min)
+            </span>
           </div>
           <p className="text-[11px] text-zinc-500">Total telephony traffic</p>
         </div>
 
         <div className="bg-zinc-950/60 border border-zinc-800/80 rounded-2xl p-6 space-y-2">
           <div className="flex items-center justify-between text-zinc-400">
-            <span className="text-xs font-semibold uppercase tracking-wider">Security State</span>
+            <span className="text-xs font-semibold uppercase tracking-wider">
+              Security State
+            </span>
             <Shield className="w-4 h-4 text-amber-400" />
           </div>
           <div className="text-3xl font-extrabold text-emerald-400">SECURE</div>
-          <p className="text-[11px] text-zinc-500">RLS & audit logging active</p>
+          <p className="text-[11px] text-zinc-500">
+            RLS & audit logging active
+          </p>
         </div>
       </div>
 
       {/* Grid panels */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        
         {/* Panel A: Recent Signups */}
         <div className="bg-[#0f111a]/60 border border-white/5 rounded-2xl p-6 space-y-4">
           <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
-            <Building2 className="w-4 h-4 text-violet-400" /> Recent Tenant Signups
+            <Building2 className="w-4 h-4 text-violet-400" /> Recent Tenant
+            Signups
           </h3>
           <div className="divide-y divide-zinc-800/50">
-            {(!recentTenants || recentTenants.length === 0) ? (
-              <p className="text-xs text-zinc-500 py-6 text-center">No organizations registered yet.</p>
+            {!recentTenants || recentTenants.length === 0 ? (
+              <p className="text-xs text-zinc-500 py-6 text-center">
+                No organizations registered yet.
+              </p>
             ) : (
               recentTenants.map((t) => (
-                <Link 
-                  key={t.id} 
+                <Link
+                  key={t.id}
                   href={`/admin/tenants/${t.id}`}
                   className="py-3 flex items-center justify-between hover:bg-white/[0.02] px-2 rounded-xl transition-colors group text-xs"
                 >
@@ -119,9 +149,11 @@ export default async function AdminOverviewPage() {
                     </div>
                     <div>
                       <div className="font-bold text-white group-hover:text-violet-400 transition-colors">
-                        {t.name || t.full_name || 'Unnamed Tenant'}
+                        {t.name || t.full_name || "Unnamed Tenant"}
                       </div>
-                      <span className="text-[10px] text-zinc-500 font-mono">{t.primary_email || 'No email'}</span>
+                      <span className="text-[10px] text-zinc-500 font-mono">
+                        {t.primary_email || "No email"}
+                      </span>
                     </div>
                   </div>
                   <ChevronRight className="w-4 h-4 text-zinc-600 group-hover:text-violet-400 transition-transform group-hover:translate-x-0.5" />
@@ -130,7 +162,7 @@ export default async function AdminOverviewPage() {
             )}
           </div>
           <div className="pt-2 text-right">
-            <Link 
+            <Link
               href="/admin/tenants"
               className="text-xs text-violet-400 hover:text-violet-300 font-bold uppercase tracking-wider"
             >
@@ -142,24 +174,33 @@ export default async function AdminOverviewPage() {
         {/* Panel B: Open Support Tickets */}
         <div className="bg-[#0f111a]/60 border border-white/5 rounded-2xl p-6 space-y-4">
           <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
-            <LifeBuoy className="w-4 h-4 text-amber-500" /> Action Required: Open Tickets
+            <LifeBuoy className="w-4 h-4 text-amber-500" /> Action Required:
+            Open Tickets
           </h3>
           <div className="divide-y divide-zinc-800/50">
-            {(!openTickets || openTickets.length === 0) ? (
-              <p className="text-xs text-zinc-500 py-6 text-center">No pending support tickets.</p>
+            {!openTickets || openTickets.length === 0 ? (
+              <p className="text-xs text-zinc-500 py-6 text-center">
+                No pending support tickets.
+              </p>
             ) : (
               openTickets.map((t) => (
-                <Link 
-                  key={t.id} 
+                <Link
+                  key={t.id}
                   href="/admin/support"
                   className="py-3 flex items-center justify-between hover:bg-white/[0.02] px-2 rounded-xl transition-colors group text-xs"
                 >
                   <div>
                     <div className="flex items-center gap-2">
-                      <span className="font-mono text-[9px] text-zinc-500">{t.ticket_number}</span>
-                      <span className={`text-[8px] font-bold px-1.5 rounded uppercase ${
-                        t.priority === 'urgent' ? 'bg-rose-500/10 text-rose-400' : 'bg-zinc-800 text-zinc-400'
-                      }`}>
+                      <span className="font-mono text-[9px] text-zinc-500">
+                        {t.ticket_number}
+                      </span>
+                      <span
+                        className={`text-[8px] font-bold px-1.5 rounded uppercase ${
+                          t.priority === "urgent"
+                            ? "bg-rose-500/10 text-rose-400"
+                            : "bg-zinc-800 text-zinc-400"
+                        }`}
+                      >
                         {t.priority}
                       </span>
                     </div>
@@ -173,7 +214,7 @@ export default async function AdminOverviewPage() {
             )}
           </div>
           <div className="pt-2 text-right">
-            <Link 
+            <Link
               href="/admin/support"
               className="text-xs text-violet-400 hover:text-violet-300 font-bold uppercase tracking-wider"
             >
@@ -199,9 +240,15 @@ export default async function AdminOverviewPage() {
             {/* Monitor 1: Uptime */}
             <div className="p-3.5 rounded-xl bg-zinc-950/60 border border-zinc-900 flex items-start justify-between">
               <div>
-                <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 block">Uptime Probes</span>
-                <span className="text-xs font-bold text-white mt-1 block">BetterStack HTTP/TCP</span>
-                <span className="text-[10px] text-emerald-400 font-mono mt-0.5 block">10 Monitors · 3m Interval</span>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 block">
+                  Uptime Probes
+                </span>
+                <span className="text-xs font-bold text-white mt-1 block">
+                  BetterStack HTTP/TCP
+                </span>
+                <span className="text-[10px] text-emerald-400 font-mono mt-0.5 block">
+                  10 Monitors · 3m Interval
+                </span>
               </div>
               <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
             </div>
@@ -209,9 +256,15 @@ export default async function AdminOverviewPage() {
             {/* Monitor 2: Errors */}
             <div className="p-3.5 rounded-xl bg-zinc-950/60 border border-zinc-900 flex items-start justify-between">
               <div>
-                <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 block">Exception Tracing</span>
-                <span className="text-xs font-bold text-white mt-1 block">Sentry Error Monitor</span>
-                <span className="text-[10px] text-emerald-400 font-mono mt-0.5 block">Zero-PII Hook Active</span>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 block">
+                  Exception Tracing
+                </span>
+                <span className="text-xs font-bold text-white mt-1 block">
+                  Sentry Error Monitor
+                </span>
+                <span className="text-[10px] text-emerald-400 font-mono mt-0.5 block">
+                  Zero-PII Hook Active
+                </span>
               </div>
               <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
             </div>
@@ -219,9 +272,15 @@ export default async function AdminOverviewPage() {
             {/* Monitor 3: Cron Jobs */}
             <div className="p-3.5 rounded-xl bg-zinc-950/60 border border-zinc-900 flex items-start justify-between">
               <div>
-                <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 block">Worker Heartbeats</span>
-                <span className="text-xs font-bold text-white mt-1 block">Healthchecks.io</span>
-                <span className="text-[10px] text-emerald-400 font-mono mt-0.5 block">cleanup · scheduler · pool</span>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 block">
+                  Worker Heartbeats
+                </span>
+                <span className="text-xs font-bold text-white mt-1 block">
+                  Healthchecks.io
+                </span>
+                <span className="text-[10px] text-emerald-400 font-mono mt-0.5 block">
+                  cleanup · scheduler · pool
+                </span>
               </div>
               <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
             </div>
@@ -229,9 +288,15 @@ export default async function AdminOverviewPage() {
             {/* Monitor 4: Logs */}
             <div className="p-3.5 rounded-xl bg-zinc-950/60 border border-zinc-900 flex items-start justify-between">
               <div>
-                <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 block">Log Aggregation</span>
-                <span className="text-xs font-bold text-white mt-1 block">BetterStack Logs</span>
-                <span className="text-[10px] text-emerald-400 font-mono mt-0.5 block">Pre-scrubbed PII Stream</span>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 block">
+                  Log Aggregation
+                </span>
+                <span className="text-xs font-bold text-white mt-1 block">
+                  BetterStack Logs
+                </span>
+                <span className="text-[10px] text-emerald-400 font-mono mt-0.5 block">
+                  Pre-scrubbed PII Stream
+                </span>
               </div>
               <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
             </div>
@@ -239,9 +304,15 @@ export default async function AdminOverviewPage() {
             {/* Monitor 5: Alerts */}
             <div className="p-3.5 rounded-xl bg-zinc-950/60 border border-zinc-900 flex items-start justify-between">
               <div>
-                <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 block">Incident Alerts</span>
-                <span className="text-xs font-bold text-white mt-1 block">Telegram Bot + Email</span>
-                <span className="text-[10px] text-emerald-400 font-mono mt-0.5 block">Instant P1/P2 Dispatch</span>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 block">
+                  Incident Alerts
+                </span>
+                <span className="text-xs font-bold text-white mt-1 block">
+                  Telegram Bot + Email
+                </span>
+                <span className="text-[10px] text-emerald-400 font-mono mt-0.5 block">
+                  Instant P1/P2 Dispatch
+                </span>
               </div>
               <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
             </div>
@@ -249,17 +320,26 @@ export default async function AdminOverviewPage() {
             {/* Monitor 6: Database */}
             <div className="p-3.5 rounded-xl bg-zinc-950/60 border border-zinc-900 flex items-start justify-between">
               <div>
-                <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 block">Database Connectivity</span>
-                <span className="text-xs font-bold text-white mt-1 block">Supabase PostgreSQL</span>
-                <span className="text-[10px] text-emerald-400 font-mono mt-0.5 block">RLS Enforced · Mumbai Reg</span>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 block">
+                  Database Connectivity
+                </span>
+                <span className="text-xs font-bold text-white mt-1 block">
+                  Supabase PostgreSQL
+                </span>
+                <span className="text-[10px] text-emerald-400 font-mono mt-0.5 block">
+                  RLS Enforced · Mumbai Reg
+                </span>
               </div>
               <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
             </div>
           </div>
 
           <div className="pt-2 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs text-zinc-500 border-t border-white/5">
-            <span>7 Day-1 synthetic probes running: homepage, API /health, LiveKit WS, DB ping, webhooks, SSL, DNS.</span>
-            <Link 
+            <span>
+              7 Day-1 synthetic probes running: homepage, API /health, LiveKit
+              WS, DB ping, webhooks, SSL, DNS.
+            </span>
+            <Link
               href="/admin/system"
               className="text-xs text-violet-400 hover:text-violet-300 font-bold uppercase tracking-wider shrink-0"
             >
@@ -267,8 +347,7 @@ export default async function AdminOverviewPage() {
             </Link>
           </div>
         </div>
-
       </div>
     </div>
-  )
+  );
 }
