@@ -138,6 +138,12 @@ export default function SupportPage() {
     return 'bg-zinc-100 dark:bg-white/5 border-zinc-200 dark:border-white/5 text-zinc-500'
   }
 
+  const formatCategory = (cat: string) => {
+    if (cat === 'cfu_forwarding') return 'Call Forwarding (CFU)'
+    if (cat === 'number_porting') return 'Number Porting (Premium)'
+    return cat.replace(/_/g, ' ')
+  }
+
   const statusColor = (st: string) => {
     const s = st.toLowerCase()
     if (s === 'open') {
@@ -189,7 +195,7 @@ export default function SupportPage() {
               </div>
 
               <h3 className="text-xs font-bold text-[var(--heading)] font-display mt-3 truncate">{t.subject}</h3>
-              <p className="text-[10px] text-[var(--muted)] uppercase tracking-widest mt-1 font-montserrat">{t.category.replace('_', ' ')}</p>
+              <p className="text-[10px] text-[var(--muted)] uppercase tracking-widest mt-1 font-montserrat">{formatCategory(t.category)}</p>
             </div>
 
             <div className="flex justify-between items-center pt-3 border-t border-[var(--border)] mt-4">
@@ -390,7 +396,8 @@ export default function SupportPage() {
                     onChange={(e) => setCategory(e.target.value)}
                     className="w-full px-3 py-2.5 bg-[var(--background)] border border-[var(--border)] rounded-xl text-xs text-[var(--heading)] cursor-pointer focus:outline-none"
                   >
-                    <option value="cfu_forwarding">Call Forwarding (CFU) Setup</option>
+                    <option value="cfu_forwarding">Call Forwarding (CFU Unconditional - Default)</option>
+                    <option value="number_porting">Number Porting Request (Premium)</option>
                     <option value="general">General Inquiry</option>
                     <option value="billing">Billing & Pricing</option>
                     <option value="agent_issue">Voice Agent Concerns</option>

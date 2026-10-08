@@ -26,6 +26,11 @@ const DOCUMENT_TYPE_DESCRIPTIONS: Record<string, string> = {
   company_pan: 'Income Tax Department Permanent Account Number (PAN) Card',
   incorporation_cert: 'Ministry of Corporate Affairs (MCA) Certificate of Incorporation',
   utility_bill: 'Commercial Electricity, Water, or Landline Telephone Utility Bill',
+  passport: 'Official International Passport (Authorized Signatory)',
+  national_id: 'Government-Issued National Identity Card or Driver License',
+  company_registration: 'Official Company Registration Certificate / Certificate of Incorporation',
+  business_ein: 'Official Tax Identification Number (EIN, VAT, or Commercial Tax Certificate)',
+  trade_license: 'Municipal Trade License or Commercial Registry Certificate',
 }
 
 /**

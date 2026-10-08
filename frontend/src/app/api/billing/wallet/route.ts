@@ -42,6 +42,15 @@ export async function GET() {
       return NextResponse.json({ error: 'No organization linked to profile' }, { status: 400 })
     }
 
+    // Fetch dynamic system_config (P3, P7, P8)
+    const { data: configs } = await adminClient
+      .from('system_config')
+      .select('config_key, config_value')
+    const configMap: Record<string, string> = {}
+    configs?.forEach((c: any) => { configMap[c.config_key] = c.config_value })
+
+    const defaultSpendLimitPaisa = parseInt(configMap.default_spend_limit_paisa || '250000', 10)
+
     // Fetch or provision wallet
     const { data: wallet } = await adminClient
       .from('wallets')
@@ -53,7 +62,7 @@ export async function GET() {
       organization_id: orgId,
       balance_paisa: 0,
       currency: 'INR',
-      spend_limit_paisa: 250000,
+      spend_limit_paisa: defaultSpendLimitPaisa,
       current_spend_paisa: 0,
       reliability_score: 85,
       emergency_minutes_available: 0,
@@ -61,12 +70,21 @@ export async function GET() {
       last_topup_at: null,
     }
 
+    // Fetch organization billing model (P5)
+    const { data: orgData } = await adminClient
+      .from('organizations')
+      .select('metadata')
+      .eq('id', orgId)
+      .maybeSingle()
+    const billingModel = orgData?.metadata?.billing_model || (profile as any)?.billing_model || 'subscription'
+
     return NextResponse.json({
       success: true,
       wallet: {
         ...walletData,
+        billing_model: billingModel,
         balance_inr: (walletData.balance_paisa || 0) / 100,
-        spend_limit_inr: (walletData.spend_limit_paisa || 250000) / 100,
+        spend_limit_inr: (walletData.spend_limit_paisa || defaultSpendLimitPaisa) / 100,
         current_spend_inr: (walletData.current_spend_paisa || 0) / 100,
       },
     })
@@ -97,6 +115,19 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'No organization linked to profile' }, { status: 400 })
     }
 
+    // Dynamic system configs (P3, P7, P8)
+    const { data: configs } = await adminClient
+      .from('system_config')
+      .select('config_key, config_value')
+    const configMap: Record<string, string> = {}
+    configs?.forEach((c: any) => { configMap[c.config_key] = c.config_value })
+
+    const emergencyQuota = parseInt(configMap.emergency_minutes_quota || '50', 10)
+    const minReliabilityScore = parseInt(configMap.emergency_minutes_min_reliability_score || '80', 10)
+    const cooldownDays = parseInt(configMap.emergency_minutes_cooldown_days || '30', 10)
+    const minTopupPaisa = parseInt(configMap.wallet_min_topup_paisa || '50000', 10) // default ₹500
+    const minTopupInr = Math.max(1, minTopupPaisa / 100)
+
     const body = await req.json().catch(() => ({}))
     const { action } = body
 
@@ -108,19 +139,19 @@ export async function POST(req: Request) {
         .maybeSingle()
 
       const reliabilityScore = wallet?.reliability_score ?? 85
-      if (reliabilityScore <= 80) {
+      if (reliabilityScore <= minReliabilityScore) {
         return NextResponse.json({
-          error: `Reliability Score must exceed 80 to unlock emergency minutes (current: ${reliabilityScore}).`,
+          error: `Reliability Score must exceed ${minReliabilityScore} to unlock emergency minutes (current: ${reliabilityScore}).`,
         }, { status: 403 })
       }
 
-      // Check 30-day cooldown
+      // Check cooldown
       if (wallet?.emergency_minutes_claimed_at) {
         const lastClaimed = new Date(wallet.emergency_minutes_claimed_at).getTime()
         const daysSince = (Date.now() - lastClaimed) / (1000 * 60 * 60 * 24)
-        if (daysSince < 30) {
+        if (daysSince < cooldownDays) {
           return NextResponse.json({
-            error: `Emergency minutes can only be claimed once every 30 days. Please wait ${Math.ceil(30 - daysSince)} more days.`,
+            error: `Emergency minutes can only be claimed once every ${cooldownDays} days. Please wait ${Math.ceil(cooldownDays - daysSince)} more days.`,
           }, { status: 429 })
         }
       }
@@ -128,23 +159,23 @@ export async function POST(req: Request) {
       const nowIso = new Date().toISOString()
       await adminClient.from('wallets').upsert({
         organization_id: orgId,
-        emergency_minutes_available: 50,
+        emergency_minutes_available: emergencyQuota,
         emergency_minutes_claimed_at: nowIso,
         updated_at: nowIso,
       }, { onConflict: 'organization_id' })
 
       return NextResponse.json({
         success: true,
-        message: '50 emergency minutes successfully claimed.',
-        emergency_minutes_available: 50,
+        message: `${emergencyQuota} emergency minutes successfully claimed.`,
+        emergency_minutes_available: emergencyQuota,
       })
     }
 
     // 1. Create Razorpay Order for Real Top-Up
     if (action === 'create_order') {
       const amountInr = Number(body.amount_inr)
-      if (!amountInr || amountInr < 100) {
-        return NextResponse.json({ error: 'Minimum wallet top-up is ₹100' }, { status: 400 })
+      if (!amountInr || amountInr < minTopupInr) {
+        return NextResponse.json({ error: `Minimum wallet top-up is ₹${minTopupInr}` }, { status: 400 })
       }
       const amountPaisa = Math.round(amountInr * 100)
 

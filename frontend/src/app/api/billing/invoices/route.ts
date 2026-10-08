@@ -32,9 +32,20 @@ export async function GET(request: NextRequest) {
       if (invNum?.startsWith('TRI-')) {
         invNum = `VAK/26-27/${String(idx + 1).padStart(5, '0')}`
       }
+      const totalPaisa =
+        (inv.grand_total_paisa && Number(inv.grand_total_paisa) > 0)
+          ? Number(inv.grand_total_paisa)
+          : (inv.total_amount && Number(inv.total_amount) > 0)
+          ? Number(inv.total_amount)
+          : (inv.subscription_amount && Number(inv.subscription_amount) > 0)
+          ? Number(inv.subscription_amount)
+          : 0
+
       return {
         ...inv,
         invoice_number: invNum,
+        grand_total_paisa: totalPaisa,
+        total_amount: totalPaisa,
       }
     })
 

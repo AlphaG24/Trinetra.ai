@@ -20,6 +20,34 @@ export const revalidate = 0;
 export default async function AdminOverviewPage() {
   const supabase = await createClient();
 
+  // Decision A1: developer_tester accounts are strictly excluded from business metrics
+  const { data: devProfiles } = await supabase
+    .from("profiles")
+    .select("id, organization_id")
+    .in("role", ["developer_tester", "dev_test", "tester"]);
+
+  const devOrgIds = (devProfiles?.map((p) => p.organization_id).filter(Boolean) || []) as string[];
+
+  // Construct queries with developer_tester exclusion filters
+  let orgsQuery = supabase.from("organizations").select("*", { count: "exact", head: true });
+  let agentsQuery = supabase.from("agents").select("*", { count: "exact", head: true });
+  let callsQuery = supabase.from("voice_calls").select("duration_seconds");
+  let leadsQuery = supabase.from("leads").select("*", { count: "exact", head: true });
+  let recentTenantsQuery = supabase
+    .from("organizations")
+    .select("*")
+    .order("created_at", { ascending: false })
+    .limit(5);
+
+  if (devOrgIds.length > 0) {
+    const orgFilter = `(${devOrgIds.join(",")})`;
+    orgsQuery = orgsQuery.not("id", "in", orgFilter);
+    agentsQuery = agentsQuery.not("organization_id", "in", orgFilter);
+    callsQuery = callsQuery.not("organization_id", "in", orgFilter);
+    leadsQuery = leadsQuery.not("organization_id", "in", orgFilter);
+    recentTenantsQuery = recentTenantsQuery.not("id", "in", orgFilter);
+  }
+
   // Fetch counts and metrics in parallel
   const [
     { count: tenantsCount },
@@ -29,15 +57,11 @@ export default async function AdminOverviewPage() {
     { data: recentTenants },
     { data: openTickets },
   ] = await Promise.all([
-    supabase.from("organizations").select("*", { count: "exact", head: true }),
-    supabase.from("agents").select("*", { count: "exact", head: true }),
-    supabase.from("voice_calls").select("duration_seconds"),
-    supabase.from("leads").select("*", { count: "exact", head: true }),
-    supabase
-      .from("organizations")
-      .select("*")
-      .order("created_at", { ascending: false })
-      .limit(5),
+    orgsQuery,
+    agentsQuery,
+    callsQuery,
+    leadsQuery,
+    recentTenantsQuery,
     supabase
       .from("support_tickets")
       .select("*")
@@ -56,13 +80,19 @@ export default async function AdminOverviewPage() {
   return (
     <div className="space-y-8 animate-in fade-in duration-300">
       {/* Header */}
-      <div className="pb-6 border-b border-white/5">
-        <h1 className="text-3xl font-extrabold tracking-tight text-white font-display">
-          Admin Control Center
-        </h1>
-        <p className="text-zinc-400 text-sm mt-1">
-          System health, tenant metrics, and platform operations.
-        </p>
+      <div className="pb-6 border-b border-white/5 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-extrabold tracking-tight text-white font-display">
+            Admin Control Center
+          </h1>
+          <p className="text-zinc-400 text-sm mt-1">
+            System health, tenant metrics, and platform operations.
+          </p>
+        </div>
+        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-violet-500/10 border border-violet-500/20 text-violet-300 text-xs font-mono">
+          <Activity className="w-3.5 h-3.5 text-violet-400" />
+          <span>Metrics exclude developer/tester accounts</span>
+        </div>
       </div>
 
       {/* Global Metric Cards */}
@@ -223,12 +253,12 @@ export default async function AdminOverviewPage() {
           </div>
         </div>
 
-        {/* Panel C: Section 6 Monitoring & Alerting Stack */}
+        {/* Panel C: Single-Pane-of-Glass Monitoring & Operations Stack */}
         <div className="bg-[#0f111a]/60 border border-white/5 rounded-2xl p-6 space-y-4 lg:col-span-2">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-white/5 pb-3">
             <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
               <Activity className="w-4 h-4 text-emerald-400" />
-              Platform Observability & Monitoring Stack (Section 6)
+              Platform Observability & Operations Stack
             </h3>
             <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full w-fit">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
@@ -311,7 +341,7 @@ export default async function AdminOverviewPage() {
                   Telegram Bot + Email
                 </span>
                 <span className="text-[10px] text-emerald-400 font-mono mt-0.5 block">
-                  Instant P1/P2 Dispatch
+                  Instant Critical Dispatch
                 </span>
               </div>
               <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />

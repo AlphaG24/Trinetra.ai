@@ -113,7 +113,7 @@ function asBoolean(value: unknown) {
   return false;
 }
 
-function formatPrice(value: number | null, currency: "INR" | "USD" = "INR") {
+function formatPrice(value: number | null, currency: "INR" | "USD" | "EUR" = "INR") {
   if (value === null || !Number.isFinite(value)) return "";
   if (currency === "USD") {
     const dollars = value / 100;
@@ -123,15 +123,23 @@ function formatPrice(value: number | null, currency: "INR" | "USD" = "INR") {
       maximumFractionDigits: whole ? 0 : 2,
     }).format(dollars)}`;
   }
+  if (currency === "EUR") {
+    const euros = value / 100;
+    const whole = Number.isInteger(euros);
+    return `€${new Intl.NumberFormat("de-DE", {
+      minimumFractionDigits: whole ? 0 : 2,
+      maximumFractionDigits: whole ? 0 : 2,
+    }).format(euros)}`;
+  }
   const rupees = value / 100;
   const whole = Number.isInteger(rupees);
-  return `\u20B9${new Intl.NumberFormat("en-IN", {
+  return `₹${new Intl.NumberFormat("en-IN", {
     minimumFractionDigits: whole ? 0 : 2,
     maximumFractionDigits: whole ? 0 : 2,
   }).format(rupees)}`;
 }
 
-function formatPaise(value: number | null, currency: "INR" | "USD" = "INR") {
+function formatPaise(value: number | null, currency: "INR" | "USD" | "EUR" = "INR") {
   return formatPrice(value, currency);
 }
 
@@ -174,7 +182,7 @@ function formatIncludedValue(value: number | null, unit: string) {
   return `${value.toLocaleString("en-IN")} ${unit}`;
 }
 
-function getMonthlyDisplayPrice(plan: PlanRecord, billingMode: BillingMode, currency: "INR" | "USD" = "INR") {
+function getMonthlyDisplayPrice(plan: PlanRecord, billingMode: BillingMode, currency: "INR" | "USD" | "EUR" = "INR") {
   if (plan.priceMonthly === 0) return "Custom";
   return formatPrice(billingMode === "annual" ? plan.priceAnnual : plan.priceMonthly, currency);
 }
@@ -526,18 +534,20 @@ function PricingCard({
   plan: PlanRecord;
   index: number;
   billingMode: BillingMode;
-  currencyMode?: "INR" | "USD";
+  currencyMode?: "INR" | "USD" | "EUR";
   publicConfig?: any;
 }) {
   const isPopular = plan.isPopular;
   const cardFeatures = getCardFeatures(plan);
-  const setupFee = currencyMode === "USD" ? null : getSetupFee(plan);
+  const setupFee = currencyMode !== "INR" ? null : getSetupFee(plan);
   const minimumMonths = getMinimumMonths(plan);
   const savings = getAnnualSavings(plan);
   const displayPrice = getMonthlyDisplayPrice(plan, billingMode, currencyMode);
   const monthlyPrice = formatPrice(plan.priceMonthly, currencyMode);
   const overageLine = currencyMode === "USD"
     ? `${publicConfig?.overage_per_minute_usd_cents ? `$${(parseInt(publicConfig.overage_per_minute_usd_cents, 10) / 100).toFixed(2)}` : "$0.12"}/min`
+    : currencyMode === "EUR"
+    ? `${publicConfig?.overage_per_minute_eur_cents ? `€${(parseInt(publicConfig.overage_per_minute_eur_cents, 10) / 100).toFixed(2)}` : "€0.11"}/min`
     : [
         plan.overageVoicePerMinute !== null ? `${formatPrice(plan.overageVoicePerMinute, currencyMode)}/min` : "",
         plan.overageChatPerConversation !== null ? `${formatPrice(plan.overageChatPerConversation, currencyMode)}/chat` : "",
@@ -631,12 +641,14 @@ function PricingCard({
 export default function PricingPage() {
   const { data: dbPlans, loading } = useActivePlans();
   const [publicConfig, setPublicConfig] = useState<any>(null);
-  const [currencyMode, setCurrencyMode] = useState<"INR" | "USD">("INR");
+  const [currencyMode, setCurrencyMode] = useState<"INR" | "USD" | "EUR">("INR");
 
   useEffect(() => {
     try {
       const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || "";
-      if (tz && !tz.includes("Calcutta") && !tz.includes("Kolkata") && !tz.includes("Asia/Colombo")) {
+      if (tz.startsWith("Europe/")) {
+        setCurrencyMode("EUR");
+      } else if (tz && !tz.includes("Calcutta") && !tz.includes("Kolkata") && !tz.includes("Asia/Colombo")) {
         setCurrencyMode("USD");
       }
     } catch {
@@ -677,6 +689,23 @@ export default function PricingPage() {
           p.includedVoiceMinutes = parseInt(publicConfig?.enterprise_minutes || '10000', 10);
           p.description = 'Global tailored limits, international numbers, and dedicated SLA.';
         }
+      } else if (currencyMode === "EUR") {
+        if (p.slug === 'starter') {
+          p.priceMonthly = parseInt(publicConfig?.starter_price_eur_cents || '7900', 10);
+          p.priceAnnual = Math.round(p.priceMonthly * 0.8);
+          p.includedVoiceMinutes = parseInt(publicConfig?.starter_minutes || '500', 10);
+        } else if (p.slug === 'growth') {
+          p.name = 'Professional';
+          p.priceMonthly = parseInt(publicConfig?.professional_price_eur_cents || '21900', 10);
+          p.priceAnnual = Math.round(p.priceMonthly * 0.8);
+          p.includedVoiceMinutes = parseInt(publicConfig?.professional_minutes || '2000', 10);
+        } else if (p.slug === 'scale') {
+          p.name = 'Enterprise';
+          p.priceMonthly = parseInt(publicConfig?.enterprise_price_eur_cents || '49900', 10);
+          p.priceAnnual = Math.round(p.priceMonthly * 0.8);
+          p.includedVoiceMinutes = parseInt(publicConfig?.enterprise_minutes || '10000', 10);
+          p.description = 'European GDPR-compliant limits, EU virtual numbers, and dedicated SLA.';
+        }
       } else {
         if (p.slug === 'starter') {
           p.priceMonthly = parseInt(publicConfig?.starter_price_paisa || '499900', 10);
@@ -694,6 +723,9 @@ export default function PricingPage() {
           p.includedVoiceMinutes = parseInt(publicConfig?.enterprise_minutes || '10000', 10);
           p.description = 'Tailored limits, custom integrations, and dedicated SLA for large enterprises.';
         }
+      }
+      if (currencyMode === "INR" && publicConfig?.overage_per_minute_paisa) {
+        p.overageVoicePerMinute = parseInt(publicConfig.overage_per_minute_paisa, 10);
       }
       return p;
     });
@@ -731,7 +763,7 @@ export default function PricingPage() {
 
           <div className="relative z-10 mx-auto max-w-[760px]">
             <div className="mb-[24px] inline-flex rounded-full border border-[rgba(139,92,246,0.15)] bg-[rgba(139,92,246,0.1)] px-[16px] py-[6px] font-sans text-[13px] font-medium text-[#D7C4F7]">
-              {"\u2726"} Pricing
+              {"✦"} Pricing
             </div>
             <h1 className="font-display text-[38px] font-bold tracking-[-0.02em] text-[#FAF7FF] md:text-[52px]">
               Simple Plans. Real Results.
@@ -746,7 +778,7 @@ export default function PricingPage() {
                 <button
                   type="button"
                   onClick={() => setCurrencyMode("INR")}
-                  className={`flex items-center gap-1.5 px-3.5 py-1 rounded-full text-xs font-semibold transition-all ${
+                  className={`flex items-center gap-1.5 px-3.5 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer ${
                     currencyMode === "INR"
                       ? "bg-[#8B5CF6] text-white shadow-sm"
                       : "text-[#8D86A8] hover:text-[#FAF7FF]"
@@ -757,13 +789,24 @@ export default function PricingPage() {
                 <button
                   type="button"
                   onClick={() => setCurrencyMode("USD")}
-                  className={`flex items-center gap-1.5 px-3.5 py-1 rounded-full text-xs font-semibold transition-all ${
+                  className={`flex items-center gap-1.5 px-3.5 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer ${
                     currencyMode === "USD"
                       ? "bg-[#8B5CF6] text-white shadow-sm"
                       : "text-[#8D86A8] hover:text-[#FAF7FF]"
                   }`}
                 >
                   <span>🌐</span> Global (USD $)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCurrencyMode("EUR")}
+                  className={`flex items-center gap-1.5 px-3.5 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer ${
+                    currencyMode === "EUR"
+                      ? "bg-[#8B5CF6] text-white shadow-sm"
+                      : "text-[#8D86A8] hover:text-[#FAF7FF]"
+                  }`}
+                >
+                  <span>🇪🇺</span> Europe (EUR €)
                 </button>
               </div>
             </div>

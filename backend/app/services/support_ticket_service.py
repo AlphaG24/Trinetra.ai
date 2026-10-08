@@ -37,6 +37,7 @@ logger = logging.getLogger("SupportTicketService")
 # Allowed ticket categories
 ALLOWED_CATEGORIES = (
     "cfu_forwarding",
+    "number_porting",
     "agent_issue",
     "billing",
     "feature_request",

@@ -63,8 +63,20 @@ export async function GET() {
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    const entityTypes = ['company_pan', 'gstin_certificate', 'incorporation_cert']
-    const signatoryTypes = ['authorized_signatory_id']
+    const entityTypes = [
+      'company_pan', 
+      'gstin_certificate', 
+      'incorporation_cert',
+      'company_registration',
+      'business_ein',
+      'trade_license'
+    ]
+    const signatoryTypes = [
+      'authorized_signatory_id',
+      'passport',
+      'national_id',
+      'drivers_license'
+    ]
 
     const allDocs = docs || []
     // Entity Proof checks
@@ -96,14 +108,14 @@ export async function GET() {
       entity: {
         isMandatory: true,
         title: 'Entity / Business Proof',
-        description: 'Company PAN Card, GSTIN Certificate, or Incorporation Certificate',
+        description: 'Company PAN, GSTIN, Incorporation, or Company Registration Certificate',
         verified: hasVerifiedEntity,
         status: hasVerifiedEntity ? 'verified' : (hasPendingEntity ? 'pending_review' : (hasRejectedEntity ? 'rejected' : 'missing')),
       },
       signatory: {
         isMandatory: true,
         title: 'Authorized Signatory Proof',
-        description: 'Masked Aadhaar Card, Passport, or Voter ID of registered officer',
+        description: 'Masked Aadhaar, Passport, or National ID of registered officer',
         verified: hasVerifiedSignatory,
         status: hasVerifiedSignatory ? 'verified' : (hasPendingSignatory ? 'pending_review' : (hasRejectedSignatory ? 'rejected' : 'missing')),
       },

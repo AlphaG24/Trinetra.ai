@@ -482,6 +482,8 @@ export function AgentDetailPageClient({
     if (agentData?.config?.plan_tier) {
       const aTier = agentData.config.plan_tier.toLowerCase()
       if (aTier === 'professional' || aTier === 'enterprise' || aTier === 'pro') return 'pro'
+      if (aTier === 'credit_based') return 'credit_based'
+      if (aTier === 'outcome_based') return 'outcome_based'
       return aTier
     }
     // 2. If agent is explicitly marked demo
@@ -494,16 +496,16 @@ export function AgentDetailPageClient({
       if (pTier === 'professional' || pTier === 'enterprise' || pTier === 'pro') return 'pro'
       if (pTier === 'starter') return 'starter'
       if (pTier === 'trial') return 'trial'
+      if (pTier === 'credit_based') return 'credit_based'
+      if (pTier === 'outcome_based') return 'outcome_based'
     }
     return 'free_demo'
   }
 
   const tier = getAgentTier(agent, profile)
 
-
-
-  // Trial users are treated as fully paid for feature access
-  const isPaid = tier === 'starter' || tier === 'pro' || tier === 'trial'
+  // Paid users are treated as fully paid for feature access
+  const isPaid = tier === 'starter' || tier === 'pro' || tier === 'trial' || tier === 'credit_based' || tier === 'outcome_based'
 
   const userTier = (profile?.plan_tier || 'free').toLowerCase()
   let demoMinutesLimit = 10
@@ -740,13 +742,30 @@ export function AgentDetailPageClient({
 
           {/* Tier Badge */}
           <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-[9px] font-black uppercase border border-[var(--border)] bg-[var(--background)] text-[var(--heading)] font-montserrat tracking-wide">
-            {tier === 'pro' ? 'Pro Plan' : tier === 'starter' ? 'Starter Plan' : tier === 'trial' ? 'Trial Plan' : 'Free Demo'}
+            {tier === 'pro'
+              ? 'Pro Plan'
+              : tier === 'starter'
+              ? 'Starter Plan'
+              : tier === 'trial'
+              ? 'Trial Plan'
+              : tier === 'credit_based'
+              ? 'Credit-Based Plan'
+              : tier === 'outcome_based'
+              ? 'Outcome-Based Plan'
+              : 'Free Demo'}
           </span>
 
           {/* Minutes Remaining — only show for free demo */}
           {tier === 'free_demo' && (
             <span className="text-[10px] font-mono text-[var(--muted)] bg-[var(--background)] px-2.5 py-1 rounded-lg border border-[var(--border)]">
               {remainingMinutes} min left
+            </span>
+          )}
+
+          {/* Prepaid Wallet Active Indicator */}
+          {(tier === 'credit_based' || tier === 'outcome_based') && (
+            <span className="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-lg border border-emerald-500/20">
+              Prepaid Wallet Active
             </span>
           )}
 

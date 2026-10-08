@@ -204,9 +204,12 @@ class UsageService:
         max_agents = await self._get_config(f"max_agents_{plan_tier}", base_agents) + additional_agents
         max_numbers = await self._get_config(f"max_phone_numbers_{plan_tier}", base_numbers) + additional_phone_numbers
         
-        # Fallback if specific config is not set
+        # Fallback if specific config is not set (P10: Pooled across all customer numbers; no per-number cap)
         if max_numbers == additional_phone_numbers:
-            max_numbers = await self._get_config("max_phone_numbers_per_org", 10) + additional_phone_numbers
+            pooled_cap = await self._get_config("max_pooled_numbers_per_org", None)
+            if pooled_cap is None:
+                pooled_cap = await self._get_config("max_phone_numbers_per_org", 10)
+            max_numbers = int(pooled_cap) + additional_phone_numbers
             
         monthly_minutes = await self._get_config(f"{plan_tier}_minutes", 0)
         if monthly_minutes == 0:

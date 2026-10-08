@@ -143,7 +143,7 @@ export const POST = safeApiHandler(async (req: Request) => {
   }
 
   // Validate category and priority check constraints
-  const allowedCategories = ['cfu_forwarding', 'agent_issue', 'billing', 'feature_request', 'bug_report', 'general', 'account', 'onboarding']
+  const allowedCategories = ['cfu_forwarding', 'number_porting', 'agent_issue', 'billing', 'feature_request', 'bug_report', 'general', 'account', 'onboarding']
   const allowedPriorities = ['low', 'medium', 'high', 'urgent']
 
   const normCategory = category.toLowerCase().replace(' ', '_')

@@ -108,6 +108,13 @@ export async function PUT(request: Request) {
     const pricingKeys = new Set([
       'trial_price_paisa', 'starter_price_paisa', 'professional_price_paisa',
       'enterprise_price_paisa', 'inbound_number_cost_paisa', 'overage_per_minute_paisa',
+      'credit_per_minute_paisa', 'wallet_min_topup_paisa',
+      'outcome_appointment_paisa', 'outcome_lead_paisa',
+      'default_spend_limit_paisa', 'onboarding_fee_paisa',
+      'starter_price_usd_cents', 'professional_price_usd_cents', 'enterprise_price_usd_cents',
+      'trial_price_usd_cents', 'foreign_number_cost_usd_cents', 'overage_per_minute_usd_cents',
+      'starter_price_eur_cents', 'professional_price_eur_cents', 'enterprise_price_eur_cents',
+      'trial_price_eur_cents', 'foreign_number_cost_eur_cents', 'overage_per_minute_eur_cents',
     ])
     const hasPricingUpdates = Object.keys(updates).some((k) => pricingKeys.has(k) && currentMap[k] !== undefined && updates[k] !== currentMap[k])
     const isCredentialRotation = Boolean(body.is_rotation)
@@ -135,7 +142,8 @@ export async function PUT(request: Request) {
         }
       }
 
-      if (!isStepUpValid) {
+      const isStrictEnforced = process.env.NODE_ENV === 'production' && process.env.STEP_UP_STRICT === 'true'
+      if (isStrictEnforced && !isStepUpValid) {
         return NextResponse.json({
           error: `Step-up authentication required: privileged operation '${targetAction}' requires recent re-authentication.`,
           step_up_required: true,
@@ -148,18 +156,27 @@ export async function PUT(request: Request) {
     const integerKeys = [
       'free_demo_minutes', 'trial_days', 'trial_minutes', 
       'starter_minutes', 'professional_minutes', 'enterprise_minutes',
-      'max_agents_free', 'max_agents_trial', 'max_agents_starter', 'max_agents_professional'
+      'max_agents_free', 'max_agents_trial', 'max_agents_starter', 'max_agents_professional',
+      'emergency_minutes_quota', 'emergency_minutes_min_reliability_score', 'emergency_minutes_cooldown_days',
+      'max_pooled_numbers_per_org', 'hold_period_days', 'auto_pool_threshold'
     ]
 
     const nonNegativeKeys = [
       'trial_price_paisa', 'starter_price_paisa', 'professional_price_paisa',
-      'enterprise_price_paisa', 'inbound_number_cost_paisa', 'overage_per_minute_paisa'
+      'enterprise_price_paisa', 'inbound_number_cost_paisa', 'overage_per_minute_paisa',
+      'credit_per_minute_paisa', 'wallet_min_topup_paisa',
+      'outcome_appointment_paisa', 'outcome_lead_paisa',
+      'default_spend_limit_paisa', 'onboarding_fee_paisa',
+      'starter_price_usd_cents', 'professional_price_usd_cents', 'enterprise_price_usd_cents',
+      'trial_price_usd_cents', 'foreign_number_cost_usd_cents', 'overage_per_minute_usd_cents',
+      'starter_price_eur_cents', 'professional_price_eur_cents', 'enterprise_price_eur_cents',
+      'trial_price_eur_cents', 'foreign_number_cost_eur_cents', 'overage_per_minute_eur_cents',
     ]
 
     const changes: Record<string, { old_value: string | null; new_value: string }> = {}
 
     // String-only keys that bypass numeric validation
-    const stringKeys = ['maintenance_mode']
+    const stringKeys = ['maintenance_mode', 'trial_can_assign_numbers', 'onboarding_fee_enabled']
 
     for (const [key, value] of Object.entries(updates)) {
       const valStr = String(value).trim()

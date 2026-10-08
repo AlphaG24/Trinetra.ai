@@ -47,6 +47,7 @@ interface Invoice {
   id: string
   invoice_number: string
   subscription_amount?: number
+  total_amount?: number
   grand_total_paisa?: number
   subtotal_paisa?: number
   total_tax_paisa?: number
@@ -83,6 +84,7 @@ interface WalletInfo {
   reliability_score: number
   emergency_minutes_available: number
   emergency_minutes_claimed_at: string | null
+  billing_model?: 'subscription' | 'credit_based' | 'outcome_based' | string
 }
 
 function BillingContent() {
@@ -157,8 +159,9 @@ function BillingContent() {
   }, [])
 
   const handleQuickTopup = async (amount: number) => {
-    if (!amount || amount < 100) {
-      toast.error('Minimum top-up amount is ₹100')
+    const minTopupInr = Math.max(1, Math.round(parseInt(configs.wallet_min_topup_paisa || '50000', 10) / 100))
+    if (!amount || amount < minTopupInr) {
+      toast.error(`Minimum top-up amount is ₹${minTopupInr}`)
       return
     }
 
@@ -300,6 +303,14 @@ function BillingContent() {
     }
   }, [router])
 
+  const getInvoiceAmountPaisa = (inv: Invoice): number => {
+    if (inv.grand_total_paisa && Number(inv.grand_total_paisa) > 0) return Number(inv.grand_total_paisa)
+    if (inv.total_amount && Number(inv.total_amount) > 0) return Number(inv.total_amount)
+    if (inv.subscription_amount && Number(inv.subscription_amount) > 0) return Number(inv.subscription_amount)
+    if (inv.subtotal_paisa && Number(inv.subtotal_paisa) > 0) return Number(inv.subtotal_paisa)
+    return 0
+  }
+
   const handleDownload = async (inv: Invoice) => {
     try {
       const response = await fetch(`/api/billing/invoices/download?id=${inv.id}`)
@@ -317,7 +328,7 @@ function BillingContent() {
       console.error('Failed to download invoice:', err)
       toast.error('Failed to download PDF invoice. Downloading text receipt instead.')
 
-      const totalAmt = ((inv.grand_total_paisa ?? inv.subscription_amount ?? 0) / 100).toFixed(2)
+      const totalAmt = (getInvoiceAmountPaisa(inv) / 100).toFixed(2)
       const content = `INVOICE\n=======================\nInvoice Number: ${inv.invoice_number}\nDate: ${new Date(inv.created_at).toLocaleDateString()}\nPlan: ${inv.plan_tier || 'Subscription'}\nAmount: ₹${totalAmt}\nGST (18%): ₹0.00 (Included)\nTotal: ₹${totalAmt}\nStatus: ${inv.status}\nPayment Method: ${inv.payment_method || 'Razorpay'}\n\nThank you for your business!`
 
       const blob = new Blob([content], { type: 'text/plain' })
@@ -637,10 +648,17 @@ function BillingContent() {
               <Wallet className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="font-bold text-sm text-[var(--heading)] font-display flex items-center gap-2">
+              <h3 className="font-bold text-sm text-[var(--heading)] font-display flex flex-wrap items-center gap-2">
                 Prepaid Balance & Spend Limits
                 <span className="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
                   Active
+                </span>
+                <span className="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider bg-violet-500/10 text-violet-400 border border-violet-500/20">
+                  {wallet?.billing_model === 'credit_based'
+                    ? 'Credit-Based (Pay-As-You-Go)'
+                    : wallet?.billing_model === 'outcome_based'
+                    ? 'Outcome-Based (Per Result)'
+                    : 'Subscription Plan Model'}
                 </span>
               </h3>
               <p className="text-xs text-[var(--muted)] mt-0.5">
@@ -1040,7 +1058,7 @@ function BillingContent() {
                       {inv.invoice_number?.startsWith('TRI-') ? `VAK/26-27/${inv.invoice_number.slice(-5)}` : inv.invoice_number}
                     </td>
                     <td className="py-3 px-4 whitespace-nowrap font-mono font-medium">
-                      {formatPrice(inv.grand_total_paisa ?? inv.subscription_amount ?? 0)}
+                      {formatPrice(getInvoiceAmountPaisa(inv))}
                     </td>
                     <td className="py-3 px-4 whitespace-nowrap">
                       <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${inv.status.toLowerCase() === 'paid'

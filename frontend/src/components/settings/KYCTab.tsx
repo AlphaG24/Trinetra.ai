@@ -284,15 +284,24 @@ export function KYCTab() {
                 onChange={e => setDocType(e.target.value)}
                 className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-white/10 text-zinc-900 dark:text-white text-xs font-semibold rounded-xl p-3 focus:outline-none focus:ring-1 focus:ring-violet-500"
               >
-                <option value="company_pan">Company / Business PAN Card (Mandatory Entity Proof)</option>
-                <option value="gstin_certificate">GSTIN Registration Certificate (Mandatory Entity Proof)</option>
-                <option value="authorized_signatory_id">Authorized Signatory ID - Aadhaar / Passport (Mandatory Signatory Proof)</option>
-                <option value="incorporation_cert">Certificate of Incorporation (Alternative Entity Proof)</option>
-                <option value="utility_bill">Business Electricity / Telephone Utility Bill (Supporting Address)</option>
+                <optgroup label="India (Domestic)">
+                  <option value="company_pan">Company / Business PAN Card (Mandatory Entity Proof)</option>
+                  <option value="gstin_certificate">GSTIN Registration Certificate (Mandatory Entity Proof)</option>
+                  <option value="authorized_signatory_id">Authorized Signatory ID - Masked Aadhaar / Voter ID (Mandatory Signatory Proof)</option>
+                  <option value="incorporation_cert">Certificate of Incorporation (Alternative Entity Proof)</option>
+                  <option value="utility_bill">Business Electricity / Telephone Utility Bill (Supporting Address)</option>
+                </optgroup>
+                <optgroup label="Global / International">
+                  <option value="passport">Passport (Global Signatory Proof)</option>
+                  <option value="national_id">National ID Card / Driver License (Global Signatory Proof)</option>
+                  <option value="company_registration">Company Registration Certificate (Global Entity Proof)</option>
+                  <option value="business_ein">Business Tax ID / EIN / VAT Certificate (Global Entity Proof)</option>
+                  <option value="trade_license">Commercial Registry / Trade License (Global Entity Proof)</option>
+                </optgroup>
               </select>
               <p className="text-[10px] text-violet-600 dark:text-violet-400 mt-1 font-medium flex items-center gap-1">
                 <Info className="w-3 h-3" />
-                {docType === 'authorized_signatory_id'
+                {['authorized_signatory_id', 'passport', 'national_id'].includes(docType)
                   ? 'Satisfies Mandatory Requirement 2 (Authorized Signatory ID)'
                   : docType === 'utility_bill'
                   ? 'Supplemental address verification document'
@@ -308,12 +317,20 @@ export function KYCTab() {
                 type="text"
                 value={rawId}
                 onChange={e => setRawId(e.target.value)}
-                placeholder={docType === 'authorized_signatory_id' ? 'Aadhaar (12 digits) or Passport' : 'PAN (e.g. ABCDE1234F) or GSTIN'}
+                placeholder={
+                  ['authorized_signatory_id', 'masked_aadhaar'].includes(docType) ? 'Masked Aadhaar (12 digits) or Voter ID' :
+                  docType === 'passport' ? 'Passport Number (e.g. A1234567)' :
+                  docType === 'national_id' ? 'National ID / Driver License Number' :
+                  docType === 'company_pan' ? 'PAN (e.g. ABCDE1234F)' :
+                  docType === 'gstin_certificate' ? 'GSTIN (e.g. 27AABCU9603R1ZM)' :
+                  docType === 'business_ein' ? 'EIN / VAT / Tax ID Number' :
+                  'Document / Registration Number'
+                }
                 className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-white/10 text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-650 text-xs font-semibold font-mono rounded-xl p-3 focus:outline-none focus:ring-1 focus:ring-violet-500"
               />
               <p className="text-[10px] text-zinc-400 dark:text-zinc-500 mt-1 flex items-center gap-1 font-mono">
                 <Lock className="w-3 h-3 text-emerald-500" />
-                UIDAI Safe: Only masked identifier (e.g. •••• •••• 1234) is permanently vaulted.
+                Statutory Privacy Safe: Raw Aadhaar numbers are never stored; only masked identifiers are permanently vaulted.
               </p>
             </div>
 

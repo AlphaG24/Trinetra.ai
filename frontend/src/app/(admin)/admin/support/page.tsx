@@ -79,6 +79,12 @@ export default function AdminSupportPage() {
   // System Admins (for assignment)
   const [adminsList, setAdminsList] = useState<AdminProfile[]>([])
 
+  const formatCategory = (cat: string) => {
+    if (cat === 'cfu_forwarding') return 'Call Forwarding (CFU)'
+    if (cat === 'number_porting') return 'Number Porting (Premium)'
+    return cat.replace(/_/g, ' ')
+  }
+
   const fetchTickets = async () => {
     setIsLoading(true)
     try {
@@ -259,6 +265,8 @@ export default function AdminSupportPage() {
                 className="bg-black border border-white/5 rounded-xl px-2 py-2 text-[10px] text-white focus:outline-none focus:border-violet-500 cursor-pointer"
               >
                 <option value="all">All Categories</option>
+                <option value="cfu_forwarding">Call Forwarding (CFU)</option>
+                <option value="number_porting">Number Porting (Premium)</option>
                 <option value="general">General</option>
                 <option value="billing">Billing</option>
                 <option value="agent_issue">Agent Issue</option>
@@ -306,7 +314,7 @@ export default function AdminSupportPage() {
                   </div>
                   <h4 className="text-xs font-bold text-white mt-1.5 truncate">{t.subject}</h4>
                   <div className="flex justify-between items-center text-[10px] text-zinc-500 pt-2 border-t border-white/5 mt-2">
-                    <span className="capitalize">{t.category.replace('_', ' ')}</span>
+                    <span className="capitalize">{formatCategory(t.category)}</span>
                     <span className={`text-[9px] uppercase font-bold ${
                       t.priority === 'urgent' ? 'text-rose-400' : t.priority === 'high' ? 'text-orange-400' : 'text-zinc-500'
                     }`}>
@@ -331,7 +339,7 @@ export default function AdminSupportPage() {
                     <div className="flex items-center gap-2">
                       <span className="text-[10px] font-mono text-zinc-500">{selectedTicket.ticket_number}</span>
                       <span className="text-[9px] font-black uppercase text-violet-400 bg-violet-500/10 px-2 py-0.5 rounded border border-violet-500/20 capitalize">
-                        {selectedTicket.category.replace('_', ' ')}
+                        {formatCategory(selectedTicket.category)}
                       </span>
                     </div>
                     <h2 className="text-base font-bold text-white mt-1">{selectedTicket.subject}</h2>

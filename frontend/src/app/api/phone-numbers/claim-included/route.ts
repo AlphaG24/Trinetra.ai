@@ -87,9 +87,10 @@ export async function POST(request: Request) {
         .eq("organization_id", profile.organization_id)
         .eq("status", "verified");
 
-      const entityTypes = ["company_pan", "gstin_certificate", "incorporation_cert"];
+      const entityTypes = ["company_pan", "gstin_certificate", "incorporation_cert", "company_registration", "business_ein", "trade_license"];
+      const signatoryTypes = ["authorized_signatory_id", "passport", "national_id", "drivers_license"];
       const hasVerifiedEntity = kycDocs?.some((d) => entityTypes.includes(d.document_type));
-      const hasVerifiedSignatory = kycDocs?.some((d) => d.document_type === "authorized_signatory_id");
+      const hasVerifiedSignatory = kycDocs?.some((d) => signatoryTypes.includes(d.document_type));
 
       if (!hasVerifiedEntity || !hasVerifiedSignatory) {
         return NextResponse.json(

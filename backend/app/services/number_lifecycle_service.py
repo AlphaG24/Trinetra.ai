@@ -36,6 +36,7 @@ logger = logging.getLogger("NumberLifecycleService")
 # Lifecycle Constants
 GRACE_PERIOD_DAYS = 15
 DEFAULT_HOLD_PERIOD_DAYS = int(os.getenv("HOLD_PERIOD_DAYS", "14"))
+DEFAULT_AUTO_POOL_THRESHOLD = int(os.getenv("AUTO_POOL_THRESHOLD", "10"))
 TOTAL_LIFECYCLE_DAYS = GRACE_PERIOD_DAYS + DEFAULT_HOLD_PERIOD_DAYS
 
 NEUTRAL_UNAVAILABLE_MESSAGE = (
@@ -115,6 +116,21 @@ class NumberLifecycleService:
         return f"{prefix}{'X' * masked_len}{suffix}"
 
     # -------------------------------------------------------------------------
+    # Helper: System Configuration Fetcher
+    # -------------------------------------------------------------------------
+    def _get_system_config_int(self, key: str, default: int) -> int:
+        """Fetch integer configuration from system_config table with fallback."""
+        try:
+            res = self.supabase.table("system_config").select("config_value").eq("config_key", key).limit(1).execute()
+            if res.data and len(res.data) > 0:
+                val = res.data[0].get("config_value")
+                if val is not None and str(val).strip() != "":
+                    return int(val)
+        except Exception as e:
+            logger.debug(f"Failed to fetch system_config '{key}': {e}")
+        return default
+
+    # -------------------------------------------------------------------------
     # 1. Expire Number (Transition to Grace Period)
     # -------------------------------------------------------------------------
     def expire_number(
@@ -129,7 +145,8 @@ class NumberLifecycleService:
         """
         now = datetime.now(timezone.utc)
         grace_ends = now + timedelta(days=GRACE_PERIOD_DAYS)
-        hold_days = custom_hold_days or DEFAULT_HOLD_PERIOD_DAYS
+        configured_hold = self._get_system_config_int("hold_period_days", DEFAULT_HOLD_PERIOD_DAYS)
+        hold_days = custom_hold_days if custom_hold_days is not None else configured_hold
         hold_ends = grace_ends + timedelta(days=hold_days)
         reactivation_token = secrets.token_urlsafe(32)
 
@@ -442,8 +459,9 @@ class NumberLifecycleService:
         # 4. Active Period Reminders (Decision N4: Day 1, 7, 14, 21, 28)
         reminders_dispatched = self.check_lifecycle_reminders()
 
-        # 5. Auto-Pool Inventory Expansion Check (Decision N6: available < 10)
-        pool_status = self.check_pool_inventory_expansion(threshold=10)
+        # 5. Auto-Pool Inventory Expansion Check (Decision N6: available < threshold)
+        pool_threshold = self._get_system_config_int("auto_pool_threshold", DEFAULT_AUTO_POOL_THRESHOLD)
+        pool_status = self.check_pool_inventory_expansion(threshold=pool_threshold)
 
         return {
             "processed_at": now_iso,
