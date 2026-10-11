@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Bot, CreditCard, Check, ArrowLeft, ShieldCheck, Clock, Phone, BarChart3, Zap, Plus, Minus, Trash2, Gift, ShoppingCart, Tag } from 'lucide-react'
+import { Bot, CreditCard, Check, ArrowLeft, ShieldCheck, Clock, Phone, BarChart3, Zap, Plus, Minus, Trash2, Gift, ShoppingCart, Tag, Sparkles } from 'lucide-react'
 import { toast } from 'sonner'
 import Link from 'next/link'
 import Script from 'next/script'
@@ -155,7 +155,21 @@ function CheckoutContent() {
           }
 
           const itemKey = `${agentSlug}_${planTier}`
-          const displayName = `${agentName} (${planTier.toUpperCase()} Upgrade)`
+          let displayName = `${agentName} (${planTier.toUpperCase()} Upgrade)`
+
+          if (planTier === 'trial') {
+            const personalitiesParam = searchParams.get('personalities')
+            const countParam = searchParams.get('count')
+            if (personalitiesParam) {
+              const formattedList = decodeURIComponent(personalitiesParam)
+                .split(',')
+                .map(p => p.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()))
+                .join(', ')
+              displayName = `7-Day Trial (${countParam || '2'} Agents: ${formattedList})`
+            } else {
+              displayName = `${agentName} (7-Day Trial)`
+            }
+          }
 
           // Check if this subscription is already in the cart
           const exists = restoredCart.some(item => item.type === 'subscription' && item.key === itemKey)
@@ -312,6 +326,29 @@ function CheckoutContent() {
     const couponDiscount = appliedCoupon ? appliedCoupon.discountRupees : 0
     const taxableSubtotal = Math.max(0, discountedSubtotal - couponDiscount)
 
+    const isTrialOnly = cart.length > 0 && cart.every(item =>
+      (item.name || '').toLowerCase().includes('trial') ||
+      (item.key || '').toLowerCase().includes('trial')
+    )
+
+    if (isTrialOnly) {
+      return {
+        subtotal,
+        discount,
+        discountedSubtotal,
+        couponDiscount,
+        taxableSubtotal,
+        isInterState: false,
+        stateName: 'Delhi',
+        cgst: 0,
+        sgst: 0,
+        igst: 0,
+        totalTax: 0,
+        total: taxableSubtotal,
+        isTrial: true
+      }
+    }
+
     const cleanGst = isClaimingGst && gstin.trim().length === 15 ? gstin.trim().toUpperCase() : null
     const stateCode = cleanGst ? cleanGst.substring(0, 2) : '07'
 
@@ -330,7 +367,8 @@ function CheckoutContent() {
       sgst: gstBreakdown.sgstAmount / 100,
       igst: gstBreakdown.igstAmount / 100,
       totalTax: gstBreakdown.totalTaxAmount / 100,
-      total
+      total,
+      isTrial: false
     }
   }
 
@@ -735,7 +773,15 @@ function CheckoutContent() {
                 )}
 
                 {/* GST Tax Breakdown */}
-                {cartPrices.isInterState ? (
+                {cartPrices.isTrial ? (
+                  <div className="flex justify-between items-center py-1.5 px-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-[10px] font-mono">
+                    <span className="flex items-center gap-1 font-semibold">
+                      <ShieldCheck className="w-3.5 h-3.5 shrink-0" />
+                      <span>Trial Tax Exemption:</span>
+                    </span>
+                    <span className="font-bold">₹0.00 (0% GST)</span>
+                  </div>
+                ) : cartPrices.isInterState ? (
                   <div className="flex justify-between text-[var(--muted)]">
                     <div className="flex items-center gap-1">
                       <span>IGST (18% Inter-State):</span>
@@ -778,6 +824,18 @@ function CheckoutContent() {
                   <span className="text-lg font-bold font-display text-[var(--heading)] font-mono">{formatRawRupees(cartPrices.total)}</span>
                 </div>
 
+                {cartPrices.isTrial && (
+                  <div className="p-3 rounded-xl bg-zinc-100 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 text-[10px] text-[var(--muted)] space-y-1">
+                    <div className="font-bold text-[var(--heading)] flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                      <span>7-Day Trial Autopay Mandate</span>
+                    </div>
+                    <p className="leading-relaxed">
+                      ₹99 charged today with ₹0 GST. Autopay scheduled to renew at chosen plan rate with standard GST after 7 days. Cancel anytime with zero penalty before day 7.
+                    </p>
+                  </div>
+                )}
+
                 <button
                   onClick={handleCheckout}
                   disabled={processing}
@@ -788,7 +846,7 @@ function CheckoutContent() {
                   }`}
                 >
                   <CreditCard className="w-4 h-4" />
-                  {processing ? 'Processing...' : `Pay ${formatRawRupees(cartPrices.total)}`}
+                  {processing ? 'Processing...' : cartPrices.isTrial ? `Pay ${formatRawRupees(cartPrices.total)} (Start 7-Day Trial)` : `Pay ${formatRawRupees(cartPrices.total)}`}
                 </button>
               </div>
             ) : (

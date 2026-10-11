@@ -9,7 +9,9 @@ import {
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import toast from 'react-hot-toast'
+import { toast } from 'sonner'
+import TrialSetupModal from '@/components/billing/TrialSetupModal'
+import EnterpriseContactModal from '@/components/enterprise/EnterpriseContactModal'
 
 // Resolve Lucide icons dynamically
 const getIcon = (name: string) => {
@@ -334,6 +336,9 @@ interface PricingSectionProps {
 
 export function PricingSection({ config, agentType = 'voice', agentSlug = 'voice', adminPrice, onStartDemo }: PricingSectionProps) {
   const router = useRouter()
+  const [isTrialModalOpen, setIsTrialModalOpen] = useState(false)
+  const [isEnterpriseModalOpen, setIsEnterpriseModalOpen] = useState(false)
+
   const freeDemoMinutes = config.free_demo_minutes || '10'
   const trialPrice = parseInt(config.trial_price_paisa || '9900', 10) / 100
   const trialDays = config.trial_days || '7'
@@ -453,7 +458,7 @@ export function PricingSection({ config, agentType = 'voice', agentSlug = 'voice
           </div>
 
           <button
-            onClick={() => router.push(`/dashboard/checkout?agent=${agentSlug}&plan=trial`)}
+            onClick={() => setIsTrialModalOpen(true)}
             className="btn-luxury-animated group mt-6 w-full py-3.5 px-4 rounded-xl font-bold text-xs uppercase tracking-widest transition-all cursor-pointer text-center shadow-lg hover:scale-[1.01] flex items-center justify-center gap-2"
           >
             <span className="text-white font-extrabold tracking-widest">Start Trial for ₹{trialPrice.toFixed(0)}</span>
@@ -461,51 +466,71 @@ export function PricingSection({ config, agentType = 'voice', agentSlug = 'voice
           </button>
         </div>
 
-        {/* 3. Monthly Scale Plan (Starter / Pro) */}
+        {/* 3. Go Enterprise (Custom SLA / High Volume) */}
         <div className="bg-white/70 dark:bg-white/[0.03] backdrop-blur-xl border border-zinc-200 dark:border-white/10 rounded-3xl p-6 flex flex-col justify-between shadow-sm hover:border-zinc-300 dark:hover:border-white/20 transition-all">
           <div className="space-y-4">
             <div className="flex justify-between items-center">
-              <h3 className="text-base font-bold text-zinc-900 dark:text-white">Business Monthly</h3>
-              <span className="text-[10px] font-bold font-mono px-2 py-0.5 rounded bg-zinc-100 dark:bg-white/10 text-zinc-600 dark:text-zinc-300">
-                PRODUCTION
+              <h3 className="text-base font-bold text-zinc-900 dark:text-white">Go Enterprise</h3>
+              <span className="text-[10px] font-bold font-mono px-2 py-0.5 rounded bg-violet-500/10 text-violet-600 dark:text-violet-400 border border-violet-500/20">
+                BESPOKE
               </span>
             </div>
             <div>
               <div className="text-3xl font-black text-zinc-900 dark:text-white font-mono flex items-baseline gap-1">
-                <span>₹{starterPrice}</span>
-                <span className="text-xs text-zinc-400 font-normal">/mo</span>
+                <span>Custom</span>
+                <span className="text-xs text-zinc-400 font-normal">/ SLA</span>
               </div>
-              <p className="text-[11px] text-zinc-500 mt-1">High-volume business deployment</p>
+              <p className="text-[11px] text-zinc-500 mt-1">High-throughput enterprise infrastructure</p>
             </div>
 
             <ul className="space-y-3 text-xs text-zinc-600 dark:text-zinc-300 pt-2 border-t border-zinc-100 dark:border-white/5">
               <li className="flex items-center gap-2">
                 <Check className="w-4 h-4 text-emerald-500 shrink-0" />
-                <span><strong>{starterMinutes} mins/mo</strong> included</span>
+                <span><strong>Bespoke agent slots & concurrency</strong></span>
               </li>
               <li className="flex items-center gap-2">
                 <Check className="w-4 h-4 text-emerald-500 shrink-0" />
-                <span>Unlimited concurrent calls</span>
+                <span>Dedicated SIP trunks & local numbers</span>
               </li>
               <li className="flex items-center gap-2">
                 <Check className="w-4 h-4 text-emerald-500 shrink-0" />
-                <span>Webhook & Zapier integrations</span>
+                <span>Custom LLM fine-tuning & voice cloning</span>
               </li>
               <li className="flex items-center gap-2">
                 <Check className="w-4 h-4 text-emerald-500 shrink-0" />
-                <span>Priority low-latency SIP trunks</span>
+                <span>Dedicated account manager & 99.99% SLA</span>
               </li>
             </ul>
           </div>
 
           <button
-            onClick={() => router.push(`/dashboard/checkout?agent=${agentSlug}&plan=starter`)}
+            onClick={() => setIsEnterpriseModalOpen(true)}
             className="mt-6 w-full py-3 px-4 rounded-xl bg-zinc-900 hover:bg-black dark:bg-white/10 dark:hover:bg-white/20 text-white font-bold text-xs uppercase tracking-wider transition-all cursor-pointer text-center"
           >
-            Deploy at ₹{starterPrice}/mo
+            Contact Enterprise →
           </button>
         </div>
       </div>
+
+      {/* Trial Setup & Personality Selector Modal */}
+      <TrialSetupModal
+        isOpen={isTrialModalOpen}
+        onClose={() => setIsTrialModalOpen(false)}
+        configs={config}
+        onProceedToCheckout={async (trialData) => {
+          setIsTrialModalOpen(false)
+          router.push(
+            `/dashboard/checkout?agent=${agentSlug}&plan=trial&tier=${trialData.targetPlanSlug}&count=${trialData.agentCount}&personalities=${encodeURIComponent(trialData.selectedPersonalities.join(','))}`
+          )
+        }}
+      />
+
+      {/* Enterprise Lead Generation Modal */}
+      <EnterpriseContactModal
+        isOpen={isEnterpriseModalOpen}
+        onClose={() => setIsEnterpriseModalOpen(false)}
+        initialPlanSlug={agentSlug}
+      />
     </div>
   )
 }
