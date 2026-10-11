@@ -13,7 +13,7 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import Link from "next/link";
-import { ObservabilityWidgets } from "@/src/components/admin/ObservabilityWidgets";
+import ObservabilityWidgets from "@/components/admin/ObservabilityWidgets";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;

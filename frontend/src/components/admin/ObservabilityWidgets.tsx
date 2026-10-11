@@ -34,7 +34,7 @@ interface SentryError {
   resolved: boolean
 }
 
-export default function ObservabilityWidgets() {
+export function ObservabilityWidgets() {
   const [mounted, setMounted] = useState(false)
   const [loading, setLoading] = useState(false)
   const [lastPolled, setLastPolled] = useState<Date>(new Date())
@@ -309,4 +309,4 @@ export default function ObservabilityWidgets() {
   )
 }
 
-export { ObservabilityWidgets }
+export default ObservabilityWidgets
