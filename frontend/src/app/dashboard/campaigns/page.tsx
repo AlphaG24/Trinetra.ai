@@ -172,7 +172,7 @@ export default function CampaignsPage() {
   if (loading || !profile) {
     return (
       <div className="flex h-[50vh] w-full items-center justify-center">
-        <div className="w-8 h-8 border-2 border-violet-500 border-t-transparent rounded-full animate-spin" />
+        <div className="w-8 h-8 border-2 border-zinc-900 dark:border-white border-t-transparent rounded-full animate-spin" />
       </div>
     )
   }
@@ -199,7 +199,7 @@ export default function CampaignsPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-[var(--heading)] font-display flex items-center gap-2">
-            <Megaphone className="w-6 h-6 text-violet-500" />
+            <Megaphone className="w-6 h-6 text-zinc-900 dark:text-white" />
             Outbound Campaigns
           </h1>
           <p className="text-xs text-[var(--muted)] mt-1">Upload prospect lists, schedule calling windows, and view AI-dialing conversion metrics.</p>
@@ -215,7 +215,7 @@ export default function CampaignsPage() {
           
           <Link
             href="/dashboard/campaigns/analytics"
-            className="px-4 py-2.5 border border-violet-500/30 bg-violet-500/10 hover:bg-violet-500/20 text-violet-700 dark:text-violet-300 text-xs font-bold uppercase rounded-xl tracking-wider transition-all flex items-center gap-2 shadow-sm cursor-pointer"
+            className="px-4 py-2.5 border border-[var(--border)] bg-[var(--card-bg)] hover:bg-[var(--hover-bg)] text-[var(--heading)] text-xs font-bold uppercase rounded-xl tracking-wider transition-all flex items-center gap-2 shadow-xs cursor-pointer"
           >
             <BarChart3 className="w-4 h-4" />
             Compare
@@ -223,7 +223,7 @@ export default function CampaignsPage() {
 
           <button
             onClick={() => setIsModalOpen(true)}
-            className="px-4 py-2.5 bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold uppercase rounded-xl tracking-wider transition-all flex items-center gap-2 shadow-md cursor-pointer"
+            className="px-4 py-2.5 bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 text-xs font-bold uppercase rounded-xl tracking-wider transition-all flex items-center gap-2 shadow-sm cursor-pointer active:scale-[0.98]"
           >
             <Plus className="w-4 h-4" />
             New Campaign
@@ -235,7 +235,7 @@ export default function CampaignsPage() {
       {loading ? (
         <div className="flex h-[40vh] w-full items-center justify-center">
           <div className="flex flex-col items-center gap-2">
-            <Loader2 className="w-8 h-8 animate-spin text-violet-500" />
+            <Loader2 className="w-8 h-8 animate-spin text-zinc-900 dark:text-white" />
             <p className="text-xs text-[var(--muted)]">Loading campaigns...</p>
           </div>
         </div>
@@ -250,7 +250,7 @@ export default function CampaignsPage() {
           </div>
           <button
             onClick={() => setIsModalOpen(true)}
-            className="px-5 py-2.5 bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold uppercase rounded-xl tracking-wider transition-all cursor-pointer"
+            className="px-5 py-2.5 bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 text-xs font-bold uppercase rounded-xl tracking-wider transition-all cursor-pointer shadow-sm active:scale-[0.98]"
           >
             Create First Campaign
           </button>
@@ -329,7 +329,7 @@ export default function CampaignsPage() {
                     </div>
                     <div className="w-full bg-[var(--background)] rounded-full h-2 overflow-hidden border border-[var(--border)]">
                       <div 
-                        className="bg-violet-600 h-full rounded-full transition-all duration-550"
+                        className="bg-zinc-900 dark:bg-white h-full rounded-full transition-all duration-550"
                         style={{ width: `${calledPercentage}%` }}
                       />
                     </div>

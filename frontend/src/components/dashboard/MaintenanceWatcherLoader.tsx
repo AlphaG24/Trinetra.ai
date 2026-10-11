@@ -1,18 +1,27 @@
 'use client'
 
-import dynamic from 'next/dynamic'
-
-// ssr:false must live in a Client Component; MaintenanceWatcher uses
-// useSearchParams + Supabase Realtime so it cannot be SSR-rendered anyway
-const MaintenanceWatcher = dynamic(
-  () => import('@/src/components/dashboard/MaintenanceWatcher'),
-  { ssr: false }
-)
+import React, { Suspense, useState, useEffect } from 'react'
+import MaintenanceWatcher from '@/src/components/dashboard/MaintenanceWatcher'
 
 export function MaintenanceWatcherLoader({
   initialMaintenanceMode,
 }: {
   initialMaintenanceMode?: boolean
 }) {
-  return <MaintenanceWatcher initialMaintenanceMode={initialMaintenanceMode} />
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  if (!mounted) {
+    return null
+  }
+
+  return (
+    <Suspense fallback={null}>
+      <MaintenanceWatcher initialMaintenanceMode={initialMaintenanceMode} />
+    </Suspense>
+  )
 }
+

@@ -394,7 +394,7 @@ export function NotificationsPageClient({
             <button
               onClick={markAllRead}
               disabled={markingAll}
-              className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-violet-600 hover:bg-violet-700 rounded-xl transition-all cursor-pointer shadow-xs shadow-violet-500/20 disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-zinc-900 hover:bg-zinc-800 dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 rounded-xl transition-all cursor-pointer shadow-sm disabled:opacity-50 active:scale-[0.98]"
             >
               {markingAll ? (
                 <Loader2 className="w-3.5 h-3.5 animate-spin" />

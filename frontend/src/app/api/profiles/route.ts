@@ -46,17 +46,32 @@ export async function GET() {
       return NextResponse.json({ error: dbError.message }, { status: 500 })
     }
 
+    const userEmail = (user.email || '').toLowerCase().trim()
+    const isSuperAdminByEmail = userEmail === 'raghav00424@gmail.com' || userEmail === 'raghav@trinetra.ai' || (process.env.NEXT_PUBLIC_ADMIN_EMAILS || '').includes(userEmail)
+    const metaRole = (user.app_metadata?.role || user.user_metadata?.role || '').toLowerCase().trim()
+    const isSuperAdmin = isSuperAdminByEmail || metaRole === 'admin' || metaRole === 'super_admin'
+
     if (!profile) {
       const fallbackProfile = {
         id: user.id,
         email: user.email,
-        full_name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'User',
-        role: 'client',
-        plan_tier: 'free',
-        onboarding_complete: false,
+        full_name: user.user_metadata?.full_name || user.email?.split('@')[0] || (isSuperAdmin ? 'Super Admin' : 'User'),
+        role: isSuperAdmin ? 'super_admin' : 'client',
+        plan_tier: isSuperAdmin ? 'enterprise' : 'free',
+        onboarding_complete: isSuperAdmin ? true : false,
       }
       await admin.from('profiles').upsert(fallbackProfile)
       return NextResponse.json({ profile: fallbackProfile })
+    }
+
+    // Auto-heal in database if user is superadmin but database profile has client
+    if (isSuperAdmin && profile.role !== 'super_admin' && profile.role !== 'admin') {
+      try {
+        await admin.from('profiles').update({ role: 'super_admin' }).eq('id', user.id)
+        profile.role = 'super_admin'
+      } catch (err) {
+        console.warn('Failed to auto-heal super_admin role in profiles:', err)
+      }
     }
 
     const resolvedEmail = profile.email || user.email || ''

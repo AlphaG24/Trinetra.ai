@@ -315,7 +315,7 @@ export function TranscriptModal({
             <div className="px-6 py-4 border-t border-[var(--border)] bg-[var(--background)]/60 flex justify-end">
               <button
                 onClick={onClose}
-                className="px-5 py-2.5 bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold uppercase tracking-wider rounded-xl transition-all shadow-md cursor-pointer"
+                className="px-5 py-2.5 bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 text-xs font-bold uppercase tracking-wider rounded-xl transition-all shadow-sm active:scale-[0.98] cursor-pointer"
               >
                 Close Logs
               </button>

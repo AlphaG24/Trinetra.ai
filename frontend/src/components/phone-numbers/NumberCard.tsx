@@ -228,7 +228,7 @@ export function NumberCard({
             <button
               onClick={() => onBuyNow && onBuyNow(phoneNumber)}
               disabled={isBuying}
-              className="px-4 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-700 text-white font-bold text-xs uppercase tracking-wider transition-all shadow-sm shadow-violet-600/20"
+              className="px-4 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 font-bold text-xs uppercase tracking-wider transition-all shadow-sm active:scale-[0.98]"
             >
               {isBuying ? "Processing..." : "Buy Now"}
             </button>

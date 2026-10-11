@@ -29,6 +29,85 @@ interface Appointment {
   };
 }
 
+// 1. Manually Animated Folio Calendar Agenda for "Total Bookings"
+function AnimatedAppointmentFolioIcon() {
+  return (
+    <svg className="w-6 h-6 overflow-visible" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+      {/* Calendar Folio Binder Body */}
+      <rect x="3" y="4" width="18" height="17" rx="3.5" strokeWidth="1.8" />
+      <line x1="3" y1="9" x2="21" y2="9" strokeWidth="1.8" />
+      {/* Binder Rings */}
+      <line x1="8" y1="2" x2="8" y2="5" strokeWidth="2.2" strokeLinecap="round" />
+      <line x1="16" y1="2" x2="16" y2="5" strokeWidth="2.2" strokeLinecap="round" />
+      {/* Sequenced Appointment Slots */}
+      <circle cx="8" cy="13" r="1.4" fill="currentColor" className="anim-cal-dot-1" stroke="none" />
+      <circle cx="12" cy="13" r="1.4" fill="currentColor" className="anim-cal-dot-2" stroke="none" />
+      <circle cx="16" cy="13" r="1.4" fill="currentColor" className="anim-cal-dot-3" stroke="none" />
+      {/* Active Booking Reservation Pill */}
+      <rect x="7" y="16.5" width="10" height="2" rx="1" fill="currentColor" stroke="none" opacity="0.75" />
+    </svg>
+  );
+}
+
+// 2. Manually Animated Precision Swiss Chronometer for "Upcoming / Scheduled"
+function AnimatedPrecisionChronoIcon() {
+  return (
+    <svg className="w-6 h-6 overflow-visible" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+      {/* Outer Chronometer Bezel */}
+      <circle cx="12" cy="12" r="9.5" strokeWidth="1.8" />
+      <circle cx="12" cy="12" r="7.2" strokeWidth="0.9" strokeDasharray="1.5 1.5" opacity="0.5" />
+      {/* Cardinal Precision Indices (12, 3, 6, 9) */}
+      <line x1="12" y1="3.5" x2="12" y2="5" strokeWidth="1.8" strokeLinecap="round" />
+      <line x1="19" y1="12" x2="20.5" y2="12" strokeWidth="1.8" strokeLinecap="round" />
+      <line x1="12" y1="19" x2="12" y2="20.5" strokeWidth="1.8" strokeLinecap="round" />
+      <line x1="3.5" y1="12" x2="5" y2="12" strokeWidth="1.8" strokeLinecap="round" />
+      {/* Hour Hand (Set to 10 o'clock) */}
+      <line x1="12" y1="12" x2="9.5" y2="8" strokeWidth="2" strokeLinecap="round" />
+      {/* Continuous Minute Hand Mechanical Sweep */}
+      <line x1="12" y1="12" x2="16" y2="12" strokeWidth="1.8" strokeLinecap="round" className="anim-chrono-minute" />
+      {/* Central Chrono Jewel Pin */}
+      <circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
+// 3. Manually Animated Today Dispatch Timeline for "Today's Schedule"
+function AnimatedLiveDispatchTimelineIcon() {
+  return (
+    <svg className="w-6 h-6 overflow-visible" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+      {/* Timeline Board Silhouette */}
+      <rect x="3" y="3.5" width="18" height="17" rx="3.5" strokeWidth="1.8" />
+      <line x1="3" y1="8" x2="21" y2="8" strokeWidth="1.8" />
+      {/* Top Binder Tabs */}
+      <line x1="8" y1="1.8" x2="8" y2="4.2" strokeWidth="2" strokeLinecap="round" />
+      <line x1="16" y1="1.8" x2="16" y2="4.2" strokeWidth="2" strokeLinecap="round" />
+      {/* Time-Track Schedule Axis */}
+      <line x1="6" y1="12.5" x2="18" y2="12.5" strokeWidth="1.4" strokeDasharray="2 1.5" opacity="0.5" />
+      {/* Gliding Active Playhead Beacon */}
+      <circle cx="11" cy="12.5" r="2.2" fill="currentColor" stroke="none" className="anim-timeline-playhead" />
+      {/* Today Confirmed Slot */}
+      <rect x="6.5" y="16" width="7" height="2" rx="1" fill="currentColor" stroke="none" opacity="0.8" />
+      <circle cx="16.5" cy="17" r="1.2" fill="currentColor" stroke="none" opacity="0.5" />
+    </svg>
+  );
+}
+
+// 4. Manually Animated Verified Session Fulfillment Seal for "Completed Sessions"
+function AnimatedVerifiedSessionSealIcon() {
+  return (
+    <svg className="w-6 h-6 overflow-visible" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+      {/* Concentric Verified Seal Rings */}
+      <circle cx="12" cy="12" r="9.5" strokeWidth="1.8" />
+      <circle cx="12" cy="12" r="7.2" strokeWidth="0.9" strokeDasharray="2.5 1.5" opacity="0.4" />
+      {/* Precision Verified Checkmark */}
+      <path d="M 7.5 12.2 L 10.5 15.2 L 16.5 8.8" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+      {/* Radiating Accomplishment Micro-Sparks */}
+      <circle cx="18" cy="6" r="1" fill="currentColor" stroke="none" className="anim-spark-radiance" />
+      <circle cx="6" cy="18" r="1" fill="currentColor" stroke="none" className="anim-spark-radiance" style={{ animationDelay: '0.7s' }} />
+    </svg>
+  );
+}
+
 export default function AppointmentsPage() {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -239,9 +318,9 @@ export default function AppointmentsPage() {
 
       {/* KPI Stats Overview */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div className="bg-white dark:bg-[#120E22] border border-zinc-200 dark:border-white/10 rounded-2xl p-6 shadow-xs flex items-center gap-4 hover:border-violet-500/30 transition-all">
-          <div className="p-3.5 bg-violet-500/10 rounded-xl text-violet-600 dark:text-violet-400">
-            <CalendarDays className="w-6 h-6" />
+        <div className="bg-white dark:bg-[#120E22] border border-zinc-200 dark:border-white/10 rounded-2xl p-6 shadow-xs flex items-center gap-4 hover:border-violet-500/30 transition-all group">
+          <div className="text-violet-600 dark:text-violet-400 flex items-center justify-center flex-shrink-0">
+            <AnimatedAppointmentFolioIcon />
           </div>
           <div>
             <div className="text-2xl font-bold font-mono text-zinc-900 dark:text-white">{stats.total_count}</div>
@@ -249,9 +328,9 @@ export default function AppointmentsPage() {
           </div>
         </div>
 
-        <div className="bg-white dark:bg-[#120E22] border border-zinc-200 dark:border-white/10 rounded-2xl p-6 shadow-xs flex items-center gap-4 hover:border-amber-500/30 transition-all">
-          <div className="p-3.5 bg-amber-500/10 rounded-xl text-amber-600 dark:text-amber-400">
-            <Clock className="w-6 h-6" />
+        <div className="bg-white dark:bg-[#120E22] border border-zinc-200 dark:border-white/10 rounded-2xl p-6 shadow-xs flex items-center gap-4 hover:border-amber-500/30 transition-all group">
+          <div className="text-amber-600 dark:text-amber-400 flex items-center justify-center flex-shrink-0">
+            <AnimatedPrecisionChronoIcon />
           </div>
           <div>
             <div className="text-2xl font-bold font-mono text-amber-600 dark:text-amber-400">{stats.scheduled_count}</div>
@@ -259,13 +338,9 @@ export default function AppointmentsPage() {
           </div>
         </div>
 
-        <div className="bg-white dark:bg-[#120E22] border border-zinc-200 dark:border-white/10 rounded-2xl p-6 shadow-xs flex items-center gap-4 hover:border-emerald-500/30 transition-all">
-          <div className="p-3.5 bg-emerald-500/10 rounded-xl text-emerald-600 dark:text-emerald-400 relative">
-            <CalendarClock className="w-6 h-6" />
-            <span className="absolute top-2 right-2 flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-            </span>
+        <div className="bg-white dark:bg-[#120E22] border border-zinc-200 dark:border-white/10 rounded-2xl p-6 shadow-xs flex items-center gap-4 hover:border-emerald-500/30 transition-all group">
+          <div className="text-emerald-600 dark:text-emerald-400 flex items-center justify-center flex-shrink-0">
+            <AnimatedLiveDispatchTimelineIcon />
           </div>
           <div>
             <div className="text-2xl font-bold font-mono text-emerald-600 dark:text-emerald-400">{stats.today_count}</div>
@@ -273,9 +348,9 @@ export default function AppointmentsPage() {
           </div>
         </div>
 
-        <div className="bg-white dark:bg-[#120E22] border border-zinc-200 dark:border-white/10 rounded-2xl p-6 shadow-xs flex items-center gap-4 hover:border-violet-500/30 transition-all">
-          <div className="p-3.5 bg-violet-500/10 rounded-xl text-violet-600 dark:text-violet-400">
-            <CheckCircle2 className="w-6 h-6" />
+        <div className="bg-white dark:bg-[#120E22] border border-zinc-200 dark:border-white/10 rounded-2xl p-6 shadow-xs flex items-center gap-4 hover:border-violet-500/30 transition-all group">
+          <div className="text-violet-600 dark:text-violet-400 flex items-center justify-center flex-shrink-0">
+            <AnimatedVerifiedSessionSealIcon />
           </div>
           <div>
             <div className="text-2xl font-bold font-mono text-zinc-900 dark:text-white">{stats.completed_count}</div>
@@ -305,7 +380,7 @@ export default function AppointmentsPage() {
                 onClick={() => setStatusFilter(st)}
                 className={`px-3 py-1.5 rounded-lg capitalize text-xs font-bold tracking-wider transition-all cursor-pointer ${
                   statusFilter === st
-                    ? "bg-violet-600 text-white shadow-xs"
+                    ? "bg-zinc-900 text-white dark:bg-white dark:text-zinc-950 shadow-xs"
                     : "bg-zinc-100 dark:bg-white/5 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-200 dark:hover:bg-white/10"
                 }`}
               >

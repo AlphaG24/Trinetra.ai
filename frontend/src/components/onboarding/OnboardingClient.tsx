@@ -306,9 +306,9 @@ export function OnboardingClient() {
                   <div key={s.id} className="flex gap-4 items-start">
                     <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition shrink-0 ${
                       isDone 
-                        ? 'bg-violet-600 text-white' 
+                        ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-950' 
                         : isActive 
-                        ? (isDark ? 'bg-violet-500/15 border-2 border-violet-500 text-violet-450' : 'bg-violet-600 text-white shadow-sm')
+                        ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-950 shadow-sm'
                         : (isDark ? 'bg-zinc-900 border-zinc-800 text-zinc-500' : 'bg-zinc-100 border-zinc-200 text-zinc-500')
                     }`}>
                       {isDone ? <Check className="w-4 h-4" /> : s.id}
@@ -585,7 +585,7 @@ export function OnboardingClient() {
             {step < 3 ? (
               <button
                 onClick={handleNextStep}
-                className="flex items-center gap-1.5 px-6 py-3 rounded-xl bg-violet-600 hover:bg-violet-700 text-white font-extrabold text-xs uppercase tracking-wider transition shadow-md shadow-violet-500/10 cursor-pointer"
+                className="flex items-center gap-1.5 px-6 py-3 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 font-bold text-xs uppercase tracking-wider transition shadow-sm cursor-pointer active:scale-[0.98]"
               >
                 <span>Continue</span>
                 <ArrowRight className="w-3.5 h-3.5" />
@@ -606,7 +606,7 @@ export function OnboardingClient() {
                 <button
                   onClick={handleComplete}
                   disabled={loading}
-                  className="flex items-center gap-1.5 px-6 py-3 rounded-xl bg-violet-600 hover:bg-violet-700 text-white font-extrabold text-xs uppercase tracking-wider transition shadow-md shadow-violet-500/10 disabled:opacity-60 cursor-pointer"
+                  className="flex items-center gap-1.5 px-6 py-3 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 font-bold text-xs uppercase tracking-wider transition shadow-sm disabled:opacity-60 cursor-pointer active:scale-[0.98]"
                 >
                   {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
                   <span>Complete Setup</span>

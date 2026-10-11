@@ -52,6 +52,15 @@
   --gold-600: #D97706;
   --cyan-400: #22D3EE;
   --cyan-500: #06B6D4;
+  /* Mint-Teal Brand Accents (Homepage Brand Gradient) */
+  --brand-mint: #89D4C2;
+  --mint-300: #B2E5D9;
+  --mint-400: #89D4C2;
+  --mint-500: #62C1AB;
+  --mint-600: #3EAB93;
+  --mint-700: #1D8A74;
+  --mint-glow: rgba(137, 212, 194, 0.16);
+  --mint-border: rgba(137, 212, 194, 0.35);
   --text-accent: #7C3AED;
   --border-subtle: rgba(0, 0, 0, 0.06);
   --border-medium: rgba(0, 0, 0, 0.12);
@@ -65,14 +74,14 @@
 html[data-theme='light'],
 html.light,
 .light {
-  --bg-deep: #F8F9FC;
+  --bg-deep: #F8FBFB;
   --bg-primary: #FFFFFF;
   --bg-secondary: #F1F3F9;
   --bg-surface: #FFFFFF;
   --text-primary: #1A1D20;
   --text-secondary: #4A5268;
   --text-tertiary: #8E96A4;
-  --background: #F8F9FC;
+  --background: #F8FBFB;
   --card-bg: #FFFFFF;
   --heading: #1A1D20;
   --body: #4A5268;
@@ -89,9 +98,8 @@ html.light,
 :root[data-theme='light'] body,
 html[data-theme='light'] body,
 html.light body {
-  background-color: #F8F9FC !important;
+  background-color: #F8FBFB !important;
   color: #4A5268 !important;
-  background-image: none !important;
 }
 
 :root[data-theme='dark'],
@@ -145,9 +153,22 @@ h6 {
 
 .dashboard-theme-root {
   font-family: var(--font-merriweather), Merriweather, Georgia, serif !important;
-  background-color: var(--background) !important;
-  background-image: none !important;
+  background-color: #F8FBFB !important;
+  background-image: 
+    radial-gradient(100% 650px at 50% -50px, rgba(137, 212, 194, 0.40) 0%, rgba(137, 212, 194, 0.18) 45%, rgba(137, 212, 194, 0.03) 75%, transparent 100%),
+    linear-gradient(180deg, rgba(137, 212, 194, 0.22) 0%, rgba(137, 212, 194, 0.06) 350px, transparent 650px) !important;
+  background-repeat: no-repeat !important;
+  background-attachment: local !important;
   color: var(--body);
+}
+
+:root[data-theme='dark'] .dashboard-theme-root,
+html[data-theme='dark'] .dashboard-theme-root,
+html.dark .dashboard-theme-root,
+.dark .dashboard-theme-root {
+  background-color: #080010 !important;
+  background-image: 
+    radial-gradient(100% 650px at 50% -50px, rgba(137, 212, 194, 0.15) 0%, rgba(137, 212, 194, 0.05) 50%, transparent 100%) !important;
 }
 
 /* Scoped headings styling */
@@ -156,22 +177,148 @@ h6 {
 .dashboard-theme-root h3,
 .dashboard-theme-root h4,
 .dashboard-theme-root h5,
-.dashboard-theme-root h6,
-.dashboard-theme-root [class*="font-display"],
-.dashboard-theme-root [class*="font-playfair"] {
+.dashboard-theme-root h6 {
   font-family: var(--font-playfair), "Playfair Display", Georgia, serif !important;
   color: var(--heading);
 }
 
+.dashboard-theme-root [class*="font-display"],
+.dashboard-theme-root [class*="font-playfair"] {
+  font-family: var(--font-playfair), "Playfair Display", Georgia, serif !important;
+}
+
 .dashboard-theme-root [class*="font-montserrat"] {
   font-family: var(--font-montserrat), Montserrat, "Segoe UI", sans-serif !important;
-  color: var(--heading);
 }
 
 /* Ensure smooth text transitions for all links & buttons */
 .dashboard-theme-root a,
 .dashboard-theme-root button {
   transition: all 0.15s ease;
+}
+
+/* Light mode card & text adaptation for admin/dashboard panels */
+:root[data-theme='light'] .dashboard-theme-root .bg-zinc-950,
+:root[data-theme='light'] .dashboard-theme-root [class*="bg-zinc-950/"],
+:root[data-theme='light'] .dashboard-theme-root .bg-\[\#0f111a\],
+:root[data-theme='light'] .dashboard-theme-root [class*="bg-\[\#0f111a\]"],
+.light .dashboard-theme-root .bg-zinc-950,
+.light .dashboard-theme-root [class*="bg-zinc-950/"],
+.light .dashboard-theme-root .bg-\[\#0f111a\],
+.light .dashboard-theme-root [class*="bg-\[\#0f111a\]"] {
+  background-color: var(--card-bg) !important;
+  border-color: var(--border) !important;
+}
+
+:root[data-theme='light'] .dashboard-theme-root .border-zinc-800,
+:root[data-theme='light'] .dashboard-theme-root [class*="border-zinc-800/"],
+:root[data-theme='light'] .dashboard-theme-root .border-zinc-900,
+:root[data-theme='light'] .dashboard-theme-root [class*="border-zinc-900/"],
+.light .dashboard-theme-root .border-zinc-800,
+.light .dashboard-theme-root [class*="border-zinc-800/"],
+.light .dashboard-theme-root .border-zinc-900,
+.light .dashboard-theme-root [class*="border-zinc-900/"] {
+  border-color: var(--border) !important;
+}
+
+/* Sidebar Nav Item: Signature White & Black on click */
+.sidebar-item-active {
+  background-color: #18181b !important;
+  color: #ffffff !important;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+}
+.sidebar-item-active svg,
+.sidebar-item-active span {
+  color: #ffffff !important;
+}
+
+/* Sidebar Nav Item: Inactive State (Bold black text & icons in light mode) */
+.sidebar-item-inactive {
+  color: #09090b !important;
+}
+.sidebar-item-inactive svg {
+  color: #09090b !important;
+  opacity: 0.95;
+}
+.sidebar-item-inactive span {
+  color: #09090b !important;
+  font-weight: 600;
+}
+.sidebar-item-inactive:hover {
+  background-color: #f4f4f5 !important;
+  color: #000000 !important;
+}
+.sidebar-item-inactive:hover svg,
+.sidebar-item-inactive:hover span {
+  color: #000000 !important;
+  opacity: 1;
+}
+
+:root[data-theme='dark'] .sidebar-item-inactive,
+html[data-theme='dark'] .sidebar-item-inactive,
+html.dark .sidebar-item-inactive,
+.dark .sidebar-item-inactive {
+  color: #d4d4d8 !important;
+}
+:root[data-theme='dark'] .sidebar-item-inactive svg,
+html[data-theme='dark'] .sidebar-item-inactive svg,
+html.dark .sidebar-item-inactive svg,
+.dark .sidebar-item-inactive svg {
+  color: #a1a1aa !important;
+  opacity: 0.9;
+}
+:root[data-theme='dark'] .sidebar-item-inactive span,
+html[data-theme='dark'] .sidebar-item-inactive span,
+html.dark .sidebar-item-inactive span,
+.dark .sidebar-item-inactive span {
+  color: #d4d4d8 !important;
+}
+:root[data-theme='dark'] .sidebar-item-inactive:hover,
+html[data-theme='dark'] .sidebar-item-inactive:hover,
+html.dark .sidebar-item-inactive:hover,
+.dark .sidebar-item-inactive:hover {
+  background-color: rgba(255, 255, 255, 0.07) !important;
+  color: #ffffff !important;
+}
+:root[data-theme='dark'] .sidebar-item-inactive:hover svg,
+:root[data-theme='dark'] .sidebar-item-inactive:hover span,
+html[data-theme='dark'] .sidebar-item-inactive:hover svg,
+html[data-theme='dark'] .sidebar-item-inactive:hover span,
+html.dark .sidebar-item-inactive:hover svg,
+html.dark .sidebar-item-inactive:hover span,
+.dark .sidebar-item-inactive:hover svg,
+.dark .sidebar-item-inactive:hover span {
+  color: #ffffff !important;
+  opacity: 1;
+}
+
+:root[data-theme='dark'] .sidebar-item-active,
+html[data-theme='dark'] .sidebar-item-active,
+html.dark .sidebar-item-active,
+.dark .sidebar-item-active {
+  background-color: #ffffff !important;
+  color: #09090b !important;
+}
+:root[data-theme='dark'] .sidebar-item-active svg,
+:root[data-theme='dark'] .sidebar-item-active span,
+html[data-theme='dark'] .sidebar-item-active svg,
+html[data-theme='dark'] .sidebar-item-active span,
+html.dark .sidebar-item-active svg,
+html.dark .sidebar-item-active span,
+.dark .sidebar-item-active svg,
+.dark .sidebar-item-active span {
+  color: #09090b !important;
+}
+
+:root[data-theme='light'] .dashboard-theme-root input,
+:root[data-theme='light'] .dashboard-theme-root select,
+:root[data-theme='light'] .dashboard-theme-root textarea,
+.light .dashboard-theme-root input,
+.light .dashboard-theme-root select,
+.light .dashboard-theme-root textarea {
+  background-color: var(--card-bg) !important;
+  color: var(--heading) !important;
+  border-color: var(--border) !important;
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -198,6 +345,11 @@ h6 {
 /* ═══════════════════════════════════════════════════════════════
    SCROLLBAR & MISC UTILITIES
    ═══════════════════════════════════════════════════════════════ */
+
+.dashboard-ambient-mesh {
+  background-image: none !important;
+}
+
 
 @layer base {
 
@@ -578,3 +730,199 @@ html.light .navbar__link:hover {
   animation: lightSweep 3.5s ease-in-out infinite;
   pointer-events: none;
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   BESPOKE ANIMATED DASHBOARD & APPOINTMENTS KPI ICONS
+   Engineered for smooth, high-fidelity micro-interactions
+   ═══════════════════════════════════════════════════════════════ */
+
+/* 1. Equalizer Audio Waveform Bars (ScaleY) */
+@keyframes eqBarScale1 {
+  0%, 100% { transform: scaleY(0.4); }
+  50% { transform: scaleY(1); }
+}
+@keyframes eqBarScale2 {
+  0%, 100% { transform: scaleY(1); }
+  50% { transform: scaleY(0.35); }
+}
+@keyframes eqBarScale3 {
+  0%, 100% { transform: scaleY(0.5); }
+  50% { transform: scaleY(1.1); }
+}
+@keyframes eqBarScale4 {
+  0%, 100% { transform: scaleY(0.95); }
+  50% { transform: scaleY(0.3); }
+}
+@keyframes eqBarScale5 {
+  0%, 100% { transform: scaleY(0.4); }
+  50% { transform: scaleY(0.95); }
+}
+
+.anim-eq-1 { transform-box: fill-box; transform-origin: center; animation: eqBarScale1 1.2s ease-in-out infinite; }
+.anim-eq-2 { transform-box: fill-box; transform-origin: center; animation: eqBarScale2 1.45s ease-in-out infinite; }
+.anim-eq-3 { transform-box: fill-box; transform-origin: center; animation: eqBarScale3 1.1s ease-in-out infinite; }
+.anim-eq-4 { transform-box: fill-box; transform-origin: center; animation: eqBarScale4 1.35s ease-in-out infinite; }
+.anim-eq-5 { transform-box: fill-box; transform-origin: center; animation: eqBarScale5 1.25s ease-in-out infinite; }
+
+/* 2. Fleet Orbit & Satellite Command */
+@keyframes fleetOrbitRotate {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+.anim-fleet-orbit {
+  transform-origin: 12px 12px;
+  animation: fleetOrbitRotate 16s linear infinite;
+}
+
+@keyframes pulseCore {
+  0%, 100% { transform: scale(1); opacity: 0.8; }
+  50% { transform: scale(1.2); opacity: 1; }
+}
+.anim-core-pulse {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: pulseCore 2.2s ease-in-out infinite;
+}
+
+/* 3. Reticle & Radar Scanner */
+@keyframes radarScanBeam {
+  0%, 100% { transform: translateY(-3.5px); opacity: 0.3; }
+  50% { transform: translateY(3.5px); opacity: 0.9; }
+}
+.anim-radar-scan {
+  animation: radarScanBeam 2.4s ease-in-out infinite;
+}
+
+@keyframes reticleBreathe {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(0.93); }
+}
+.anim-reticle-breathe {
+  transform-origin: 12px 12px;
+  animation: reticleBreathe 3s ease-in-out infinite;
+}
+
+/* 4. Conversion Yield Growth */
+@keyframes yieldBarPulse1 {
+  0%, 100% { transform: scaleY(0.65); }
+  50% { transform: scaleY(1); }
+}
+@keyframes yieldBarPulse2 {
+  0%, 100% { transform: scaleY(0.7); }
+  50% { transform: scaleY(1.05); }
+}
+@keyframes yieldBarPulse3 {
+  0%, 100% { transform: scaleY(0.75); }
+  50% { transform: scaleY(1.1); }
+}
+.anim-yield-bar-1 { transform-box: fill-box; transform-origin: bottom; animation: yieldBarPulse1 2.2s ease-in-out infinite; }
+.anim-yield-bar-2 { transform-box: fill-box; transform-origin: bottom; animation: yieldBarPulse2 2.2s ease-in-out infinite 0.35s; }
+.anim-yield-bar-3 { transform-box: fill-box; transform-origin: bottom; animation: yieldBarPulse3 2.2s ease-in-out infinite 0.7s; }
+
+@keyframes arrowAscend {
+  0%, 100% { transform: translate(0, 0); }
+  50% { transform: translate(1.5px, -1.5px); }
+}
+.anim-arrow-ascend {
+  animation: arrowAscend 1.8s ease-in-out infinite;
+}
+
+/* 5. Chrono Minute Hand Mechanical Sweep */
+@keyframes chronoMinuteSweep {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+.anim-chrono-minute {
+  transform-origin: 12px 12px;
+  animation: chronoMinuteSweep 10s linear infinite;
+}
+
+/* 6. Calendar Slots Pulse */
+@keyframes calSlotSequence {
+  0%, 100% { opacity: 0.35; transform: scale(0.9); }
+  50% { opacity: 1; transform: scale(1.15); }
+}
+.anim-cal-dot-1 { transform-box: fill-box; transform-origin: center; animation: calSlotSequence 2.1s ease-in-out infinite; }
+.anim-cal-dot-2 { transform-box: fill-box; transform-origin: center; animation: calSlotSequence 2.1s ease-in-out infinite 0.4s; }
+.anim-cal-dot-3 { transform-box: fill-box; transform-origin: center; animation: calSlotSequence 2.1s ease-in-out infinite 0.8s; }
+
+/* 7. Schedule Timeline Playhead Glide */
+@keyframes timelinePlayheadGlide {
+  0%, 100% { transform: translateX(-3px); }
+  50% { transform: translateX(3px); }
+}
+.anim-timeline-playhead {
+  animation: timelinePlayheadGlide 3.2s ease-in-out infinite;
+}
+
+/* 8. Verified Spark Radiance */
+@keyframes sparkGlow {
+  0%, 100% { transform: scale(0.6); opacity: 0.2; }
+  50% { transform: scale(1.2); opacity: 1; }
+}
+.anim-spark-radiance {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: sparkGlow 2s ease-in-out infinite;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   QUICK ACTION ATTRACTOR (Automated Light Sheen & Micro-Interactions)
+   Captures first-time user attention with magnetic visual flow
+   ═══════════════════════════════════════════════════════════════ */
+@keyframes ambientSheen {
+  0% {
+    transform: translateX(-190%) skewX(-20deg);
+  }
+  25%, 100% {
+    transform: translateX(290%) skewX(-20deg);
+  }
+}
+
+.ambient-action-card {
+  position: relative;
+  overflow: hidden;
+}
+
+.ambient-action-card::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 45%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(137, 212, 194, 0.22) 50%,
+    transparent 100%
+  );
+  animation: ambientSheen 4.2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  pointer-events: none;
+}
+
+.dark .ambient-action-card::after {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.12) 50%,
+    transparent 100%
+  );
+}
+
+.ambient-action-card:hover::after {
+  opacity: 0;
+}
+
+@keyframes bubbleRise1 {
+  0% { transform: translateY(0); opacity: 0; }
+  40% { opacity: 0.9; }
+  100% { transform: translateY(-7px); opacity: 0; }
+}
+@keyframes bubbleRise2 {
+  0% { transform: translateY(0); opacity: 0; }
+  50% { opacity: 0.9; }
+  100% { transform: translateY(-9px); opacity: 0; }
+}
+.anim-bubble-1 { animation: bubbleRise1 2s ease-out infinite; }
+.anim-bubble-2 { animation: bubbleRise2 2.5s ease-out infinite 0.7s; }

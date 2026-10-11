@@ -123,20 +123,48 @@ export async function GET(
     const totalMinutes = Math.ceil((calls?.reduce((acc, c) => acc + (c.duration_seconds || 0), 0) || 0) / 60)
     const totalLeads = calls?.filter(c => c.is_lead).length || 0
 
-    // 6. Fetch Wallet Data (P3, P4, P5, P7, P8) using adminClient to bypass RLS
+    // 6. Fetch KYC Status & Paid Minutes
+    let kycStatus = 'unsubmitted'
+    try {
+      const { data: kycDoc } = await adminClient
+        .from('kyc_documents')
+        .select('status')
+        .or(`organization_id.eq.${effectiveOrgId},organization_id.eq.${id},user_id.eq.${id}`)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      if (kycDoc?.status) {
+        kycStatus = kycDoc.status
+      }
+    } catch {}
+
+    const { data: profMinutes } = await adminClient
+      .from('profiles')
+      .select('paid_minutes_remaining, demo_minutes_limit')
+      .or(`organization_id.eq.${effectiveOrgId},id.eq.${id}`)
+      .limit(1)
+      .maybeSingle()
+
+    tenantData = {
+      ...tenantData,
+      kyc_status: kycStatus,
+      paid_minutes_remaining: profMinutes?.paid_minutes_remaining ?? profMinutes?.demo_minutes_limit ?? 20,
+    }
+
+    // 7. Fetch Wallet Data (P3, P4, P5, P7, P8) using adminClient to bypass RLS
     const { data: wallet } = await adminClient
       .from('wallets')
       .select('*')
       .or(`organization_id.eq.${effectiveOrgId},organization_id.eq.${id}`)
       .maybeSingle()
 
-    // 7. Fetch Recent Wallet Ledger Transactions
+    // 8. Fetch Recent Wallet Ledger Transactions
     const { data: transactions } = await adminClient
       .from('wallet_transactions')
       .select('*')
       .or(`organization_id.eq.${effectiveOrgId},organization_id.eq.${id}`)
       .order('created_at', { ascending: false })
-      .limit(5)
+      .limit(10)
 
     // Fetch dynamic default spend limit from system_config if available
     let defaultSpendLimitPaisa = 250000
@@ -456,6 +484,146 @@ export async function PUT(
       }
     }
 
+    // Task 5.10: Admin debiting wallet directly
+    if (body.debit_credit_paisa !== undefined && Number(body.debit_credit_paisa) > 0) {
+      const debitPaisa = Number(body.debit_credit_paisa)
+      const debitReason = body.debit_reason?.trim() || `Admin manual debit of ₹${(debitPaisa / 100).toFixed(2)}`
+
+      const { data: currentWallet } = await adminClient
+        .from('wallets')
+        .select('*')
+        .or(`organization_id.eq.${effectiveOrgId},organization_id.eq.${id}`)
+        .maybeSingle()
+
+      const currentBal = currentWallet?.balance_paisa || 0
+      const newBal = Math.max(0, currentBal - debitPaisa)
+      const nowIso = new Date().toISOString()
+
+      if (currentWallet) {
+        const { data: savedWallet, error: updateErr } = await adminClient
+          .from('wallets')
+          .update({
+            balance_paisa: newBal,
+            updated_at: nowIso,
+          })
+          .eq('id', currentWallet.id)
+          .select()
+          .single()
+
+        if (updateErr) throw new Error(`Debit update failed: ${updateErr.message}`)
+        updatedWallet = savedWallet
+      }
+
+      try {
+        await adminClient
+          .from('wallet_transactions')
+          .insert({
+            organization_id: effectiveOrgId,
+            amount_paisa: -debitPaisa,
+            type: 'admin_debit',
+            reference_id: `admin_deb_${Date.now()}`,
+            balance_after_paisa: newBal,
+            description: debitReason,
+            created_at: nowIso,
+          })
+      } catch (txErr) {
+        console.warn('Debit transaction log skipped:', txErr)
+      }
+    }
+
+    // Task 5.14: Refund Processor
+    if (body.process_refund_paisa !== undefined && Number(body.process_refund_paisa) > 0) {
+      const refundPaisa = Number(body.process_refund_paisa)
+      const refundReason = body.refund_reason?.trim() || `Approved refund of ₹${(refundPaisa / 100).toFixed(2)}`
+      const isReversalDeduct = body.refund_mode === 'deduct_balance'
+
+      const { data: currentWallet } = await adminClient
+        .from('wallets')
+        .select('*')
+        .or(`organization_id.eq.${effectiveOrgId},organization_id.eq.${id}`)
+        .maybeSingle()
+
+      const currentBal = currentWallet?.balance_paisa || 0
+      const delta = isReversalDeduct ? -refundPaisa : refundPaisa
+      const newBal = Math.max(0, currentBal + delta)
+      const nowIso = new Date().toISOString()
+
+      if (currentWallet) {
+        const { data: savedWallet, error: updateErr } = await adminClient
+          .from('wallets')
+          .update({
+            balance_paisa: newBal,
+            updated_at: nowIso,
+          })
+          .eq('id', currentWallet.id)
+          .select()
+          .single()
+
+        if (updateErr) throw new Error(`Refund wallet update failed: ${updateErr.message}`)
+        updatedWallet = savedWallet
+      }
+
+      try {
+        await adminClient
+          .from('wallet_transactions')
+          .insert({
+            organization_id: effectiveOrgId,
+            amount_paisa: delta,
+            type: 'refund',
+            reference_id: `refund_${Date.now()}`,
+            balance_after_paisa: newBal,
+            description: refundReason,
+            created_at: nowIso,
+          })
+      } catch (txErr) {
+        console.warn('Refund ledger log skipped:', txErr)
+      }
+    }
+
+    // Task 5.9: Manual Voice Minutes Adjustment (+/- Mins)
+    if (body.adjust_voice_minutes !== undefined && Number(body.adjust_voice_minutes) !== 0) {
+      const deltaMins = Number(body.adjust_voice_minutes)
+      const { data: prof } = await adminClient
+        .from('profiles')
+        .select('id, paid_minutes_remaining, demo_minutes_limit')
+        .or(`organization_id.eq.${effectiveOrgId},id.eq.${id}`)
+        .limit(1)
+        .maybeSingle()
+
+      if (prof) {
+        const curMins = prof.paid_minutes_remaining ?? prof.demo_minutes_limit ?? 20
+        const newMins = Math.max(0, curMins + deltaMins)
+        await adminClient
+          .from('profiles')
+          .update({
+            paid_minutes_remaining: newMins,
+            demo_minutes_limit: newMins
+          })
+          .eq('id', prof.id)
+      }
+    }
+
+    // Task 5.8: Manual pause/resume agent
+    if (body.agent_id && body.agent_is_active !== undefined) {
+      const isActive = Boolean(body.agent_is_active)
+      await adminClient
+        .from('agents')
+        .update({ is_active: isActive })
+        .eq('id', body.agent_id)
+
+      try {
+        await adminClient.from('audit_logs').insert({
+          user_id: user.id,
+          user_email: user.email,
+          user_role: profile.role,
+          action: isActive ? 'admin.agent_resumed' : 'admin.agent_paused',
+          resource_type: 'agent',
+          resource_id: body.agent_id,
+          new_values: { is_active: isActive },
+        })
+      } catch {}
+    }
+
     if (!updatedWallet) {
       const { data: freshWallet } = await adminClient
         .from('wallets')
@@ -480,7 +648,14 @@ export async function PUT(
           spend_limit_paisa: body.spend_limit_paisa,
           demo_minutes_limit: body.demo_minutes_limit,
           add_credit_paisa: body.add_credit_paisa,
+          debit_credit_paisa: body.debit_credit_paisa,
+          process_refund_paisa: body.process_refund_paisa,
+          adjust_voice_minutes: body.adjust_voice_minutes,
+          agent_id: body.agent_id,
+          agent_is_active: body.agent_is_active,
           credit_reason: body.credit_reason,
+          debit_reason: body.debit_reason,
+          refund_reason: body.refund_reason,
         },
       })
     } catch (auditErr) {

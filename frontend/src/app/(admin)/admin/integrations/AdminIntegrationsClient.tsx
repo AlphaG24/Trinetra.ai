@@ -245,10 +245,10 @@ export function AdminIntegrationsClient() {
           <p className="text-xs text-zinc-500">Loading blueprint configurations...</p>
         </div>
       ) : (
-        <div className="bg-white dark:bg-[#0D0120] border border-zinc-200 dark:border-white/5 rounded-3xl overflow-hidden shadow-sm">
+        <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-3xl overflow-hidden shadow-sm">
           <div className="overflow-x-auto">
             <table className="w-full text-xs text-left">
-              <thead className="bg-zinc-50 dark:bg-[#080010] text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider border-b border-zinc-200 dark:border-white/5">
+              <thead className="bg-zinc-50 dark:bg-white/5 text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider border-b border-[var(--border)] font-playfair">
                 <tr>
                   <th className="px-6 py-4">Blueprint Name</th>
                   <th className="px-6 py-4">Slug</th>
@@ -259,7 +259,7 @@ export function AdminIntegrationsClient() {
                   <th className="px-6 py-4 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-zinc-200 dark:divide-white/5">
+              <tbody className="divide-y divide-[var(--border)]">
                 {types.map(type => {
                   const Icon = ICON_MAP[type.icon] || Puzzle
                   return (

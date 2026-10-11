@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
 import { createClient as createSupabaseClient } from '@supabase/supabase-js'
+import { validateCoupon } from '@/lib/coupons'
+import { calculateGSTBreakdown, validateGSTIN } from '@/lib/gst'
 
 interface CartItem {
   type: 'subscription' | 'phone_number' | 'bundle' | 'number_pool' | 'number_renewal'
@@ -26,7 +28,21 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json()
-    const { items, use_same_profile } = body as { items: CartItem[], use_same_profile?: boolean }
+    const { 
+      items, 
+      use_same_profile,
+      coupon_code,
+      customer_gstin,
+      customer_legal_name,
+      save_gst_to_profile
+    } = body as { 
+      items: CartItem[]
+      use_same_profile?: boolean
+      coupon_code?: string
+      customer_gstin?: string
+      customer_legal_name?: string
+      save_gst_to_profile?: boolean
+    }
 
     if (!items || !Array.isArray(items) || items.length === 0) {
       return NextResponse.json({ error: 'Cart is empty' }, { status: 400 })
@@ -161,13 +177,54 @@ export async function POST(request: Request) {
       }
     }
 
-    const discountedSubtotal = subtotal - discount
-    
-    // Add 18% GST (9% CGST + 9% SGST)
-    const taxAmount = Math.round(discountedSubtotal * 0.18)
-    const totalAmount = discountedSubtotal + taxAmount
+    const quantityDiscountedSubtotal = subtotal - discount
+    let couponDiscountPaisa = 0
+    let validatedCouponCode: string | null = null
 
-    console.log('[CHECKOUT] Subtotal:', subtotal, 'Discount:', discount, 'Tax (18%):', taxAmount, 'Total:', totalAmount)
+    if (coupon_code && typeof coupon_code === 'string' && coupon_code.trim()) {
+      const couponRes = await validateCoupon(adminClient, coupon_code.trim(), quantityDiscountedSubtotal / 100, user.id)
+      if (couponRes.isValid) {
+        couponDiscountPaisa = couponRes.discountAmountPaisa
+        validatedCouponCode = couponRes.coupon!.code
+      } else {
+        return NextResponse.json({ error: couponRes.error || 'Invalid coupon code' }, { status: 400 })
+      }
+    }
+
+    const taxableSubtotal = Math.max(0, quantityDiscountedSubtotal - couponDiscountPaisa)
+
+    // GST calculation: Pure trial has strictly 0 CGST and 0 SGST
+    const isPureTrial = hasTrial && items.length === 1
+
+    let customerStateCode = '07' // Default Delhi
+    let cleanGSTIN: string | null = null
+
+    if (customer_gstin && typeof customer_gstin === 'string' && customer_gstin.trim()) {
+      const gstinVal = validateGSTIN(customer_gstin.trim())
+      if (!gstinVal.isValid) {
+        return NextResponse.json({ error: gstinVal.message || 'Invalid GSTIN provided' }, { status: 400 })
+      }
+      cleanGSTIN = customer_gstin.trim().toUpperCase()
+      customerStateCode = gstinVal.stateCode || '07'
+    }
+
+    const taxBreakdown = isPureTrial
+      ? {
+          isInterState: false,
+          cgstRate: 0,
+          cgstAmount: 0,
+          sgstRate: 0,
+          sgstAmount: 0,
+          igstRate: 0,
+          igstAmount: 0,
+          totalTaxAmount: 0,
+          grandTotal: taxableSubtotal
+        }
+      : calculateGSTBreakdown(taxableSubtotal, cleanGSTIN ? customerStateCode : null)
+
+    const totalAmount = isPureTrial ? taxableSubtotal : taxBreakdown.grandTotal
+
+    console.log('[CHECKOUT] isPureTrial:', isPureTrial, 'Subtotal:', subtotal, 'Taxable:', taxableSubtotal, 'Tax:', taxBreakdown.totalTaxAmount, 'Total:', totalAmount)
 
     const auth = btoa(`${keyId}:${keySecret}`)
     const orderRes = await fetch('https://api.razorpay.com/v1/orders', {
@@ -183,7 +240,13 @@ export async function POST(request: Request) {
         notes: { 
           user_id: user.id, 
           cart_items: JSON.stringify(items), 
-          use_same_profile: use_same_profile ? 'true' : 'false'
+          use_same_profile: use_same_profile ? 'true' : 'false',
+          coupon_code: validatedCouponCode || '',
+          coupon_discount_paisa: couponDiscountPaisa.toString(),
+          customer_gstin: cleanGSTIN || '',
+          customer_legal_name: customer_legal_name || '',
+          customer_state_code: customerStateCode,
+          save_gst_to_profile: save_gst_to_profile ? 'true' : 'false'
         }
       })
     })
@@ -204,6 +267,11 @@ export async function POST(request: Request) {
       currency: 'INR',
       cart_items: items,
       use_same_profile,
+      coupon_code: validatedCouponCode,
+      coupon_discount_paisa: couponDiscountPaisa,
+      customer_gstin: cleanGSTIN,
+      customer_legal_name,
+      tax_breakdown: taxBreakdown,
       user_email: user.email || '',
       user_name: user.user_metadata?.full_name || ''
     })

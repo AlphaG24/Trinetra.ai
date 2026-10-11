@@ -14,21 +14,21 @@ export default function AdminNavbar({ currentView, onLogout, autoSaveStatus }) {
   };
 
   return (
-    <nav className="sticky top-0 z-50 flex h-28 w-full items-center justify-between border-b border-white/10 bg-[#080010]/98 px-12 backdrop-blur-2xl">
+    <nav className="sticky top-0 z-50 flex h-28 w-full items-center justify-between border-b border-[var(--border)] bg-[var(--card-bg)]/95 px-12 backdrop-blur-2xl">
       <div className="flex items-center gap-6">
         <div className="flex select-none items-center gap-4">
-          <div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-600/30 to-violet-900/50 p-3 shadow-[0_0_20px_rgba(139,92,246,0.2)]">
+          <div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-zinc-100 dark:bg-white/5 p-3 shadow-sm border border-[var(--border)]">
             <img 
               src="/trident.png"
               alt="Trinetra AI"
-              className="h-full w-full object-contain"
+              className="h-full w-full object-contain dynamic-logo"
             />
           </div>
           <div className="flex flex-col">
-            <span className="text-3xl font-black uppercase tracking-widest text-[#FAF7FF]">
+            <span className="text-3xl font-bold tracking-tight text-[var(--heading)] font-playfair">
               Trinetra
             </span>
-            <span className="text-xs font-bold uppercase tracking-[0.2em] text-violet-400">
+            <span className="text-xs font-bold uppercase tracking-[0.2em] text-emerald-600 dark:text-emerald-400 font-playfair">
               Admin Console
             </span>
           </div>

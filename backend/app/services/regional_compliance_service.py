@@ -14,6 +14,7 @@ Canonical 5 Regions:
 """
 
 import re
+import json
 import logging
 from datetime import datetime, time
 from typing import Dict, Any, List, Optional, Tuple
@@ -509,3 +510,56 @@ class RegionalComplianceService:
             "count": len(CANONICAL_REGIONS),
             "regions": CANONICAL_REGIONS
         }
+
+    @classmethod
+    def update_region_config(cls, region_code: str, updates: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Dynamically updates canonical region configuration (DND hours, cooling period, KYC documents, etc.)
+        Persists to system_config in Supabase so changes survive restarts and take effect immediately.
+        """
+        region_code = region_code.upper()
+        if region_code not in CANONICAL_REGIONS:
+            raise ValueError(f"Unknown region '{region_code}'. Allowed: {list(CANONICAL_REGIONS.keys())}")
+
+        region = CANONICAL_REGIONS[region_code]
+        if "calling_hours" in updates and isinstance(updates["calling_hours"], dict):
+            region["calling_hours"].update(updates["calling_hours"])
+            if "start" in updates["calling_hours"] or "end" in updates["calling_hours"]:
+                st = region["calling_hours"].get("start", "09:00")
+                en = region["calling_hours"].get("end", "21:00")
+                tz = region["calling_hours"].get("timezone_default", "Local")
+                region["calling_hours"]["window_str"] = f"{st}–{en} {tz}"
+
+        if "lifecycle" in updates and isinstance(updates["lifecycle"], dict):
+            region["lifecycle"].update(updates["lifecycle"])
+
+        if "kyc_documents" in updates and isinstance(updates["kyc_documents"], list):
+            region["kyc_documents"] = list(updates["kyc_documents"])
+
+        if "dnd_regulation" in updates:
+            region["dnd_regulation"] = str(updates["dnd_regulation"])
+
+        if "dnd_scrub_required" in updates:
+            region["dnd_scrub_required"] = bool(updates["dnd_scrub_required"])
+
+        if "recording_consent" in updates and isinstance(updates["recording_consent"], dict):
+            region["recording_consent"].update(updates["recording_consent"])
+
+        # Persist to DB system_config if available
+        if supabase_admin:
+            try:
+                config_key = f"region_config_{region_code}"
+                supabase_admin.table("system_config").upsert({
+                    "key": config_key,
+                    "value": json.dumps(region),
+                    "description": f"Admin custom compliance rules for region {region_code}"
+                }, on_conflict="key").execute()
+            except Exception as e:
+                logger.warning(f"Failed to persist region config to system_config: {e}")
+
+        return {
+            "success": True,
+            "region_code": region_code,
+            "region": region
+        }
+

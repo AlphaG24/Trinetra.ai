@@ -57,7 +57,7 @@ async def get_compliance_summary():
 # =====================================================================
 # Master Plan Section 3: Global Compliance Strategy Endpoints
 # =====================================================================
-from typing import Optional
+from typing import Optional, Dict, Any
 from pydantic import BaseModel, Field
 from app.services.regional_compliance_service import RegionalComplianceService
 
@@ -80,6 +80,17 @@ class RegionalKYCValidateRequest(BaseModel):
 async def list_regions():
     """Returns all 5 canonical compliance regions with statutory requirements."""
     return RegionalComplianceService.list_all_regions()
+
+
+@compliance_router.put("/regions/{region_code}")
+async def update_region(region_code: str, updates: Dict[str, Any]):
+    """Admin endpoint to update regional compliance rules (DND hours, cooling period, KYC type)."""
+    try:
+        res = RegionalComplianceService.update_region_config(region_code, updates)
+        return res
+    except ValueError as e:
+        return {"success": False, "error": str(e)}
+
 
 
 @compliance_router.get("/resolve-call")

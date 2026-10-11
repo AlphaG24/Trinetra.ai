@@ -6,6 +6,8 @@ import { sendEmailTemplate } from '@/lib/email'
 import { generateInvoicePdf } from '@/lib/pdf'
 import fs from 'fs'
 import path from 'path'
+import { validateCoupon, recordCouponRedemption } from '@/lib/coupons'
+import { calculateGSTBreakdown, validateGSTIN } from '@/lib/gst'
 
 interface CartItem {
   type: 'subscription' | 'phone_number' | 'bundle' | 'number_pool' | 'number_renewal'
@@ -30,16 +32,37 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
     
-    const body = await request.json()
-    console.log('[Verify Payment] 1F LOG: Payment verification start for user:', user.id, 'with email:', user.email)
-    console.log('[Verify Payment] 1F LOG: Request payload details:', JSON.stringify(body))
+    let body: any = {}
+    try {
+      const text = await request.text()
+      if (text) {
+        body = JSON.parse(text)
+      }
+    } catch (parseErr) {
+      console.warn('[Verify Payment] Could not parse request JSON body:', parseErr)
+      return NextResponse.json({ error: 'Invalid or empty request payload' }, { status: 400 })
+    }
 
-    const { razorpay_payment_id, razorpay_order_id, razorpay_signature, items, use_same_profile } = body as {
+    const { 
+      razorpay_payment_id, 
+      razorpay_order_id, 
+      razorpay_signature, 
+      items, 
+      use_same_profile,
+      coupon_code,
+      customer_gstin,
+      customer_legal_name,
+      save_gst_to_profile
+    } = body as {
       razorpay_payment_id: string
       razorpay_order_id: string
       razorpay_signature: string
       items: CartItem[]
       use_same_profile?: boolean
+      coupon_code?: string
+      customer_gstin?: string
+      customer_legal_name?: string
+      save_gst_to_profile?: boolean
     }
 
     if (!items || items.length === 0) {
@@ -179,13 +202,36 @@ export async function POST(request: Request) {
         const finalPrice = totalRawPrice - itemDiscount
         totalPaidPaisa += finalPrice
 
-        invoiceLines.push({
-          item: `${item.key.toUpperCase()} Subscription Plan Upgrade`,
-          quantity: item.quantity,
-          rate: basePrice,
-          discount: itemDiscount,
-          amount: finalPrice
-        })
+        if (tierKey === 'trial') {
+          const trialMeta = (body as any).trial_metadata || {}
+          const targetCount = trialMeta.agentCount || 2
+          const persList = Array.isArray(trialMeta.selectedPersonalities) && trialMeta.selectedPersonalities.length > 0
+            ? trialMeta.selectedPersonalities.map((p: string) => p.replace('_', ' ')).join(', ')
+            : 'Sales Executive, Customer Support'
+          const targetPrice = trialMeta.targetPriceRupees || (targetCount === 1 ? 4999 : targetCount === 4 ? 19999 : 9999)
+          const renewalDateStr = trialMeta.renewalDate
+            ? new Date(trialMeta.renewalDate).toLocaleDateString('en-IN', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })
+            : new Date(Date.now() + 7 * 86400000).toLocaleDateString('en-IN', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })
+
+          invoiceLines.push({
+            item: `7-Day All-Access Trial (${targetCount} Agent${targetCount > 1 ? 's' : ''} - ${persList})`,
+            description: `Initial charge: ₹99.00 (0 CGST / 0 SGST). Upcoming autopay deduction: ₹${targetPrice.toLocaleString('en-IN')} + 18% GST (Total: ₹${Math.round(targetPrice * 1.18).toLocaleString('en-IN')}) scheduled on ${renewalDateStr}. Cancel anytime before then in billing settings.`,
+            quantity: 1,
+            rate: basePrice,
+            discount: 0,
+            amount: finalPrice,
+            is_trial: true,
+            invoice_type: 'trial'
+          })
+        } else {
+          invoiceLines.push({
+            item: `${item.key.toUpperCase()} Subscription Plan Upgrade`,
+            quantity: item.quantity,
+            rate: basePrice,
+            discount: itemDiscount,
+            amount: finalPrice
+          })
+        }
       } else if (item.type === 'phone_number') {
         additionalNumbersToAdd += item.quantity
 
@@ -587,8 +633,59 @@ export async function POST(request: Request) {
       }
     }
 
-    const taxPaisa = Math.round(totalPaidPaisa * 0.18) // 18% GST total (9% CGST + 9% SGST)
-    const finalTotalPaisa = totalPaidPaisa + taxPaisa
+    // 3b. Coupon validation and discount line
+    let couponDiscountPaisa = 0
+    let validCouponCode = ''
+    if (coupon_code && typeof coupon_code === 'string' && coupon_code.trim()) {
+      const cRes = await validateCoupon(adminClient, coupon_code.trim(), totalPaidPaisa / 100, user.id)
+      if (cRes.isValid) {
+        couponDiscountPaisa = cRes.discountAmountPaisa
+        validCouponCode = cRes.coupon!.code
+        invoiceLines.push({
+          item: `Coupon Discount (${validCouponCode})`,
+          quantity: 1,
+          rate: -couponDiscountPaisa,
+          discount: 0,
+          amount: -couponDiscountPaisa
+        })
+      }
+    }
+
+    const taxablePaisa = Math.max(0, totalPaidPaisa - couponDiscountPaisa)
+
+    // 3c. GST Calculation (Intra-state CGST+SGST vs Inter-state IGST)
+    let cleanGSTIN = customer_gstin && typeof customer_gstin === 'string' && customer_gstin.trim()
+      ? customer_gstin.trim().toUpperCase()
+      : (profile.gst_number || profile.gstin || null)
+
+    let customerStateCode = '07'
+    let stateName = profile.state || 'Delhi'
+    if (cleanGSTIN) {
+      const gstinVal = validateGSTIN(cleanGSTIN)
+      if (gstinVal.isValid) {
+        customerStateCode = gstinVal.stateCode!
+        stateName = gstinVal.state!
+      }
+    }
+
+    const isPureTrial = items.length === 1 && items.some(i => i.type === 'subscription' && (i.key.toLowerCase().includes('trial') || i.key === 'trial'))
+
+    const gstCalc = isPureTrial
+      ? {
+          isInterState: false,
+          cgstRate: 0,
+          cgstAmount: 0,
+          sgstRate: 0,
+          sgstAmount: 0,
+          igstRate: 0,
+          igstAmount: 0,
+          totalTaxAmount: 0,
+          grandTotal: taxablePaisa
+        }
+      : calculateGSTBreakdown(taxablePaisa, cleanGSTIN ? customerStateCode : null)
+
+    const taxPaisa = gstCalc.totalTaxAmount
+    const finalTotalPaisa = isPureTrial ? taxablePaisa : (taxablePaisa + taxPaisa)
 
     // 4. Update profiles table with fallback checks
     const updates: Record<string, any> = {
@@ -600,6 +697,12 @@ export async function POST(request: Request) {
       trial_started_at: trialStartedAtToSet,
       trial_ends_at: trialEndsAtToSet,
       updated_at: new Date().toISOString()
+    }
+
+    if (save_gst_to_profile && cleanGSTIN) {
+      updates.gst_number = cleanGSTIN
+      if (customer_legal_name) updates.company_name = customer_legal_name
+      updates.state = stateName
     }
 
     // Support fallback increments if columns exist, otherwise safe defaults
@@ -620,6 +723,19 @@ export async function POST(request: Request) {
     }
     console.log('[Verify Payment] 1F LOG: User profile limits updated successfully in DB:', JSON.stringify(updates))
 
+    // Record coupon redemption if applicable
+    if (validCouponCode) {
+      await recordCouponRedemption(
+        adminClient,
+        validCouponCode,
+        user.id,
+        razorpay_order_id,
+        razorpay_payment_id,
+        couponDiscountPaisa,
+        totalPaidPaisa
+      )
+    }
+
     // 5. Create and save a single invoice with dynamic line items (VAK/ series per Task 11)
     const { count: totalInvoices } = await adminClient
       .from('invoices')
@@ -634,15 +750,42 @@ export async function POST(request: Request) {
         invoice_number: vakInvoiceNumber,
         period_start: new Date().toISOString(),
         period_end: new Date(Date.now() + 30 * 86400000).toISOString(),
-        subscription_amount: totalPaidPaisa,
+        subscription_amount: taxablePaisa,
         tax_amount: taxPaisa,
         total_amount: finalTotalPaisa,
         line_items: invoiceLines,
         status: 'paid',
-        payment_method: 'razorpay',
+        payment_method: 'Razorpay Gateway',
         payment_id: razorpay_payment_id,
+        payment_reference_id: razorpay_payment_id,
         paid_at: new Date().toISOString(),
-        due_date: new Date(Date.now() + 30 * 86400000).toISOString()
+        due_date: new Date(Date.now() + 30 * 86400000).toISOString(),
+        customer_legal_name: customer_legal_name || profile.company_name || profile.full_name || user.email,
+        customer_gstin: cleanGSTIN || 'N/A',
+        customer_state: stateName,
+        customer_state_code: customerStateCode,
+        customer_billing_address: {
+          name: customer_legal_name || profile.full_name || '',
+          company: customer_legal_name || profile.company_name || '',
+          email: user.email,
+          address: profile.address || '',
+          city: profile.city || '',
+          state: stateName,
+          pincode: profile.pincode || '',
+          country: profile.country || 'India'
+        },
+        place_of_supply: stateName,
+        subtotal_paisa: taxablePaisa,
+        cgst_rate_pct: gstCalc.cgstRate,
+        cgst_amount_paisa: gstCalc.cgstAmount,
+        sgst_rate_pct: gstCalc.sgstRate,
+        sgst_amount_paisa: gstCalc.sgstAmount,
+        igst_rate_pct: gstCalc.igstRate,
+        igst_amount_paisa: gstCalc.igstAmount,
+        total_tax_paisa: taxPaisa,
+        grand_total_paisa: finalTotalPaisa,
+        supplier_name: 'Vaakriti Technologies Private Limited',
+        supplier_gstin: '07AAAAA0000A1Z5'
       })
       .select()
       .single()
@@ -663,17 +806,19 @@ export async function POST(request: Request) {
       const pdfBuffer = generateInvoicePdf({
         invoiceNumber: invoiceRecord.invoice_number,
         date: new Date(invoiceRecord.created_at).toLocaleDateString('en-IN'),
-        customerName: profile.full_name || user.email!,
+        customerName: invoiceRecord.customer_legal_name || profile.full_name || user.email!,
         customerEmail: user.email!,
-        customerAddress: `${profile.city || ''}, ${profile.state || ''}, ${profile.country || 'IN'}`.replace(/^,\s*/, '').replace(/,\s*,$/, ''),
-        customerGstin: profile.gst_number || 'N/A',
-        subtotal: (totalPaidPaisa / 100).toFixed(2),
+        customerAddress: `${invoiceRecord.customer_billing_address?.city || profile.city || ''}, ${invoiceRecord.customer_billing_address?.state || profile.state || ''}, ${profile.country || 'IN'}`.replace(/^,\s*/, '').replace(/,\s*,$/, ''),
+        customerGstin: invoiceRecord.customer_gstin || 'N/A',
+        subtotal: (taxablePaisa / 100).toFixed(2),
         tax: (taxPaisa / 100).toFixed(2),
         total: (finalTotalPaisa / 100).toFixed(2),
         paymentMethod: 'Razorpay',
         transactionId: razorpay_payment_id,
-        placeOfSupply: profile.state || 'IN',
+        placeOfSupply: invoiceRecord.place_of_supply || 'IN',
         amountInWords: 'Rupees ' + (finalTotalPaisa / 100).toLocaleString('en-IN') + ' Only',
+        supplierName: invoiceRecord.supplier_name || 'Vaakriti Technologies Private Limited',
+        supplierGstin: invoiceRecord.supplier_gstin || '07AAAAA0000A1Z5',
         items: invoiceLines.map((line: any) => ({
           quantity: line.quantity,
           description: line.item,
@@ -747,11 +892,11 @@ export async function POST(request: Request) {
     try {
       await sendEmailTemplate({
         to: user.email!,
-        subject: `Invoice ${invoiceRecord.invoice_number} from TRINETRAEDU-AI`,
+        subject: `Tax Invoice ${invoiceRecord.invoice_number}`,
         templateName: 'invoice',
         variables: {
           invoice_number: invoiceRecord.invoice_number,
-          company_name: 'TRINETRAEDU-AI',
+          company_name: invoiceRecord.supplier_name || 'Vaakriti Technologies Private Limited',
           company_address: 'India , Uttar Pradesh\\nKanpur Nagar , 208022',
           company_phone: '+91 9580619562',
           company_email: 'support@trinetraedu-ai.com',
@@ -806,7 +951,20 @@ export async function POST(request: Request) {
     }
 
     const redirectUrl = firstAgentId ? `/dashboard/agents/${firstAgentId}/setup?bundle=true` : undefined
-    return NextResponse.json({ success: true, invoice_id: invoiceRecord.id, redirect_url: redirectUrl })
+    const cleanCustomerAddress = typeof invoiceRecord.customer_address === 'string' && invoiceRecord.customer_address.trim().length > 0
+      ? invoiceRecord.customer_address
+      : [profile.address || profile.street, profile.city, profile.state, profile.pincode, profile.country || 'India'].filter(Boolean).join(', ') || 'India'
+
+    return NextResponse.json({
+      success: true,
+      invoice_id: invoiceRecord.id,
+      invoice_number: invoiceRecord.invoice_number,
+      invoice: {
+        ...invoiceRecord,
+        customer_address: cleanCustomerAddress
+      },
+      redirect_url: redirectUrl
+    })
   } catch (error: any) {
     console.error('[Verify Payment] Catch Error:', error)
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })

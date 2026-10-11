@@ -106,7 +106,7 @@ export async function POST(req: Request) {
     const adminClient = getAdminClient()
     const { data: profile } = await adminClient
       .from('profiles')
-      .select('organization_id, role, full_name, company_name, state')
+      .select('*')
       .eq('id', user.id)
       .single()
 
@@ -318,7 +318,7 @@ export async function POST(req: Request) {
         },
       ]
 
-      const { error: invErr } = await adminClient.from('invoices').insert({
+      const { data: insertedInv, error: invErr } = await adminClient.from('invoices').insert({
         organization_id: orgId,
         invoice_number: invNumber,
         fiscal_year: '2026-2027',
@@ -336,8 +336,20 @@ export async function POST(req: Request) {
         currency: 'INR',
         supplier_name: 'Vaakriti Technologies Private Limited',
         supplier_gstin: '07AAAAA0000A1Z5',
-        customer_legal_name: profile.full_name || profile.company_name || user.email,
-        place_of_supply: profile.state || 'Delhi',
+        customer_legal_name: (profile as any)?.company_name || (profile as any)?.full_name || user.email,
+        customer_gstin: (profile as any)?.gst_number || (profile as any)?.gstin || 'N/A',
+        customer_state: (profile as any)?.state || 'Delhi',
+        customer_billing_address: {
+          name: (profile as any)?.full_name || '',
+          company: (profile as any)?.company_name || '',
+          email: user.email,
+          address: (profile as any)?.address || '',
+          city: (profile as any)?.city || '',
+          state: (profile as any)?.state || '',
+          pincode: (profile as any)?.pincode || '',
+          country: (profile as any)?.country || 'India'
+        },
+        place_of_supply: (profile as any)?.state || 'Delhi',
         subtotal_paisa: taxablePaisa,
         cgst_rate_pct: 9.00,
         cgst_amount_paisa: cgstPaisa,
@@ -351,7 +363,7 @@ export async function POST(req: Request) {
         paid_at: nowIso,
         created_at: nowIso,
         updated_at: nowIso,
-      })
+      }).select().single()
 
       if (invErr) {
         console.error('[Wallet Route] Failed to insert invoice record:', invErr)
@@ -360,7 +372,9 @@ export async function POST(req: Request) {
       return NextResponse.json({
         success: true,
         message: `Wallet successfully topped up by ₹${amountInrNum.toLocaleString('en-IN')}!`,
+        invoice_id: insertedInv?.id,
         invoice_number: invNumber,
+        invoice: insertedInv,
         wallet: {
           ...updatedWallet,
           balance_inr: newBalance / 100,
@@ -424,7 +438,7 @@ export async function POST(req: Request) {
 
       const fallbackPaymentRef = `PAY-${Date.now()}`
 
-      const { error: fallbackInvErr } = await adminClient.from('invoices').insert({
+      const { data: fallbackInv, error: fallbackInvErr } = await adminClient.from('invoices').insert({
         organization_id: orgId,
         invoice_number: invNumber,
         fiscal_year: '2026-2027',
@@ -456,7 +470,7 @@ export async function POST(req: Request) {
         paid_at: nowIso,
         created_at: nowIso,
         updated_at: nowIso,
-      })
+      }).select().single()
 
       if (fallbackInvErr) {
         console.error('[Wallet Route] Failed to insert fallback invoice record:', fallbackInvErr)
@@ -465,7 +479,9 @@ export async function POST(req: Request) {
       return NextResponse.json({
         success: true,
         message: `Wallet topped up by ₹${amountInr.toLocaleString('en-IN')}`,
+        invoice_id: fallbackInv?.id,
         invoice_number: invNumber,
+        invoice: fallbackInv,
         wallet: {
           ...updatedWallet,
           balance_inr: newBalance / 100,

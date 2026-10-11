@@ -8,6 +8,7 @@ import Link from "next/link";
 
 import { Layout } from "@/components/layout/Layout";
 import { PlanRecord, getConfigString, hasConfiguredValue, useActivePlans, useSiteConfig } from "@/lib/site-content";
+import EnterpriseContactModal from "@/components/enterprise/EnterpriseContactModal";
 
 type BillingMode = "monthly" | "annual";
 type FeatureTone = "default" | "included" | "excluded" | "addon";
@@ -530,12 +531,14 @@ function PricingCard({
   billingMode,
   currencyMode = "INR",
   publicConfig,
+  onOpenEnterprise,
 }: {
   plan: PlanRecord;
   index: number;
   billingMode: BillingMode;
   currencyMode?: "INR" | "USD" | "EUR";
   publicConfig?: any;
+  onOpenEnterprise?: () => void;
 }) {
   const isPopular = plan.isPopular;
   const cardFeatures = getCardFeatures(plan);
@@ -620,16 +623,26 @@ function PricingCard({
         </div>
 
         <div className="mt-[24px]">
-          <Link
-            href={`/contact?plan=${plan.slug}`}
-            className={`block w-full rounded-[12px] px-[18px] py-[14px] text-center font-sans text-[15px] font-medium transition-all duration-300 ${
-              isPopular
-                ? "bg-[#8B5CF6] text-white shadow-[0_0_24px_rgba(139,92,246,0.28)] hover:bg-[#7C3AED]"
-                : "border border-[#2D1255] bg-transparent text-[#E9D5FF] hover:border-[#8B5CF6] hover:bg-[rgba(139,92,246,0.08)]"
-            }`}
-          >
-            {index === 2 ? "Talk to Us ->" : "Get Started ->"}
-          </Link>
+          {index === 2 || plan.slug === 'scale' ? (
+            <button
+              type="button"
+              onClick={onOpenEnterprise}
+              className="block w-full rounded-[12px] px-[18px] py-[14px] text-center font-sans text-[15px] font-medium transition-all duration-300 border border-[#2D1255] bg-transparent text-[#E9D5FF] hover:border-[#8B5CF6] hover:bg-[rgba(139,92,246,0.08)] cursor-pointer"
+            >
+              Contact Enterprise {"->"}
+            </button>
+          ) : (
+            <Link
+              href="/dashboard/billing"
+              className={`block w-full rounded-[12px] px-[18px] py-[14px] text-center font-sans text-[15px] font-medium transition-all duration-300 ${
+                isPopular
+                  ? "bg-[#8B5CF6] text-white shadow-[0_0_24px_rgba(139,92,246,0.28)] hover:bg-[#7C3AED]"
+                  : "border border-[#2D1255] bg-transparent text-[#E9D5FF] hover:border-[#8B5CF6] hover:bg-[rgba(139,92,246,0.08)]"
+              }`}
+            >
+              Get Started {"->"}
+            </Link>
+          )}
 
           {overageLine ? <div className="mt-[12px] text-center font-sans text-[12px] leading-[1.5] text-[#6B6088]">Overage: {overageLine}</div> : null}
         </div>
@@ -735,6 +748,7 @@ export default function PricingPage() {
   const [billingMode, setBillingMode] = useState<BillingMode>("monthly");
   const [comparisonOpen, setComparisonOpen] = useState(false);
   const [openFaq, setOpenFaq] = useState<number | null>(0);
+  const [isEnterpriseModalOpen, setIsEnterpriseModalOpen] = useState(false);
 
   const companyPhone = getConfigString(siteConfig, "company_phone_1");
 
@@ -872,6 +886,7 @@ export default function PricingPage() {
                     billingMode={billingMode} 
                     currencyMode={currencyMode}
                     publicConfig={publicConfig}
+                    onOpenEnterprise={() => setIsEnterpriseModalOpen(true)}
                   />
                 ))}
               </div>
@@ -1165,6 +1180,11 @@ export default function PricingPage() {
           </>
         )}
       </div>
+
+      <EnterpriseContactModal
+        isOpen={isEnterpriseModalOpen}
+        onClose={() => setIsEnterpriseModalOpen(false)}
+      />
     </Layout>
   );
 }

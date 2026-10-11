@@ -84,7 +84,7 @@ export async function middleware(request: NextRequest) {
   try {
     const userPromise = supabase.auth.getUser()
     const timeoutPromise = new Promise<{ data: { user: null }; error: Error }>((_, reject) =>
-      setTimeout(() => reject(new Error('Supabase Auth timeout')), 8000)
+      setTimeout(() => reject(new Error('Supabase Auth timeout')), 2500)
     )
 
     const result = await Promise.race([userPromise, timeoutPromise])
@@ -109,8 +109,12 @@ export async function middleware(request: NextRequest) {
 
   // Authenticated user trying to access login/signup
   if (user && isAuthRoute) {
+    const userEmail = (user.email || '').toLowerCase().trim()
+    const metaRole = (user.app_metadata?.role || user.user_metadata?.role || '').toLowerCase().trim()
+    const isSuperAdmin = userEmail === 'raghav00424@gmail.com' || userEmail === 'raghav@trinetra.ai' || metaRole === 'admin' || metaRole === 'super_admin'
+
     const url = request.nextUrl.clone()
-    url.pathname = '/dashboard'
+    url.pathname = isSuperAdmin ? '/admin' : '/dashboard'
     return NextResponse.redirect(url)
   }
 

@@ -465,7 +465,7 @@ export default function IntegrationsPageClient({ agents: initialAgents }: Integr
                       <button
                         onClick={handleTestConnection}
                         disabled={testing}
-                        className="w-full py-2.5 rounded-xl border border-violet-500/20 hover:border-violet-500 text-violet-500 hover:bg-violet-500/5 text-xs font-semibold transition cursor-pointer flex items-center justify-center gap-1.5"
+                        className="w-full py-2.5 rounded-xl border border-[var(--border)] hover:bg-[var(--hover-bg)] text-[var(--heading)] text-xs font-bold uppercase tracking-wider transition cursor-pointer flex items-center justify-center gap-1.5 shadow-xs"
                       >
                         {testing ? (
                           <>
@@ -473,7 +473,7 @@ export default function IntegrationsPageClient({ agents: initialAgents }: Integr
                           </>
                         ) : (
                           <>
-                            <Zap className="w-3.5 h-3.5 fill-violet-500/10" /> Test Connection Credentials
+                            <Zap className="w-3.5 h-3.5" /> Test Connection Credentials
                           </>
                         )}
                       </button>
@@ -495,7 +495,7 @@ export default function IntegrationsPageClient({ agents: initialAgents }: Integr
                 {activeStep < activeType.setup_steps.length ? (
                   <button
                     onClick={() => setActiveStep(prev => prev + 1)}
-                    className="px-5 py-2.5 bg-violet-600 hover:bg-violet-500 text-white rounded-xl text-xs font-semibold shadow-lg shadow-violet-600/15 cursor-pointer flex items-center gap-1"
+                    className="px-5 py-2.5 bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 rounded-xl text-xs font-bold uppercase tracking-wider shadow-sm cursor-pointer flex items-center gap-1 active:scale-[0.98]"
                   >
                     Next <ChevronRight className="w-4 h-4" />
                   </button>
@@ -503,7 +503,7 @@ export default function IntegrationsPageClient({ agents: initialAgents }: Integr
                   <button
                     onClick={handleSaveConnection}
                     disabled={saving}
-                    className="px-6 py-2.5 bg-violet-600 hover:bg-violet-500 disabled:bg-violet-600/50 text-white rounded-xl text-xs font-semibold shadow-lg shadow-violet-600/15 cursor-pointer flex items-center gap-1.5"
+                    className="px-6 py-2.5 bg-zinc-900 hover:bg-zinc-800 disabled:opacity-50 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 rounded-xl text-xs font-bold uppercase tracking-wider shadow-sm cursor-pointer flex items-center gap-1.5 active:scale-[0.98]"
                   >
                     {saving ? (
                       <>

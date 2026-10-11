@@ -9,6 +9,7 @@ import {
 import { NumberCard } from "@/src/components/phone-numbers/NumberCard";
 import { ManageNumberModal } from "@/src/components/phone-numbers/ManageNumberModal";
 import { PaymentProgressModal } from "@/src/components/phone-numbers/PaymentProgressModal";
+import PaymentSuccessInvoiceModal, { InvoiceData } from "@/components/billing/PaymentSuccessInvoiceModal";
 import { toast } from "sonner";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
@@ -61,6 +62,23 @@ export default function PhoneNumbersPage() {
 
   // Pre-loaded agents for instant modal rendering
   const [agents, setAgents] = useState<any[]>([]);
+
+  // Immediate Invoice Modal State
+  const [invoiceModal, setInvoiceModal] = useState<{
+    isOpen: boolean;
+    status: 'verifying' | 'success' | 'error';
+    title?: string;
+    errorMessage?: string;
+    paymentId?: string;
+    invoice?: InvoiceData | null;
+    invoiceId?: string;
+    continueLabel?: string;
+    onContinueAction?: () => void;
+  }>({
+    isOpen: false,
+    status: 'verifying',
+    invoice: null
+  });
 
   // Payment Verification & Allocation Progress State
   const [paymentProgress, setPaymentProgress] = useState<{
@@ -337,14 +355,13 @@ export default function PhoneNumbersPage() {
         },
         theme: { color: "#7c3aed" },
         handler: async function (response: any) {
-          // Open progress modal immediately so user sees live confirmation & progress
-          setPaymentProgress({
+          // Open high-trust loader modal immediately with no-refresh warning
+          setInvoiceModal({
             isOpen: true,
             status: "verifying",
-            title: "Securing Your Phone Line",
-            phoneNumber: data.data.phone_number,
-            provider: poolNum.provider === "exotel" ? "Exotel" : poolNum.provider === "sarvam" ? "Sarvam AI" : "Twilio",
-            paymentId: response.razorpay_payment_id
+            title: `Securing Phone Line (${data.data.phone_number})`,
+            paymentId: response.razorpay_payment_id,
+            invoice: null
           });
 
           try {
@@ -365,28 +382,37 @@ export default function PhoneNumbersPage() {
 
             const verifyData = await verifyRes.json();
             if (verifyRes.ok) {
-              setPaymentProgress(prev => ({
-                ...prev,
-                status: "success",
-                phoneNumber: data.data.phone_number
-              }));
               toast.success("Phone number purchased successfully!");
               fetchPurchasedNumbers();
               fetchPoolNumbers();
+              setInvoiceModal({
+                isOpen: true,
+                status: "success",
+                paymentId: response.razorpay_payment_id,
+                invoice: verifyData.invoice,
+                invoiceId: verifyData.invoice_id,
+                continueLabel: "Done & View Numbers",
+                onContinueAction: () => {
+                  setInvoiceModal(prev => ({ ...prev, isOpen: false }));
+                  fetchPurchasedNumbers();
+                }
+              });
             } else {
-              setPaymentProgress(prev => ({
-                ...prev,
+              setInvoiceModal({
+                isOpen: true,
                 status: "error",
-                errorMsg: verifyData.error || "Payment verification failed"
-              }));
+                errorMessage: verifyData.error || "Payment verification failed",
+                paymentId: response.razorpay_payment_id
+              });
               toast.error(verifyData.error || "Payment verification failed");
             }
           } catch (err: any) {
-            setPaymentProgress(prev => ({
-              ...prev,
+            setInvoiceModal({
+              isOpen: true,
               status: "error",
-              errorMsg: err.message || "Payment verification failed"
-            }));
+              errorMessage: err.message || "Payment verification failed",
+              paymentId: response.razorpay_payment_id
+            });
             toast.error(err.message || "Payment verification failed");
           }
         }
@@ -431,12 +457,13 @@ export default function PhoneNumbersPage() {
         },
         theme: { color: "#7c3aed" },
         handler: async function (response: any) {
-          setPaymentProgress({
+          // Open high-trust loader modal immediately with no-refresh warning
+          setInvoiceModal({
             isOpen: true,
             status: "verifying",
-            title: "Renewing Phone Line",
-            phoneNumber: data.data.phone_number,
-            paymentId: response.razorpay_payment_id
+            title: `Renewing Phone Line (${data.data.phone_number})`,
+            paymentId: response.razorpay_payment_id,
+            invoice: null
           });
 
           try {
@@ -457,27 +484,36 @@ export default function PhoneNumbersPage() {
 
             const verifyData = await verifyRes.json();
             if (verifyRes.ok) {
-              setPaymentProgress(prev => ({
-                ...prev,
-                status: "success",
-                phoneNumber: data.data.phone_number
-              }));
               toast.success("Phone number renewed for 30 days!");
               fetchPurchasedNumbers();
+              setInvoiceModal({
+                isOpen: true,
+                status: "success",
+                paymentId: response.razorpay_payment_id,
+                invoice: verifyData.invoice,
+                invoiceId: verifyData.invoice_id,
+                continueLabel: "Done & View Numbers",
+                onContinueAction: () => {
+                  setInvoiceModal(prev => ({ ...prev, isOpen: false }));
+                  fetchPurchasedNumbers();
+                }
+              });
             } else {
-              setPaymentProgress(prev => ({
-                ...prev,
+              setInvoiceModal({
+                isOpen: true,
                 status: "error",
-                errorMsg: verifyData.error || "Payment verification failed"
-              }));
+                errorMessage: verifyData.error || "Payment verification failed",
+                paymentId: response.razorpay_payment_id
+              });
               toast.error(verifyData.error || "Payment verification failed");
             }
           } catch (err: any) {
-            setPaymentProgress(prev => ({
-              ...prev,
+            setInvoiceModal({
+              isOpen: true,
               status: "error",
-              errorMsg: err.message || "Renewal verification failed"
-            }));
+              errorMessage: err.message || "Renewal verification failed",
+              paymentId: response.razorpay_payment_id
+            });
             toast.error(err.message || "Renewal verification failed");
           }
         }
@@ -566,7 +602,7 @@ export default function PhoneNumbersPage() {
           </div>
           <Link
             href="/dashboard/settings?tab=kyc"
-            className="px-4 py-2.5 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white rounded-xl text-xs font-bold transition-all shrink-0 flex items-center justify-center gap-1.5 shadow-md shadow-violet-600/20 whitespace-nowrap"
+            className="px-4 py-2.5 bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 rounded-xl text-xs font-bold transition-all shrink-0 flex items-center justify-center gap-1.5 shadow-sm whitespace-nowrap active:scale-[0.98]"
           >
             Upload Mandatory Documents &rarr;
           </Link>
@@ -577,7 +613,7 @@ export default function PhoneNumbersPage() {
       <div className="mb-12">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-[var(--border)] pb-3 mb-6 gap-3">
           <h2 className="font-playfair text-xl font-bold text-[var(--heading)] flex items-center gap-2">
-            <ShoppingBag className="w-5 h-5 text-violet-400" />
+            <ShoppingBag className="w-5 h-5 text-zinc-900 dark:text-white" />
             Pool Numbers & Bidding Inventory ({poolNumbers.length})
           </h2>
 
@@ -586,7 +622,7 @@ export default function PhoneNumbersPage() {
               onClick={() => setPoolCategoryFilter("all")}
               className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
                 poolCategoryFilter === "all"
-                  ? "bg-violet-600 text-white shadow-md shadow-violet-600/20"
+                  ? "bg-zinc-900 text-white dark:bg-white dark:text-zinc-950 shadow-sm"
                   : "bg-[var(--secondary)] text-[var(--muted)] hover:text-[var(--heading)]"
               }`}
             >
@@ -596,7 +632,7 @@ export default function PhoneNumbersPage() {
               onClick={() => setPoolCategoryFilter("available_now")}
               className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
                 poolCategoryFilter === "available_now"
-                  ? "bg-violet-600 text-white shadow-md shadow-violet-600/20"
+                  ? "bg-zinc-900 text-white dark:bg-white dark:text-zinc-950 shadow-sm"
                   : "bg-[var(--secondary)] text-[var(--muted)] hover:text-[var(--heading)]"
               }`}
             >
@@ -938,7 +974,7 @@ export default function PhoneNumbersPage() {
               <Link
                 href="/dashboard/settings?tab=kyc"
                 onClick={() => setShowKycRequiredModal(false)}
-                className="px-4 py-2.5 bg-gradient-to-r from-violet-600 to-indigo-600 text-white rounded-xl text-xs font-bold hover:opacity-90 transition-opacity flex items-center gap-1.5 shadow-md shadow-violet-600/20"
+                className="px-4 py-2.5 bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm active:scale-[0.98]"
               >
                 Upload Mandatory Documents &rarr;
               </Link>
@@ -946,6 +982,26 @@ export default function PhoneNumbersPage() {
           </div>
         </div>
       )}
+      {/* Immediate On-Screen Printable and Downloadable Invoice Modal */}
+      <PaymentSuccessInvoiceModal
+        isOpen={invoiceModal.isOpen}
+        status={invoiceModal.status}
+        title={invoiceModal.title}
+        errorMessage={invoiceModal.errorMessage}
+        paymentId={invoiceModal.paymentId}
+        invoice={invoiceModal.invoice}
+        invoiceId={invoiceModal.invoiceId}
+        profile={authProfile}
+        continueLabel={invoiceModal.continueLabel}
+        onClose={() => setInvoiceModal(prev => ({ ...prev, isOpen: false }))}
+        onContinue={() => {
+          if (invoiceModal.onContinueAction) {
+            invoiceModal.onContinueAction();
+          } else {
+            setInvoiceModal(prev => ({ ...prev, isOpen: false }));
+          }
+        }}
+      />
     </div>
   );
 }

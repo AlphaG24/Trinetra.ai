@@ -28,9 +28,17 @@ import {
   ShieldCheck as ShieldCheckIcon,
   Sparkles,
   RefreshCw,
-  ArrowRight
+  ArrowRight,
+  Eye,
+  Tag
 } from 'lucide-react'
 import { toast } from 'sonner'
+import PaymentSuccessInvoiceModal, { InvoiceData } from '@/components/billing/PaymentSuccessInvoiceModal'
+import { useAuth } from '@/src/components/providers/AuthProvider'
+import CheckoutPromoAndGSTSection, { AppliedCouponInfo } from '@/components/checkout/CheckoutPromoAndGSTSection'
+import { calculateGSTBreakdown } from '@/lib/gst'
+import TrialSetupModal from '@/components/billing/TrialSetupModal'
+import EnterpriseContactModal from '@/components/enterprise/EnterpriseContactModal'
 
 interface UserLimits {
   plan_tier: string
@@ -89,6 +97,7 @@ interface WalletInfo {
 
 function BillingContent() {
   const router = useRouter()
+  const { user, profile } = useAuth()
 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -98,6 +107,21 @@ function BillingContent() {
   const [invoices, setInvoices] = useState<Invoice[]>([])
   const [showAllInvoices, setShowAllInvoices] = useState(false)
   const [availableBundles, setAvailableBundles] = useState<Bundle[]>([])
+  const [invoiceModal, setInvoiceModal] = useState<{
+    isOpen: boolean
+    status: 'verifying' | 'success' | 'error'
+    title?: string
+    errorMessage?: string
+    paymentId?: string
+    invoice?: InvoiceData | null
+    invoiceId?: string
+    onContinueAction?: () => void
+    continueLabel?: string
+  }>({
+    isOpen: false,
+    status: 'verifying',
+    invoice: null
+  })
 
   // Wallet State
   const [wallet, setWallet] = useState<WalletInfo | null>(null)
@@ -109,9 +133,34 @@ function BillingContent() {
   const [cart, setCart] = useState<CartItem[]>([])
   const [useSameProfile, setUseSameProfile] = useState<boolean>(true)
 
-  const fetchBillingData = async () => {
+  // Coupon & GST State
+  const [appliedCoupon, setAppliedCoupon] = useState<AppliedCouponInfo | null>(null)
+  const [isClaimingGst, setIsClaimingGst] = useState<boolean>(false)
+  const [gstin, setGstin] = useState<string>('')
+  const [legalName, setLegalName] = useState<string>('')
+  const [saveGstToProfile, setSaveGstToProfile] = useState<boolean>(true)
+
+  // Modals & Invoicing Tabs State
+  const [isTrialModalOpen, setIsTrialModalOpen] = useState(false)
+  const [isEnterpriseModalOpen, setIsEnterpriseModalOpen] = useState(false)
+  const [invoiceTab, setInvoiceTab] = useState<'paid' | 'trial'>('paid')
+
+  useEffect(() => {
+    if (profile) {
+      const p = profile as any
+      if (p.gst_number || p.gstin) {
+        setGstin(p.gst_number || p.gstin || '')
+        setIsClaimingGst(true)
+      }
+      if (p.company_name) {
+        setLegalName(p.company_name)
+      }
+    }
+  }, [profile])
+
+  const fetchBillingData = async (isInitial = false) => {
     try {
-      setLoading(true)
+      if (isInitial) setLoading(true)
       const configRes = await fetch('/api/dashboard/config')
       if (!configRes.ok) {
         throw new Error('Failed to retrieve billing configuration')
@@ -150,12 +199,12 @@ function BillingContent() {
     } catch (err: any) {
       setError(err.message || 'Something went wrong')
     } finally {
-      setLoading(false)
+      if (isInitial) setLoading(false)
     }
   }
 
   useEffect(() => {
-    fetchBillingData()
+    fetchBillingData(true)
   }, [])
 
   const handleQuickTopup = async (amount: number) => {
@@ -198,7 +247,15 @@ function BillingContent() {
           color: '#18181b'
         },
         handler: async function (response: any) {
-          toast.info('Verifying transaction on server...')
+          // Open high-trust loader modal immediately with no-refresh warning
+          setInvoiceModal({
+            isOpen: true,
+            status: 'verifying',
+            title: `Confirming Recharge (₹${amount.toLocaleString('en-IN')})`,
+            paymentId: response.razorpay_payment_id,
+            invoice: null
+          })
+
           try {
             const verifyRes = await fetch('/api/billing/wallet', {
               method: 'POST',
@@ -215,12 +272,72 @@ function BillingContent() {
             const verifyData = await verifyRes.json()
             if (verifyRes.ok) {
               toast.success(verifyData.message || `Wallet topped up by ₹${amount.toLocaleString('en-IN')}!`)
-              fetchBillingData()
+              
+              const rawInv = verifyData.invoice || {}
+              const resolvedInv = {
+                ...rawInv,
+                id: verifyData.invoice_id || rawInv.id || 'inv_' + Date.now(),
+                invoice_number: verifyData.invoice_number || rawInv.invoice_number || `VAK/26-27/${Date.now().toString().slice(-5)}`,
+                grand_total_paisa: rawInv.grand_total_paisa || (amount * 100),
+                total_amount: rawInv.total_amount || (amount * 100),
+                subtotal_paisa: rawInv.subtotal_paisa || Math.round((amount * 100) / 1.18),
+                total_tax_paisa: rawInv.total_tax_paisa || ((amount * 100) - Math.round((amount * 100) / 1.18)),
+                payment_id: response.razorpay_payment_id,
+                payment_method: 'Razorpay UPI / Cards',
+                created_at: rawInv.created_at || new Date().toISOString(),
+                supplier_name: rawInv.supplier_name || 'Vaakriti Technologies Private Limited',
+                supplier_gstin: rawInv.supplier_gstin || '07AAAAA0000A1Z5',
+                customer_legal_name: rawInv.customer_legal_name || profile?.company_name || profile?.full_name || user?.user_metadata?.full_name || 'Customer',
+                customer_email: rawInv.customer_email || profile?.email || user?.email || '',
+                customer_address: typeof rawInv.customer_address === 'string' && rawInv.customer_address.trim().length > 0
+                  ? rawInv.customer_address
+                  : [profile?.address || profile?.street, profile?.city, profile?.state, profile?.pincode, profile?.country || 'India'].filter(Boolean).join(', ') || 'India',
+                customer_gstin: rawInv.customer_gstin || profile?.gst_number || profile?.gstin || 'N/A',
+                line_items: rawInv.line_items || [
+                  {
+                    description: `Prepaid Wallet Recharge (₹${amount.toLocaleString('en-IN')})`,
+                    hsn_sac: '998413',
+                    quantity: 1,
+                    rate_paisa: Math.round((amount * 100) / 1.18),
+                    amount_paisa: Math.round((amount * 100) / 1.18),
+                    taxable_amount_paisa: Math.round((amount * 100) / 1.18),
+                    gst_rate: 18,
+                    total_paisa: amount * 100
+                  }
+                ]
+              }
+
+              // Show on-screen printable and downloadable invoice immediately!
+              setInvoiceModal({
+                isOpen: true,
+                status: 'success',
+                paymentId: response.razorpay_payment_id,
+                invoice: resolvedInv,
+                invoiceId: resolvedInv.id,
+                continueLabel: 'Done & Return to Billing',
+                onContinueAction: () => {
+                  setInvoiceModal(prev => ({ ...prev, isOpen: false }))
+                  fetchBillingData(false)
+                }
+              })
+
+              // Background refresh data without resetting loading state
+              fetchBillingData(false)
             } else {
-              toast.error(verifyData.error || 'Verification failed. Please contact billing support.')
+              setInvoiceModal({
+                isOpen: true,
+                status: 'error',
+                errorMessage: verifyData.error || 'Verification failed. Please contact billing support.',
+                paymentId: response.razorpay_payment_id
+              })
             }
           } catch (vErr: any) {
-            toast.error(vErr.message || 'Payment verification failed')
+            setInvoiceModal({
+              isOpen: true,
+              status: 'error',
+              errorMessage: vErr.message || 'Payment verification failed',
+              paymentId: response.razorpay_payment_id
+            })
           } finally {
             setTopupLoading(false)
           }
@@ -264,9 +381,127 @@ function BillingContent() {
       toast.error('The ₹99 Trial is a strictly one-time offer for new accounts. You already have an active subscription or trial.')
       return
     }
-    const trialCost = parseInt(configs.trial_price_paisa || '9900', 10) / 100
-    addToCart('subscription', 'trial', '7-Day All-Access Trial (50 mins, 2 Agents)', trialCost)
-    toast.success('₹99 Trial added to your cart! Click "Proceed to Checkout" on the right to complete payment via Razorpay.')
+    setIsTrialModalOpen(true)
+  }
+
+  const handleTrialModalCheckout = async (trialPayload: {
+    agentCount: number
+    targetPlanSlug: string
+    targetPriceRupees: number
+    selectedPersonalities: string[]
+    renewalDate: string
+  }) => {
+    try {
+      setUpdatingPlan(true)
+      const trialItems = [{
+        type: 'subscription' as const,
+        key: 'trial',
+        quantity: 1
+      }]
+
+      const res = await fetch('/api/billing/create-checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          items: trialItems,
+          use_same_profile: true,
+          trial_metadata: trialPayload
+        })
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to initiate trial checkout')
+
+      const options = {
+        key: data.key,
+        amount: data.amount,
+        currency: data.currency || 'INR',
+        name: 'Trinetra AI',
+        description: `7-Day All-Access Trial (${trialPayload.agentCount} Agents)`,
+        order_id: data.order_id,
+        prefill: {
+          email: data.user_email,
+          name: data.user_name
+        },
+        handler: async function (response: any) {
+          setInvoiceModal({
+            isOpen: true,
+            status: 'verifying',
+            title: 'Activating 7-Day All-Access Trial...',
+            paymentId: response.razorpay_payment_id,
+            invoice: null
+          })
+
+          try {
+            const verifyRes = await fetch('/api/billing/verify-payment', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_signature: response.razorpay_signature,
+                items: trialItems,
+                trial_metadata: trialPayload
+              })
+            })
+
+            if (verifyRes.ok) {
+              const verifyData = await verifyRes.json()
+              toast.success('Trial activated successfully! 50 minutes & agents are live.')
+              fetchBillingData(false)
+              const rawInv = verifyData.invoice || {}
+              const resolvedInv = {
+                ...rawInv,
+                id: verifyData.invoice_id || rawInv.id || 'inv_' + Date.now(),
+                invoice_number: verifyData.invoice_number || rawInv.invoice_number || `VAK/26-27/${Date.now().toString().slice(-5)}`,
+                grand_total_paisa: 9900,
+                total_amount: 9900,
+                subtotal_paisa: 9900,
+                total_tax_paisa: 0,
+                payment_id: response.razorpay_payment_id,
+                payment_method: 'Razorpay Gateway',
+                created_at: rawInv.created_at || new Date().toISOString(),
+                supplier_name: 'Vaakriti Technologies Private Limited',
+                supplier_gstin: '07AAAAA0000A1Z5',
+                customer_legal_name: profile?.company_name || profile?.full_name || 'Customer',
+                customer_email: profile?.email || user?.email || '',
+                customer_address: profile?.city || 'India',
+                customer_gstin: 'N/A',
+                line_items: [{
+                  description: `7-Day All-Access Trial (${trialPayload.agentCount} Agents - ${trialPayload.selectedPersonalities.join(', ')})`,
+                  quantity: 1,
+                  amount_paisa: 9900
+                }]
+              }
+
+              setInvoiceModal({
+                isOpen: true,
+                status: 'success',
+                paymentId: response.razorpay_payment_id,
+                invoice: resolvedInv,
+                invoiceId: resolvedInv.id,
+                continueLabel: 'Go to Agent Setup',
+                onContinueAction: () => {
+                  setInvoiceModal(prev => ({ ...prev, isOpen: false }))
+                  window.location.href = '/dashboard/agents'
+                }
+              })
+            } else {
+              const verifyData = await verifyRes.json()
+              toast.error(verifyData.error || 'Payment verification failed')
+            }
+          } catch (vErr: any) {
+            toast.error(vErr.message || 'Payment verification failed')
+          }
+        }
+      }
+
+      const rzp = new (window as any).Razorpay(options)
+      rzp.open()
+    } catch (err: any) {
+      toast.error(err.message || 'Trial activation initiation failed')
+    } finally {
+      setUpdatingPlan(false)
+    }
   }
 
   useEffect(() => {
@@ -335,10 +570,43 @@ function BillingContent() {
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `Invoice_${inv.invoice_number}.txt`
+      const safeNum = (inv.invoice_number || 'receipt').replace(/[\/\\:*?"<>|]/g, '_')
+      a.download = `Invoice_${safeNum}.txt`
       a.click()
       URL.revokeObjectURL(url)
     }
+  }
+
+  const handleViewInvoice = (inv: Invoice) => {
+    setInvoiceModal({
+      isOpen: true,
+      status: 'success',
+      invoice: {
+        ...(inv as any),
+        id: inv.id,
+        invoice_number: inv.invoice_number,
+        total_amount: getInvoiceAmountPaisa(inv),
+        grand_total_paisa: getInvoiceAmountPaisa(inv),
+        subtotal_paisa: inv.subtotal_paisa || (inv as any).subscription_amount || Math.round(getInvoiceAmountPaisa(inv) / 1.18),
+        total_tax_paisa: inv.total_tax_paisa || (inv as any).tax_amount || (getInvoiceAmountPaisa(inv) - (inv.subtotal_paisa || (inv as any).subscription_amount || Math.round(getInvoiceAmountPaisa(inv) / 1.18))),
+        status: inv.status,
+        created_at: inv.created_at,
+        payment_method: inv.payment_method || 'Razorpay Gateway',
+        plan_tier: inv.plan_tier,
+        supplier_name: (inv as any).supplier_name || 'Vaakriti Technologies Private Limited',
+        supplier_gstin: (inv as any).supplier_gstin || '07AAAAA0000A1Z5',
+        customer_legal_name: (inv as any).customer_legal_name || profile?.company_name || profile?.full_name || user?.user_metadata?.full_name || 'Customer',
+        customer_email: (inv as any).customer_email || profile?.email || user?.email || '',
+        customer_address: typeof (inv as any).customer_address === 'string' && (inv as any).customer_address.trim().length > 0
+          ? (inv as any).customer_address
+          : [profile?.address || profile?.street, profile?.city, profile?.state, profile?.pincode, profile?.country || 'India'].filter(Boolean).join(', ') || 'India',
+        customer_gstin: (inv as any).customer_gstin || profile?.gst_number || profile?.gstin || 'N/A',
+        line_items: (inv as any).line_items
+      },
+      invoiceId: inv.id,
+      continueLabel: 'Close Invoice',
+      onContinueAction: () => setInvoiceModal(prev => ({ ...prev, isOpen: false }))
+    })
   }
 
   // Cart Management
@@ -380,8 +648,49 @@ function BillingContent() {
     toast.error('Item removed from cart')
   }
 
+  // Coupon Handlers
+  const handleApplyCoupon = async (code: string): Promise<boolean> => {
+    try {
+      const prices = calculateRawSubtotal()
+      const res = await fetch('/api/billing/coupons/validate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          code,
+          subtotal: prices.discountedSubtotal
+        })
+      })
+      const data = await res.json()
+      if (!res.ok || !data.isValid) {
+        toast.error(data.error || 'Invalid coupon code')
+        return false
+      }
+
+      setAppliedCoupon({
+        code: data.coupon.code,
+        title: data.coupon.title,
+        discountRupees: data.discountAmountRupees,
+        discountPaisa: data.discountAmountPaisa,
+        discount_type: data.coupon.discount_type,
+        discount_value: data.coupon.discount_value
+      })
+      toast.success(`Coupon ${data.coupon.code} applied! Saved ₹${data.discountAmountRupees.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`)
+      return true
+    } catch (err: any) {
+      toast.error(err.message || 'Error validating coupon')
+      return false
+    }
+  }
+
+  const handleRemoveCoupon = () => {
+    if (appliedCoupon) {
+      toast.info(`Coupon ${appliedCoupon.code} removed`)
+      setAppliedCoupon(null)
+    }
+  }
+
   // Pricing & Discount Calculations
-  const calculateCartPrices = () => {
+  const calculateRawSubtotal = () => {
     let subtotal = 0
     let discount = 0
     let totalAgentsQty = 0
@@ -416,16 +725,32 @@ function BillingContent() {
     })
 
     const discountedSubtotal = subtotal - discount
-    const cgst = Math.round(discountedSubtotal * 0.09) // 9% CGST
-    const sgst = Math.round(discountedSubtotal * 0.09) // 9% SGST
-    const total = discountedSubtotal + cgst + sgst
+    return { subtotal, discount, discountedSubtotal }
+  }
+
+  const calculateCartPrices = () => {
+    const { subtotal, discount, discountedSubtotal } = calculateRawSubtotal()
+    const couponDiscount = appliedCoupon ? appliedCoupon.discountRupees : 0
+    const taxableSubtotal = Math.max(0, discountedSubtotal - couponDiscount)
+
+    const cleanGst = isClaimingGst && gstin.trim().length === 15 ? gstin.trim().toUpperCase() : null
+    const stateCode = cleanGst ? cleanGst.substring(0, 2) : '07'
+
+    const gstBreakdown = calculateGSTBreakdown(taxableSubtotal * 100, cleanGst ? stateCode : null)
+    const total = taxableSubtotal + (gstBreakdown.totalTaxAmount / 100)
 
     return {
       subtotal,
       discount,
       discountedSubtotal,
-      cgst,
-      sgst,
+      couponDiscount,
+      taxableSubtotal,
+      isInterState: gstBreakdown.isInterState,
+      stateName: gstBreakdown.stateName,
+      cgst: gstBreakdown.cgstAmount / 100,
+      sgst: gstBreakdown.sgstAmount / 100,
+      igst: gstBreakdown.igstAmount / 100,
+      totalTax: gstBreakdown.totalTaxAmount / 100,
       total
     }
   }
@@ -450,7 +775,11 @@ function BillingContent() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           items: formattedItems,
-          use_same_profile: useSameProfile
+          use_same_profile: useSameProfile,
+          coupon_code: appliedCoupon?.code,
+          customer_gstin: isClaimingGst && gstin.trim().length === 15 ? gstin.trim().toUpperCase() : undefined,
+          customer_legal_name: isClaimingGst && legalName.trim() ? legalName.trim() : undefined,
+          save_gst_to_profile: saveGstToProfile
         })
       })
       const data = await res.json()
@@ -472,32 +801,101 @@ function BillingContent() {
           name: data.user_name
         },
         handler: async function (response: any) {
-          toast.info('Verifying transaction on server...')
-          const verifyRes = await fetch('/api/billing/verify-payment', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              razorpay_payment_id: response.razorpay_payment_id,
-              razorpay_order_id: response.razorpay_order_id,
-              razorpay_signature: response.razorpay_signature,
-              items: formattedItems,
-              use_same_profile: useSameProfile
-            })
+          // Open high-trust loader modal immediately with no-refresh warning
+          setInvoiceModal({
+            isOpen: true,
+            status: 'verifying',
+            title: 'Provisioning AI Voice Resources...',
+            paymentId: response.razorpay_payment_id,
+            invoice: null
           })
 
-          if (verifyRes.ok) {
-            const verifyData = await verifyRes.json()
-            toast.success('Payment successful! Your purchased resources have been provisioned.')
-            setCart([])
-            router.refresh()
-            if (verifyData.redirect_url) {
-              router.push(verifyData.redirect_url)
+          try {
+            const verifyRes = await fetch('/api/billing/verify-payment', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_signature: response.razorpay_signature,
+                items: formattedItems,
+                use_same_profile: useSameProfile,
+                coupon_code: appliedCoupon?.code,
+                customer_gstin: isClaimingGst && gstin.trim().length === 15 ? gstin.trim().toUpperCase() : undefined,
+                customer_legal_name: isClaimingGst && legalName.trim() ? legalName.trim() : undefined,
+                save_gst_to_profile: saveGstToProfile
+              })
+            })
+
+            if (verifyRes.ok) {
+              const verifyData = await verifyRes.json()
+              toast.success('Payment successful! Your purchased resources have been provisioned.')
+              const { total: cartTotal, discountedSubtotal: cartSubtotal, cgst, sgst } = calculateCartPrices()
+              const cartTax = cgst + sgst
+              setCart([])
+
+              const rawInv = verifyData.invoice || {}
+              const resolvedInv = {
+                ...rawInv,
+                id: verifyData.invoice_id || rawInv.id || 'inv_' + Date.now(),
+                invoice_number: verifyData.invoice_number || rawInv.invoice_number || `VAK/26-27/${Date.now().toString().slice(-5)}`,
+                grand_total_paisa: rawInv.grand_total_paisa || (cartTotal * 100),
+                total_amount: rawInv.total_amount || (cartTotal * 100),
+                subtotal_paisa: rawInv.subtotal_paisa || Math.round(cartSubtotal * 100),
+                total_tax_paisa: rawInv.total_tax_paisa || Math.round(cartTax * 100),
+                payment_id: response.razorpay_payment_id,
+                payment_method: 'Razorpay Gateway',
+                created_at: rawInv.created_at || new Date().toISOString(),
+                supplier_name: rawInv.supplier_name || 'Vaakriti Technologies Private Limited',
+                supplier_gstin: rawInv.supplier_gstin || '07AAAAA0000A1Z5',
+                customer_legal_name: rawInv.customer_legal_name || profile?.company_name || profile?.full_name || user?.user_metadata?.full_name || 'Customer',
+                customer_email: rawInv.customer_email || profile?.email || user?.email || '',
+                customer_address: typeof rawInv.customer_address === 'string' && rawInv.customer_address.trim().length > 0
+                  ? rawInv.customer_address
+                  : [profile?.address || profile?.street, profile?.city, profile?.state, profile?.pincode, profile?.country || 'India'].filter(Boolean).join(', ') || 'India',
+                customer_gstin: rawInv.customer_gstin || profile?.gst_number || profile?.gstin || 'N/A',
+                line_items: rawInv.line_items || cart.map(item => ({
+                  description: item.name,
+                  quantity: item.quantity,
+                  amount_paisa: Math.round(item.price * item.quantity * 100)
+                }))
+              }
+
+              // Show on-screen printable and downloadable invoice immediately!
+              setInvoiceModal({
+                isOpen: true,
+                status: 'success',
+                paymentId: response.razorpay_payment_id,
+                invoice: resolvedInv,
+                invoiceId: resolvedInv.id,
+                continueLabel: verifyData.redirect_url ? 'Continue to Agent Setup' : 'Continue to Dashboard',
+                onContinueAction: () => {
+                  setInvoiceModal(prev => ({ ...prev, isOpen: false }))
+                  const targetUrl = verifyData.redirect_url || '/dashboard/agents'
+                  window.location.href = targetUrl
+                }
+              })
+
+              // Background refresh data without resetting loading state
+              fetchBillingData(false)
             } else {
-              window.location.reload()
+              const errorData = await verifyRes.json()
+              setInvoiceModal({
+                isOpen: true,
+                status: 'error',
+                errorMessage: errorData.error || 'Verification failed. Please contact billing support.',
+                paymentId: response.razorpay_payment_id
+              })
             }
-          } else {
-            const errorData = await verifyRes.json()
-            toast.error(errorData.error || 'Verification failed. Please contact billing support.')
+          } catch (vErr: any) {
+            setInvoiceModal({
+              isOpen: true,
+              status: 'error',
+              errorMessage: vErr.message || 'Payment verification failed',
+              paymentId: response.razorpay_payment_id
+            })
+          } finally {
+            setUpdatingPlan(false)
           }
         }
       }
@@ -532,15 +930,36 @@ function BillingContent() {
 
   if (loading) {
     return (
-      <div className="space-y-8 animate-pulse p-6">
-        <div className="h-8 w-64 bg-[var(--hover-bg)] rounded-lg" />
-        <div className="h-32 bg-[var(--card-bg)] rounded-2xl border border-[var(--border)]" />
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="h-96 bg-[var(--card-bg)] rounded-2xl border border-[var(--border)]" />
-          <div className="h-96 bg-[var(--card-bg)] rounded-2xl border border-[var(--border)]" />
-          <div className="h-96 bg-[var(--card-bg)] rounded-2xl border border-[var(--border)]" />
+      <>
+        <div className="space-y-8 animate-pulse p-6">
+          <div className="h-8 w-64 bg-[var(--hover-bg)] rounded-lg" />
+          <div className="h-32 bg-[var(--card-bg)] rounded-2xl border border-[var(--border)]" />
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="h-96 bg-[var(--card-bg)] rounded-2xl border border-[var(--border)]" />
+            <div className="h-96 bg-[var(--card-bg)] rounded-2xl border border-[var(--border)]" />
+            <div className="h-96 bg-[var(--card-bg)] rounded-2xl border border-[var(--border)]" />
+          </div>
         </div>
-      </div>
+        <PaymentSuccessInvoiceModal
+          isOpen={invoiceModal.isOpen}
+          status={invoiceModal.status}
+          title={invoiceModal.title}
+          errorMessage={invoiceModal.errorMessage}
+          paymentId={invoiceModal.paymentId}
+          invoice={invoiceModal.invoice}
+          invoiceId={invoiceModal.invoiceId}
+          profile={profile}
+          continueLabel={invoiceModal.continueLabel}
+          onClose={() => setInvoiceModal(prev => ({ ...prev, isOpen: false }))}
+          onContinue={() => {
+            if (invoiceModal.onContinueAction) {
+              invoiceModal.onContinueAction()
+            } else {
+              setInvoiceModal(prev => ({ ...prev, isOpen: false }))
+            }
+          }}
+        />
+      </>
     )
   }
 
@@ -612,34 +1031,6 @@ function BillingContent() {
         <p className="text-xs text-[var(--muted)] mt-1">Manage plans, provision dedicated numbers, or purchase bundle packs with bulk discounts.</p>
       </div>
 
-      {/* First-time Onboarding Free Trial & Marketplace Guidance Alert */}
-      <div className="bg-gradient-to-r from-violet-500/10 via-purple-500/5 to-transparent border border-violet-500/25 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-violet-500/15 border border-violet-500/25 flex items-center justify-center text-violet-400 shrink-0">
-            <Sparkles className="w-4 h-4" />
-          </div>
-          <div>
-            <h4 className="text-xs font-bold text-[var(--heading)] flex items-center gap-2">
-              First-Time Onboarding? Try Free Trial First
-              <span className="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider bg-violet-500/15 text-violet-400 border border-violet-500/30">
-                Recommended
-              </span>
-            </h4>
-            <p className="text-[11px] text-[var(--muted)] mt-0.5">
-              Start with our zero-risk Free Trial to test agents in the live sandbox, then visit the Marketplace to choose and deploy your voice agent.
-            </p>
-          </div>
-        </div>
-        <Link
-          href="/dashboard/marketplace"
-          className="inline-flex items-center gap-1.5 px-4 py-2 bg-violet-600 hover:bg-violet-500 text-white text-xs font-bold rounded-xl transition-all shadow-sm shrink-0 whitespace-nowrap cursor-pointer"
-        >
-          <span>Go to Marketplace</span>
-          <ArrowRight className="w-3.5 h-3.5" />
-        </Link>
-      </div>
-
-
       {/* 1. Prepaid Wallet & Spend Limits Engine (Master Plan Section 18.9 & 18.10) - Prominent Full Width */}
       <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-6 shadow-sm space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[var(--border)] pb-4">
@@ -653,7 +1044,7 @@ function BillingContent() {
                 <span className="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
                   Active
                 </span>
-                <span className="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider bg-violet-500/10 text-violet-400 border border-violet-500/20">
+                <span className="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider bg-zinc-500/10 text-zinc-600 dark:text-zinc-400 border border-zinc-500/20">
                   {wallet?.billing_model === 'credit_based'
                     ? 'Credit-Based (Pay-As-You-Go)'
                     : wallet?.billing_model === 'outcome_based'
@@ -789,9 +1180,9 @@ function BillingContent() {
 
           {/* ₹99 Trial Tier Callout (Decision P2) for Free Users */}
           {isFree && (
-            <div className="bg-gradient-to-r from-violet-950/30 to-purple-900/20 border border-violet-500/30 rounded-2xl p-6 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-6 text-left">
+            <div className="bg-zinc-100/80 dark:bg-zinc-900/40 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-6 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-6 text-left">
               <div className="space-y-2">
-                <div className="inline-flex items-center gap-2 px-2.5 py-0.5 rounded-full bg-violet-500/10 border border-violet-500/30 text-violet-400 text-[10px] font-bold uppercase tracking-wider">
+                <div className="inline-flex items-center gap-2 px-2.5 py-0.5 rounded-full bg-zinc-200 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 text-zinc-800 dark:text-zinc-200 text-[10px] font-bold uppercase tracking-wider">
                   <Sparkles className="w-3 h-3" /> Limited Trial Offer
                 </div>
                 <h3 className="font-bold text-base text-[var(--heading)] font-display flex items-center gap-2">
@@ -805,7 +1196,7 @@ function BillingContent() {
                 type="button"
                 disabled={updatingPlan}
                 onClick={handleActivateTrial}
-                className="px-6 py-3 bg-violet-600 hover:bg-violet-500 text-white font-bold text-xs uppercase tracking-wider rounded-xl transition-all cursor-pointer shadow-lg shadow-violet-600/20 shrink-0 text-center disabled:opacity-50"
+                className="px-6 py-3 bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 font-bold text-xs uppercase tracking-wider rounded-xl transition-all cursor-pointer shadow-sm shrink-0 text-center disabled:opacity-50 active:scale-[0.98]"
               >
                 {updatingPlan ? 'Activating...' : 'Activate for ₹99'}
               </button>
@@ -822,12 +1213,12 @@ function BillingContent() {
                   Activate Premium Voice Agents
                 </h3>
                 <p className="text-xs text-[var(--muted)] leading-relaxed max-w-lg">
-                  Explore our template marketplace to deploy pre-configured sales, support, and receptionist specialists. Select the exact plan tier (Starter/Professional) when activating your agent.
+                  <strong className="text-[var(--heading)] font-semibold">First-time onboarding?</strong> Test agents in the <strong className="text-[var(--heading)] font-semibold">live sandbox</strong> with our <strong className="text-[var(--heading)] font-semibold">zero-risk trial</strong>, or explore our <strong className="text-[var(--heading)] font-semibold">template marketplace</strong> to deploy pre-configured sales, support, and receptionist specialists. Select your plan tier (<strong className="text-[var(--heading)] font-semibold">Starter / Professional</strong>) when activating your agent.
                 </p>
               </div>
               <Link
                 href="/dashboard/marketplace"
-                className="px-5 py-2.5 bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white border border-zinc-700/30 dark:border-zinc-300 font-bold text-xs uppercase tracking-wider rounded-xl transition-all cursor-pointer shadow-sm shrink-0 text-center"
+                className="px-5 py-2.5 bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 font-bold text-xs uppercase tracking-wider rounded-xl transition-all cursor-pointer shadow-sm shrink-0 text-center active:scale-[0.98]"
               >
                 Go to Marketplace
               </Link>
@@ -893,6 +1284,29 @@ function BillingContent() {
             </div>
           )}
 
+          {/* Go Enterprise Tier Banner */}
+          <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-6 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-6 text-left">
+            <div className="space-y-2">
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-zinc-200 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 text-zinc-800 dark:text-zinc-200 text-[10px] font-bold uppercase tracking-wider">
+                <Sparkles className="w-3 h-3 text-amber-500" /> Enterprise Scale
+              </div>
+              <h3 className="font-bold text-sm text-[var(--heading)] font-display flex items-center gap-2">
+                <Bot className="w-4 h-4 text-[var(--heading)]" />
+                Custom Enterprise Telephony & Limits
+              </h3>
+              <p className="text-xs text-[var(--muted)] leading-relaxed max-w-lg">
+                High-volume call quotas (10,000+ min/month), dedicated VPC air-gapped deployment, custom fine-tuned voice personas, and bespoke SLA contracts.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsEnterpriseModalOpen(true)}
+              className="px-5 py-2.5 bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 font-bold text-xs uppercase tracking-wider rounded-xl transition-all cursor-pointer shadow-sm shrink-0 text-center active:scale-[0.98]"
+            >
+              Contact Enterprise
+            </button>
+          </div>
+
         </div>
 
         {/* Right Side: Interactive Shopping Cart Sidebar */}
@@ -900,7 +1314,7 @@ function BillingContent() {
           <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-6 shadow-sm flex flex-col justify-between min-h-[640px]">
             <div>
               <div className="flex items-center gap-2 border-b border-[var(--border)] pb-4 mb-4">
-                <ShoppingCart className="w-5 h-5 text-violet-500" />
+                <ShoppingCart className="w-5 h-5 text-zinc-900 dark:text-white" />
                 <h3 className="font-bold text-base font-display text-[var(--heading)]">Your Cart Summary</h3>
               </div>
 
@@ -916,7 +1330,7 @@ function BillingContent() {
                     <div key={index} className="flex gap-3 justify-between items-center p-3 bg-[var(--background)] border border-[var(--border)] rounded-xl relative">
                       <div className="space-y-1 flex-1 min-w-0">
                         <span className="text-xs font-bold text-[var(--heading)] block truncate pr-1">{item.name}</span>
-                        <span className="text-[10px] text-violet-500 font-mono font-bold">{formatRawRupees(item.price)} each</span>
+                        <span className="text-[10px] text-zinc-600 dark:text-zinc-400 font-mono font-bold">{formatRawRupees(item.price)} each</span>
                       </div>
 
                       <div className="flex items-center gap-3 shrink-0">
@@ -928,14 +1342,14 @@ function BillingContent() {
                             <div className="flex items-center gap-1.5 bg-[var(--card-bg)] border border-[var(--border)] rounded-lg p-0.5">
                               <button
                                 onClick={() => updateQuantity(index, -1)}
-                                className="p-1 text-[var(--muted)] hover:text-violet-500 transition-colors"
+                                className="p-1 text-[var(--muted)] hover:text-zinc-900 dark:hover:text-white transition-colors"
                               >
                                 <Minus className="w-2.5 h-2.5" />
                               </button>
                               <span className="text-[11px] font-mono font-bold px-1">{item.quantity}</span>
                               <button
                                 onClick={() => updateQuantity(index, 1)}
-                                className="p-1 text-[var(--muted)] hover:text-violet-500 transition-colors"
+                                className="p-1 text-[var(--muted)] hover:text-zinc-900 dark:hover:text-white transition-colors"
                               >
                                 <Plus className="w-2.5 h-2.5" />
                               </button>
@@ -957,6 +1371,26 @@ function BillingContent() {
               )}
             </div>
 
+            {/* Promo Code & GST Section */}
+            {cart.length > 0 && (
+              <div className="mt-4 pt-4 border-t border-[var(--border)]">
+                <CheckoutPromoAndGSTSection
+                  subtotalRupees={cartPrices.discountedSubtotal}
+                  appliedCoupon={appliedCoupon}
+                  onApplyCoupon={handleApplyCoupon}
+                  onRemoveCoupon={handleRemoveCoupon}
+                  isClaimingGst={isClaimingGst}
+                  onToggleClaimGst={setIsClaimingGst}
+                  gstin={gstin}
+                  onGstinChange={setGstin}
+                  legalName={legalName}
+                  onLegalNameChange={setLegalName}
+                  saveGstToProfile={saveGstToProfile}
+                  onToggleSaveGst={setSaveGstToProfile}
+                />
+              </div>
+            )}
+
             {/* Calculations Breakdown */}
             {cart.length > 0 && (
               <div className="border-t border-[var(--border)] pt-4 mt-6 space-y-3">
@@ -972,15 +1406,38 @@ function BillingContent() {
                   </div>
                 )}
 
-                <div className="flex justify-between text-xs text-[var(--muted)]">
-                  <span>CGST (9%):</span>
-                  <span className="font-mono">{formatRawRupees(cartPrices.cgst)}</span>
-                </div>
+                {cartPrices.couponDiscount > 0 && (
+                  <div className="flex justify-between text-xs text-emerald-500 font-semibold animate-in fade-in duration-200">
+                    <span className="flex items-center gap-1">
+                      <Tag className="w-3 h-3" />
+                      <span>Promo Discount ({appliedCoupon?.code}):</span>
+                    </span>
+                    <span className="font-mono font-bold">-{formatRawRupees(cartPrices.couponDiscount)}</span>
+                  </div>
+                )}
 
-                <div className="flex justify-between text-xs text-[var(--muted)]">
-                  <span>SGST (9%):</span>
-                  <span className="font-mono">{formatRawRupees(cartPrices.sgst)}</span>
-                </div>
+                {/* Tax Breakdown */}
+                {cartPrices.isInterState ? (
+                  <div className="flex justify-between text-xs text-[var(--muted)]">
+                    <div className="flex items-center gap-1">
+                      <span>IGST (18% Inter-State):</span>
+                      <span className="text-[9px] font-mono text-zinc-500">({cartPrices.stateName})</span>
+                    </div>
+                    <span className="font-mono">{formatRawRupees(cartPrices.igst)}</span>
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex justify-between text-xs text-[var(--muted)]">
+                      <span>CGST (9%):</span>
+                      <span className="font-mono">{formatRawRupees(cartPrices.cgst)}</span>
+                    </div>
+
+                    <div className="flex justify-between text-xs text-[var(--muted)]">
+                      <span>SGST (9%):</span>
+                      <span className="font-mono">{formatRawRupees(cartPrices.sgst)}</span>
+                    </div>
+                  </>
+                )}
 
                 {/* Same profile configuration option */}
                 <div className="pt-2 border-t border-[var(--border)] flex items-start gap-2">
@@ -989,7 +1446,7 @@ function BillingContent() {
                     id="useSameProfile"
                     checked={useSameProfile}
                     onChange={(e) => setUseSameProfile(e.target.checked)}
-                    className="w-4 h-4 rounded border-[var(--border)] text-violet-600 focus:ring-violet-500 bg-[var(--background)] mt-0.5 cursor-pointer"
+                    className="w-4 h-4 rounded border-[var(--border)] accent-zinc-900 dark:accent-white text-zinc-900 dark:text-white focus:ring-zinc-900 dark:focus:ring-white bg-[var(--background)] mt-0.5 cursor-pointer"
                   />
                   <label htmlFor="useSameProfile" className="text-[10px] text-[var(--muted)] leading-tight select-none cursor-pointer">
                     Apply the same business setup profile to all purchased agents
@@ -1028,76 +1485,197 @@ function BillingContent() {
           </div>
         </div>
 
-        {invoices.length === 0 ? (
-          <div className="text-center py-8">
-            <p className="text-xs text-[var(--muted)]">No payments found in your history.</p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="border-b border-[var(--border)] text-[10px] uppercase font-bold tracking-wider text-[var(--muted)]">
-                  <th className="py-3 px-4 font-montserrat">Date</th>
-                  <th className="py-3 px-4 font-montserrat">Invoice Number</th>
-                  <th className="py-3 px-4 font-montserrat">Amount</th>
-                  <th className="py-3 px-4 font-montserrat">Status</th>
-                  <th className="py-3 px-4 font-montserrat text-right">Action</th>
-                </tr>
-              </thead>
-              <tbody className="text-xs text-[var(--heading)] divide-y divide-[var(--border)]">
-                {(showAllInvoices ? invoices : invoices.slice(0, 3)).map((inv) => (
-                  <tr key={inv.id} className="hover:bg-[var(--hover-bg)]/20 transition-colors">
-                    <td className="py-3 px-4 whitespace-nowrap">
-                      {new Date(inv.created_at).toLocaleDateString('en-IN', {
-                        year: 'numeric',
-                        month: 'short',
-                        day: 'numeric'
-                      })}
-                    </td>
-                    <td className="py-3 px-4 whitespace-nowrap font-mono text-[10px]">
-                      {inv.invoice_number?.startsWith('TRI-') ? `VAK/26-27/${inv.invoice_number.slice(-5)}` : inv.invoice_number}
-                    </td>
-                    <td className="py-3 px-4 whitespace-nowrap font-mono font-medium">
-                      {formatPrice(getInvoiceAmountPaisa(inv))}
-                    </td>
-                    <td className="py-3 px-4 whitespace-nowrap">
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${inv.status.toLowerCase() === 'paid'
-                          ? 'bg-green-500/10 text-green-500 border border-green-500/20'
-                          : 'bg-amber-500/10 text-amber-500 border border-amber-500/20'
-                        }`}>
-                        {inv.status}
-                      </span>
-                    </td>
-                    <td className="py-3 px-4 text-right">
-                      <button
-                        onClick={() => handleDownload(inv)}
-                        className="inline-flex items-center gap-1.5 text-xs text-[var(--heading)] hover:opacity-75 font-bold transition-colors cursor-pointer"
-                      >
-                        <Download className="w-3.5 h-3.5" />
-                        Download
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-        <div className="mt-4 pt-4 border-t border-[var(--border)] flex items-center justify-between flex-wrap gap-2">
-          <p className="text-xs text-[var(--muted)] flex items-center gap-1.5">
-            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-            <span>All official GST tax invoices are permanently stored and downloadable anytime.</span>
-          </p>
-          {invoices.length > 3 && (
-            <button
-              onClick={() => setShowAllInvoices(!showAllInvoices)}
-              className="text-xs text-[var(--heading)] hover:bg-[var(--hover-bg)] border border-[var(--border)] px-3 py-1.5 rounded-xl uppercase tracking-wider text-[10px] font-bold transition-all cursor-pointer"
-            >
-              {showAllInvoices ? 'Show Less' : `Show All (${invoices.length})`}
-            </button>
-          )}
-        </div>
+        {/* Dual Invoice Tabs (Feature 4) */}
+        {(() => {
+          const trialInvoices = invoices.filter(inv =>
+            inv.plan_tier === 'trial' ||
+            inv.grand_total_paisa === 9900 ||
+            inv.total_amount === 9900 ||
+            (Array.isArray((inv as any).line_items) && (inv as any).line_items.some((item: any) =>
+              item.is_trial === true || item.invoice_type === 'trial' || (item.item || item.description || '').toLowerCase().includes('trial')
+            ))
+          )
+
+          const paidInvoices = invoices.filter(inv =>
+            inv.plan_tier !== 'trial' &&
+            inv.grand_total_paisa !== 9900 &&
+            inv.total_amount !== 9900 &&
+            !(Array.isArray((inv as any).line_items) && (inv as any).line_items.some((item: any) =>
+              item.is_trial === true || item.invoice_type === 'trial' || (item.item || item.description || '').toLowerCase().includes('trial')
+            ))
+          )
+
+          const activeList = invoiceTab === 'paid' ? paidInvoices : trialInvoices
+
+          return (
+            <div>
+              <div className="flex items-center gap-2 border-b border-[var(--border)] mb-4">
+                <button
+                  type="button"
+                  onClick={() => { setInvoiceTab('paid'); setShowAllInvoices(false); }}
+                  className={`pb-2.5 px-3 text-xs font-bold font-montserrat uppercase tracking-wider transition-colors relative cursor-pointer flex items-center gap-2 ${
+                    invoiceTab === 'paid'
+                      ? 'text-[var(--heading)] border-b-2 border-zinc-900 dark:border-white'
+                      : 'text-[var(--muted)] hover:text-[var(--heading)]'
+                  }`}
+                >
+                  <span>Paid Invoices</span>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] bg-zinc-200 dark:bg-zinc-800 text-[var(--heading)] font-mono">
+                    {paidInvoices.length}
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => { setInvoiceTab('trial'); setShowAllInvoices(false); }}
+                  className={`pb-2.5 px-3 text-xs font-bold font-montserrat uppercase tracking-wider transition-colors relative cursor-pointer flex items-center gap-2 ${
+                    invoiceTab === 'trial'
+                      ? 'text-[var(--heading)] border-b-2 border-zinc-900 dark:border-white'
+                      : 'text-[var(--muted)] hover:text-[var(--heading)]'
+                  }`}
+                >
+                  <span>Trial Invoices</span>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] bg-zinc-200 dark:bg-zinc-800 text-[var(--heading)] font-mono">
+                    {trialInvoices.length}
+                  </span>
+                </button>
+              </div>
+
+              {activeList.length === 0 ? (
+                <div className="text-center py-8">
+                  <p className="text-xs text-[var(--muted)]">
+                    {invoiceTab === 'paid'
+                      ? 'No paid subscription invoices found. Direct purchases and post-trial renewed invoices appear here.'
+                      : 'No trial invoices found. When you activate the ₹99 7-day trial, your trial invoice with zero GST will appear here.'}
+                  </p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="border-b border-[var(--border)] text-[10px] uppercase font-bold tracking-wider text-[var(--muted)]">
+                        <th className="py-3 px-4 font-montserrat">Date</th>
+                        <th className="py-3 px-4 font-montserrat">Invoice Number</th>
+                        <th className="py-3 px-4 font-montserrat">Amount</th>
+                        <th className="py-3 px-4 font-montserrat">Type & Status</th>
+                        <th className="py-3 px-4 font-montserrat text-right">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="text-xs text-[var(--heading)] divide-y divide-[var(--border)]">
+                      {(showAllInvoices ? activeList : activeList.slice(0, 3)).map((inv) => (
+                        <tr key={inv.id} className="hover:bg-[var(--hover-bg)]/20 transition-colors">
+                          <td className="py-3 px-4 whitespace-nowrap">
+                            {new Date(inv.created_at).toLocaleDateString('en-IN', {
+                              year: 'numeric',
+                              month: 'short',
+                              day: 'numeric'
+                            })}
+                          </td>
+                          <td className="py-3 px-4 whitespace-nowrap font-mono text-[10px]">
+                            {inv.invoice_number?.startsWith('TRI-') ? `VAK/26-27/${inv.invoice_number.slice(-5)}` : inv.invoice_number}
+                          </td>
+                          <td className="py-3 px-4 whitespace-nowrap font-mono font-medium">
+                            {formatPrice(getInvoiceAmountPaisa(inv))}
+                          </td>
+                          <td className="py-3 px-4 whitespace-nowrap">
+                            <div className="flex items-center gap-1.5">
+                              <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${inv.status.toLowerCase() === 'paid'
+                                  ? 'bg-green-500/10 text-green-500 border border-green-500/20'
+                                  : 'bg-amber-500/10 text-amber-500 border border-amber-500/20'
+                                }`}>
+                                {inv.status}
+                              </span>
+                              {invoiceTab === 'trial' && (
+                                <span className="px-1.5 py-0.5 rounded text-[9px] font-mono bg-zinc-200 dark:bg-zinc-800 text-[var(--muted)]">
+                                  0 GST
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="py-3 px-4 text-right">
+                            <div className="inline-flex items-center gap-2 justify-end">
+                              <button
+                                onClick={() => handleViewInvoice(inv)}
+                                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--hover-bg)] hover:bg-[var(--border)] text-xs text-[var(--heading)] font-semibold transition cursor-pointer"
+                                title="View & Print Official Invoice on Screen"
+                              >
+                                <Eye className="w-3.5 h-3.5 text-zinc-700 dark:text-zinc-300" />
+                                View
+                              </button>
+                              <button
+                                onClick={() => handleDownload(inv)}
+                                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--hover-bg)] hover:bg-[var(--border)] text-xs text-[var(--heading)] font-semibold transition cursor-pointer"
+                                title="Download Official PDF Invoice"
+                              >
+                                <Download className="w-3.5 h-3.5" />
+                                PDF
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              <div className="mt-4 pt-4 border-t border-[var(--border)] flex items-center justify-between flex-wrap gap-2">
+                <p className="text-xs text-[var(--muted)] flex items-center gap-1.5">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                  <span>
+                    {invoiceTab === 'paid'
+                      ? 'All statutory B2B/B2C GST invoices are permanently stored for your accounting records.'
+                      : 'Trial invoices document your ₹99 evaluation and upcoming autopay mandate disclosures.'}
+                  </span>
+                </p>
+                {activeList.length > 3 && (
+                  <button
+                    onClick={() => setShowAllInvoices(!showAllInvoices)}
+                    className="text-xs text-[var(--heading)] hover:bg-[var(--hover-bg)] border border-[var(--border)] px-3 py-1.5 rounded-xl uppercase tracking-wider text-[10px] font-bold transition-all cursor-pointer"
+                  >
+                    {showAllInvoices ? 'Show Less' : `Show All (${activeList.length})`}
+                  </button>
+                )}
+              </div>
+            </div>
+          )
+        })()}
       </div>
+
+      {/* Immediate On-Screen Printable and Downloadable Invoice Modal */}
+      <PaymentSuccessInvoiceModal
+        isOpen={invoiceModal.isOpen}
+        status={invoiceModal.status}
+        title={invoiceModal.title}
+        errorMessage={invoiceModal.errorMessage}
+        paymentId={invoiceModal.paymentId}
+        invoice={invoiceModal.invoice}
+        invoiceId={invoiceModal.invoiceId}
+        profile={profile}
+        continueLabel={invoiceModal.continueLabel}
+        onClose={() => setInvoiceModal(prev => ({ ...prev, isOpen: false }))}
+        onContinue={() => {
+          if (invoiceModal.onContinueAction) {
+            invoiceModal.onContinueAction()
+          } else {
+            setInvoiceModal(prev => ({ ...prev, isOpen: false }))
+          }
+        }}
+      />
+
+      {/* Trial Setup & Personality Selector Modal */}
+      <TrialSetupModal
+        isOpen={isTrialModalOpen}
+        onClose={() => setIsTrialModalOpen(false)}
+        configs={configs}
+        onProceedToCheckout={handleTrialModalCheckout}
+      />
+
+      {/* Enterprise Contact Modal */}
+      <EnterpriseContactModal
+        isOpen={isEnterpriseModalOpen}
+        onClose={() => setIsEnterpriseModalOpen(false)}
+      />
     </div>
   )
 }

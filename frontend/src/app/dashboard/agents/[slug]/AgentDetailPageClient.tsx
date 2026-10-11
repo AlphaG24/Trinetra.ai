@@ -610,7 +610,7 @@ export function AgentDetailPageClient({
           <div className="flex flex-col gap-3 pt-2">
             <Link
               href={upgradeUrl}
-              className="w-full py-3 bg-violet-600 hover:bg-violet-555 text-white font-bold text-xs uppercase rounded-xl tracking-wider shadow-md hover:scale-[1.02] transition-all block text-center cursor-pointer font-montserrat"
+              className="w-full py-3 bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 font-bold text-xs uppercase rounded-xl tracking-wider shadow-sm transition-all block text-center cursor-pointer font-montserrat active:scale-[0.99]"
             >
               Upgrade Plan
             </Link>
@@ -679,13 +679,13 @@ export function AgentDetailPageClient({
                   }}
                   autoFocus
                   disabled={savingName}
-                  className="px-3 py-1 bg-[var(--background)] border border-violet-500 rounded-lg text-lg font-bold text-[var(--heading)] font-display focus:outline-none focus:ring-2 focus:ring-violet-500/30 min-w-[200px]"
+                  className="px-3 py-1 bg-[var(--background)] border border-zinc-900 dark:border-white rounded-lg text-lg font-bold text-[var(--heading)] font-display focus:outline-none focus:ring-2 focus:ring-zinc-900/20 dark:focus:ring-white/20 min-w-[200px]"
                   placeholder="Enter agent name..."
                 />
                 <button
                   onClick={handleSaveName}
                   disabled={savingName}
-                  className="p-1.5 bg-violet-600 hover:bg-violet-700 text-white rounded-lg transition-colors shadow-sm cursor-pointer"
+                  className="p-1.5 bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 rounded-lg transition-colors shadow-sm cursor-pointer"
                   title="Save Name (Enter)"
                 >
                   {savingName ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
@@ -704,7 +704,7 @@ export function AgentDetailPageClient({
                 <h1 className="text-xl font-bold text-[var(--heading)] font-display tracking-tight">{agent.agent_name}</h1>
                 <button
                   onClick={handleStartEditName}
-                  className="p-1 text-[var(--muted)] hover:text-violet-500 hover:bg-[var(--hover-bg)] rounded-md transition-colors cursor-pointer opacity-70 group-hover:opacity-100"
+                  className="p-1 text-[var(--muted)] hover:text-zinc-900 dark:hover:text-white hover:bg-[var(--hover-bg)] rounded-md transition-colors cursor-pointer opacity-70 group-hover:opacity-100"
                   title="Rename Agent"
                 >
                   <Pencil className="w-3.5 h-3.5" />
@@ -875,7 +875,7 @@ export function AgentDetailPageClient({
             </p>
             <Link 
               href={upgradeUrl}
-              className="px-6 py-2.5 bg-violet-600 hover:bg-violet-700 text-white font-bold text-[10px] uppercase tracking-wider rounded-xl transition-all shadow-md hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0"
+              className="px-6 py-2.5 bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 font-bold text-[10px] uppercase tracking-wider rounded-xl transition-all shadow-sm active:scale-[0.98]"
             >
               Upgrade Now
             </Link>

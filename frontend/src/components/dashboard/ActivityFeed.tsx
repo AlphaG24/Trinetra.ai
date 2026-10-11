@@ -36,7 +36,7 @@ const getActivityIcon = (type: ActivityType) => {
     case 'chat_started': return <div className="p-2 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-full"><MessageCircle className="w-4 h-4" /></div>
     case 'missed_call': return <div className="p-2 bg-red-500/10 text-red-600 dark:text-red-400 rounded-full"><PhoneMissed className="w-4 h-4" /></div>
     case 'usage_alert': return <div className="p-2 bg-amber-500/10 text-amber-600 dark:text-amber-400 rounded-full"><AlertTriangle className="w-4 h-4" /></div>
-    case 'demo_call': return <div className="p-2 bg-purple-500/10 text-purple-600 dark:text-purple-400 rounded-full"><FlaskConical className="w-4 h-4" /></div>
+    case 'demo_call': return <div className="p-2 bg-zinc-500/10 text-zinc-900 dark:text-white rounded-full"><FlaskConical className="w-4 h-4" /></div>
     default: return <div className="p-2 bg-gray-500/10 text-gray-600 dark:text-gray-400 rounded-full"><AlertTriangle className="w-4 h-4" /></div>
   }
 }
@@ -141,14 +141,14 @@ export function ActivityFeed({
 
   return (
     <div className="bg-transparent h-full flex flex-col">
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-xl font-bold text-[var(--heading)]">Live Activity</h2>
+      <div className="flex items-center justify-between pb-4 border-b border-zinc-100 dark:border-zinc-800 mb-5">
+        <h2 className="text-sm md:text-base font-bold font-montserrat text-zinc-900 dark:text-white uppercase tracking-wider">Live Activity</h2>
         <div className="flex items-center gap-2">
-          <span className="relative flex h-3 w-3">
+          <span className="relative flex h-2.5 w-2.5">
             {(isConnected || isControlled) && <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>}
-            <span className={`relative inline-flex rounded-full h-3 w-3 ${(isConnected || isControlled) ? 'bg-emerald-500' : 'bg-[var(--border)]'}`}></span>
+            <span className={`relative inline-flex rounded-full h-2.5 w-2.5 ${(isConnected || isControlled) ? 'bg-emerald-500' : 'bg-zinc-300 dark:bg-zinc-700'}`}></span>
           </span>
-          <span className={`text-sm font-medium ${(isConnected || isControlled) ? 'text-emerald-500' : 'text-[var(--muted)]'}`}>
+          <span className={`text-xs font-semibold ${(isConnected || isControlled) ? 'text-emerald-600 dark:text-emerald-400' : 'text-zinc-400'}`}>
             {(isConnected || isControlled) ? 'Live' : 'Connecting...'}
           </span>
         </div>
@@ -157,28 +157,28 @@ export function ActivityFeed({
       <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar">
         {loading ? (
           <div className="flex flex-col items-center justify-center h-full min-h-[200px]">
-            <div className="w-8 h-8 border-2 border-violet-500 border-t-transparent rounded-full animate-spin mb-2" />
-            <p className="text-xs text-[var(--muted)]">Loading activity...</p>
+            <div suppressHydrationWarning className="w-8 h-8 border-2 border-zinc-900 dark:border-white border-t-transparent rounded-full animate-spin mb-2" />
+            <p className="text-xs text-zinc-400">Loading activity...</p>
           </div>
         ) : error ? (
           <div className="flex flex-col items-center justify-center h-full min-h-[200px] text-center p-4">
-            <p className="text-sm text-red-400 mb-3">{error.message || 'Failed to load activity'}</p>
+            <p className="text-sm text-red-500 mb-3">{error.message || 'Failed to load activity'}</p>
             {onRetry && (
               <button 
                 onClick={onRetry}
-                className="px-3 py-1.5 bg-violet-600 hover:bg-violet-700 text-white rounded-lg text-xs font-semibold transition-colors cursor-pointer"
+                className="px-3 py-1.5 bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 rounded-lg text-xs font-bold transition-all shadow-sm active:scale-[0.98] cursor-pointer"
               >
                 Retry
               </button>
             )}
           </div>
         ) : displayActivities.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full min-h-[200px] text-center">
-            <div className="w-16 h-16 rounded-full bg-[var(--hover-bg)] flex items-center justify-center mb-4 border border-[var(--border)]">
-              <Activity className="w-8 h-8 text-[var(--muted)]" />
+          <div className="flex flex-col items-center justify-center h-full min-h-[200px] text-center py-6">
+            <div className="w-14 h-14 rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center mb-3 border border-zinc-200/80 dark:border-zinc-700">
+              <Activity className="w-6 h-6 text-zinc-400" />
             </div>
-            <h3 className="text-lg font-medium text-[var(--heading)] mb-2">No recent activity</h3>
-            <p className="text-[var(--muted)] mb-6 text-sm max-w-xs">Live events from the last 5 hours will appear here in real time.</p>
+            <h3 className="text-sm md:text-base font-bold font-montserrat text-zinc-900 dark:text-white mb-1">No recent activity</h3>
+            <p className="text-xs text-zinc-500 dark:text-zinc-400 max-w-xs">Live events from the last 5 hours will appear here in real time.</p>
           </div>
         ) : (
           <div className="space-y-4">

@@ -51,9 +51,24 @@ export default function TenantDetailPage({ params }: { params: Promise<{ id: str
   // Decision P8: Spend limit ₹2,500 default; admin can override per customer
   const [spendLimitInr, setSpendLimitInr] = useState<number>(2500)
 
-  // Direct Add / Adjust Credit State
+  // Direct Add / Adjust Credit & Debit & Refund State
+  const [walletTab, setWalletTab] = useState<'credit' | 'debit' | 'refund'>('credit')
   const [creditAmount, setCreditAmount] = useState<string>('')
   const [creditReason, setCreditReason] = useState<string>('')
+  const [debitAmount, setDebitAmount] = useState<string>('')
+  const [debitReason, setDebitReason] = useState<string>('')
+  const [debiting, setDebiting] = useState(false)
+  const [refundAmount, setRefundAmount] = useState<string>('')
+  const [refundReason, setRefundReason] = useState<string>('')
+  const [refundMode, setRefundMode] = useState<'credit_back' | 'deduct_balance'>('credit_back')
+  const [refunding, setRefunding] = useState(false)
+
+  // Manual Voice Minutes Adjuster State
+  const [adjustMinutesDelta, setAdjustMinutesDelta] = useState<string>('')
+  const [adjustingMinutes, setAdjustingMinutes] = useState(false)
+
+  // Agent Pause/Resume Toggle State
+  const [togglingAgentId, setTogglingAgentId] = useState<string | null>(null)
 
   const loadTenant = useCallback(async (isInitial = false) => {
     try {
@@ -116,6 +131,146 @@ export default function TenantDetailPage({ params }: { params: Promise<{ id: str
       toast.error('Credit addition failed: ' + err.message)
     } finally {
       setAddingCredit(false)
+    }
+  }
+
+  // Task 5.10: Dedicated "Debit Wallet" Action Handler
+  const handleDebitWallet = async () => {
+    const amt = Number(debitAmount)
+    if (!amt || isNaN(amt) || amt <= 0) {
+      toast.error('Please enter a valid debit amount (greater than ₹0)')
+      return
+    }
+
+    try {
+      setDebiting(true)
+      const res = await fetch(`/api/admin/tenants/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          debit_credit_paisa: Math.round(amt * 100),
+          debit_reason: debitReason.trim() || `Admin manual debit of ₹${amt.toLocaleString('en-IN')}`,
+        }),
+      })
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error || 'Failed to debit wallet')
+      }
+      const json = await res.json()
+
+      toast.success(`Successfully debited ₹${amt.toLocaleString('en-IN')} from wallet. Balance dropped! 📉`)
+      setDebitAmount('')
+      setDebitReason('')
+      if (json.wallet) {
+        setData(prev => prev ? { ...prev, wallet: json.wallet } : prev)
+      }
+      await loadTenant(false)
+    } catch (err: any) {
+      toast.error('Wallet debit failed: ' + err.message)
+    } finally {
+      setDebiting(false)
+    }
+  }
+
+  // Task 5.14: Dedicated "Refund Processor" Action Handler
+  const handleProcessRefund = async () => {
+    const amt = Number(refundAmount)
+    if (!amt || isNaN(amt) || amt <= 0) {
+      toast.error('Please enter a valid refund amount (greater than ₹0)')
+      return
+    }
+
+    try {
+      setRefunding(true)
+      const res = await fetch(`/api/admin/tenants/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          process_refund_paisa: Math.round(amt * 100),
+          refund_reason: refundReason.trim() || `Customer refund approval for ₹${amt.toLocaleString('en-IN')}`,
+          refund_mode: refundMode,
+        }),
+      })
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error || 'Failed to process refund')
+      }
+      const json = await res.json()
+
+      toast.success(`Refund of ₹${amt.toLocaleString('en-IN')} processed successfully! Customer notified & ledger updated.`)
+      setRefundAmount('')
+      setRefundReason('')
+      if (json.wallet) {
+        setData(prev => prev ? { ...prev, wallet: json.wallet } : prev)
+      }
+      await loadTenant(false)
+    } catch (err: any) {
+      toast.error('Refund processing failed: ' + err.message)
+    } finally {
+      setRefunding(false)
+    }
+  }
+
+  // Task 5.9: Dedicated "+/- Voice Minutes Adjustment" Handler
+  const handleAdjustMinutes = async () => {
+    const delta = Number(adjustMinutesDelta)
+    if (!delta || isNaN(delta) || delta === 0) {
+      toast.error('Please enter a non-zero minutes delta (e.g. +100 or -50)')
+      return
+    }
+
+    try {
+      setAdjustingMinutes(true)
+      const res = await fetch(`/api/admin/tenants/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          adjust_voice_minutes: delta,
+        }),
+      })
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error || 'Failed to adjust voice minutes')
+      }
+
+      toast.success(`Adjusted voice minutes by ${delta > 0 ? `+${delta}` : delta} mins! Balance updated. ⏱️`)
+      setAdjustMinutesDelta('')
+      await loadTenant(false)
+    } catch (err: any) {
+      toast.error('Minutes adjustment failed: ' + err.message)
+    } finally {
+      setAdjustingMinutes(false)
+    }
+  }
+
+  // Task 5.8: Dedicated "Pause / Resume Agent" Action Handler
+  const handleToggleAgent = async (agentId: string, currentActive: boolean) => {
+    try {
+      setTogglingAgentId(agentId)
+      const newActive = !currentActive
+      const res = await fetch(`/api/admin/tenants/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          agent_id: agentId,
+          agent_is_active: newActive,
+        }),
+      })
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error || 'Failed to update agent status')
+      }
+
+      toast.success(newActive ? 'Agent resumed! Now accepting calls.' : 'Agent paused! Calls will now be rejected. ⏸️')
+      await loadTenant(false)
+    } catch (err: any) {
+      toast.error('Agent toggle failed: ' + err.message)
+    } finally {
+      setTogglingAgentId(null)
     }
   }
 
@@ -322,6 +477,26 @@ export default function TenantDetailPage({ params }: { params: Promise<{ id: str
                   {tenant?.created_at ? new Date(tenant.created_at).toLocaleDateString('en-IN') : 'N/A'}
                 </span>
               </div>
+              <div>
+                <span className="text-zinc-500 block">KYC Status</span>
+                <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase mt-1 ${
+                  tenant?.kyc_status === 'verified'
+                    ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                    : tenant?.kyc_status === 'pending_review'
+                    ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                    : tenant?.kyc_status === 'rejected'
+                    ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
+                    : 'bg-zinc-800 text-zinc-400'
+                }`}>
+                  {tenant?.kyc_status || 'unsubmitted'}
+                </span>
+              </div>
+              <div>
+                <span className="text-zinc-500 block">Voice Minutes Balance</span>
+                <span className="font-semibold text-white font-mono text-sm mt-0.5 block">
+                  {tenant?.paid_minutes_remaining ?? 20} min
+                </span>
+              </div>
               {(tenant?.business_description || tenant?.description) && (
                 <div className="col-span-2 pt-2 border-t border-zinc-800/60">
                   <span className="text-zinc-500 block mb-1">Business Description</span>
@@ -344,17 +519,57 @@ export default function TenantDetailPage({ params }: { params: Promise<{ id: str
               <p className="text-xs text-zinc-500 py-4 text-center">No active agents deployed for this organization.</p>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {data.agents.map((agent: any) => (
-                  <div key={agent.id} className="p-3 bg-zinc-900/50 rounded-xl border border-zinc-800/60 flex items-center justify-between">
-                    <div>
-                      <div className="font-bold text-xs text-white">{agent.name || 'Unnamed Agent'}</div>
-                      <div className="text-[10px] text-zinc-500 font-mono mt-0.5">Role: {agent.role || 'Assistant'}</div>
+                {data.agents.map((agent: any) => {
+                  const isAgentActive = agent.is_active !== false
+                  const isToggling = togglingAgentId === agent.id
+
+                  return (
+                    <div key={agent.id} className="p-3.5 bg-zinc-900/60 rounded-xl border border-zinc-800/80 flex flex-col justify-between gap-3 shadow-sm">
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <div className="font-bold text-xs text-white">{agent.name || 'Unnamed Agent'}</div>
+                          <div className="text-[10px] text-zinc-500 font-mono mt-0.5">Role: {agent.role || 'Assistant'}</div>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase ${
+                            isAgentActive
+                              ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                              : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
+                          }`}>
+                            {isAgentActive ? 'Active' : 'Paused'}
+                          </span>
+                          <span className="px-1.5 py-0.5 rounded text-[9px] font-mono text-zinc-400 bg-zinc-800">
+                            {agent.voice_provider || 'Vapi'}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="pt-2 border-t border-zinc-800/60 flex items-center justify-between">
+                        <span className="text-[10px] text-zinc-500">
+                          {isAgentActive ? 'Accepting inbound & outbound calls' : 'Calls rejected (Paused)'}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleToggleAgent(agent.id, isAgentActive)}
+                          disabled={isToggling}
+                          className={`px-3 py-1 rounded-lg text-[10px] font-bold transition-all flex items-center gap-1 cursor-pointer ${
+                            isAgentActive
+                              ? 'bg-rose-500/10 text-rose-400 border border-rose-500/30 hover:bg-rose-500/20'
+                              : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/20'
+                          }`}
+                        >
+                          {isToggling ? (
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                          ) : isAgentActive ? (
+                            'Pause Agent'
+                          ) : (
+                            'Resume Agent'
+                          )}
+                        </button>
+                      </div>
                     </div>
-                    <span className="px-2 py-0.5 rounded text-[9px] font-bold uppercase bg-violet-500/10 text-violet-400 border border-violet-500/20">
-                      {agent.voice_provider || 'Vapi'}
-                    </span>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             )}
           </div>
@@ -394,81 +609,274 @@ export default function TenantDetailPage({ params }: { params: Promise<{ id: str
               </div>
             </div>
 
-            {/* Add / Adjust Credit Action Form */}
-            <div className="space-y-3 pt-1">
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-bold text-zinc-200 flex items-center gap-1.5">
-                  <PlusCircle className="w-3.5 h-3.5 text-emerald-400" />
-                  Add / Adjust Credit
-                </label>
-                <span className="text-[10px] text-zinc-500 font-mono">Instant Ledger Deposit</span>
+            {/* Wallet Action Tabs (Credit, Debit, Refund) */}
+            <div className="pt-1 space-y-3">
+              <div className="flex rounded-xl bg-zinc-900 border border-zinc-800 p-1 gap-1">
+                <button
+                  type="button"
+                  onClick={() => setWalletTab('credit')}
+                  className={`flex-1 py-1.5 text-[11px] font-bold rounded-lg transition-all cursor-pointer ${
+                    walletTab === 'credit'
+                      ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                      : 'text-zinc-400 hover:text-white'
+                  }`}
+                >
+                  + Add Credit
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setWalletTab('debit')}
+                  className={`flex-1 py-1.5 text-[11px] font-bold rounded-lg transition-all cursor-pointer ${
+                    walletTab === 'debit'
+                      ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
+                      : 'text-zinc-400 hover:text-white'
+                  }`}
+                >
+                  - Debit Balance
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setWalletTab('refund')}
+                  className={`flex-1 py-1.5 text-[11px] font-bold rounded-lg transition-all cursor-pointer ${
+                    walletTab === 'refund'
+                      ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                      : 'text-zinc-400 hover:text-white'
+                  }`}
+                >
+                  Refund
+                </button>
               </div>
 
-              {/* Amount Input */}
-              <div className="space-y-1.5">
-                <div className="relative">
-                  <span className="absolute left-3 top-2 text-xs text-zinc-500 font-bold">₹</span>
-                  <input
-                    type="number"
-                    placeholder="Enter amount (e.g. 500 or 1000)"
-                    value={creditAmount}
-                    onChange={(e) => setCreditAmount(e.target.value)}
-                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl pl-7 pr-3 py-2 text-xs text-white placeholder-zinc-600 focus:outline-none focus:border-emerald-500"
-                    min="1"
-                    step="50"
-                  />
+              {/* TAB 1: ADD CREDIT */}
+              {walletTab === 'credit' && (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-zinc-200 flex items-center gap-1.5">
+                      <PlusCircle className="w-3.5 h-3.5 text-emerald-400" />
+                      Add / Adjust Credit
+                    </label>
+                    <span className="text-[10px] text-zinc-500 font-mono">Instant Ledger Deposit</span>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <div className="relative">
+                      <span className="absolute left-3 top-2 text-xs text-zinc-500 font-bold">₹</span>
+                      <input
+                        type="number"
+                        placeholder="Enter amount (e.g. 500 or 1000)"
+                        value={creditAmount}
+                        onChange={(e) => setCreditAmount(e.target.value)}
+                        className="w-full bg-zinc-900 border border-zinc-800 rounded-xl pl-7 pr-3 py-2 text-xs text-white placeholder-zinc-600 focus:outline-none focus:border-emerald-500"
+                        min="1"
+                        step="50"
+                      />
+                    </div>
+
+                    <div className="flex gap-1.5">
+                      {[500, 1000, 2500, 5000].map((preset) => (
+                        <button
+                          key={preset}
+                          type="button"
+                          onClick={() => setCreditAmount(String(preset))}
+                          className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition-colors cursor-pointer ${
+                            creditAmount === String(preset)
+                              ? 'bg-emerald-500 text-black font-extrabold'
+                              : 'bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-700'
+                          }`}
+                        >
+                          +₹{preset.toLocaleString('en-IN')}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <input
+                      type="text"
+                      placeholder="Optional reason (e.g. Promotional top-up)"
+                      value={creditReason}
+                      onChange={(e) => setCreditReason(e.target.value)}
+                      className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white placeholder-zinc-600 focus:outline-none focus:border-emerald-500"
+                      maxLength={120}
+                    />
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleAddCredit}
+                    disabled={addingCredit || !creditAmount || Number(creditAmount) <= 0}
+                    className="w-full py-2.5 px-4 rounded-xl text-xs font-bold bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 disabled:opacity-40 disabled:cursor-not-allowed text-white shadow-lg shadow-emerald-500/20 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    {addingCredit ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        Crediting...
+                      </>
+                    ) : (
+                      <>
+                        <Coins className="w-3.5 h-3.5" />
+                        Credit Wallet {creditAmount && Number(creditAmount) > 0 ? `(₹${Number(creditAmount).toLocaleString('en-IN')})` : ''}
+                      </>
+                    )}
+                  </button>
                 </div>
+              )}
 
-                {/* Quick Preset Buttons */}
-                <div className="flex gap-1.5">
-                  {[500, 1000, 2500, 5000].map((preset) => (
-                    <button
-                      key={preset}
-                      type="button"
-                      onClick={() => setCreditAmount(String(preset))}
-                      className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition-colors ${
-                        creditAmount === String(preset)
-                          ? 'bg-emerald-500 text-black font-extrabold'
-                          : 'bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-700'
-                      }`}
-                    >
-                      +₹{preset.toLocaleString('en-IN')}
-                    </button>
-                  ))}
+              {/* TAB 2: DEBIT WALLET (Task 5.10) */}
+              {walletTab === 'debit' && (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-zinc-200 flex items-center gap-1.5">
+                      <Coins className="w-3.5 h-3.5 text-rose-400" />
+                      Manual Wallet Debit (Task 5.10)
+                    </label>
+                    <span className="text-[10px] text-zinc-500 font-mono">Deducts Live Balance</span>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <div className="relative">
+                      <span className="absolute left-3 top-2 text-xs text-zinc-500 font-bold">₹</span>
+                      <input
+                        type="number"
+                        placeholder="Enter debit amount (e.g. 500)"
+                        value={debitAmount}
+                        onChange={(e) => setDebitAmount(e.target.value)}
+                        className="w-full bg-zinc-900 border border-zinc-800 rounded-xl pl-7 pr-3 py-2 text-xs text-white placeholder-zinc-600 focus:outline-none focus:border-rose-500"
+                        min="1"
+                        step="50"
+                      />
+                    </div>
+
+                    <div className="flex gap-1.5">
+                      {[100, 500, 1000, 2500].map((preset) => (
+                        <button
+                          key={preset}
+                          type="button"
+                          onClick={() => setDebitAmount(String(preset))}
+                          className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition-colors cursor-pointer ${
+                            debitAmount === String(preset)
+                              ? 'bg-rose-500 text-white font-extrabold'
+                              : 'bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-700'
+                          }`}
+                        >
+                          -₹{preset.toLocaleString('en-IN')}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <input
+                      type="text"
+                      placeholder="Mandatory reason for debit (e.g. Dispute chargeback, Manual correction)"
+                      value={debitReason}
+                      onChange={(e) => setDebitReason(e.target.value)}
+                      className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white placeholder-zinc-600 focus:outline-none focus:border-rose-500"
+                      maxLength={120}
+                    />
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleDebitWallet}
+                    disabled={debiting || !debitAmount || Number(debitAmount) <= 0}
+                    className="w-full py-2.5 px-4 rounded-xl text-xs font-bold bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 disabled:opacity-40 disabled:cursor-not-allowed text-white shadow-lg shadow-rose-500/20 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    {debiting ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        Debiting...
+                      </>
+                    ) : (
+                      <>
+                        <Coins className="w-3.5 h-3.5" />
+                        Debit Wallet {debitAmount && Number(debitAmount) > 0 ? `(-₹${Number(debitAmount).toLocaleString('en-IN')})` : ''}
+                      </>
+                    )}
+                  </button>
                 </div>
-              </div>
+              )}
 
-              {/* Reason / Reference Note */}
-              <div className="space-y-1">
-                <input
-                  type="text"
-                  placeholder="Optional reason/note (e.g. Promotional credit, Goodwill)"
-                  value={creditReason}
-                  onChange={(e) => setCreditReason(e.target.value)}
-                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white placeholder-zinc-600 focus:outline-none focus:border-emerald-500"
-                  maxLength={120}
-                />
-              </div>
+              {/* TAB 3: REFUND PROCESSOR (Task 5.14) */}
+              {walletTab === 'refund' && (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-zinc-200 flex items-center gap-1.5">
+                      <Wallet className="w-3.5 h-3.5 text-amber-400" />
+                      Refund Processor (Task 5.14)
+                    </label>
+                    <span className="text-[10px] text-zinc-500 font-mono">Statutory Credit Note</span>
+                  </div>
 
-              {/* Add Credit Action Button */}
-              <button
-                type="button"
-                onClick={handleAddCredit}
-                disabled={addingCredit || !creditAmount || Number(creditAmount) <= 0}
-                className="w-full py-2.5 px-4 rounded-xl text-xs font-bold bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 disabled:opacity-40 disabled:cursor-not-allowed text-white shadow-lg shadow-emerald-500/20 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
-              >
-                {addingCredit ? (
-                  <>
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    Adding Credit...
-                  </>
-                ) : (
-                  <>
-                    <Coins className="w-3.5 h-3.5" />
-                    Add Credit {creditAmount && Number(creditAmount) > 0 ? `(₹${Number(creditAmount).toLocaleString('en-IN')})` : ''}
-                  </>
-                )}
-              </button>
+                  <div className="space-y-1.5">
+                    <div className="relative">
+                      <span className="absolute left-3 top-2 text-xs text-zinc-500 font-bold">₹</span>
+                      <input
+                        type="number"
+                        placeholder="Refund amount (e.g. 1500)"
+                        value={refundAmount}
+                        onChange={(e) => setRefundAmount(e.target.value)}
+                        className="w-full bg-zinc-900 border border-zinc-800 rounded-xl pl-7 pr-3 py-2 text-xs text-white placeholder-zinc-600 focus:outline-none focus:border-amber-500"
+                        min="1"
+                        step="50"
+                      />
+                    </div>
+
+                    <div className="flex items-center gap-2 pt-1 text-[11px] text-zinc-400">
+                      <label className="flex items-center gap-1.5 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="refund_mode"
+                          value="credit_back"
+                          checked={refundMode === 'credit_back'}
+                          onChange={() => setRefundMode('credit_back')}
+                        />
+                        Credit to Customer Wallet
+                      </label>
+                      <label className="flex items-center gap-1.5 cursor-pointer ml-2">
+                        <input
+                          type="radio"
+                          name="refund_mode"
+                          value="deduct_balance"
+                          checked={refundMode === 'deduct_balance'}
+                          onChange={() => setRefundMode('deduct_balance')}
+                        />
+                        Deduct (External Bank Refund)
+                      </label>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <input
+                      type="text"
+                      placeholder="Reason for refund (e.g. Cooling-off period cancellation, SLA breach)"
+                      value={refundReason}
+                      onChange={(e) => setRefundReason(e.target.value)}
+                      className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white placeholder-zinc-600 focus:outline-none focus:border-amber-500"
+                      maxLength={120}
+                    />
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleProcessRefund}
+                    disabled={refunding || !refundAmount || Number(refundAmount) <= 0}
+                    className="w-full py-2.5 px-4 rounded-xl text-xs font-bold bg-gradient-to-r from-amber-600 to-yellow-600 hover:from-amber-500 hover:to-yellow-500 disabled:opacity-40 disabled:cursor-not-allowed text-black font-extrabold shadow-lg shadow-amber-500/20 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    {refunding ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        Processing Refund...
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        Approve & Process Refund {refundAmount && Number(refundAmount) > 0 ? `(₹${Number(refundAmount).toLocaleString('en-IN')})` : ''}
+                      </>
+                    )}
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Spend Limit Override */}
@@ -596,6 +1004,65 @@ export default function TenantDetailPage({ params }: { params: Promise<{ id: str
                 <span className="text-[9px] text-zinc-400 block mt-0.5">
                   {data?.wallet?.emergency_minutes_claimed_at ? 'Claimed recently' : 'Unclaimed'}
                 </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Task 5.9: Manual Voice Minutes Adjustment (+/- Mins) */}
+          <div className="bg-zinc-950/60 border border-zinc-800/80 rounded-2xl p-6 space-y-4">
+            <h3 className="text-base font-bold text-white flex items-center justify-between">
+              <span className="flex items-center gap-2">
+                <Clock className="w-4 h-4 text-emerald-400" />
+                Manual Voice Minutes Adjustment (Task 5.9)
+              </span>
+              <span className="text-[10px] font-mono text-zinc-400 bg-zinc-900 border border-zinc-800 px-2 py-0.5 rounded">
+                Current: {tenant?.paid_minutes_remaining ?? 20}m
+              </span>
+            </h3>
+
+            <div className="space-y-3">
+              <label className="text-xs text-zinc-400 block">
+                Adjust balance (+/- minutes). e.g. +100 to top-up, or -50 to revoke.
+              </label>
+              
+              <div className="flex gap-2">
+                <input
+                  type="number"
+                  placeholder="e.g. +100 or -50"
+                  value={adjustMinutesDelta}
+                  onChange={(e) => setAdjustMinutesDelta(e.target.value)}
+                  className="flex-1 bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500 font-mono"
+                />
+                <button
+                  type="button"
+                  onClick={handleAdjustMinutes}
+                  disabled={adjustingMinutes || !adjustMinutesDelta || Number(adjustMinutesDelta) === 0}
+                  className="px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center gap-1.5"
+                >
+                  {adjustingMinutes ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    'Apply Adjustment'
+                  )}
+                </button>
+              </div>
+
+              {/* Quick preset buttons */}
+              <div className="flex gap-1.5 pt-1">
+                {[-100, -50, 50, 100, 500].map((preset) => (
+                  <button
+                    key={preset}
+                    type="button"
+                    onClick={() => setAdjustMinutesDelta(String(preset))}
+                    className={`px-2 py-1 rounded-lg text-[10px] font-bold font-mono transition-colors cursor-pointer ${
+                      adjustMinutesDelta === String(preset)
+                        ? 'bg-emerald-500 text-black font-extrabold'
+                        : 'bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white'
+                    }`}
+                  >
+                    {preset > 0 ? `+${preset}` : preset}m
+                  </button>
+                ))}
               </div>
             </div>
           </div>

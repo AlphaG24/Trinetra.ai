@@ -78,7 +78,7 @@ export default function UserBlogDashboard() {
         {canCreate ? (
           <button
             onClick={() => router.push('/dashboard/blogs/new')}
-            className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-gradient-to-br from-violet-600 to-violet-500 px-5 text-sm font-semibold text-white shadow-[0_0_20px_rgba(139,92,246,0.2)] transition-transform hover:scale-[1.02]"
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 px-5 text-sm font-bold shadow-sm transition-all active:scale-[0.98] cursor-pointer"
           >
             <Plus size={16} />
             Write Article
@@ -95,13 +95,13 @@ export default function UserBlogDashboard() {
         <div className="flex bg-[var(--card-bg)] rounded-xl p-1 border border-[var(--border)] w-full md:w-auto">
           <button
             onClick={() => setActiveTab('my_blogs')}
-            className={`flex-1 md:flex-none px-6 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'my_blogs' ? 'bg-violet-600 text-white shadow-md' : 'text-zinc-400 hover:text-white'}`}
+            className={`flex-1 md:flex-none px-6 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'my_blogs' ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-950 shadow-sm' : 'text-zinc-400 hover:text-zinc-900 dark:hover:text-white'}`}
           >
             My Blogs
           </button>
           <button
             onClick={() => setActiveTab('discover')}
-            className={`flex-1 md:flex-none px-6 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'discover' ? 'bg-violet-600 text-white shadow-md' : 'text-zinc-400 hover:text-white'}`}
+            className={`flex-1 md:flex-none px-6 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'discover' ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-950 shadow-sm' : 'text-zinc-400 hover:text-zinc-900 dark:hover:text-white'}`}
           >
             Discover
           </button>
@@ -114,7 +114,7 @@ export default function UserBlogDashboard() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search articles..."
-            className="h-10 w-full rounded-xl border border-[var(--border)] bg-[var(--background)] pl-10 pr-4 text-xs text-white outline-none focus:border-violet-500"
+            className="h-10 w-full rounded-xl border border-[var(--border)] bg-[var(--background)] pl-10 pr-4 text-xs text-[var(--body)] outline-none focus:border-zinc-400 dark:focus:border-zinc-500"
           />
         </div>
       </div>
@@ -122,7 +122,7 @@ export default function UserBlogDashboard() {
       {/* Grid */}
       {loading ? (
         <div className="flex flex-col items-center justify-center py-20 text-zinc-500 gap-3">
-          <Loader2 className="w-8 h-8 animate-spin text-violet-400" />
+          <Loader2 className="w-8 h-8 animate-spin text-zinc-400" />
           <p className="text-xs">Loading articles...</p>
         </div>
       ) : filteredPosts.length === 0 ? (

@@ -9,12 +9,12 @@ export default function AdminBrand({ size = "md", showText = true }) {
       <img
         src="/logo-transparent.png"
         alt="Trinetra AI"
-        className={`${heightClass} w-auto object-contain`}
+        className={`${heightClass} w-auto object-contain dynamic-logo`}
       />
       {showText ? (
         <div className="flex flex-col leading-tight">
-          <span className="text-sm font-semibold text-gray-200">Blog Admin</span>
-          <span className="text-[12px] text-gray-500">Content & community console</span>
+          <span className="text-sm font-bold text-[var(--heading)] font-playfair">Blog Admin</span>
+          <span className="text-[12px] text-[var(--text-muted)] font-merriweather">Content & community console</span>
         </div>
       ) : null}
     </div>
