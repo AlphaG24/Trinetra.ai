@@ -633,6 +633,24 @@ export async function POST(request: Request) {
       }
     }
 
+    // 3a. Onboarding & Setup Fee processing (if enabled in admin configs and not pure trial)
+    const isPureTrial = items.length === 1 && items.some((item: any) => item.type === 'subscription' && (item.key === 'trial' || item.key.endsWith('_trial')))
+    const onboardingFeeEnabled = config.onboarding_fee_enabled === 'true'
+    const onboardingFeePaisa = (onboardingFeeEnabled && !isPureTrial)
+      ? parseInt(config.onboarding_fee_paisa || '0', 10)
+      : 0
+
+    if (onboardingFeePaisa > 0) {
+      totalPaidPaisa += onboardingFeePaisa
+      invoiceLines.push({
+        item: 'One-Time Onboarding & Setup Fee',
+        quantity: 1,
+        rate: onboardingFeePaisa,
+        discount: 0,
+        amount: onboardingFeePaisa
+      })
+    }
+
     // 3b. Coupon validation and discount line
     let couponDiscountPaisa = 0
     let validCouponCode = ''
@@ -667,8 +685,6 @@ export async function POST(request: Request) {
         stateName = gstinVal.state!
       }
     }
-
-    const isPureTrial = items.length === 1 && items.some(i => i.type === 'subscription' && (i.key.toLowerCase().includes('trial') || i.key === 'trial'))
 
     const gstCalc = isPureTrial
       ? {

@@ -28,7 +28,11 @@ import {
   Loader2,
   Percent,
   Phone,
-  Euro
+  Euro,
+  Wallet,
+  Send,
+  Layers,
+  CheckCircle2
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -87,6 +91,19 @@ export default function PricingPlansAdminPage() {
     display_order: 1
   })
 
+  // Global Wallet Management State
+  const [walletStats, setWalletStats] = useState<{
+    total_wallets: number
+    total_balance_paisa: number
+    total_spend_paisa: number
+    total_tenants: number
+  } | null>(null)
+  const [loadingWalletStats, setLoadingWalletStats] = useState(false)
+  const [globalCreditAmount, setGlobalCreditAmount] = useState('100')
+  const [globalCreditScope, setGlobalCreditScope] = useState<'all' | 'existing' | 'paid'>('all')
+  const [globalCreditReason, setGlobalCreditReason] = useState('')
+  const [disbursingGlobalCredit, setDisbursingGlobalCredit] = useState(false)
+
   // Load System Configs
   const fetchConfigs = useCallback(async () => {
     try {
@@ -95,9 +112,15 @@ export default function PricingPlansAdminPage() {
       if (!res.ok) throw new Error('Failed to load system pricing configs')
       const data = await res.json()
       const confMap: Record<string, string> = {}
-      ;(data.configs || []).forEach((c: any) => {
-        confMap[c.config_key] = c.config_value
-      })
+      if (Array.isArray(data.configs)) {
+        data.configs.forEach((c: any) => {
+          if (c && c.config_key) confMap[c.config_key] = String(c.config_value)
+        })
+      } else if (data.configs && typeof data.configs === 'object') {
+        Object.entries(data.configs).forEach(([k, v]) => {
+          confMap[k] = String(v)
+        })
+      }
       setConfigs(confMap)
     } catch (err: any) {
       console.warn('Error loading system configs:', err)
@@ -105,6 +128,58 @@ export default function PricingPlansAdminPage() {
       setLoadingConfigs(false)
     }
   }, [])
+
+  const fetchWalletStats = useCallback(async () => {
+    try {
+      setLoadingWalletStats(true)
+      const res = await fetch('/api/admin/wallets')
+      if (!res.ok) throw new Error('Failed to load wallet stats')
+      const data = await res.json()
+      setWalletStats(data)
+    } catch (err: any) {
+      console.warn('Error loading wallet stats:', err)
+    } finally {
+      setLoadingWalletStats(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (activeTab === 'credits') {
+      fetchWalletStats()
+    }
+  }, [activeTab, fetchWalletStats])
+
+  const handleDisburseGlobalCredit = async () => {
+    const amt = Number(globalCreditAmount)
+    if (!amt || isNaN(amt) || amt <= 0) {
+      toast.error('Please enter a valid credit amount (greater than ₹0)')
+      return
+    }
+
+    try {
+      setDisbursingGlobalCredit(true)
+      const res = await fetch('/api/admin/wallets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          amount_paisa: Math.round(amt * 100),
+          target_scope: globalCreditScope,
+          reason: globalCreditReason.trim() || `Global admin promotional grant of ₹${amt.toLocaleString('en-IN')}`
+        })
+      })
+
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to disburse global credits')
+
+      toast.success(data.message || `Successfully credited ₹${amt} across ${data.credited_count} tenants! 🚀`)
+      setGlobalCreditReason('')
+      fetchWalletStats()
+    } catch (err: any) {
+      toast.error(err.message || 'Error disbursing global credits')
+    } finally {
+      setDisbursingGlobalCredit(false)
+    }
+  }
 
   const handleConfigChange = (key: string, val: string) => {
     setConfigs(prev => ({ ...prev, [key]: val }))
@@ -157,7 +232,10 @@ export default function PricingPlansAdminPage() {
         body: JSON.stringify({ configs: payload })
       })
 
-      if (!res.ok) throw new Error('Failed to persist pricing settings')
+      if (!res.ok) {
+        const errData = await res.json().catch(() => null)
+        throw new Error(errData?.error || 'Failed to persist pricing settings')
+      }
       toast.success('Pricing configurations saved successfully!')
       fetchConfigs()
     } catch (err: any) {
@@ -734,73 +812,278 @@ export default function PricingPlansAdminPage() {
         </div>
       )}
 
-      {/* TAB 3: CREDITS & OUTCOMES */}
+      {/* TAB 3: CREDITS, WALLETS & OUTCOMES */}
       {activeTab === 'credits' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-in fade-in duration-200">
-          <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-6 space-y-6 shadow-xs">
-            <h2 className="text-sm font-bold text-[var(--heading)] uppercase tracking-wider border-b border-[var(--border)] pb-3 flex items-center gap-2">
-              <Coins className="w-4 h-4 text-amber-500" />
-              Prepaid Credits (Pay-As-You-Go)
-            </h2>
+        <div className="space-y-6 animate-in fade-in duration-200">
+          {/* Live Platform Wallet Overview */}
+          <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-6 shadow-xs">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 mb-4 border-b border-[var(--border)] gap-2">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-amber-500/10 text-amber-500 border border-amber-500/20">
+                  <Wallet className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="text-sm font-bold text-[var(--heading)] uppercase tracking-wider">
+                    Global Platform Wallet Metrics
+                  </h2>
+                  <p className="text-[11px] text-[var(--muted)]">
+                    Live aggregate balances and spend across all tenant organization wallets
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => fetchWalletStats()}
+                disabled={loadingWalletStats}
+                className="self-start sm:self-center flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[var(--border)] bg-[var(--hover-bg)] text-xs text-[var(--heading)] hover:opacity-80 transition cursor-pointer"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${loadingWalletStats ? 'animate-spin' : ''}`} />
+                <span>Refresh Live Stats</span>
+              </button>
+            </div>
 
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-bold text-[var(--muted)] uppercase tracking-widest">Credit Rate (₹/min)</label>
-                  <input
-                    type="number"
-                    step="0.05"
-                    value={displayRupees(configs.credit_per_minute_paisa || '150')}
-                    onChange={(e) => handleRupeeChange('credit_per_minute_paisa', e.target.value)}
-                    className="w-full bg-[var(--hover-bg)] border border-[var(--border)] rounded-xl px-4 py-2.5 text-xs text-[var(--heading)] focus:border-amber-500 outline-none"
-                    min="0"
-                  />
-                  <span className="text-[9px] text-[var(--muted)] block">Prepaid calling rate (default: ₹1.50/min).</span>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-bold text-[var(--muted)] uppercase tracking-widest">Min Wallet Topup (₹)</label>
-                  <input
-                    type="number"
-                    value={displayRupees(configs.wallet_min_topup_paisa || '50000')}
-                    onChange={(e) => handleRupeeChange('wallet_min_topup_paisa', e.target.value)}
-                    className="w-full bg-[var(--hover-bg)] border border-[var(--border)] rounded-xl px-4 py-2.5 text-xs text-[var(--heading)] focus:border-amber-500 outline-none"
-                    min="0"
-                  />
-                  <span className="text-[9px] text-[var(--muted)] block">Minimum recharge amount (default: ₹500).</span>
-                </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="p-4 rounded-xl bg-[var(--hover-bg)] border border-[var(--border)] space-y-1">
+                <span className="text-[10px] font-bold text-[var(--muted)] uppercase tracking-wider block">
+                  Active Wallets
+                </span>
+                <span className="text-xl font-bold font-mono text-[var(--heading)]">
+                  {loadingWalletStats ? '...' : (walletStats?.total_wallets ?? 0)}
+                </span>
+                <span className="text-[9px] text-[var(--muted)] block">Wallets currently provisioned</span>
+              </div>
+
+              <div className="p-4 rounded-xl bg-[var(--hover-bg)] border border-[var(--border)] space-y-1">
+                <span className="text-[10px] font-bold text-[var(--muted)] uppercase tracking-wider block">
+                  Platform Balance
+                </span>
+                <span className="text-xl font-bold font-mono text-emerald-600 dark:text-emerald-400">
+                  {loadingWalletStats ? '...' : `₹${(((walletStats?.total_balance_paisa || 0) / 100)).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`}
+                </span>
+                <span className="text-[9px] text-[var(--muted)] block">Total customer credits held</span>
+              </div>
+
+              <div className="p-4 rounded-xl bg-[var(--hover-bg)] border border-[var(--border)] space-y-1">
+                <span className="text-[10px] font-bold text-[var(--muted)] uppercase tracking-wider block">
+                  Monthly Spend
+                </span>
+                <span className="text-xl font-bold font-mono text-amber-600 dark:text-amber-400">
+                  {loadingWalletStats ? '...' : `₹${(((walletStats?.total_spend_paisa || 0) / 100)).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`}
+                </span>
+                <span className="text-[9px] text-[var(--muted)] block">Used for calls & outcomes</span>
+              </div>
+
+              <div className="p-4 rounded-xl bg-[var(--hover-bg)] border border-[var(--border)] space-y-1">
+                <span className="text-[10px] font-bold text-[var(--muted)] uppercase tracking-wider block">
+                  Eligible Tenants
+                </span>
+                <span className="text-xl font-bold font-mono text-[var(--heading)]">
+                  {loadingWalletStats ? '...' : (walletStats?.total_tenants ?? 0)}
+                </span>
+                <span className="text-[9px] text-[var(--muted)] block">Registered platform accounts</span>
               </div>
             </div>
           </div>
 
-          <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-6 space-y-6 shadow-xs">
-            <h2 className="text-sm font-bold text-[var(--heading)] uppercase tracking-wider border-b border-[var(--border)] pb-3 flex items-center gap-2">
-              <Target className="w-4 h-4 text-emerald-500" />
-              Outcome-Based Conversion Rates
-            </h2>
+          {/* Global Insert Credit Tool (Disburse Credit to Tenants) */}
+          <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-6 shadow-xs space-y-5 border-l-4 border-l-amber-500">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-[var(--border)] gap-2">
+              <div>
+                <h2 className="text-sm font-bold text-[var(--heading)] uppercase tracking-wider flex items-center gap-2">
+                  <Send className="w-4 h-4 text-amber-500" />
+                  Global Bulk Credit Disbursement (Insert Credit)
+                </h2>
+                <p className="text-[11px] text-[var(--muted)] mt-0.5">
+                  Insert and credit funds into tenant wallets globally across the platform in one click.
+                </p>
+              </div>
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 font-bold self-start sm:self-auto">
+                SUPER ADMIN
+              </span>
+            </div>
 
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-bold text-[var(--muted)] uppercase tracking-widest">Booked Appointment (₹)</label>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold text-[var(--muted)] uppercase tracking-widest">
+                  Target Audience
+                </label>
+                <select
+                  value={globalCreditScope}
+                  onChange={(e: any) => setGlobalCreditScope(e.target.value)}
+                  className="w-full bg-[var(--hover-bg)] border border-[var(--border)] rounded-xl px-3.5 py-2.5 text-xs text-[var(--heading)] focus:border-amber-500 outline-none cursor-pointer"
+                >
+                  <option value="all">All Active Tenants (Auto-creates wallet if missing)</option>
+                  <option value="existing">Existing Wallets Only ({walletStats?.total_wallets ?? 0} provisioned)</option>
+                  <option value="paid">Paid Plan Tenants Only (Starter / Pro / Enterprise)</option>
+                </select>
+                <span className="text-[9px] text-[var(--muted)] block">Scope of tenants receiving credit.</span>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold text-[var(--muted)] uppercase tracking-widest">
+                  Credit Amount per Tenant (₹)
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-[var(--muted)]">₹</span>
                   <input
                     type="number"
-                    value={displayRupees(configs.outcome_appointment_paisa || '4900')}
-                    onChange={(e) => handleRupeeChange('outcome_appointment_paisa', e.target.value)}
-                    className="w-full bg-[var(--hover-bg)] border border-[var(--border)] rounded-xl px-4 py-2.5 text-xs text-[var(--heading)] focus:border-emerald-500 outline-none"
-                    min="0"
+                    min="1"
+                    value={globalCreditAmount}
+                    onChange={(e) => setGlobalCreditAmount(e.target.value)}
+                    placeholder="100"
+                    className="w-full bg-[var(--hover-bg)] border border-[var(--border)] rounded-xl pl-8 pr-4 py-2.5 text-xs text-[var(--heading)] focus:border-amber-500 outline-none font-mono"
                   />
-                  <span className="text-[9px] text-[var(--muted)] block">Per confirmed booking (default: ₹49).</span>
                 </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-bold text-[var(--muted)] uppercase tracking-widest">Qualified BANT Lead (₹)</label>
+                {/* Quick Presets */}
+                <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                  {['50', '100', '250', '500', '1000'].map((preset) => (
+                    <button
+                      key={preset}
+                      type="button"
+                      onClick={() => setGlobalCreditAmount(preset)}
+                      className={`text-[9px] font-mono px-2 py-0.5 rounded border transition cursor-pointer ${
+                        globalCreditAmount === preset
+                          ? 'bg-amber-500 text-black border-amber-600 font-bold'
+                          : 'bg-[var(--card-bg)] text-[var(--muted)] border-[var(--border)] hover:text-[var(--heading)]'
+                      }`}
+                    >
+                      +₹{preset}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold text-[var(--muted)] uppercase tracking-widest">
+                  Audit Reason / Description
+                </label>
+                <input
+                  type="text"
+                  value={globalCreditReason}
+                  onChange={(e) => setGlobalCreditReason(e.target.value)}
+                  placeholder="e.g. Platform goodwill credit, Festive promotional grant"
+                  className="w-full bg-[var(--hover-bg)] border border-[var(--border)] rounded-xl px-3.5 py-2.5 text-xs text-[var(--heading)] focus:border-amber-500 outline-none"
+                />
+                <span className="text-[9px] text-[var(--muted)] block">Logged in transaction ledger and audit logs.</span>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between pt-2 border-t border-[var(--border)]">
+              <p className="text-[10px] text-[var(--muted)]">
+                Will disburse <span className="font-bold text-[var(--heading)] font-mono">₹{Number(globalCreditAmount) || 0}</span> to each matching organization.
+              </p>
+              <button
+                type="button"
+                onClick={handleDisburseGlobalCredit}
+                disabled={disbursingGlobalCredit || !globalCreditAmount || Number(globalCreditAmount) <= 0}
+                className="flex items-center gap-2 px-4 py-2.5 bg-amber-500 hover:bg-amber-400 text-zinc-950 font-bold rounded-xl text-xs transition shadow-md shadow-amber-500/20 cursor-pointer disabled:opacity-50"
+              >
+                {disbursingGlobalCredit ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span>Disbursing Credits...</span>
+                  </>
+                ) : (
+                  <>
+                    <Coins className="w-3.5 h-3.5" />
+                    <span>Disburse Credits Globally 🚀</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+
+          {/* Pricing Settings Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Global Default Welcome Credit & Calling Rates */}
+            <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-6 space-y-6 shadow-xs">
+              <h2 className="text-sm font-bold text-[var(--heading)] uppercase tracking-wider border-b border-[var(--border)] pb-3 flex items-center gap-2">
+                <Coins className="w-4 h-4 text-amber-500" />
+                Prepaid Credits & Welcome Bonus
+              </h2>
+
+              <div className="space-y-4">
+                <div className="p-3.5 rounded-xl bg-amber-500/5 border border-amber-500/20 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[10px] font-bold text-[var(--heading)] uppercase tracking-widest flex items-center gap-1.5">
+                      <Gift className="w-3.5 h-3.5 text-amber-500" />
+                      Global Welcome Signup Credit (₹)
+                    </label>
+                    <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 font-bold">
+                      NEW TENANTS
+                    </span>
+                  </div>
                   <input
                     type="number"
-                    value={displayRupees(configs.outcome_lead_paisa || '2900')}
-                    onChange={(e) => handleRupeeChange('outcome_lead_paisa', e.target.value)}
-                    className="w-full bg-[var(--hover-bg)] border border-[var(--border)] rounded-xl px-4 py-2.5 text-xs text-[var(--heading)] focus:border-emerald-500 outline-none"
+                    value={displayRupees(configs.default_signup_wallet_credit_paisa || '0')}
+                    onChange={(e) => handleRupeeChange('default_signup_wallet_credit_paisa', e.target.value)}
+                    className="w-full bg-[var(--hover-bg)] border border-[var(--border)] rounded-xl px-4 py-2.5 text-xs text-[var(--heading)] focus:border-amber-500 outline-none font-mono"
                     min="0"
                   />
-                  <span className="text-[9px] text-[var(--muted)] block">Per verified lead (default: ₹29).</span>
+                  <span className="text-[9px] text-[var(--muted)] block">
+                    Starting wallet balance automatically credited when a new tenant registers or initializes their account.
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold text-[var(--muted)] uppercase tracking-widest">Credit Rate (₹/min)</label>
+                    <input
+                      type="number"
+                      step="0.05"
+                      value={displayRupees(configs.credit_per_minute_paisa || '150')}
+                      onChange={(e) => handleRupeeChange('credit_per_minute_paisa', e.target.value)}
+                      className="w-full bg-[var(--hover-bg)] border border-[var(--border)] rounded-xl px-4 py-2.5 text-xs text-[var(--heading)] focus:border-amber-500 outline-none"
+                      min="0"
+                    />
+                    <span className="text-[9px] text-[var(--muted)] block">Prepaid calling rate (default: ₹1.50/min).</span>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold text-[var(--muted)] uppercase tracking-widest">Min Wallet Topup (₹)</label>
+                    <input
+                      type="number"
+                      value={displayRupees(configs.wallet_min_topup_paisa || '50000')}
+                      onChange={(e) => handleRupeeChange('wallet_min_topup_paisa', e.target.value)}
+                      className="w-full bg-[var(--hover-bg)] border border-[var(--border)] rounded-xl px-4 py-2.5 text-xs text-[var(--heading)] focus:border-amber-500 outline-none"
+                      min="0"
+                    />
+                    <span className="text-[9px] text-[var(--muted)] block">Minimum recharge amount (default: ₹500).</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Outcome-Based Rates */}
+            <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-6 space-y-6 shadow-xs">
+              <h2 className="text-sm font-bold text-[var(--heading)] uppercase tracking-wider border-b border-[var(--border)] pb-3 flex items-center gap-2">
+                <Target className="w-4 h-4 text-emerald-500" />
+                Outcome-Based Conversion Rates
+              </h2>
+
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold text-[var(--muted)] uppercase tracking-widest">Booked Appointment (₹)</label>
+                    <input
+                      type="number"
+                      value={displayRupees(configs.outcome_appointment_paisa || '4900')}
+                      onChange={(e) => handleRupeeChange('outcome_appointment_paisa', e.target.value)}
+                      className="w-full bg-[var(--hover-bg)] border border-[var(--border)] rounded-xl px-4 py-2.5 text-xs text-[var(--heading)] focus:border-emerald-500 outline-none"
+                      min="0"
+                    />
+                    <span className="text-[9px] text-[var(--muted)] block">Per confirmed booking (default: ₹49).</span>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold text-[var(--muted)] uppercase tracking-widest">Qualified BANT Lead (₹)</label>
+                    <input
+                      type="number"
+                      value={displayRupees(configs.outcome_lead_paisa || '2900')}
+                      onChange={(e) => handleRupeeChange('outcome_lead_paisa', e.target.value)}
+                      className="w-full bg-[var(--hover-bg)] border border-[var(--border)] rounded-xl px-4 py-2.5 text-xs text-[var(--heading)] focus:border-emerald-500 outline-none"
+                      min="0"
+                    />
+                    <span className="text-[9px] text-[var(--muted)] block">Per verified lead (default: ₹29).</span>
+                  </div>
                 </div>
               </div>
             </div>

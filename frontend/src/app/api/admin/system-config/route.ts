@@ -55,7 +55,7 @@ export async function GET() {
   }
 }
 
-export async function PUT(request: Request) {
+async function handleUpdateConfigs(request: Request) {
   try {
     const body = await request.json()
     const supabase = await createClient()
@@ -87,10 +87,26 @@ export async function PUT(request: Request) {
       return NextResponse.json({ error: 'Forbidden: Admin or Super Admin role required' }, { status: 403 })
     }
 
-    // 3. Upsert entries into system_config
-    const updates = body.configs as Record<string, string>
-    if (!updates || typeof updates !== 'object') {
-      return NextResponse.json({ error: 'Invalid config payload' }, { status: 400 })
+    // 3. Normalize entries into Record<string, string> (supports array or object)
+    const rawConfigs = body.configs !== undefined ? body.configs : body
+    const updates: Record<string, string> = {}
+
+    if (Array.isArray(rawConfigs)) {
+      rawConfigs.forEach((item: any) => {
+        if (item && item.config_key !== undefined) {
+          updates[item.config_key] = String(item.config_value ?? '')
+        }
+      })
+    } else if (rawConfigs && typeof rawConfigs === 'object') {
+      Object.entries(rawConfigs).forEach(([k, v]) => {
+        if (typeof v !== 'object' || v === null) {
+          updates[k] = String(v ?? '')
+        }
+      })
+    }
+
+    if (Object.keys(updates).length === 0) {
+      return NextResponse.json({ error: 'Invalid config payload: no key-value pairs provided' }, { status: 400 })
     }
 
     // Fetch current config state for old_value tracking and change detection
@@ -167,6 +183,7 @@ export async function PUT(request: Request) {
       'credit_per_minute_paisa', 'wallet_min_topup_paisa',
       'outcome_appointment_paisa', 'outcome_lead_paisa',
       'default_spend_limit_paisa', 'onboarding_fee_paisa',
+      'default_signup_wallet_credit_paisa',
       'starter_price_usd_cents', 'professional_price_usd_cents', 'enterprise_price_usd_cents',
       'trial_price_usd_cents', 'foreign_number_cost_usd_cents', 'overage_per_minute_usd_cents',
       'starter_price_eur_cents', 'professional_price_eur_cents', 'enterprise_price_eur_cents',
@@ -254,4 +271,12 @@ export async function PUT(request: Request) {
     console.error('System config route error:', error)
     return NextResponse.json({ error: error.message || 'Internal Server Error', stack: error.stack }, { status: 500 })
   }
+}
+
+export async function PUT(request: Request) {
+  return handleUpdateConfigs(request)
+}
+
+export async function POST(request: Request) {
+  return handleUpdateConfigs(request)
 }

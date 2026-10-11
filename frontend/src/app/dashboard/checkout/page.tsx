@@ -791,24 +791,37 @@ function CheckoutContent() {
                   </div>
                 )}
 
-                {/* Onboarding & Setup Fee Line Item */}
-                {!cartPrices.isTrial && (
-                  cartPrices.onboardingFeeEnabled && cartPrices.onboardingFee > 0 ? (
-                    <div className="flex justify-between items-center text-[var(--heading)] font-semibold text-xs py-0.5">
-                      <div className="flex items-center gap-1.5">
-                        <span>Onboarding & Setup Fee:</span>
-                        <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-violet-500/10 text-violet-600 dark:text-violet-400 border border-violet-500/20 font-bold">
-                          ONE-TIME
-                        </span>
-                      </div>
-                      <span className="font-mono">+{formatRawRupees(cartPrices.onboardingFee)}</span>
+                {/* Onboarding & Setup Fee Line Item (Cases A, B, C) */}
+                {cartPrices.isTrial ? (
+                  <div className="flex justify-between items-center text-[11px] py-0.5">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[var(--muted)]">Onboarding & Setup Fee:</span>
+                      <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 font-bold">
+                        TRIAL SPECIAL
+                      </span>
                     </div>
-                  ) : (
-                    <div className="flex justify-between items-center text-[var(--muted)] text-[11px] py-0.5">
+                    <span className="text-emerald-600 dark:text-emerald-400 font-bold font-mono">Waived Off (₹0)</span>
+                  </div>
+                ) : cartPrices.onboardingFeeEnabled && cartPrices.onboardingFee > 0 ? (
+                  <div className="flex justify-between items-center text-[var(--heading)] font-semibold text-xs py-0.5">
+                    <div className="flex items-center gap-1.5">
                       <span>Onboarding & Setup Fee:</span>
-                      <span className="text-emerald-600 dark:text-emerald-400 font-bold font-mono">Waived (₹0)</span>
+                      <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-violet-500/10 text-violet-600 dark:text-violet-400 border border-violet-500/20 font-bold">
+                        ONE-TIME
+                      </span>
                     </div>
-                  )
+                    <span className="font-mono">+{formatRawRupees(cartPrices.onboardingFee)}</span>
+                  </div>
+                ) : (
+                  <div className="flex justify-between items-center text-[11px] py-0.5">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[var(--muted)]">Onboarding & Setup Fee:</span>
+                      <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 font-bold">
+                        100% WAIVED
+                      </span>
+                    </div>
+                    <span className="text-emerald-600 dark:text-emerald-400 font-bold font-mono">Waived Off (₹0)</span>
+                  </div>
                 )}
 
                 {/* GST Tax Breakdown */}

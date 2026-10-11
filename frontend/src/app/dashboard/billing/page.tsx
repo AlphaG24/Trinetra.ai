@@ -731,7 +731,40 @@ function BillingContent() {
   const calculateCartPrices = () => {
     const { subtotal, discount, discountedSubtotal } = calculateRawSubtotal()
     const couponDiscount = appliedCoupon ? appliedCoupon.discountRupees : 0
-    const taxableSubtotal = Math.max(0, discountedSubtotal - couponDiscount)
+    const baseAmount = Math.max(0, discountedSubtotal - couponDiscount)
+
+    const isTrialOnly = cart.length > 0 && cart.every(item =>
+      (item.name || '').toLowerCase().includes('trial') ||
+      (item.key || '').toLowerCase().includes('trial')
+    )
+
+    const onboardingFeeEnabled = configs.onboarding_fee_enabled === 'true'
+    const rawOnboardingFeePaisa = parseInt(configs.onboarding_fee_paisa || '0', 10)
+    const onboardingFeeRupees = (onboardingFeeEnabled && !isTrialOnly)
+      ? Math.round(rawOnboardingFeePaisa / 100)
+      : 0
+
+    if (isTrialOnly) {
+      return {
+        subtotal,
+        discount,
+        discountedSubtotal,
+        couponDiscount,
+        onboardingFee: 0,
+        onboardingFeeEnabled: false,
+        taxableSubtotal: baseAmount,
+        isInterState: false,
+        stateName: 'Delhi',
+        cgst: 0,
+        sgst: 0,
+        igst: 0,
+        totalTax: 0,
+        total: baseAmount,
+        isTrial: true
+      }
+    }
+
+    const taxableSubtotal = baseAmount + onboardingFeeRupees
 
     const cleanGst = isClaimingGst && gstin.trim().length === 15 ? gstin.trim().toUpperCase() : null
     const stateCode = cleanGst ? cleanGst.substring(0, 2) : '07'
@@ -744,6 +777,8 @@ function BillingContent() {
       discount,
       discountedSubtotal,
       couponDiscount,
+      onboardingFee: onboardingFeeRupees,
+      onboardingFeeEnabled,
       taxableSubtotal,
       isInterState: gstBreakdown.isInterState,
       stateName: gstBreakdown.stateName,
@@ -751,7 +786,8 @@ function BillingContent() {
       sgst: gstBreakdown.sgstAmount / 100,
       igst: gstBreakdown.igstAmount / 100,
       totalTax: gstBreakdown.totalTaxAmount / 100,
-      total
+      total,
+      isTrial: false
     }
   }
 
@@ -1413,6 +1449,39 @@ function BillingContent() {
                       <span>Promo Discount ({appliedCoupon?.code}):</span>
                     </span>
                     <span className="font-mono font-bold">-{formatRawRupees(cartPrices.couponDiscount)}</span>
+                  </div>
+                )}
+
+                {/* Onboarding & Setup Fee Line Item (Cases A, B, C) */}
+                {cartPrices.isTrial ? (
+                  <div className="flex justify-between items-center text-[11px] py-0.5">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[var(--muted)]">Onboarding & Setup Fee:</span>
+                      <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 font-bold">
+                        TRIAL SPECIAL
+                      </span>
+                    </div>
+                    <span className="text-emerald-600 dark:text-emerald-400 font-bold font-mono">Waived Off (₹0)</span>
+                  </div>
+                ) : cartPrices.onboardingFeeEnabled && cartPrices.onboardingFee > 0 ? (
+                  <div className="flex justify-between items-center text-[var(--heading)] font-semibold text-xs py-0.5">
+                    <div className="flex items-center gap-1.5">
+                      <span>Onboarding & Setup Fee:</span>
+                      <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-violet-500/10 text-violet-600 dark:text-violet-400 border border-violet-500/20 font-bold">
+                        ONE-TIME
+                      </span>
+                    </div>
+                    <span className="font-mono">+{formatRawRupees(cartPrices.onboardingFee)}</span>
+                  </div>
+                ) : (
+                  <div className="flex justify-between items-center text-[11px] py-0.5">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[var(--muted)]">Onboarding & Setup Fee:</span>
+                      <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 font-bold">
+                        100% WAIVED
+                      </span>
+                    </div>
+                    <span className="text-emerald-600 dark:text-emerald-400 font-bold font-mono">Waived Off (₹0)</span>
                   </div>
                 )}
 
