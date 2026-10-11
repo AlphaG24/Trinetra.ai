@@ -191,10 +191,26 @@ export async function POST(request: Request) {
       }
     }
 
-    const taxableSubtotal = Math.max(0, quantityDiscountedSubtotal - couponDiscountPaisa)
-
-    // GST calculation: Pure trial has strictly 0 CGST and 0 SGST
     const isPureTrial = hasTrial && items.length === 1
+
+    // Check Onboarding & Setup Fee (enabled via admin in /admin/plans)
+    const onboardingFeeEnabled = config.onboarding_fee_enabled === 'true'
+    const onboardingFeePaisa = (onboardingFeeEnabled && !isPureTrial)
+      ? parseInt(config.onboarding_fee_paisa || '0', 10)
+      : 0
+
+    if (onboardingFeePaisa > 0) {
+      detailsList.push({
+        item: 'One-Time Onboarding & Setup Fee',
+        rate: onboardingFeePaisa,
+        quantity: 1,
+        amount: onboardingFeePaisa,
+        discount_applied: 0
+      })
+    }
+
+    const baseTaxable = Math.max(0, quantityDiscountedSubtotal - couponDiscountPaisa)
+    const taxableSubtotal = baseTaxable + onboardingFeePaisa
 
     let customerStateCode = '07' // Default Delhi
     let cleanGSTIN: string | null = null

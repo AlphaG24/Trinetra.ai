@@ -23,6 +23,8 @@ interface SystemConfigs {
   bulk_discount_3_agents_percent?: string
   bulk_discount_2_numbers_percent?: string
   bulk_discount_3plus_numbers_percent?: string
+  onboarding_fee_enabled?: string
+  onboarding_fee_paisa?: string
 }
 
 interface Bundle {
@@ -329,12 +331,18 @@ function CheckoutContent() {
   const calculateCartPrices = () => {
     const { subtotal, discount, discountedSubtotal } = calculateRawSubtotal()
     const couponDiscount = appliedCoupon ? appliedCoupon.discountRupees : 0
-    const taxableSubtotal = Math.max(0, discountedSubtotal - couponDiscount)
+    const baseAmount = Math.max(0, discountedSubtotal - couponDiscount)
 
     const isTrialOnly = cart.length > 0 && cart.every(item =>
       (item.name || '').toLowerCase().includes('trial') ||
       (item.key || '').toLowerCase().includes('trial')
     )
+
+    const onboardingFeeEnabled = configs.onboarding_fee_enabled === 'true'
+    const rawOnboardingFeePaisa = parseInt(configs.onboarding_fee_paisa || '0', 10)
+    const onboardingFeeRupees = (onboardingFeeEnabled && !isTrialOnly)
+      ? Math.round(rawOnboardingFeePaisa / 100)
+      : 0
 
     if (isTrialOnly) {
       return {
@@ -342,17 +350,21 @@ function CheckoutContent() {
         discount,
         discountedSubtotal,
         couponDiscount,
-        taxableSubtotal,
+        onboardingFee: 0,
+        onboardingFeeEnabled: false,
+        taxableSubtotal: baseAmount,
         isInterState: false,
         stateName: 'Delhi',
         cgst: 0,
         sgst: 0,
         igst: 0,
         totalTax: 0,
-        total: taxableSubtotal,
+        total: baseAmount,
         isTrial: true
       }
     }
+
+    const taxableSubtotal = baseAmount + onboardingFeeRupees
 
     const cleanGst = isClaimingGst && gstin.trim().length === 15 ? gstin.trim().toUpperCase() : null
     const stateCode = cleanGst ? cleanGst.substring(0, 2) : '07'
@@ -365,6 +377,8 @@ function CheckoutContent() {
       discount,
       discountedSubtotal,
       couponDiscount,
+      onboardingFee: onboardingFeeRupees,
+      onboardingFeeEnabled,
       taxableSubtotal,
       isInterState: gstBreakdown.isInterState,
       stateName: gstBreakdown.stateName,
@@ -775,6 +789,26 @@ function CheckoutContent() {
                     </span>
                     <span className="font-mono font-bold">-{formatRawRupees(cartPrices.couponDiscount)}</span>
                   </div>
+                )}
+
+                {/* Onboarding & Setup Fee Line Item */}
+                {!cartPrices.isTrial && (
+                  cartPrices.onboardingFeeEnabled && cartPrices.onboardingFee > 0 ? (
+                    <div className="flex justify-between items-center text-[var(--heading)] font-semibold text-xs py-0.5">
+                      <div className="flex items-center gap-1.5">
+                        <span>Onboarding & Setup Fee:</span>
+                        <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-violet-500/10 text-violet-600 dark:text-violet-400 border border-violet-500/20 font-bold">
+                          ONE-TIME
+                        </span>
+                      </div>
+                      <span className="font-mono">+{formatRawRupees(cartPrices.onboardingFee)}</span>
+                    </div>
+                  ) : (
+                    <div className="flex justify-between items-center text-[var(--muted)] text-[11px] py-0.5">
+                      <span>Onboarding & Setup Fee:</span>
+                      <span className="text-emerald-600 dark:text-emerald-400 font-bold font-mono">Waived (₹0)</span>
+                    </div>
+                  )
                 )}
 
                 {/* GST Tax Breakdown */}
