@@ -183,6 +183,11 @@ function CheckoutContent() {
               price,
               quantity: 1
             }]
+          } else {
+            // Update displayName and price if user re-selected different personalities
+            restoredCart = restoredCart.map(item =>
+              item.key === itemKey ? { ...item, name: displayName, price } : item
+            )
           }
 
           // Save cart to local storage and update state

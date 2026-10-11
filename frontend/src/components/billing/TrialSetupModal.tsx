@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import {
   Sparkles,
   Bot,
@@ -11,9 +11,32 @@ import {
   AlertCircle,
   ArrowRight,
   RefreshCw,
-  Info
+  Info,
+  PhoneCall,
+  CheckCircle2,
+  Zap,
+  HelpCircle
 } from 'lucide-react'
 import { toast } from 'sonner'
+
+export interface Plan {
+  id: string
+  name: string
+  slug: string
+  description: string
+  price_monthly: number
+  price_annual: number
+  max_agents: number
+  included_voice_minutes: number
+  included_chat_conversations?: number
+  included_social_posts?: number
+  overage_voice_per_minute?: number
+  is_popular?: boolean
+  is_active?: boolean
+  badge_text?: string | null
+  display_order?: number
+  features?: Record<string, any>
+}
 
 export interface PersonalityOption {
   id: string
@@ -87,42 +110,106 @@ export default function TrialSetupModal({
   configs = {},
   onProceedToCheckout
 }: TrialSetupModalProps) {
-  const [loading, setLoading] = useState(false)
-  const [selectedAgentCount, setSelectedAgentCount] = useState<1 | 2 | 4>(2)
+  const [submitting, setSubmitting] = useState(false)
+  const [plans, setPlans] = useState<Plan[]>([])
+  const [loadingPlans, setLoadingPlans] = useState(true)
+  const [selectedPlanId, setSelectedPlanId] = useState<string>('')
   const [selectedPersonalities, setSelectedPersonalities] = useState<string[]>(['sales', 'support'])
 
-  // Rate cards for post-trial autopay (admin-configurable with sensible defaults)
-  const planRateCards = useMemo(() => {
-    const starterPrice = Math.round(parseInt(configs.starter_price_paisa || '499900', 10) / 100)
-    const proPrice = Math.round(parseInt(configs.professional_price_paisa || '999900', 10) / 100)
-    const scalePrice = Math.round(parseInt(configs.scale_price_paisa || '1999900', 10) / 100)
+  // Fetch active plans directly configured by admin in /admin/plans
+  useEffect(() => {
+    if (!isOpen) return
+    let isMounted = true
 
-    return {
-      1: {
-        agentCount: 1,
-        slug: 'starter',
-        name: 'Single Agent Plan',
-        monthlyPrice: starterPrice || 4999,
-        includedMinutes: 500
-      },
-      2: {
-        agentCount: 2,
-        slug: 'growth',
-        name: 'Dual Agent Business Plan',
-        monthlyPrice: proPrice || 9999,
-        includedMinutes: 1500
-      },
-      4: {
-        agentCount: 4,
-        slug: 'scale',
-        name: 'Quad Agent Enterprise Scale',
-        monthlyPrice: scalePrice || 19999,
-        includedMinutes: 4000
+    async function loadPlans() {
+      try {
+        setLoadingPlans(true)
+        const res = await fetch('/api/plans')
+        if (!res.ok) throw new Error('Failed to load pricing plans')
+        const data = await res.json()
+        const fetchedPlans: Plan[] = data.plans || []
+
+        if (isMounted) {
+          setPlans(fetchedPlans)
+          if (fetchedPlans.length > 0) {
+            // Find default plan (popular plan or 2-agent growth plan or 1st plan)
+            const popular = fetchedPlans.find(p => p.is_popular) || fetchedPlans.find(p => p.max_agents === 2) || fetchedPlans[0]
+            setSelectedPlanId(popular.id)
+            
+            // Default personality selection based on agent count
+            const defaultQuota = popular.max_agents || 1
+            if (defaultQuota === 1) {
+              setSelectedPersonalities(['sales'])
+            } else if (defaultQuota === 2) {
+              setSelectedPersonalities(['sales', 'support'])
+            } else if (defaultQuota >= 4) {
+              setSelectedPersonalities(['sales', 'appointment', 'support', 'lead_qualifier'])
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('Error loading plans from API, using fallback:', err)
+        // Fallback default plans
+        if (isMounted) {
+          const fallbackPlans: Plan[] = [
+            {
+              id: 'starter',
+              name: 'Starter AI',
+              slug: 'starter',
+              description: 'For solo founders and small teams getting started with AI',
+              price_monthly: 499900,
+              price_annual: 399900,
+              max_agents: 1,
+              included_voice_minutes: 500,
+              is_popular: false
+            },
+            {
+              id: 'growth',
+              name: 'Growth AI',
+              slug: 'growth',
+              description: 'For growing businesses that need multi-channel AI',
+              price_monthly: 999900,
+              price_annual: 799900,
+              max_agents: 2,
+              included_voice_minutes: 1500,
+              is_popular: true,
+              badge_text: 'MOST POPULAR'
+            },
+            {
+              id: 'scale',
+              name: 'Scale AI',
+              slug: 'scale',
+              description: 'For established businesses and agencies scaling operations',
+              price_monthly: 1999900,
+              price_annual: 1599900,
+              max_agents: 4,
+              included_voice_minutes: 4000,
+              is_popular: false
+            }
+          ]
+          setPlans(fallbackPlans)
+          setSelectedPlanId('growth')
+        }
+      } finally {
+        if (isMounted) setLoadingPlans(false)
       }
     }
-  }, [configs])
 
-  const targetPlan = planRateCards[selectedAgentCount]
+    loadPlans()
+    return () => {
+      isMounted = false
+    }
+  }, [isOpen])
+
+  // Current selected plan entity
+  const selectedPlan = useMemo(() => {
+    return plans.find(p => p.id === selectedPlanId) || plans[0] || null
+  }, [plans, selectedPlanId])
+
+  const selectedAgentCount = selectedPlan ? (selectedPlan.max_agents || 1) : 2
+  const futureBasePrice = selectedPlan ? Math.round((selectedPlan.price_monthly || 0) / 100) : 4999
+  const futureGstAmount = Math.round(futureBasePrice * 0.18)
+  const futureGrandTotal = futureBasePrice + futureGstAmount
 
   // Renewal date = exactly 7 days from now
   const renewalDateObj = useMemo(() => {
@@ -140,16 +227,12 @@ export default function TrialSetupModal({
     })
   }, [renewalDateObj])
 
-  // Future price calculations with GST
-  const futureBasePrice = targetPlan.monthlyPrice
-  const futureGstAmount = Math.round(futureBasePrice * 0.18)
-  const futureGrandTotal = futureBasePrice + futureGstAmount
-
-  // Handle changing agent capacity (resets personalities if quota exceeded)
-  const handleSelectCapacity = (count: 1 | 2 | 4) => {
-    setSelectedAgentCount(count)
-    if (selectedPersonalities.length > count) {
-      setSelectedPersonalities(selectedPersonalities.slice(0, count))
+  // Handle switching plan card
+  const handleSelectPlan = (plan: Plan) => {
+    setSelectedPlanId(plan.id)
+    const newCount = plan.max_agents || 1
+    if (selectedPersonalities.length > newCount) {
+      setSelectedPersonalities(selectedPersonalities.slice(0, newCount))
     }
   }
 
@@ -159,7 +242,7 @@ export default function TrialSetupModal({
       setSelectedPersonalities(selectedPersonalities.filter(item => item !== id))
     } else {
       if (selectedPersonalities.length >= selectedAgentCount) {
-        toast.error(`Your plan includes exactly ${selectedAgentCount} agent${selectedAgentCount > 1 ? 's' : ''}. Deselect one first to choose this personality.`)
+        toast.error(`Your plan (${selectedPlan?.name || 'Selected'}) includes exactly ${selectedAgentCount} agent${selectedAgentCount > 1 ? 's' : ''}. Deselect one first to choose this personality.`)
         return
       }
       setSelectedPersonalities([...selectedPersonalities, id])
@@ -169,6 +252,11 @@ export default function TrialSetupModal({
   const isQuotaSatisfied = selectedPersonalities.length === selectedAgentCount
 
   const handleConfirmAndPay = async () => {
+    if (!selectedPlan) {
+      toast.error('Please select an ongoing renewal plan')
+      return
+    }
+
     if (!isQuotaSatisfied) {
       const remaining = selectedAgentCount - selectedPersonalities.length
       toast.error(`Please select exactly ${selectedAgentCount} personalities. (${remaining} more needed)`)
@@ -176,11 +264,11 @@ export default function TrialSetupModal({
     }
 
     try {
-      setLoading(true)
+      setSubmitting(true)
       await onProceedToCheckout({
         agentCount: selectedAgentCount,
-        targetPlanSlug: targetPlan.slug,
-        targetPriceRupees: targetPlan.monthlyPrice,
+        targetPlanSlug: selectedPlan.slug,
+        targetPriceRupees: futureBasePrice,
         selectedPersonalities,
         renewalDate: renewalDateObj.toISOString()
       })
@@ -188,7 +276,7 @@ export default function TrialSetupModal({
     } catch (err: any) {
       toast.error(err.message || 'Error processing trial setup')
     } finally {
-      setLoading(false)
+      setSubmitting(false)
     }
   }
 
@@ -196,7 +284,7 @@ export default function TrialSetupModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-3xl w-full max-w-2xl p-6 sm:p-8 shadow-2xl space-y-6 relative max-h-[92vh] overflow-y-auto animate-in zoom-in-95 duration-200">
+      <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-3xl w-full max-w-3xl p-6 sm:p-8 shadow-2xl space-y-6 relative max-h-[92vh] overflow-y-auto animate-in zoom-in-95 duration-200">
         <button
           onClick={onClose}
           className="absolute top-5 right-5 w-8 h-8 rounded-xl bg-[var(--background)] hover:bg-[var(--hover-bg)] text-[var(--muted)] hover:text-[var(--heading)] flex items-center justify-center text-sm transition cursor-pointer border border-[var(--border)]"
@@ -213,96 +301,143 @@ export default function TrialSetupModal({
             Configure Your AI Voice Workforce
           </h2>
           <p className="text-xs text-[var(--muted)] mt-1">
-            Pick your post-trial plan capacity and customize personality roles. Test with full live access today for ₹99 with zero GST.
+            Choose your ongoing plan capacity (as configured by administrator) and customize personality roles. Full production access starts today for ₹99 with zero GST.
           </p>
         </div>
 
-        {/* STEP 1: Plan Capacity Selector */}
-        <div className="space-y-3">
-          <label className="block text-[11px] font-bold uppercase tracking-wider text-[var(--heading)]">
-            Step 1: Choose Ongoing Plan Capacity (Rate Card)
-          </label>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            {([1, 2, 4] as const).map((count) => {
-              const card = planRateCards[count]
-              const isSelected = selectedAgentCount === count
-              return (
-                <button
-                  key={count}
-                  type="button"
-                  onClick={() => handleSelectCapacity(count)}
-                  className={`p-4 rounded-2xl border text-left transition-all cursor-pointer relative ${
-                    isSelected
-                      ? 'bg-zinc-900/5 dark:bg-white/5 border-zinc-900 dark:border-white shadow-sm ring-1 ring-zinc-900 dark:ring-white'
-                      : 'bg-[var(--background)] border-[var(--border)] hover:border-zinc-400 dark:hover:border-zinc-600'
-                  }`}
-                >
-                  {count === 2 && (
-                    <span className="absolute top-2 right-2 px-1.5 py-0.5 rounded text-[8px] font-extrabold uppercase bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-                      Popular
-                    </span>
-                  )}
-                  <div className="flex items-center gap-1.5 font-bold text-sm text-[var(--heading)]">
-                    <Bot className="w-4 h-4" />
-                    <span>{count} AI Agent{count > 1 ? 's' : ''}</span>
-                  </div>
-                  <div className="mt-2 font-mono font-bold text-lg text-[var(--heading)]">
-                    ₹{card.monthlyPrice.toLocaleString('en-IN')}
-                    <span className="text-[10px] font-normal text-[var(--muted)]">/mo</span>
-                  </div>
-                  <p className="text-[10px] text-[var(--muted)] mt-1">
-                    {card.includedMinutes.toLocaleString('en-IN')} monthly minutes
-                  </p>
-                </button>
-              )
-            })}
-          </div>
-        </div>
-
-        {/* STEP 2: Personality Selector with Strict Quota */}
+        {/* STEP 1: Choose Ongoing Plan Capacity (Admin Live Plans) */}
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <label className="block text-[11px] font-bold uppercase tracking-wider text-[var(--heading)]">
-              Step 2: Choose Personalities ({selectedPersonalities.length} / {selectedAgentCount} Selected)
+              Step 1: Choose Ongoing Plan Capacity (Rate Card)
             </label>
-            <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full ${
+            <span className="text-[10px] text-zinc-500 font-mono">
+              Live from Admin Catalog
+            </span>
+          </div>
+
+          {loadingPlans ? (
+            <div className="py-8 flex flex-col items-center justify-center gap-2 border border-dashed border-[var(--border)] rounded-2xl bg-[var(--background)]">
+              <RefreshCw className="w-5 h-5 text-amber-500 animate-spin" />
+              <span className="text-xs text-[var(--muted)]">Loading administrator plan cards...</span>
+            </div>
+          ) : plans.length === 0 ? (
+            <div className="p-4 rounded-xl border border-amber-500/30 bg-amber-500/10 text-xs text-amber-600">
+              No active subscription plans found. Please configure plans in the admin portal.
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {plans.map((plan) => {
+                const isSelected = selectedPlanId === plan.id
+                const planPrice = Math.round((plan.price_monthly || 0) / 100)
+                const badge = plan.badge_text || (plan.is_popular ? 'POPULAR' : null)
+
+                return (
+                  <button
+                    key={plan.id}
+                    type="button"
+                    onClick={() => handleSelectPlan(plan)}
+                    className={`p-4 rounded-2xl border text-left transition-all cursor-pointer relative flex flex-col justify-between ${
+                      isSelected
+                        ? 'bg-zinc-900/5 dark:bg-white/5 border-zinc-900 dark:border-white shadow-sm ring-1 ring-zinc-900 dark:ring-white scale-[1.01]'
+                        : 'bg-[var(--background)] border-[var(--border)] hover:border-zinc-400 dark:hover:border-zinc-600'
+                    }`}
+                  >
+                    <div>
+                      {badge && (
+                        <span className="absolute top-2.5 right-2.5 px-1.5 py-0.5 rounded text-[8px] font-extrabold uppercase bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                          {badge}
+                        </span>
+                      )}
+                      
+                      <div className="flex items-center gap-1.5 font-bold text-sm text-[var(--heading)]">
+                        <Bot className="w-4 h-4 text-emerald-500 shrink-0" />
+                        <span>{plan.name}</span>
+                      </div>
+
+                      <div className="text-[11px] font-semibold text-zinc-600 dark:text-zinc-300 mt-1">
+                        {plan.max_agents} AI Agent{plan.max_agents > 1 ? 's' : ''} Capacity
+                      </div>
+
+                      <div className="mt-2 font-mono font-black text-xl text-[var(--heading)]">
+                        ₹{planPrice.toLocaleString('en-IN')}
+                        <span className="text-[10px] font-normal text-[var(--muted)]">/mo</span>
+                      </div>
+
+                      <div className="text-[11px] font-medium text-[var(--muted)] mt-1 flex items-center gap-1 font-mono">
+                        <PhoneCall className="w-3 h-3 text-zinc-400 shrink-0" />
+                        <span>{(plan.included_voice_minutes || 0).toLocaleString('en-IN')} monthly minutes</span>
+                      </div>
+
+                      {plan.description && (
+                        <p className="text-[10px] text-[var(--muted)] mt-2 line-clamp-2 leading-relaxed border-t border-[var(--border)]/60 pt-2">
+                          {plan.description}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="mt-3 pt-2 border-t border-[var(--border)]/40 flex items-center justify-between text-[10px]">
+                      <span className="text-zinc-400">Post-trial mandate</span>
+                      <span className={`font-bold font-mono ${isSelected ? 'text-emerald-600 dark:text-emerald-400' : 'text-zinc-500'}`}>
+                        {isSelected ? '✓ Selected' : 'Select →'}
+                      </span>
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* STEP 2: Customize Personality Roles (Strict Quota Enforcement) */}
+        <div className="space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+            <label className="block text-[11px] font-bold uppercase tracking-wider text-[var(--heading)]">
+              Step 2: Customize Personality Roles
+            </label>
+            <span className={`text-[10px] font-bold font-mono px-2 py-0.5 rounded ${
               isQuotaSatisfied
                 ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
                 : 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20'
             }`}>
-              {isQuotaSatisfied ? 'Quota Matched' : `Select ${selectedAgentCount - selectedPersonalities.length} More`}
+              {selectedPersonalities.length} of {selectedAgentCount} Slots Selected
             </span>
           </div>
 
+          <p className="text-[11px] text-[var(--muted)]">
+            Select exactly <strong>{selectedAgentCount}</strong> personality role{selectedAgentCount > 1 ? 's' : ''} to activate for your <strong>{selectedPlan?.name || 'Selected'}</strong> trial.
+          </p>
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-            {PERSONALITY_OPTIONS.map((opt) => {
-              const isChecked = selectedPersonalities.includes(opt.id)
+            {PERSONALITY_OPTIONS.map((item) => {
+              const isChecked = selectedPersonalities.includes(item.id)
               return (
                 <div
-                  key={opt.id}
-                  onClick={() => handleTogglePersonality(opt.id)}
-                  className={`p-3 rounded-2xl border transition-all cursor-pointer flex items-start gap-3 select-none ${
+                  key={item.id}
+                  onClick={() => handleTogglePersonality(item.id)}
+                  className={`p-3 rounded-xl border text-left transition-all cursor-pointer flex items-start gap-3 select-none ${
                     isChecked
-                      ? 'bg-zinc-900/5 dark:bg-white/5 border-zinc-900 dark:border-white shadow-xs'
-                      : 'bg-[var(--background)] border-[var(--border)] hover:border-zinc-400 dark:hover:border-zinc-700 opacity-80 hover:opacity-100'
+                      ? 'bg-emerald-500/10 border-emerald-500/40 shadow-sm'
+                      : 'bg-[var(--background)] border-[var(--border)] hover:border-zinc-400 dark:hover:border-zinc-600'
                   }`}
                 >
-                  <div className={`w-5 h-5 rounded-lg border mt-0.5 flex items-center justify-center shrink-0 transition-colors ${
-                    isChecked
-                      ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 border-zinc-900 dark:border-white'
-                      : 'border-[var(--border)] bg-transparent'
-                  }`}>
-                    {isChecked && <Check className="w-3 h-3 stroke-[3]" />}
+                  <div className="text-xl shrink-0 mt-0.5">
+                    {item.iconBadge}
                   </div>
-
-                  <div className="space-y-0.5 min-w-0">
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-sm">{opt.iconBadge}</span>
-                      <span className="font-bold text-xs text-[var(--heading)] truncate">{opt.name}</span>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-bold text-xs text-[var(--heading)] truncate">
+                        {item.name}
+                      </span>
+                      {isChecked && (
+                        <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                      )}
                     </div>
-                    <span className="text-[10px] text-zinc-500 font-semibold block">{opt.role}</span>
-                    <p className="text-[10px] text-[var(--muted)] leading-relaxed line-clamp-2">
-                      {opt.description}
+                    <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider block mt-0.5">
+                      {item.role}
+                    </span>
+                    <p className="text-[10px] text-[var(--muted)] mt-1 line-clamp-2 leading-relaxed">
+                      {item.description}
                     </p>
                   </div>
                 </div>
@@ -311,75 +446,72 @@ export default function TrialSetupModal({
           </div>
         </div>
 
-        {/* STEP 3: Transparent Autopay & Zero GST Mandate Card */}
-        <div className="p-4 rounded-2xl bg-[var(--background)] border border-[var(--border)] space-y-3 text-xs">
-          <div className="flex items-center gap-2 border-b border-[var(--border)] pb-2.5 font-bold text-xs text-[var(--heading)]">
-            <ShieldCheck className="w-4 h-4 text-emerald-500" />
-            <span>Autopay Mandate & Disclosure Guarantee</span>
+        {/* STEP 3: Transparent Autopay Breakdown Card */}
+        <div className="p-4 rounded-2xl bg-zinc-100 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 space-y-3">
+          <div className="flex items-center justify-between text-xs">
+            <span className="font-bold text-[var(--heading)] flex items-center gap-1.5">
+              <CreditCard className="w-4 h-4 text-emerald-500" />
+              <span>Transparent Autopay Breakdown</span>
+            </span>
+            <span className="text-[10px] font-mono text-zinc-500">
+              Zero Surprise Guarantee
+            </span>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-            <div>
-              <span className="text-[10px] uppercase font-bold text-[var(--muted)] tracking-wider block">Today's Charge</span>
-              <div className="flex items-baseline gap-1.5 mt-0.5">
-                <span className="text-xl font-bold font-mono text-[var(--heading)]">₹99.00</span>
-                <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
-                  (0 CGST / 0 SGST)
-                </span>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-[var(--border)] text-xs">
+            <div className="space-y-1">
+              <span className="text-[10px] text-[var(--muted)] uppercase font-semibold">Today's Total (7-Day Trial)</span>
+              <div className="text-xl font-black font-mono text-emerald-600 dark:text-emerald-400">
+                ₹99 <span className="text-[11px] font-normal text-zinc-500">(0% GST Statutory Trial Exemption)</span>
               </div>
-              <span className="text-[10px] text-[var(--muted)]">Initial 7-day all-access trial activation</span>
             </div>
 
-            <div>
-              <span className="text-[10px] uppercase font-bold text-[var(--muted)] tracking-wider block">Upcoming Autopay Charge</span>
-              <div className="flex items-baseline gap-1.5 mt-0.5">
-                <span className="text-xl font-bold font-mono text-[var(--heading)]">
-                  ₹{futureGrandTotal.toLocaleString('en-IN')}
-                </span>
-                <span className="text-[10px] text-zinc-500">
-                  (₹{futureBasePrice.toLocaleString('en-IN')} + 18% GST)
-                </span>
+            <div className="space-y-1">
+              <span className="text-[10px] text-[var(--muted)] uppercase font-semibold">Ongoing Renewal Mandate</span>
+              <div className="text-sm font-bold font-mono text-[var(--heading)]">
+                ₹{futureGrandTotal.toLocaleString('en-IN')}/mo <span className="text-[10px] font-normal text-zinc-500">(₹{futureBasePrice.toLocaleString('en-IN')} + 18% GST)</span>
               </div>
-              <span className="text-[10px] text-[var(--muted)] flex items-center gap-1">
+              <div className="text-[10px] text-[var(--muted)] flex items-center gap-1">
                 <Calendar className="w-3 h-3 text-zinc-400" />
-                <span>Scheduled for {renewalDateFormatted}</span>
-              </span>
+                <span>First auto-debit: <strong>{renewalDateFormatted}</strong></span>
+              </div>
             </div>
           </div>
 
-          <div className="p-2.5 rounded-xl bg-zinc-500/5 border border-zinc-500/10 text-[11px] text-[var(--muted)] leading-relaxed flex items-start gap-2">
-            <Info className="w-4 h-4 text-zinc-400 shrink-0 mt-0.5" />
+          <div className="p-2.5 rounded-xl bg-white dark:bg-black/30 border border-zinc-200 dark:border-zinc-800 text-[10px] text-[var(--muted)] flex items-start gap-2 leading-relaxed">
+            <ShieldCheck className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
             <span>
-              <strong>Cancel Anytime:</strong> You can cancel the trial anytime before {renewalDateFormatted} in your Billing console with 1 click to prevent the post-trial debit. No questions asked.
+              <strong>Zero Risk Cancellation:</strong> You can cancel anytime with a single click in your Billing settings before day 7. If cancelled before {renewalDateFormatted}, your mandate is immediately revoked with zero penalty.
             </span>
           </div>
         </div>
 
-        {/* Modal Actions */}
-        <div className="flex items-center justify-between pt-2 border-t border-[var(--border)]">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-4 py-2.5 bg-[var(--background)] hover:bg-[var(--hover-bg)] text-[var(--heading)] text-xs font-semibold rounded-xl border border-[var(--border)] transition cursor-pointer"
-          >
-            Cancel
-          </button>
+        {/* Action Button */}
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
+          <div className="text-[11px] text-[var(--muted)] text-center sm:text-left">
+            <span>By proceeding, you verify the </span>
+            <strong className="text-[var(--heading)]">{selectedPlan?.name || 'Selected'}</strong>
+            <span> capacity and {selectedPersonalities.length} personality assignment{selectedPersonalities.length > 1 ? 's' : ''}.</span>
+          </div>
 
           <button
-            type="button"
-            disabled={loading || !isQuotaSatisfied}
             onClick={handleConfirmAndPay}
-            className="px-6 py-2.5 bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-100 font-bold text-xs uppercase tracking-wider rounded-xl transition cursor-pointer shadow-sm disabled:opacity-50 flex items-center gap-2 active:scale-95"
+            disabled={submitting || !isQuotaSatisfied || loadingPlans}
+            className={`w-full sm:w-auto px-6 py-3.5 rounded-xl font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all cursor-pointer shadow-lg active:scale-95 ${
+              isQuotaSatisfied && !loadingPlans
+                ? 'bg-zinc-900 hover:bg-black text-white dark:bg-white dark:hover:bg-zinc-200 dark:text-zinc-900'
+                : 'bg-zinc-200 dark:bg-zinc-800 text-zinc-400 cursor-not-allowed'
+            }`}
           >
-            {loading ? (
+            {submitting ? (
               <>
                 <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                <span>Initiating Trial...</span>
+                <span>Preparing Checkout...</span>
               </>
             ) : (
               <>
-                <span>Confirm & Pay ₹99</span>
-                <ArrowRight className="w-3.5 h-3.5" />
+                <span>Proceed to Checkout (₹99)</span>
+                <ArrowRight className="w-4 h-4" />
               </>
             )}
           </button>

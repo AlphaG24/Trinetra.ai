@@ -13,7 +13,9 @@ import {
   CheckCircle2,
   AlertCircle,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Search,
+  Loader2
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { validateGSTIN, INDIAN_GST_STATES, SUPPLIER_STATE_CODE } from '@/lib/gst'
@@ -123,32 +125,42 @@ export default function CheckoutPromoAndGSTSection({
   }
 
   // Automated GST Government Taxpayer Verification & Name Fetch
-  const handleGstinInputChange = async (val: string) => {
+  const triggerGstVerification = async (targetGstin: string) => {
+    if (targetGstin.length !== 15) return
+    try {
+      setIsVerifyingGst(true)
+      const res = await fetch('/api/billing/gst/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ gstin: targetGstin })
+      })
+      const data = await res.json()
+      if (res.ok && data.valid) {
+        setVerifiedGstData(data)
+        if (data.legal_name) {
+          onLegalNameChange(data.legal_name)
+          toast.success(`Taxpayer Verified: ${data.legal_name}`)
+        } else {
+          toast.info(data.message || `GSTIN validated for ${data.state}. Please confirm your registered legal trade name.`)
+        }
+      } else {
+        setVerifiedGstData(null)
+        if (data.error) toast.error(data.error)
+      }
+    } catch (err) {
+      console.warn('GST verification lookup failed:', err)
+      toast.error('Unable to reach GST verification service. Please enter your registered legal name manually.')
+    } finally {
+      setIsVerifyingGst(false)
+    }
+  }
+
+  const handleGstinInputChange = (val: string) => {
     const cleanVal = val.toUpperCase().replace(/[^0-9A-Z]/g, '')
     onGstinChange(cleanVal)
 
     if (cleanVal.length === 15) {
-      try {
-        setIsVerifyingGst(true)
-        const res = await fetch('/api/billing/gst/verify', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ gstin: cleanVal })
-        })
-        const data = await res.json()
-        if (res.ok && data.valid && data.legal_name) {
-          onLegalNameChange(data.legal_name)
-          setVerifiedGstData(data)
-          toast.success(`Taxpayer Verified: ${data.legal_name}`)
-        } else {
-          setVerifiedGstData(null)
-          if (data.error) toast.error(data.error)
-        }
-      } catch (err) {
-        console.warn('GST verification lookup failed:', err)
-      } finally {
-        setIsVerifyingGst(false)
-      }
+      triggerGstVerification(cleanVal)
     } else {
       setVerifiedGstData(null)
     }
@@ -361,25 +373,46 @@ export default function CheckoutPromoAndGSTSection({
                     Company GSTIN (15 Chars) <span className="text-red-500">*</span>
                   </label>
                   {isVerifyingGst && (
-                    <span className="text-[10px] text-zinc-500 flex items-center gap-1 font-mono">
-                      <RefreshCw className="w-2.5 h-2.5 animate-spin" /> Verifying...
+                    <span className="text-[10px] text-amber-600 dark:text-amber-400 flex items-center gap-1 font-mono font-bold animate-pulse">
+                      <RefreshCw className="w-2.5 h-2.5 animate-spin" /> Contacting GST Portal...
                     </span>
                   )}
                 </div>
-                <input
-                  type="text"
-                  maxLength={15}
-                  placeholder="e.g. 27AAPFU0939F1ZV"
-                  value={gstin}
-                  onChange={(e) => handleGstinInputChange(e.target.value)}
-                  className={`w-full bg-[var(--background)] border rounded-xl px-3.5 py-2.5 text-xs font-mono font-bold uppercase text-[var(--heading)] placeholder-[var(--muted)] focus:outline-none transition-colors ${
-                    gstinClean.length === 15
-                      ? gstinValidation?.isValid
-                        ? 'border-emerald-500 focus:border-emerald-500'
-                        : 'border-red-500 focus:border-red-500'
-                      : 'border-[var(--border)] focus:border-zinc-900 dark:focus:border-white'
-                  }`}
-                />
+                <div className="relative">
+                  <input
+                    type="text"
+                    maxLength={15}
+                    placeholder="e.g. 09BECPK9212D2ZP"
+                    value={gstin}
+                    onChange={(e) => handleGstinInputChange(e.target.value)}
+                    className={`w-full bg-[var(--background)] border rounded-xl pl-3.5 pr-24 py-2.5 text-xs font-mono font-bold uppercase text-[var(--heading)] placeholder-[var(--muted)] focus:outline-none transition-colors ${
+                      gstinClean.length === 15
+                        ? gstinValidation?.isValid
+                          ? 'border-emerald-500 focus:border-emerald-500'
+                          : 'border-red-500 focus:border-red-500'
+                        : 'border-[var(--border)] focus:border-zinc-900 dark:focus:border-white'
+                    }`}
+                  />
+                  <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center">
+                    {isVerifyingGst ? (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/25 animate-pulse">
+                        <RefreshCw className="w-2.5 h-2.5 animate-spin" /> Checking
+                      </span>
+                    ) : gstinClean.length === 15 ? (
+                      <button
+                        type="button"
+                        onClick={() => triggerGstVerification(gstinClean)}
+                        className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold bg-zinc-900 hover:bg-black text-white dark:bg-white dark:hover:bg-zinc-200 dark:text-zinc-900 transition-all cursor-pointer shadow-sm active:scale-95"
+                      >
+                        <RefreshCw className="w-2.5 h-2.5" /> Re-fetch
+                      </button>
+                    ) : (
+                      <span className="text-[10px] text-zinc-400 font-mono px-2">
+                        {15 - gstinClean.length} left
+                      </span>
+                    )}
+                  </div>
+                </div>
               </div>
 
               {/* Legal Entity Name */}
@@ -388,22 +421,44 @@ export default function CheckoutPromoAndGSTSection({
                   <label className="block text-[11px] font-bold text-[var(--heading)] uppercase tracking-wider">
                     Registered Legal Entity
                   </label>
-                  {verifiedGstData ? (
+                  {isVerifyingGst ? (
+                    <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400 bg-amber-500/10 border border-amber-500/25 px-2 py-0.5 rounded-full flex items-center gap-1 animate-pulse">
+                      <RefreshCw className="w-2.5 h-2.5 animate-spin" /> Querying GSTN API...
+                    </span>
+                  ) : verifiedGstData?.source === 'gstn_api' ? (
                     <span className="text-[9px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded flex items-center gap-0.5">
-                      <CheckCircle2 className="w-2.5 h-2.5" /> Auto-Fetched
+                      <CheckCircle2 className="w-2.5 h-2.5" /> Auto-Fetched from GSTN
+                    </span>
+                  ) : verifiedGstData?.source === 'directory' || verifiedGstData?.source === 'database' ? (
+                    <span className="text-[9px] font-bold text-blue-600 dark:text-blue-400 bg-blue-500/10 border border-blue-500/20 px-1.5 py-0.5 rounded flex items-center gap-0.5">
+                      <CheckCircle2 className="w-2.5 h-2.5" /> Verified Taxpayer
+                    </span>
+                  ) : verifiedGstData?.source === 'format_verified' ? (
+                    <span className="text-[9px] font-bold text-zinc-600 dark:text-zinc-300 bg-zinc-500/10 border border-zinc-500/20 px-1.5 py-0.5 rounded flex items-center gap-0.5">
+                      <CheckCircle2 className="w-2.5 h-2.5" /> Format Validated
                     </span>
                   ) : null}
                 </div>
-                <input
-                  type="text"
-                  placeholder={isVerifyingGst ? "Fetching government taxpayer name..." : "e.g. Acme Technologies Private Limited"}
-                  value={legalName}
-                  onChange={(e) => onLegalNameChange(e.target.value)}
-                  className="w-full bg-[var(--background)] border border-[var(--border)] rounded-xl px-3.5 py-2.5 text-xs font-semibold text-[var(--heading)] placeholder-[var(--muted)] focus:outline-none focus:border-zinc-900 dark:focus:border-white transition-colors"
-                />
+                <div className="relative">
+                  <input
+                    type="text"
+                    disabled={isVerifyingGst}
+                    placeholder={isVerifyingGst ? "Fetching taxpayer name from GST Network..." : "e.g. Acme Technologies Private Limited"}
+                    value={legalName}
+                    onChange={(e) => onLegalNameChange(e.target.value)}
+                    className={`w-full bg-[var(--background)] border border-[var(--border)] rounded-xl px-3.5 py-2.5 text-xs font-semibold text-[var(--heading)] placeholder-[var(--muted)] focus:outline-none focus:border-zinc-900 dark:focus:border-white transition-colors ${
+                      isVerifyingGst ? 'opacity-70 animate-pulse' : ''
+                    }`}
+                  />
+                  {isVerifyingGst && (
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin text-amber-500" />
+                    </div>
+                  )}
+                </div>
                 {verifiedGstData?.entity_type && (
                   <span className="text-[10px] text-[var(--muted)] mt-1 block">
-                    Entity: {verifiedGstData.entity_type} • Status: {verifiedGstData.status}
+                    Jurisdiction: {verifiedGstData.state} ({verifiedGstData.state_code}) • Entity: {verifiedGstData.entity_type} • Status: {verifiedGstData.status}
                   </span>
                 )}
               </div>
