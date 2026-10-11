@@ -5,9 +5,19 @@ import { cached } from '@/lib/redis'
 export async function GET() {
   try {
     const supabase = await createClient()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    let user: any = null
+    try {
+      const authPromise = supabase.auth.getUser()
+      const timeoutPromise = new Promise<any>((_, reject) =>
+        setTimeout(() => reject(new Error('Auth timeout')), 2500)
+      )
+      const authRes = await Promise.race([authPromise, timeoutPromise])
+      user = authRes?.data?.user ?? null
+    } catch {
+      user = null
+    }
     
-    if (authError || !user) {
+    if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 

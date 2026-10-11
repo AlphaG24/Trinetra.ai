@@ -1,25 +1,56 @@
 import { createClient } from "@/utils/supabase/server"
+import { cookies } from "next/headers"
 import { cached, invalidateCache } from "./redis"
 
 export async function authenticateRequest(): Promise<
   | { authenticated: true; user: any; profile: any; error: null; supabase: any }
   | { authenticated: false; user: null; profile: null; error: string; supabase: any }
 > {
+  const cookieStore = await cookies()
+  const hasAuthCookie = cookieStore.getAll().some(
+    c => c.name.includes('auth-token') || c.name.startsWith('sb-')
+  )
+  if (!hasAuthCookie) {
+    return { authenticated: false, user: null, profile: null, error: "Authentication required", supabase: null }
+  }
+
   const supabase = await createClient()
-  const { data: { user }, error } = await supabase.auth.getUser()
-  if (error || !user) {
+
+  // Guard getUser() with 2.5s timeout per SEC-003 to prevent gateway hangs and client TypeError: Failed to fetch
+  let user: any = null
+  let authError: any = null
+  try {
+    const authPromise = supabase.auth.getUser()
+    const timeoutPromise = new Promise<{ data: { user: null }; error: Error }>((_, reject) =>
+      setTimeout(() => reject(new Error('Auth request timeout')), 2500)
+    )
+    const result = await Promise.race([authPromise, timeoutPromise])
+    user = result?.data?.user ?? null
+    authError = result?.error ?? null
+  } catch (err: any) {
+    authError = err
+  }
+
+  if (authError || !user) {
     return { authenticated: false, user: null, profile: null, error: "Authentication required", supabase }
   }
 
-  // Cache profile lookup in Redis (120s TTL) — this is called on every protected route
-  const profile = await cached(
-    `auth-profile:${user.id}`,
-    async () => {
-      const { data } = await supabase.from('profiles').select('id, role, organization_id, plan_tier, country, additional_agents, additional_phone_numbers').eq('id', user.id).single()
-      return data
-    },
-    120
-  )
+  // Cache profile lookup in Redis (120s TTL) with 2.5s timeout guard
+  let profile: any = null
+  try {
+    const profilePromise = cached(
+      `auth-profile:${user.id}`,
+      async () => {
+        const { data } = await supabase.from('profiles').select('id, role, organization_id, plan_tier, country, additional_agents, additional_phone_numbers').eq('id', user.id).single()
+        return data
+      },
+      120
+    )
+    const profileTimeout = new Promise<any>((resolve) =>
+      setTimeout(() => resolve(null), 2500)
+    )
+    profile = await Promise.race([profilePromise, profileTimeout])
+  } catch {}
 
   if (!profile) {
     return { authenticated: false, user: null, profile: null, error: "Profile not found", supabase }

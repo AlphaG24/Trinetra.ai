@@ -1,127 +1,112 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Globe, Zap, GraduationCap, Shield, PhoneCall, Database } from "lucide-react";
+import { Globe, Zap, GraduationCap, Shield, PhoneCall, Database, ArrowRight } from "lucide-react";
 
 const features = [
   {
+    num: "01",
     id: "lang",
-    icon: <Globe size={28} className="text-[#8B5CF6]" />,
-    colorBg: "bg-[rgba(139,92,246,0.08)]",
-    title: "Multilingual AI",
-    desc: "Our agents speak Hindi, English, and more. Because India doesn't just speak English.",
+    icon: <Globe size={22} className="text-[#0B0F17]" />,
+    title: "MULTILINGUAL VOICE",
+    desc: "Autonomous voice pipelines fluently conversing across Hinglish, Hindi, Tamil, Telugu, and 60+ global languages with sub-second latency.",
   },
   {
+    num: "02",
     id: "heal",
-    icon: <Zap size={28} className="text-[#22D3EE]" />,
-    colorBg: "bg-[rgba(34,211,238,0.08)]",
-    title: "Self-Healing Agents",
-    desc: "Our AI agents detect and fix their own errors. They get smarter with every interaction.",
+    icon: <Zap size={22} className="text-[#0B0F17]" />,
+    title: "SELF-HEALING AGENTS",
+    desc: "Continuous autonomous monitoring that detects tool errors, recovers gracefully mid-call, and self-optimizes with every conversational turn.",
   },
   {
-    id: "shiksha",
-    icon: <GraduationCap size={28} className="text-[#8B5CF6]" />,
-    colorBg: "bg-[rgba(139,92,246,0.08)]",
-    title: "AI-Powered Education",
-    desc: "Empowering institutions with smart assessment engines, dynamic lesson plans, and localized teaching aids aligned with national guidelines.",
-  },
-  {
+    num: "03",
     id: "voice",
-    icon: <PhoneCall size={28} className="text-[#22D3EE]" />,
-    colorBg: "bg-[rgba(34,211,238,0.08)]",
-    title: "Autonomous Voice Workflows",
-    desc: "Deploy custom voice receptionists to manage inbound/outbound calls, schedule appointments, and coordinate workflows in multiple regional languages.",
+    icon: <PhoneCall size={22} className="text-[#0B0F17]" />,
+    title: "AUTONOMOUS RECEPTION",
+    desc: "24/7 inbound receptionists that qualify leads, schedule appointments, handle escalations, and send instant WhatsApp/SMS briefings.",
   },
   {
+    num: "04",
+    id: "shiksha",
+    icon: <GraduationCap size={22} className="text-[#0B0F17]" />,
+    title: "EDUCATION & SHIKSHA",
+    desc: "Specialized pedagogical voice engines for schools, institutes, and entrance exam candidates with curriculum alignment.",
+  },
+  {
+    num: "05",
     id: "data",
-    icon: <Database size={28} className="text-[#FBBF24]" />,
-    colorBg: "bg-[rgba(251,191,36,0.08)]",
-    title: "Intelligent Data Extraction",
-    desc: "Automate document classification and entity extraction. Pull structured datasets from complex tables, PDFs, and invoices with absolute precision.",
+    icon: <Database size={22} className="text-[#0B0F17]" />,
+    title: "STRUCTURED EXTRACTION",
+    desc: "Real-time extraction of caller intent, appointments, CRM records, and structured JSON directly from natural voice conversations.",
   },
   {
+    num: "06",
     id: "sec",
-    icon: <Shield size={28} className="text-[#F59E0B]" />,
-    colorBg: "bg-[rgba(245,158,11,0.08)]",
-    title: "Enterprise Security",
-    desc: "End-to-end encryption, DPDPA compliant, role-based access. Your data never leaves India.",
+    icon: <Shield size={22} className="text-[#0B0F17]" />,
+    title: "ENTERPRISE SECURITY",
+    desc: "DPDP Act 2023 compliant, automated PII scrubbing, 180-day retention splits, strict multi-tenant isolation, and in-country data residency.",
   },
 ];
 
 export function WhyTrinetra() {
   return (
-    <section className="w-full overflow-hidden bg-[#080010] py-[100px]">
-      <div className="mx-auto max-w-[1280px] px-[20px] md:px-[80px]">
-        <div className="mb-[64px] flex flex-col items-center text-center">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.6 }}
-            className="mb-[20px] inline-block rounded-full border border-[rgba(139,92,246,0.15)] bg-[rgba(139,92,246,0.1)] px-[16px] py-[6px] font-sans text-[13px] font-medium text-[#D7C4F7]"
-          >
-            Why Trinetra
-          </motion.div>
-
-          <motion.h2
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.6, delay: 0.1 }}
-            className="mb-[16px] font-display text-[32px] font-bold leading-tight tracking-[-0.02em] text-[#FAF7FF] md:text-[42px]"
-          >
-            Built{" "}
-            <span
-              className="bg-clip-text text-transparent"
-              style={{
-                backgroundImage:
-                  "linear-gradient(135deg, #8B5CF6 0%, #FBBF24 100%)",
-                WebkitBackgroundClip: "text",
-                WebkitTextFillColor: "transparent",
-              }}
-            >
-              Different.
-            </span>{" "}
-            Built for India.
-          </motion.h2>
-
-          <motion.p
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.6, delay: 0.2 }}
-            className="mx-auto max-w-[600px] font-sans text-[16px] font-normal leading-[1.6] text-[#B8B0D1] md:text-[18px]"
-          >
-            While others copy Silicon Valley, we build for the realities of Indian businesses.
-          </motion.p>
+    <section id="solutions" className="w-full bg-white py-20 px-6 sm:px-10 lg:px-16">
+      <div className="mx-auto max-w-[1536px]">
+        
+        {/* Section Top Bar (Matching Reference Image "■ WHAT I DO" / "SOLVING PROBLEMS WITH DESIGN") */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-8 mb-10 border-b border-slate-200/90 gap-4">
+          <div className="flex items-center gap-2.5">
+            <span className="w-2.5 h-2.5 rounded-[1px] bg-[#84CC16]" />
+            <h2 className="text-[13px] font-mono tracking-[0.2em] uppercase font-bold text-[#0B0F17]">
+              WHAT WE DO
+            </h2>
+          </div>
+          <span className="text-[11px] font-mono tracking-[0.2em] uppercase text-slate-500 font-semibold">
+            SOLVING PROBLEMS WITH VOICE &amp; AI
+          </span>
         </div>
 
-        <div className="grid grid-cols-1 gap-[20px] md:grid-cols-3">
+        {/* Grid of Luminous White Cards (Matching 01, 02, 03, 04 Card Style in Reference Image) */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {features.map((feature, idx) => (
             <motion.div
               key={feature.id}
-              initial={{ opacity: 0, y: 30 }}
+              initial={{ opacity: 0, y: 25 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
-              transition={{ duration: 0.6, delay: 0.1 * idx }}
-              className="group rounded-[16px] border border-[#1E0A35] bg-[#130224] p-[32px] transition-all duration-300 hover:-translate-y-[2px] hover:border-[#2D1255]"
+              transition={{ duration: 0.5, delay: 0.08 * idx }}
+              className="group relative flex flex-col justify-between rounded-2xl bg-white border border-slate-200/90 p-8 shadow-[0_4px_20px_rgba(0,0,0,0.03)] hover:border-lime-400 hover:shadow-[0_12px_36px_rgba(132,204,22,0.12)] transition-all duration-300"
             >
-              <div
-                className={`mb-[20px] flex h-[48px] w-[48px] items-center justify-center rounded-[12px] ${feature.colorBg}`}
-              >
-                {feature.icon}
+              <div>
+                {/* Header: Icon on Left, Lime Numeric Badge on Right */}
+                <div className="flex items-center justify-between mb-6">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-50 border border-slate-200 group-hover:border-[#84CC16] group-hover:bg-[#84CC16]/10 transition-colors">
+                    {feature.icon}
+                  </div>
+                  <span className="font-mono text-sm font-bold text-[#84CC16]">
+                    {feature.num}
+                  </span>
+                </div>
+
+                {/* Card Title & Desc */}
+                <h3 className="text-base font-bold text-[#0B0F17] tracking-tight mb-2.5 uppercase font-mono">
+                  {feature.title}
+                </h3>
+                <p className="text-[13px] text-slate-600 leading-relaxed font-sans">
+                  {feature.desc}
+                </p>
               </div>
 
-              <h3 className="mb-[10px] font-display text-[18px] font-semibold text-[#FAF7FF]">
-                {feature.title}
-              </h3>
-
-              <p className="font-sans text-[14px] font-normal leading-[1.6] text-[#B8B0D1]">
-                {feature.desc}
-              </p>
+              {/* Bottom Right Corner Arrow */}
+              <div className="mt-8 flex justify-end">
+                <span className="text-slate-400 group-hover:text-[#84CC16] group-hover:translate-x-1 transition-all duration-200 text-sm">
+                  →
+                </span>
+              </div>
             </motion.div>
           ))}
         </div>
+
       </div>
     </section>
   );

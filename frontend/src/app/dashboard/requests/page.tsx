@@ -5,8 +5,20 @@ import { createClient } from '@/utils/supabase/client'
 import { Phone, Globe, Shield, Send, CheckCircle2, AlertTriangle, XCircle, Clock, Plus, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import useSWR from 'swr'
+import { AnnouncementBannerManager } from '@/components/dashboard/AnnouncementBannerManager'
+import { DemoAgentsManager } from '@/components/dashboard/DemoAgentsManager'
 
-const fetcher = (url: string) => fetch(url).then(res => res.json())
+const fetcher = async (url: string) => {
+  try {
+    const res = await fetch(url)
+    if (!res.ok) {
+      return { success: false, data: [], error: `HTTP ${res.status}` }
+    }
+    return await res.json()
+  } catch (err: any) {
+    return { success: false, data: [], error: err?.message || 'Network error' }
+  }
+}
 
 interface RequestData {
   id: string
@@ -37,22 +49,33 @@ export default function RequestsPage() {
   const [agents, setAgents] = useState<Agent[]>([])
   const [userRole, setUserRole] = useState<string | null>(null)
 
-  const { data, error, isLoading, mutate } = useSWR('/api/developer/requests', fetcher)
+  const { data, error, isLoading, mutate } = useSWR('/api/developer/requests', fetcher, {
+    revalidateOnFocus: false,
+    shouldRetryOnError: false,
+    errorRetryCount: 1,
+  })
 
   useEffect(() => {
+    let isMounted = true
     const init = async () => {
       try {
         const supabase = createClient()
-        const { data: { user } } = await supabase.auth.getUser()
-        if (user) {
+        let user: any = null
+        try {
+          const authRes = await supabase.auth.getUser()
+          user = authRes?.data?.user ?? null
+        } catch {
+          user = null
+        }
+        if (user && isMounted) {
           // Fetch role
           const { data: profile } = await supabase
             .from('profiles')
             .select('role, organization_id')
             .eq('id', user.id)
-            .single()
+            .maybeSingle()
 
-          if (profile) {
+          if (profile && isMounted) {
             setUserRole(profile.role)
 
             // Fetch agents for dropdown
@@ -62,7 +85,7 @@ export default function RequestsPage() {
               .eq('organization_id', profile.organization_id)
               .neq('status', 'deleted')
             
-            if (userAgents) {
+            if (userAgents && isMounted) {
               setAgents(userAgents)
               if (userAgents.length > 0) {
                 setSelectedAgentId(userAgents[0].id)
@@ -75,6 +98,9 @@ export default function RequestsPage() {
       }
     }
     init()
+    return () => {
+      isMounted = false
+    }
   }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -202,6 +228,12 @@ export default function RequestsPage() {
           </button>
         )}
       </div>
+
+      {/* Topbar Announcement & Special Offers Manager */}
+      <AnnouncementBannerManager />
+
+      {/* Homepage Live Demo Agents Manager (Developer Tester Account) */}
+      <DemoAgentsManager />
 
       {/* Requests List */}
       <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl overflow-hidden shadow-xl">

@@ -1,4 +1,3 @@
-import { Fragment } from "react";
 import { createClient } from "@supabase/supabase-js";
 
 function formatLink(url: string | null) {
@@ -33,53 +32,85 @@ export async function MetricsBar() {
   // Hardcode Trinetra Shiksha since it is a separate platform
   const listItems = [
     { name: "Trinetra Shiksha", subdomain_url: "https://shiksha.trinetraedu-ai.com" },
-    ...services.map(s => ({
+    ...services.map((s) => ({
       name: s.name,
-      subdomain_url: s.subdomain_url
-    }))
+      subdomain_url: s.subdomain_url,
+    })),
   ];
 
-  // Repeat list items to make sure it fills the screen even on very large displays
-  const repeatedItems = Array(6).fill(listItems).flat();
-
-  const content = (
-    <div className="flex items-center w-max pr-[20px] animate-marquee group-hover:[animation-play-state:paused]">
-      {repeatedItems.map((item, idx) => {
-        const hasExternalLink = item.subdomain_url && item.subdomain_url.trim() !== "";
-        const href = formatLink(item.subdomain_url);
-        
-        return (
-          <Fragment key={idx}>
-            <a
-              href={href}
-              target={hasExternalLink ? "_blank" : undefined}
-              rel={hasExternalLink ? "noopener noreferrer" : undefined}
-              className="font-sans text-[16px] font-medium tracking-[0.05em] text-[#B8B0D1] hover:text-[#F59E0B] transition-all duration-300 hover:scale-105 whitespace-nowrap"
-            >
-              {item.name}
-            </a>
-            <span className="text-[#8B5CF6] text-[12px] mx-[32px] shrink-0 drop-shadow-[0_0_8px_rgba(139,92,246,0.8)]">
-              ◆
-            </span>
-          </Fragment>
-        );
-      })}
-    </div>
-  );
+  // Repeat list items to comfortably fill width on large monitors
+  const repeatedItems = Array(4).fill(listItems).flat();
 
   return (
-    <section className="w-full bg-[#0C0118] border-y border-[rgba(139,92,246,0.08)] py-[26px] overflow-hidden flex relative group">
-      <div 
-        className="flex w-full"
+    <section className="w-full pt-4 sm:pt-6 md:pt-8 pb-12 sm:pb-16 bg-transparent overflow-hidden flex flex-col items-center relative group select-none z-10">
+      <style>{`
+        @keyframes marqueeContinuous {
+          0% {
+            transform: translateX(0%);
+          }
+          100% {
+            transform: translateX(-50%);
+          }
+        }
+      `}</style>
+
+      {/* Marquee with smooth edge feathering mask */}
+      <div
+        className="flex w-full relative"
         style={{
-          maskImage: 'linear-gradient(to right, transparent, black 10%, black 90%, transparent)',
-          WebkitMaskImage: 'linear-gradient(to right, transparent, black 10%, black 90%, transparent)'
+          maskImage:
+            "linear-gradient(to right, transparent 0%, black 15%, black 85%, transparent 100%)",
+          WebkitMaskImage:
+            "linear-gradient(to right, transparent 0%, black 15%, black 85%, transparent 100%)",
         }}
       >
-        <div className="flex w-max">
-          {/* We render the row twice side-by-side to allow seamless infinite scrolling */}
-          {content}
-          {content}
+        {/* Single animated track that translates -50% with two static sibling blocks */}
+        <div
+          className="flex w-max shrink-0 items-center group-hover:[animation-play-state:paused]"
+          style={{
+            animation: "marqueeContinuous 130s linear infinite",
+            willChange: "transform",
+          }}
+        >
+          {/* Track 1: First continuous set */}
+          <div className="flex shrink-0 items-center">
+            {repeatedItems.map((item, idx) => {
+              const hasExternalLink = item.subdomain_url && item.subdomain_url.trim() !== "";
+              const href = formatLink(item.subdomain_url);
+
+              return (
+                <a
+                  key={`track-1-${idx}`}
+                  href={href}
+                  target={hasExternalLink ? "_blank" : undefined}
+                  rel={hasExternalLink ? "noopener noreferrer" : undefined}
+                  className="shrink-0 whitespace-nowrap mx-8 sm:mx-12 font-[family-name:var(--font-playfair),Georgia,serif] font-bold text-[15px] sm:text-[16px] md:text-[17px] tracking-[0.12em] uppercase text-[#111827] hover:text-emerald-700 transition-colors duration-200 cursor-pointer"
+                >
+                  {item.name}
+                </a>
+              );
+            })}
+          </div>
+
+          {/* Track 2: Identical sibling set ensuring seamless infinite loop with zero overlap */}
+          <div className="flex shrink-0 items-center" aria-hidden="true">
+            {repeatedItems.map((item, idx) => {
+              const hasExternalLink = item.subdomain_url && item.subdomain_url.trim() !== "";
+              const href = formatLink(item.subdomain_url);
+
+              return (
+                <a
+                  key={`track-2-${idx}`}
+                  href={href}
+                  target={hasExternalLink ? "_blank" : undefined}
+                  rel={hasExternalLink ? "noopener noreferrer" : undefined}
+                  className="shrink-0 whitespace-nowrap mx-8 sm:mx-12 font-[family-name:var(--font-playfair),Georgia,serif] font-bold text-[15px] sm:text-[16px] md:text-[17px] tracking-[0.12em] uppercase text-[#111827] hover:text-emerald-700 transition-colors duration-200 cursor-pointer"
+                >
+                  {item.name}
+                </a>
+              );
+            })}
+          </div>
         </div>
       </div>
     </section>

@@ -1,307 +1,176 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import Image from "next/image";
+import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Phone, X, Loader2 } from "lucide-react";
+import Image from "next/image";
+import { Phone, X, Loader2, Sparkles, Volume2 } from "lucide-react";
 import { toast } from "sonner";
-import { HeroOrb } from "./HeroOrb";
+import { PlasmaEnergyRing } from "./PlasmaEnergyRing";
 
-// Multilingual Greetings System Floating Freely (95% Reference Fidelity)
-interface FloatingGreeting {
-  id: string;
+interface GreetingWord {
   text: string;
-  script: string;
-  color: string;
-  activeColor: string;
-  left: string;
-  top: string;
-  fontSize: string;
-  fontClass: string;
-  initialOpacity: number;
-  driftX: number;
-  driftY: number;
-  duration: number;
+  phonetic: string;
+  lang: string;
+  langName: string;
+  pos: string;
   delay: number;
-  activeOrder: number;
 }
 
-const GREETINGS: FloatingGreeting[] = [
-  // Top Center - Sanskrit / Hindi "नमस्ते" (Highlighted Muted Terracotta in reference)
-  {
-    id: "namaste",
-    text: "नमस्ते",
-    script: "Devanagari",
-    color: "#C65B32",
-    activeColor: "#D9481E",
-    left: "50%",
-    top: "14%",
-    fontSize: "text-xl sm:text-2xl md:text-[26px]",
-    fontClass: "font-serif font-medium",
-    initialOpacity: 0.85,
-    driftX: 2,
-    driftY: -4,
-    duration: 6,
-    delay: 0,
-    activeOrder: 1,
-  },
-  // Upper Left - English "Hello"
-  {
-    id: "hello-1",
-    text: "Hello",
-    script: "Latin",
-    color: "#4A4036",
-    activeColor: "#171513",
-    left: "35%",
-    top: "14%",
-    fontSize: "text-lg sm:text-xl md:text-[22px]",
-    fontClass: "font-sans font-normal",
-    initialOpacity: 0.5,
-    driftX: -3,
-    driftY: -3,
-    duration: 7,
-    delay: 0.8,
-    activeOrder: 2,
-  },
-  // Upper Left - Marathi / Hindi "नमस्कार"
-  {
-    id: "namaskar",
-    text: "नमस्कार",
-    script: "Devanagari",
-    color: "#C65B32",
-    activeColor: "#D9481E",
-    left: "29%",
-    top: "26%",
-    fontSize: "text-lg sm:text-xl md:text-[22px]",
-    fontClass: "font-serif font-normal",
-    initialOpacity: 0.75,
-    driftX: -4,
-    driftY: 2,
-    duration: 6.5,
-    delay: 0.3,
-    activeOrder: 3,
-  },
-  // Upper Right - Tamil "வணக்கம்"
-  {
-    id: "vanakkam",
-    text: "வணக்கம்",
-    script: "Tamil",
-    color: "#171513",
-    activeColor: "#C65B32",
-    left: "67%",
-    top: "15%",
-    fontSize: "text-lg sm:text-xl md:text-[22px]",
-    fontClass: "font-medium",
-    initialOpacity: 0.75,
-    driftX: 3,
-    driftY: -3,
-    duration: 8,
-    delay: 1.2,
-    activeOrder: 4,
-  },
-  // Upper Right - Arabic/Urdu "Salaam"
-  {
-    id: "salaam",
-    text: "Salaam",
-    script: "Latin/Urdu",
-    color: "#5C70A8",
-    activeColor: "#2B4C7E",
-    left: "72%",
-    top: "23%",
-    fontSize: "text-base sm:text-lg md:text-[20px]",
-    fontClass: "font-serif italic",
-    initialOpacity: 0.55,
-    driftX: 4,
-    driftY: 3,
-    duration: 7.2,
-    delay: 1.6,
-    activeOrder: 5,
-  },
-  // Upper Right - Spanish "Hola"
-  {
-    id: "hola",
-    text: "Hola",
-    script: "Latin",
-    color: "#4A4036",
-    activeColor: "#171513",
-    left: "81%",
-    top: "27%",
-    fontSize: "text-base sm:text-lg md:text-[19px]",
-    fontClass: "font-sans",
-    initialOpacity: 0.5,
-    driftX: 2,
-    driftY: -2,
-    duration: 6.8,
-    delay: 2.1,
-    activeOrder: 6,
-  },
-  // Left Mid - Sanskrit "हृदा"
-  {
-    id: "hrida",
-    text: "हृदा",
-    script: "Devanagari",
-    color: "#8C7A68",
-    activeColor: "#C65B32",
-    left: "27%",
-    top: "41%",
-    fontSize: "text-sm sm:text-base md:text-[17px]",
-    fontClass: "font-serif",
-    initialOpacity: 0.6,
-    driftX: -3,
-    driftY: -2,
-    duration: 7.5,
-    delay: 0.5,
-    activeOrder: 7,
-  },
-  // Left Lower - Punjabi "ਸਤਿ ਸ੍ਰੀ ਅਕਾਲ"
-  {
-    id: "sat-sri-akal",
-    text: "ਸਤਿ ਸ੍ਰੀ ਅਕਾਲ",
-    script: "Gurmukhi",
-    color: "#171513",
-    activeColor: "#C65B32",
-    left: "28%",
-    top: "54%",
-    fontSize: "text-sm sm:text-base md:text-[18px]",
-    fontClass: "font-medium",
-    initialOpacity: 0.7,
-    driftX: -2,
-    driftY: 3,
-    duration: 8.5,
-    delay: 1.4,
-    activeOrder: 8,
-  },
-  // Left Lower - French "Bonjour"
-  {
-    id: "bonjour",
-    text: "Bonjour",
-    script: "Latin",
-    color: "#4A4036",
-    activeColor: "#171513",
-    left: "35%",
-    top: "66%",
-    fontSize: "text-base sm:text-lg md:text-[20px]",
-    fontClass: "font-serif italic",
-    initialOpacity: 0.55,
-    driftX: -3,
-    driftY: 2,
-    duration: 6.2,
-    delay: 2.5,
-    activeOrder: 9,
-  },
-  // Right Mid - English "Hello"
-  {
-    id: "hello-2",
-    text: "Hello",
-    script: "Latin",
-    color: "#5C70A8",
-    activeColor: "#2B4C7E",
-    left: "74%",
-    top: "43%",
-    fontSize: "text-base sm:text-lg md:text-[20px]",
-    fontClass: "font-sans",
-    initialOpacity: 0.5,
-    driftX: 3,
-    driftY: -3,
-    duration: 7.8,
-    delay: 1.9,
-    activeOrder: 10,
-  },
-  // Right Mid - Japanese "こんにちは"
-  {
-    id: "konnichiwa",
-    text: "こんにちは",
-    script: "Japanese",
-    color: "#171513",
-    activeColor: "#C65B32",
-    left: "75%",
-    top: "52%",
-    fontSize: "text-sm sm:text-base md:text-[17px]",
-    fontClass: "font-sans",
-    initialOpacity: 0.65,
-    driftX: 2,
-    driftY: 2,
-    duration: 8,
-    delay: 2.2,
-    activeOrder: 11,
-  },
-  // Right Lower - Arabic "مرحباً"
-  {
-    id: "marhaban",
-    text: "مرحباً",
-    script: "Arabic",
-    color: "#171513",
-    activeColor: "#C65B32",
-    left: "66%",
-    top: "67%",
-    fontSize: "text-lg sm:text-xl md:text-[23px]",
-    fontClass: "font-serif",
-    initialOpacity: 0.75,
-    driftX: 3,
-    driftY: 3,
-    duration: 7,
-    delay: 0.9,
-    activeOrder: 12,
-  },
+const MULTILINGUAL_GREETINGS: GreetingWord[] = [
+  // Top center - prominent Hindi safely above ring
+  { text: "नमस्ते", phonetic: "Namaste", lang: "hi-IN", langName: "Hindi", pos: "-top-10 sm:-top-12 left-1/2 -translate-x-1/2", delay: 0 },
+  // Top left - English
+  { text: "Hello", phonetic: "Hello", lang: "en-US", langName: "English", pos: "-top-3 sm:-top-6 left-[1%] sm:left-[4%]", delay: 0.3 },
+  // Mid upper left - Marathi
+  { text: "नमस्कार", phonetic: "Namaskar", lang: "mr-IN", langName: "Marathi", pos: "top-[24%] -left-14 sm:-left-20 md:-left-24", delay: 0.6 },
+  // Mid lower left - Punjabi
+  { text: "ਸਤਿ ਸ੍ਰੀ ਅਕਾਲ", phonetic: "Sat Sri Akal", lang: "pa-IN", langName: "Punjabi", pos: "bottom-[24%] -left-14 sm:-left-20 md:-left-24", delay: 0.9 },
+  // Bottom left - French
+  { text: "Bonjour", phonetic: "Bonjour", lang: "fr-FR", langName: "French", pos: "-bottom-10 sm:-bottom-12 left-[4%] sm:left-[8%]", delay: 1.2 },
+  // Top right - Tamil
+  { text: "வணக்கம்", phonetic: "Vanakkam", lang: "ta-IN", langName: "Tamil", pos: "-top-3 sm:-top-6 right-[1%] sm:right-[4%]", delay: 1.5 },
+  // Upper mid right - Urdu / Salaam
+  { text: "Salaam", phonetic: "Salaam", lang: "ur-IN", langName: "Urdu", pos: "top-[22%] -right-14 sm:-right-20 md:-right-24", delay: 1.8 },
+  // Mid right - Spanish
+  { text: "Hola", phonetic: "Hola", lang: "es-ES", langName: "Spanish", pos: "top-[46%] -right-14 sm:-right-20 md:-right-24", delay: 2.1 },
+  // Lower right - Japanese
+  { text: "こんにちは", phonetic: "Konnichiwa", lang: "ja-JP", langName: "Japanese", pos: "bottom-[24%] -right-14 sm:-right-20 md:-right-24", delay: 2.4 },
+  // Bottom right - Arabic
+  { text: "مرحباً", phonetic: "Marhaban", lang: "ar-SA", langName: "Arabic", pos: "-bottom-10 sm:-bottom-12 right-[4%] sm:right-[8%]", delay: 2.7 },
 ];
 
 export function Hero() {
-  const [isActive, setIsActive] = useState(false);
-  const [activeStep, setActiveStep] = useState<number>(0);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [phoneInput, setPhoneInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [speakingWord, setSpeakingWord] = useState<string | null>(null);
+  const [announcementText, setAnnouncementText] = useState("How Autonomous Voice Agents handle complex Indian calls");
 
-  // Trigger interactive "Hear Vaakriti" activation
-  const handleActivateVoice = () => {
-    setIsActive(true);
-    setActiveStep(1);
-
-    // Sequential illumination of greetings
-    let step = 1;
-    const interval = setInterval(() => {
-      step++;
-      if (step > 12) {
-        clearInterval(interval);
-      } else {
-        setActiveStep(step);
-      }
-    }, 280);
-
-    // Audio preview via Web Speech API
+  // Prime speech synthesis voices
+  React.useEffect(() => {
     if (typeof window !== "undefined" && "speechSynthesis" in window) {
-      window.speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance(
-        "Namaste. Main Vaakriti hoon. The creation of voice."
-      );
-      utterance.rate = 0.95;
-      utterance.pitch = 1.05;
-
-      const voices = window.speechSynthesis.getVoices();
-      const indianVoice = voices.find(
-        (v) =>
-          v.lang.includes("hi") ||
-          v.lang.includes("en-IN") ||
-          v.name.toLowerCase().includes("india")
-      );
-      if (indianVoice) utterance.voice = indianVoice;
-
-      utterance.onend = () => {
-        setIsActive(false);
-        setActiveStep(0);
+      window.speechSynthesis.getVoices();
+      const handleVoicesChanged = () => {
+        window.speechSynthesis.getVoices();
       };
-      utterance.onerror = () => {
-        setIsActive(false);
-        setActiveStep(0);
+      window.speechSynthesis.onvoiceschanged = handleVoicesChanged;
+      return () => {
+        window.speechSynthesis.onvoiceschanged = null;
       };
-      window.speechSynthesis.speak(utterance);
-    } else {
-      setTimeout(() => {
-        setIsActive(false);
-        setActiveStep(0);
-      }, 4000);
+    }
+  }, []);
+
+  // Web Audio Harmonic Vocal Chime (guaranteed instant audio playback on click)
+  const playAgentChime = () => {
+    try {
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+      if (ctx.state === "suspended") {
+        ctx.resume();
+      }
+      const now = ctx.currentTime;
+
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(587.33, now); // D5
+      osc.frequency.exponentialRampToValueAtTime(880.0, now + 0.08); // A5
+
+      gain.gain.setValueAtTime(0.001, now);
+      gain.gain.linearRampToValueAtTime(0.20, now + 0.015);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.35);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.start(now);
+      osc.stop(now + 0.38);
+    } catch {
+      // AudioContext fallback
     }
   };
+
+  const handleSpeakGreeting = (g: GreetingWord) => {
+    if (typeof window === "undefined") return;
+
+    // 1. Play immediate pleasant agent voice chime
+    playAgentChime();
+
+    setSpeakingWord(g.text);
+
+    // 2. Play speech synthesis with phonetic voice fallback
+    if ("speechSynthesis" in window) {
+      try {
+        window.speechSynthesis.resume();
+        window.speechSynthesis.cancel();
+
+        // 35ms timeout bypasses Chrome cancel-and-speak bug
+        setTimeout(() => {
+          const voices = window.speechSynthesis.getVoices();
+          const prefix = g.lang.split("-")[0].toLowerCase();
+          const matched =
+            voices.find((v) => v.lang.toLowerCase() === g.lang.toLowerCase()) ||
+            voices.find((v) => v.lang.toLowerCase().startsWith(prefix));
+
+          // If OS has native language voice (e.g. Hindi/Tamil voice installed), speak native script.
+          // Otherwise, pass phonetic pronunciation (e.g. "Namaste", "Vanakkam") so default/English OS voice speaks it aloud!
+          const textToSpeak = matched ? g.text : g.phonetic;
+          const utterance = new SpeechSynthesisUtterance(textToSpeak);
+
+          if (matched) {
+            utterance.voice = matched;
+            utterance.lang = g.lang;
+          } else {
+            utterance.lang = "en-US";
+          }
+
+          utterance.rate = 0.90;
+          utterance.pitch = 1.05;
+          utterance.volume = 1.0;
+
+          utterance.onend = () => {
+            setSpeakingWord((curr) => (curr === g.text ? null : curr));
+          };
+          utterance.onerror = () => {
+            setSpeakingWord((curr) => (curr === g.text ? null : curr));
+          };
+
+          window.speechSynthesis.speak(utterance);
+        }, 35);
+      } catch (e) {
+        console.error("SpeechSynthesis error:", e);
+        setTimeout(() => setSpeakingWord(null), 1200);
+      }
+    } else {
+      setTimeout(() => setSpeakingWord(null), 1200);
+    }
+
+    toast.success(`Agent speaking in ${g.langName}: "${g.text}"`, {
+      icon: <Volume2 className="w-4 h-4 text-emerald-600 animate-pulse" />,
+      duration: 2200,
+    });
+  };
+
+  React.useEffect(() => {
+    fetch("/api/public/announcement")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data?.announcement?.text) {
+          setAnnouncementText(data.announcement.text);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  React.useEffect(() => {
+    const handleOpen = () => setIsModalOpen(true);
+    if (typeof window !== "undefined") {
+      window.addEventListener("open-hero-callback-modal", handleOpen);
+      return () => window.removeEventListener("open-hero-callback-modal", handleOpen);
+    }
+  }, []);
 
   const handlePhoneSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -336,193 +205,149 @@ export function Hero() {
   };
 
   return (
-    <section className="relative w-full h-screen min-h-[780px] max-h-[1100px] flex flex-col justify-between overflow-hidden bg-[#F7F3EA] text-[#171513] select-none pt-[72px]">
-      
-      {/* ── 1. BACKGROUND: WARM IVORY WITH EXTREMELY SUBTLE GRAIN ── */}
-      <div
-        className="pointer-events-none absolute inset-0 z-0 opacity-20"
-        style={{
-          backgroundImage:
-            "radial-gradient(#9C8E7E 0.6px, transparent 0.6px)",
-          backgroundSize: "28px 28px",
-        }}
-      />
+    <section className="relative w-full bg-transparent text-[#111827] select-none pt-[112px] sm:pt-[124px] md:pt-[132px] pb-2 sm:pb-4 px-4 sm:px-8 flex flex-col items-center z-10">
 
-      {/* ── 2. LEFT SIDE ARCHITECTURAL ILLUSTRATION (ROOT: "BORN IN INDIA") ── */}
-      {/* (Fine ink illustration / architectural sketch / old engraving, very low contrast, fading into ivory) */}
-      <div className="pointer-events-none absolute left-0 bottom-0 top-[72px] w-[46%] sm:w-[40%] md:w-[35%] lg:w-[30%] z-0 overflow-hidden">
-        <div className="relative w-full h-full opacity-22 grayscale contrast-80 sepia-[0.35] mix-blend-multiply">
-          <Image
-            src="/images/varanasi-ghats.jpg"
-            alt="Ancient Indian Architectural Roots"
-            fill
-            className="object-cover object-left-bottom"
-            priority
+      {/* ── 2. MAIN HEADING: CRISP DARK CHARCOAL (#111827), CENTERED ── */}
+      <div className="relative z-10 max-w-4xl mx-auto w-full flex flex-col items-center text-center mb-8 sm:mb-10 md:mb-12">
+        <motion.h1
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.1 }}
+          className="text-[40px] sm:text-[52px] md:text-[62px] lg:text-[70px] font-medium tracking-tight text-[#111827] leading-[1.06]"
+          style={{ fontFamily: 'var(--font-playfair), "Playfair Display", Georgia, serif' }}
+        >
+          Voice for all from India
+        </motion.h1>
+      </div>
+
+      {/* ── 3. CENTERPIECE: PLASMA ENERGY RING SURROUNDED BY MULTILINGUAL GREETINGS (ZERO OVERLAP) ── */}
+      <motion.div
+        initial={{ opacity: 0, scale: 0.94 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 0.7, delay: 0.2 }}
+        className="relative z-10 w-full max-w-[560px] sm:max-w-[620px] md:max-w-[660px] h-[360px] sm:h-[400px] md:h-[430px] flex items-center justify-center mb-4 sm:mb-6 md:mb-8"
+      >
+        {/* Plasma Energy Ring Portal in the Center */}
+        <div className="relative flex items-center justify-center w-[340px] h-[340px] sm:w-[390px] sm:h-[390px] md:w-[420px] md:h-[420px]">
+          {/* Luminous Light-Pocket behind the ring to preserve its vibrant radial glow without cover up */}
+          <div
+            className="pointer-events-none absolute -inset-8 rounded-full opacity-70 blur-2xl"
+            style={{
+              background:
+                "radial-gradient(circle, rgba(255, 255, 255, 0.85) 0%, rgba(255, 255, 255, 0.45) 50%, transparent 80%)",
+            }}
           />
-          {/* Smooth feather mask to blend into warm ivory */}
-          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-[#F7F3EA]/30 to-[#F7F3EA]" />
-          <div className="absolute inset-0 bg-gradient-to-t from-[#F7F3EA] via-transparent to-[#F7F3EA]/70" />
+
+          <PlasmaEnergyRing
+            size={420}
+            onRingClick={() => setIsModalOpen(true)}
+            className="w-full h-full relative z-10"
+          />
+
+          {/* ── MULTILINGUAL GREETINGS (CLICK TO HEAR AI AGENT SPEAK IN THAT LANGUAGE) ── */}
+          {MULTILINGUAL_GREETINGS.map((g, idx) => {
+            const isSpeaking = speakingWord === g.text;
+            return (
+              <motion.div
+                key={g.text}
+                initial={{ opacity: 0, scale: 0.7 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{
+                  duration: 0.5,
+                  delay: 0.25 + g.delay * 0.12,
+                  ease: "easeOut",
+                }}
+                className={`absolute z-30 select-none ${g.pos} whitespace-nowrap`}
+              >
+                <motion.button
+                  type="button"
+                  onClick={() => handleSpeakGreeting(g)}
+                  whileHover={{ scale: 1.08 }}
+                  whileTap={{ scale: 0.95 }}
+                  animate={{
+                    y: isSpeaking ? [0, -3, 0] : [0, -2.5, 0],
+                  }}
+                  transition={{
+                    y: {
+                      duration: isSpeaking ? 0.7 : 3 + (idx % 3) * 0.7,
+                      repeat: Infinity,
+                      ease: "easeInOut",
+                      delay: idx * 0.15,
+                    },
+                  }}
+                  className={`group relative flex items-center gap-1.5 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-full text-xs sm:text-sm font-medium transition-all duration-200 cursor-pointer shadow-xs ${
+                    isSpeaking
+                      ? "bg-emerald-50 text-emerald-950 border border-emerald-400 ring-2 ring-emerald-400/40 shadow-[0_0_18px_rgba(16,185,129,0.35)] scale-105"
+                      : "bg-white/90 text-slate-800 border border-slate-200/80 hover:border-emerald-300 hover:bg-white hover:text-emerald-950 hover:shadow-md backdrop-blur-md"
+                  }`}
+                  title={`Click to hear agent speak "${g.text}" in ${g.langName}`}
+                  aria-label={`Listen to ${g.text} in ${g.langName}`}
+                >
+                  <span className="font-semibold tracking-wide">{g.text}</span>
+
+                  {isSpeaking ? (
+                    <span className="flex items-center gap-0.5 ml-0.5 h-3">
+                      <motion.span
+                        animate={{ height: ["3px", "11px", "3px"] }}
+                        transition={{ duration: 0.45, repeat: Infinity, ease: "easeInOut" }}
+                        className="w-0.5 bg-emerald-600 rounded-full"
+                      />
+                      <motion.span
+                        animate={{ height: ["7px", "14px", "5px"] }}
+                        transition={{ duration: 0.55, repeat: Infinity, ease: "easeInOut", delay: 0.1 }}
+                        className="w-0.5 bg-emerald-600 rounded-full"
+                      />
+                      <motion.span
+                        animate={{ height: ["4px", "9px", "4px"] }}
+                        transition={{ duration: 0.4, repeat: Infinity, ease: "easeInOut", delay: 0.2 }}
+                        className="w-0.5 bg-emerald-600 rounded-full"
+                      />
+                    </span>
+                  ) : (
+                    <Volume2 className="w-3 h-3 text-slate-400 group-hover:text-emerald-600 opacity-60 group-hover:opacity-100 transition-colors" />
+                  )}
+                </motion.button>
+              </motion.div>
+            );
+          })}
         </div>
-      </div>
+      </motion.div>
 
-      {/* ── 3. RIGHT SIDE EXPANSIVE WHITESPACE & ORBITAL TRAJECTORIES (REACH) ── */}
-      <div className="pointer-events-none absolute right-0 top-[72px] bottom-0 w-[45%] z-0 hidden md:block opacity-25">
-        <svg
-          viewBox="0 0 600 600"
-          className="w-full h-full text-[#A89886]"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="0.65"
-        >
-          {/* Subtle orbital trajectories extending right */}
-          <ellipse cx="260" cy="300" rx="220" ry="240" strokeDasharray="3 5" />
-          <ellipse cx="260" cy="300" rx="300" ry="320" strokeDasharray="2 7" />
-          <path d="M 80 280 Q 260 220 520 310" strokeDasharray="4 6" />
-          {/* Tiny orbital nodes */}
-          <circle cx="340" cy="240" r="2.5" fill="currentColor" />
-          <circle cx="480" cy="305" r="3" fill="currentColor" />
-        </svg>
-      </div>
-
-      {/* ── 4. MICROCOPY ANNOTATIONS ── */}
-      {/* Upper-Right Microcopy: "From India / To Everywhere" */}
-      <div className="absolute right-8 sm:right-12 md:right-20 top-24 sm:top-28 z-10 text-right select-none">
-        <p className="font-sans text-[12px] sm:text-[13px] md:text-[14px] font-normal text-[#574B3E] leading-tight">
-          From India
-        </p>
-        <p className="font-sans text-[12px] sm:text-[13px] md:text-[14px] font-normal text-[#574B3E] leading-tight">
-          To Everywhere
-        </p>
-      </div>
-
-      {/* Far-Right Edge Microcopy: "The world speaks. / We listen." */}
-      <div className="absolute right-6 sm:right-10 md:right-16 top-1/2 -translate-y-1/2 z-10 hidden lg:flex flex-col items-end gap-1.5 select-none text-right">
-        <span className="w-1.5 h-1.5 rounded-full bg-[#171513] mb-1" />
-        <p className="font-sans text-[11px] sm:text-[12px] text-[#6E6050] leading-snug">
-          The world speaks.
-        </p>
-        <p className="font-sans text-[11px] sm:text-[12px] text-[#6E6050] leading-snug">
-          We listen.
-        </p>
-      </div>
-
-      {/* ── 5. LANGUAGE SYSTEM: FLOATING FREELY AROUND THE ORB ── */}
-      <div className="pointer-events-none absolute inset-0 z-10 overflow-hidden">
-        {GREETINGS.map((g) => {
-          const isIlluminated = isActive && activeStep === g.activeOrder;
-          return (
-            <motion.div
-              key={g.id}
-              className={`absolute -translate-x-1/2 -translate-y-1/2 ${g.fontSize} ${g.fontClass} select-none transition-colors duration-300`}
-              style={{
-                left: g.left,
-                top: g.top,
-                color: isIlluminated ? g.activeColor : g.color,
-                opacity: isIlluminated ? 1 : g.initialOpacity,
-              }}
-              animate={{
-                x: [0, g.driftX, 0],
-                y: [0, g.driftY, 0],
-                opacity: isIlluminated
-                  ? [1, 0.9, 1]
-                  : [g.initialOpacity, g.initialOpacity * 1.15, g.initialOpacity],
-              }}
-              transition={{
-                duration: g.duration,
-                repeat: Infinity,
-                ease: "easeInOut",
-                delay: g.delay,
-              }}
-            >
-              {g.text}
-            </motion.div>
-          );
-        })}
-      </div>
-
-      {/* ── 6. VISUAL CENTER: DOMINANT CENTRAL HERO ORB (420–520px) ── */}
-      <div className="relative z-20 flex-1 flex items-center justify-center">
-        <HeroOrb
-          isActive={isActive}
-          onActivate={handleActivateVoice}
-        />
-      </div>
-
-      {/* ── 7. BOTTOM CTA & SCROLL CUE ── */}
-      <div className="relative z-20 flex flex-col items-center justify-center pb-5 sm:pb-7">
-        {/* ONE Elegant Primary Pill Button */}
-        <button
-          onClick={() => setIsModalOpen(true)}
-          className="group flex items-center gap-2.5 px-5 py-2.5 rounded-full bg-[#F5EFEB] border border-[#DDD3C2] hover:border-[#171513] text-xs sm:text-[13px] font-medium text-[#29231D] shadow-[0_2px_8px_rgba(23,21,19,0.04)] hover:shadow-[0_4px_16px_rgba(23,21,19,0.08)] transition-all duration-200 cursor-pointer"
-        >
-          <Phone className="w-3.5 h-3.5 text-[#C65B32] group-hover:scale-110 transition-transform" />
-          <span>Test a live call on your phone</span>
-          <span className="text-[#8C7D6D] group-hover:text-[#171513] group-hover:translate-x-0.5 transition-all">
-            →
-          </span>
-        </button>
-
-        {/* Scroll To Explore with tiny animated downward indicator */}
-        <div
-          onClick={() => {
-            window.scrollTo({
-              top: window.innerHeight * 0.95,
-              behavior: "smooth",
-            });
-          }}
-          className="mt-4 flex flex-col items-center gap-1 cursor-pointer text-[#8C7D6D] hover:text-[#171513] transition-colors"
-        >
-          <div className="w-3.5 h-6 rounded-full border border-[#C5B7A5] flex items-start justify-center p-1">
-            <motion.div
-              animate={{ y: [0, 6, 0] }}
-              transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }}
-              className="w-1 h-1 rounded-full bg-[#8C7D6D]"
-            />
-          </div>
-          <span className="text-[10px] tracking-[0.2em] uppercase font-medium">
-            Scroll to explore
-          </span>
-        </div>
-      </div>
-
-      {/* ── 8. LIVE CALL DISPATCH MODAL ── */}
+      {/* ── 6. QUICK PHONE CALLBACK MODAL ── */}
       <AnimatePresence>
         {isModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/35 backdrop-blur-[2px]">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
             <motion.div
-              initial={{ scale: 0.96, opacity: 0 }}
+              initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.96, opacity: 0 }}
-              className="relative w-full max-w-sm rounded-2xl bg-[#FAF7F0] border border-[#E2D8C9] p-6 shadow-2xl text-[#171513]"
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="relative w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl border border-slate-200"
             >
               <button
                 onClick={() => setIsModalOpen(false)}
-                className="absolute top-4 right-4 text-[#8C7D6D] hover:text-[#171513] p-1"
+                className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
 
-              <div className="flex items-center gap-2 mb-2">
-                <span className="w-2 h-2 rounded-full bg-[#C65B32]" />
-                <span className="text-[11px] font-semibold tracking-wider uppercase text-[#C65B32]">
-                  Live Voice Dispatch
-                </span>
+              <div className="w-10 h-10 rounded-full bg-teal-50 flex items-center justify-center mb-3">
+                <Phone className="w-5 h-5 text-[#0D9488]" />
               </div>
 
-              <h3 className="font-serif text-2xl font-normal text-[#171513]">
-                Test a Live Call
+              <h3 className="text-base font-bold text-[#0B0F17]">
+                Experience Trinetra Voice
               </h3>
-              <p className="text-xs text-[#6B5E50] mt-1 mb-4 leading-relaxed">
-                Enter your mobile number. Arika from Vaakriti will dial you in Hinglish with sub-400ms latency.
+              <p className="mt-1 text-xs text-slate-600 mb-4">
+                Enter your mobile number to receive a live interactive phone call from our AI agent.
               </p>
 
               <form onSubmit={handlePhoneSubmit} className="space-y-3.5">
                 <div>
-                  <label className="block text-xs font-medium text-[#4A4036] mb-1">
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
                     Mobile Number
                   </label>
                   <div className="relative flex items-center">
-                    <span className="absolute left-3 text-xs font-medium text-[#7D7060]">
+                    <span className="absolute left-3 text-xs font-mono font-medium text-slate-500">
                       +91
                     </span>
                     <input
@@ -530,7 +355,8 @@ export function Hero() {
                       value={phoneInput}
                       onChange={(e) => setPhoneInput(e.target.value)}
                       placeholder="98765 43210"
-                      className="w-full pl-11 pr-3 py-2 rounded-xl border border-[#DDD3C2] bg-white text-xs text-[#171513] placeholder-[#A89C8E] focus:outline-none focus:border-[#C65B32]"
+                      className="w-full pl-11 pr-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-xs text-[#0B0F17] placeholder-slate-400 focus:outline-none focus:border-[#0D9488] focus:bg-white"
+                      autoFocus
                     />
                   </div>
                 </div>
@@ -538,15 +364,15 @@ export function Hero() {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full py-2.5 rounded-xl bg-[#171513] hover:bg-[#C65B32] text-[#FAF7F0] font-medium text-xs flex items-center justify-center gap-2 shadow-sm transition-colors cursor-pointer disabled:opacity-60"
+                  className="w-full py-2.5 rounded-full bg-[#0B0F17] hover:bg-black text-white font-semibold text-xs flex items-center justify-center gap-2 shadow-xs transition-colors cursor-pointer disabled:opacity-60"
                 >
                   {loading ? (
                     <>
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <Loader2 className="w-3.5 h-3.5 animate-spin text-[#0D9488]" />
                       <span>Dispatching Call...</span>
                     </>
                   ) : (
-                    <span>Call Me Now</span>
+                    <span>Call Me Now →</span>
                   )}
                 </button>
               </form>
@@ -554,6 +380,7 @@ export function Hero() {
           </div>
         )}
       </AnimatePresence>
+
     </section>
   );
 }

@@ -19,7 +19,7 @@ const cspHeader = `
     default-src 'self';
     script-src 'self' 'unsafe-eval' 'unsafe-inline' https://cdnjs.cloudflare.com https://apis.google.com https://accounts.google.com https://*.razorpay.com https://*.daily.co blob:;
     style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
-    img-src 'self' blob: data: https://lh3.googleusercontent.com https://*.supabase.co https://i.postimg.cc https://assets.trinetraedu-ai.com https://*.trinetraedu-ai.com https://*.trinetra.ai;
+    img-src 'self' blob: data: https://lh3.googleusercontent.com https://*.supabase.co https://i.postimg.cc https://assets.trinetraedu-ai.com https://*.trinetraedu-ai.com https://*.trinetra.ai https://images.unsplash.com;
     font-src 'self' data: https://fonts.gstatic.com;
     connect-src 'self' http://localhost:8000 http://127.0.0.1:8000 ws://localhost:7880 ws://127.0.0.1:7880 http://localhost:7880 http://127.0.0.1:7880 https://*.livekit.cloud wss://*.livekit.cloud https://*.trycloudflare.com https://*.ngrok-free.dev https://*.ngrok.app https://*.onrender.com https://*.supabase.co wss://*.supabase.co https://formspree.io https://*.googleapis.com https://*.razorpay.com https://api.sarvam.ai wss://api.sarvam.ai https://api.elevenlabs.io https://*.daily.co wss://*.daily.co https://raw.githubusercontent.com https://*.trinetraedu-ai.com https://*.trinetra.ai blob: data: stun: turn:;
     media-src 'self' blob: https://api.sarvam.ai https://api.elevenlabs.io data: mediastream:;
@@ -59,6 +59,10 @@ const nextConfig: NextConfig = {
       {
         protocol: 'https',
         hostname: '*.supabase.co',
+      },
+      {
+        protocol: 'https',
+        hostname: 'images.unsplash.com',
       },
     ],
   },

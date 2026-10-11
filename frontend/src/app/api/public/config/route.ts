@@ -16,10 +16,6 @@ function getAdminClient() {
   return supabaseAdminSingleton
 }
 
-// In-memory cache for public system configs (TTL: 60 seconds)
-let cachedConfigs: Record<string, string> | null = null
-let cacheExpiresAt = 0
-
 const PUBLIC_KEYS = [
   "maintenance_mode",
   "free_demo_minutes", "trial_price_paisa", "trial_days", 
@@ -33,6 +29,35 @@ const PUBLIC_KEYS = [
   "foreign_number_cost_usd_cents", "overage_per_minute_usd_cents"
 ]
 
+export const DEFAULT_PUBLIC_CONFIGS: Record<string, string> = {
+  maintenance_mode: "false",
+  free_demo_minutes: "5",
+  trial_price_paisa: "9900",
+  trial_days: "7",
+  trial_minutes: "30",
+  starter_price_paisa: "499900",
+  starter_minutes: "500",
+  professional_price_paisa: "1499900",
+  professional_minutes: "2000",
+  enterprise_price_paisa: "4999900",
+  enterprise_minutes: "10000",
+  max_agents_free: "1",
+  max_agents_starter: "3",
+  max_agents_professional: "10",
+  inbound_number_cost_paisa: "49900",
+  overage_per_minute_paisa: "1200",
+  starter_price_usd_cents: "6000",
+  professional_price_usd_cents: "18000",
+  enterprise_price_usd_cents: "60000",
+  trial_price_usd_cents: "120",
+  foreign_number_cost_usd_cents: "600",
+  overage_per_minute_usd_cents: "15"
+}
+
+// In-memory cache for public system configs (TTL: 60 seconds)
+let cachedConfigs: Record<string, string> = DEFAULT_PUBLIC_CONFIGS
+let cacheExpiresAt = 0
+
 export async function GET() {
   const now = Date.now()
 
@@ -45,40 +70,41 @@ export async function GET() {
   }
 
   try {
-    const supabaseAdmin = getAdminClient()
+    const fetchPromise = (async () => {
+      const supabaseAdmin = getAdminClient()
+      const { data: configs, error } = await supabaseAdmin
+        .from('system_config')
+        .select('config_key, config_value')
 
-    // Query all public settings from system_config table
-    const { data: configs, error } = await supabaseAdmin
-      .from('system_config')
-      .select('config_key, config_value')
-
-    if (error) {
-      // If DB is busy but we have stale cache, return stale cache gracefully
-      if (cachedConfigs) {
-        return NextResponse.json({ configs: cachedConfigs })
+      if (!error && configs && Array.isArray(configs)) {
+        const configMap: Record<string, string> = { ...DEFAULT_PUBLIC_CONFIGS }
+        configs.forEach((item: any) => {
+          if (item && PUBLIC_KEYS.includes(item.config_key)) {
+            configMap[item.config_key] = item.config_value
+          }
+        })
+        return configMap
       }
-      return NextResponse.json({ error: error.message }, { status: 500 })
-    }
+      return cachedConfigs || DEFAULT_PUBLIC_CONFIGS
+    })()
 
-    const configMap: Record<string, string> = {}
-    ;(configs as any[])?.forEach((item: any) => {
-      if (item && PUBLIC_KEYS.includes(item.config_key)) {
-        configMap[item.config_key] = item.config_value
-      }
-    })
+    // Resilient 1500ms timeout guard so downstream clients never hang or throw TypeError: Failed to fetch
+    const timeoutPromise = new Promise<Record<string, string>>((resolve) =>
+      setTimeout(() => resolve(cachedConfigs || DEFAULT_PUBLIC_CONFIGS), 1500)
+    )
 
-    cachedConfigs = configMap
+    const resolvedConfigs = await Promise.race([fetchPromise, timeoutPromise])
+    cachedConfigs = resolvedConfigs
     cacheExpiresAt = now + 60000 // 60 seconds TTL
 
     return NextResponse.json(
-      { configs: configMap },
+      { configs: resolvedConfigs },
       { headers: { 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300' } }
     )
   } catch (error: any) {
-    if (cachedConfigs) {
-      return NextResponse.json({ configs: cachedConfigs })
-    }
-    return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 })
+    return NextResponse.json(
+      { configs: cachedConfigs || DEFAULT_PUBLIC_CONFIGS },
+      { headers: { 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300' } }
+    )
   }
 }
-

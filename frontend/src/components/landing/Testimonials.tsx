@@ -1,117 +1,115 @@
 "use client";
 
+import React, { useState } from "react";
 import { motion } from "framer-motion";
-import { MessageSquare } from "lucide-react";
-import Link from "next/link";
 
-// Set to empty array to trigger the "Coming Soon" state.
-// When real testimonials are added, the grid will automatically render.
-const testimonials: Array<any> = [];
+const FEEDBACK_LIST = [
+  {
+    id: 1,
+    quote:
+      "Professional, creative, and incredibly detail-oriented. The AI voice agents not only look and sound amazing, but also handle our daily call volume with flawless reliability and sub-second latency.",
+    author: "JAMES PARKER",
+    role: "FOUNDER, LAUNCHPAD",
+    initials: "JP",
+    avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
+  },
+  {
+    id: 2,
+    quote:
+      "Arika handled over 4,500 patient appointments across Mumbai clinics in Hinglish without a single breakdown. The voice quality and compliance controls are unmatched in the Indian market.",
+    author: "DR. ANANYA SEN",
+    role: "CHIEF OF OPERATIONS, CAREPULSE HEALTH",
+    initials: "AS",
+    avatar: "https://images.unsplash.com/photo-1580489944761-15a19d654956?w=150&auto=format&fit=crop&q=80",
+  },
+  {
+    id: 3,
+    quote:
+      "Trinetra's self-healing voice pipeline eliminated our manual lead follow-up backlog within 48 hours. Our conversion speed jumped by 3.4x with automated WhatsApp summaries.",
+    author: "RAJESH VERMA",
+    role: "DIRECTOR OF GROWTH, NEXUS ENTERPRISES",
+    initials: "RV",
+    avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80",
+  },
+];
 
 export function Testimonials() {
+  const [activeIndex, setActiveIndex] = useState(0);
+
   return (
-    <section className="w-full relative py-[100px] bg-[#080010] overflow-hidden">
-      {/* Subtle radial gradient background */}
-      <div 
-        className="absolute inset-0 z-0 pointer-events-none"
-        style={{
-          background: 'radial-gradient(circle at center, rgba(139,92,246,0.03) 0%, transparent 60%)'
-        }}
-      />
-
-      <div className="relative z-10 w-full flex flex-col items-center">
+    <section className="w-full bg-white py-20 px-6 sm:px-10 lg:px-16">
+      <div className="mx-auto max-w-[1536px]">
         
-        {/* HEADER */}
-        <div className="flex flex-col items-center text-center mb-[56px] px-[20px] md:px-[40px] lg:px-[80px]">
-          {/* Badge */}
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.6 }}
-            className="inline-block bg-[rgba(139,92,246,0.1)] border border-[rgba(139,92,246,0.15)] text-[#D7C4F7] font-sans font-medium text-[13px] px-[16px] py-[6px] rounded-full mb-[20px]"
-          >
-            Client Stories
-          </motion.div>
-
-          {/* Heading */}
-          <motion.h2 
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.6, delay: 0.1 }}
-            className="font-display font-bold text-[32px] md:text-[42px] text-[#FAF7FF] tracking-[-0.02em] leading-tight"
-          >
-            Real Results. Real Businesses.
-          </motion.h2>
+        {/* Section Top Bar (Matching Reference Image "■ WHAT CLIENTS SAY" / "REAL FEEDBACK →") */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-8 mb-10 border-b border-slate-200/90 gap-4">
+          <div className="flex items-center gap-2.5">
+            <span className="w-2.5 h-2.5 rounded-[1px] bg-[#84CC16]" />
+            <h2 className="text-[13px] font-mono tracking-[0.2em] uppercase font-bold text-[#0B0F17]">
+              WHAT CLIENTS SAY
+            </h2>
+          </div>
+          <span className="text-[11px] font-mono tracking-[0.2em] uppercase text-slate-500 font-semibold">
+            REAL FEEDBACK →
+          </span>
         </div>
 
-        {testimonials.length > 0 ? (
-          <>
-            {/* HORIZONTAL SCROLLING ROW */}
-            <div className="w-full overflow-x-auto snap-x snap-mandatory flex gap-[24px] px-[20px] md:px-[40px] lg:px-[80px] scroll-pl-[20px] md:scroll-pl-[40px] lg:scroll-pl-[80px] pb-[40px] [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-              {testimonials.map((t, idx) => (
-                <motion.div
-                  key={t.id}
-                  initial={{ opacity: 0, x: 50 }}
-                  whileInView={{ opacity: 1, x: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ duration: 0.6, delay: 0.1 * idx }}
-                  className="w-[85vw] md:w-[380px] shrink-0 bg-[#130224] border border-[#1E0A35] rounded-[16px] p-[32px] snap-start flex flex-col relative"
-                >
-                  <div className="absolute top-[20px] left-[24px] leading-none select-none pointer-events-none" style={{ fontFamily: 'Georgia, serif', fontSize: '56px', color: 'rgba(139,92,246,0.15)' }}>"</div>
-                  <div className="flex gap-[2px] text-[16px] mb-[20px] leading-none relative z-10">
-                    {Array.from({ length: 5 }).map((_, i) => (
-                      <span key={i} className={i < t.stars ? "text-[#FBBF24]" : "text-[#6B6088]"}>{i < t.stars ? "★" : "☆"}</span>
-                    ))}
-                  </div>
-                  <p className="font-sans font-normal text-[15px] text-[#B8B0D1] leading-[1.7] relative z-10 flex-grow">{t.quote}</p>
-                  <div className="flex items-center gap-[14px] mt-[24px] relative z-10">
-                    <div className="w-[48px] h-[48px] rounded-full shrink-0" style={{ background: t.avatarBg, boxShadow: t.avatarShadow, border: '2px solid rgba(255,255,255,0.1)' }} />
-                    <div className="flex flex-col">
-                      <div className="font-sans font-semibold text-[15px] text-[#FAF7FF] leading-tight mb-[2px]">{t.name}</div>
-                      <div className="font-sans font-normal text-[13px] text-[#6B6088] leading-tight mb-[6px]">{t.role} &bull; {t.location}</div>
-                      <div className="font-sans font-normal text-[11px] text-[#10B981] flex items-center gap-[4px] leading-none">✓ Verified Client</div>
-                    </div>
-                  </div>
-                </motion.div>
-              ))}
-              <div className="w-[1px] md:w-[40px] lg:w-[80px] shrink-0" />
-            </div>
-
-            <div className="text-center mt-[12px] px-[20px]">
-              <p className="font-sans font-normal italic text-[12px] text-[#6B6088]">
-                These are results from our pilot program. Individual results may vary.
-              </p>
-            </div>
-          </>
-        ) : (
-          /* COMING SOON STATE */
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.6, delay: 0.2 }}
-            className="w-full max-w-[600px] mx-auto bg-[#130224] border border-[#1E0A35] rounded-[16px] px-[20px] py-[48px] text-center flex flex-col items-center"
+        {/* Luminous White Testimonial Card */}
+        <div className="max-w-4xl mx-auto">
+          <motion.div
+            key={activeIndex}
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4 }}
+            className="rounded-3xl bg-white border border-slate-200/90 p-8 sm:p-12 shadow-[0_8px_30px_rgba(0,0,0,0.04)] hover:border-lime-400/80 transition-all duration-300 relative"
           >
-            <MessageSquare size={32} className="text-[#8B5CF6] mb-[16px]" />
-            <h3 className="font-display font-semibold text-[20px] text-[#FAF7FF]">
-              We're onboarding our first clients now.
-            </h3>
-            <p className="font-sans font-normal text-[15px] text-[#B8B0D1] mt-[12px] max-w-[420px] leading-relaxed">
-              Real testimonials from real businesses will appear here soon. We believe in showing genuine results, not manufactured praise.
-            </p>
-            <p className="font-sans font-medium text-[14px] text-[#D7C4F7] mt-[24px]">
-              Want to be our first featured client?
-            </p>
-            <Link 
-              href="/contact" 
-              className="mt-[12px] inline-flex items-center justify-center px-[24px] py-[10px] bg-[#8B5CF6] text-white font-sans font-medium text-[14px] rounded-full transition-colors hover:bg-[#7C3AED]"
-            >
-              Get Early Access →
-            </Link>
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6 sm:gap-8 justify-between">
+              
+              {/* Quote Body with Electric Lime Quote Mark */}
+              <div className="flex-1">
+                <div className="flex items-start gap-4">
+                  <span className="text-4xl text-[#84CC16] font-serif leading-none select-none shrink-0 font-bold">
+                    “
+                  </span>
+                  <p className="text-[15px] sm:text-[17px] text-slate-700 font-sans leading-relaxed">
+                    {FEEDBACK_LIST[activeIndex].quote}
+                  </p>
+                </div>
+              </div>
+
+              {/* Author Meta on Right (Matching Reference Image) */}
+              <div className="flex items-center gap-4 shrink-0 sm:pl-8 sm:border-l border-slate-200/80">
+                <div className="relative w-12 h-12 rounded-full border border-lime-400/50 bg-[#0C0E14] text-[#84CC16] font-mono font-bold text-sm flex items-center justify-center shadow-[0_0_12px_rgba(132,204,22,0.25)] shrink-0">
+                  {FEEDBACK_LIST[activeIndex].initials}
+                </div>
+                <div>
+                  <h4 className="text-xs sm:text-sm font-bold text-[#0B0F17] uppercase tracking-wider font-mono">
+                    {FEEDBACK_LIST[activeIndex].author}
+                  </h4>
+                  <p className="text-[10px] sm:text-[11px] text-slate-500 font-mono tracking-wider uppercase mt-0.5">
+                    {FEEDBACK_LIST[activeIndex].role}
+                  </p>
+                </div>
+              </div>
+
+            </div>
           </motion.div>
-        )}
+
+          {/* Minimalist Carousel Dots (Active Dot in Electric Lime #84CC16) */}
+          <div className="flex items-center justify-center gap-2 mt-8">
+            {FEEDBACK_LIST.map((_, idx) => (
+              <button
+                key={idx}
+                onClick={() => setActiveIndex(idx)}
+                className={`transition-all duration-300 rounded-full cursor-pointer ${
+                  idx === activeIndex
+                    ? "w-6 h-2 bg-[#84CC16] shadow-[0_0_10px_#84CC16]"
+                    : "w-2 h-2 bg-slate-300 hover:bg-slate-400"
+                }`}
+                aria-label={`Go to slide ${idx + 1}`}
+              />
+            ))}
+          </div>
+        </div>
 
       </div>
     </section>

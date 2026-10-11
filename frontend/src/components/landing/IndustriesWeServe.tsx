@@ -4,102 +4,92 @@ import { motion } from "framer-motion";
 
 const industries = [
   {
+    num: "01",
     icon: "🏥",
     title: "Healthcare & Clinics",
-    desc: "Patient calls, appointments, follow-ups"
+    desc: "Inbound triage, appointment booking, prescription refills, and pre-op reminders in regional dialects."
   },
   {
-    icon: "🍽️",
-    title: "Restaurants & Cafes",
-    desc: "Reservations, menu queries, orders"
-  },
-  {
+    num: "02",
     icon: "🏠",
-    title: "Real Estate",
-    desc: "Property inquiries, site visit scheduling"
+    title: "Real Estate & Housing",
+    desc: "Lead qualification, site visit scheduling, price guidance, and instant WhatsApp brochures."
   },
   {
-    icon: "💇",
-    title: "Salons & Spas",
-    desc: "Booking, reminders, service info"
-  },
-  {
-    icon: "🏋️",
-    title: "Fitness & Gyms",
-    desc: "Membership queries, class schedules"
-  },
-  {
+    num: "03",
     icon: "🏫",
-    title: "Education & Coaching",
-    desc: "Enrollment, doubts, fee inquiries"
+    title: "Institutes & Coaching",
+    desc: "Admissions counseling, entrance test queries, fee follow-ups, and student doubt resolution."
+  },
+  {
+    num: "04",
+    icon: "🍽️",
+    title: "Hospitality & Dining",
+    desc: "Table reservations, party bookings, catering inquiries, and operating hour details."
+  },
+  {
+    num: "05",
+    icon: "💼",
+    title: "Professional Services",
+    desc: "CA & legal consultations, client intake qualification, document checklists, and callbacks."
+  },
+  {
+    num: "06",
+    icon: "💇",
+    title: "Wellness & Salons",
+    desc: "Slot reservations, service menu queries, cancellation management, and loyalty re-engagement."
   }
 ];
 
 export function IndustriesWeServe() {
   return (
-    <section className="w-full bg-[#080010] pt-[80px] pb-[100px] overflow-hidden">
-      <div className="max-w-[1280px] mx-auto px-[20px] md:px-[80px]">
+    <section id="industries" className="w-full bg-white py-20 px-6 sm:px-10 lg:px-16 overflow-hidden">
+      <div className="max-w-[1536px] mx-auto">
         
-        {/* HEADER */}
-        <div className="flex flex-col items-center text-center mb-[56px]">
-          {/* Badge */}
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.6 }}
-            className="inline-block bg-[rgba(139,92,246,0.1)] border border-[rgba(139,92,246,0.15)] text-[#D7C4F7] font-sans font-medium text-[13px] px-[16px] py-[6px] rounded-full mb-[20px]"
-          >
-            Industries
-          </motion.div>
-
-          {/* Heading */}
-          <motion.h2 
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.6, delay: 0.1 }}
-            className="font-display font-bold text-[32px] md:text-[42px] text-[#FAF7FF] tracking-[-0.02em] mb-[16px] leading-tight"
-          >
-            Pre-Trained for Your Industry.
-          </motion.h2>
-
-          {/* Subtitle */}
-          <motion.p 
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.6, delay: 0.2 }}
-            className="font-sans font-normal text-[16px] md:text-[18px] text-[#B8B0D1] max-w-[600px] mx-auto leading-[1.6]"
-          >
-            One-click industry templates. Your AI agent understands your business from day one.
-          </motion.p>
+        {/* Section Top Bar */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-8 mb-10 border-b border-slate-200/90 gap-4">
+          <div className="flex items-center gap-2.5">
+            <span className="w-2.5 h-2.5 rounded-[1px] bg-[#84CC16]" />
+            <h2 className="text-[13px] font-mono tracking-[0.2em] uppercase font-bold text-[#0B0F17]">
+              INDUSTRIES WE SERVE
+            </h2>
+          </div>
+          <span className="text-[11px] font-mono tracking-[0.2em] uppercase text-slate-500 font-semibold">
+            VERTICAL SPECIALIZATIONS →
+          </span>
         </div>
 
-        {/* GRID */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-[16px]">
-          {industries.map((industry, idx) => (
+        {/* 6-Card Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          {industries.map((ind, idx) => (
             <motion.div
-              key={industry.title}
-              initial={{ opacity: 0, y: 20 }}
+              key={ind.title}
+              initial={{ opacity: 0, y: 25 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
-              transition={{ duration: 0.5, delay: 0.1 * idx }}
-              className="group bg-[#0C0118] border border-[#1E0A35] rounded-[14px] p-[28px] flex items-center gap-[16px] cursor-pointer transition-all duration-300 hover:bg-[#130224] hover:border-[#2D1255] hover:translate-x-[4px]"
+              transition={{ duration: 0.5, delay: idx * 0.08 }}
+              className="group relative flex flex-col justify-between rounded-2xl bg-white border border-slate-200/90 p-8 shadow-[0_4px_20px_rgba(0,0,0,0.03)] hover:border-lime-400 hover:shadow-[0_12px_36px_rgba(132,204,22,0.12)] transition-all duration-300"
             >
-              {/* Emoji Icon */}
-              <div className="text-[32px] leading-none shrink-0">
-                {industry.icon}
+              <div>
+                <div className="flex items-center justify-between mb-5">
+                  <span className="text-2xl p-2 rounded-xl bg-slate-50 border border-slate-200">{ind.icon}</span>
+                  <span className="font-mono text-xs font-bold text-[#84CC16]">
+                    {ind.num}
+                  </span>
+                </div>
+
+                <h3 className="font-mono text-sm font-bold text-[#0B0F17] uppercase tracking-tight mb-2">
+                  {ind.title}
+                </h3>
+                <p className="font-sans text-xs text-slate-600 leading-relaxed">
+                  {ind.desc}
+                </p>
               </div>
 
-              {/* Text Content */}
-              <div className="flex flex-col overflow-hidden">
-                <h3 className="font-display font-semibold text-[17px] text-[#FAF7FF] mb-[2px] truncate">
-                  {industry.title}
-                </h3>
-                <p className="font-sans text-[13px] text-[#6B6088] truncate">
-                  {industry.desc}
-                </p>
+              <div className="mt-6 flex justify-end">
+                <span className="text-slate-400 group-hover:text-[#84CC16] group-hover:translate-x-1 transition-all text-xs">
+                  →
+                </span>
               </div>
             </motion.div>
           ))}

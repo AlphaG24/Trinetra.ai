@@ -15,24 +15,46 @@ export const dynamic = 'force-dynamic'
 export async function GET() {
   try {
     const supabase = await createClient()
-    const { data: { user }, error: authErr } = await supabase.auth.getUser()
 
-    if (authErr || !user) {
+    let user: any = null
+    try {
+      const authPromise = supabase.auth.getUser()
+      const timeoutPromise = new Promise<any>((_, reject) =>
+        setTimeout(() => reject(new Error('Auth timeout')), 2500)
+      )
+      const authRes = await Promise.race([authPromise, timeoutPromise])
+      user = authRes?.data?.user ?? null
+    } catch {
+      user = null
+    }
+
+    if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     const admin = getAdminClient()
 
-    // Query notifications table strictly scoped to authenticated user
-    const { data: notifs, error } = await admin
-      .from('notifications')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false })
-      .limit(30)
-
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
+    let notifs: any[] = []
+    try {
+      const dbPromise = admin
+        .from('notifications')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(30)
+      const timeoutPromise = new Promise<any>((_, reject) =>
+        setTimeout(() => reject(new Error('DB timeout')), 2500)
+      )
+      const { data, error } = await Promise.race([dbPromise, timeoutPromise])
+      if (!error && data) {
+        notifs = data
+      }
+    } catch (dbErr) {
+      console.warn('[/api/notifications GET] DB notice, returning fallback:', dbErr)
+      return NextResponse.json({
+        notifications: [],
+        unreadCount: 0,
+      })
     }
 
     const unreadCount = (notifs || []).filter((n: any) => !n.is_read).length
@@ -42,7 +64,7 @@ export async function GET() {
       unreadCount,
     })
   } catch (err: any) {
-    console.error('[/api/notifications GET] Error:', err)
-    return NextResponse.json({ error: err.message || 'Server error' }, { status: 500 })
+    console.warn('[/api/notifications GET] Error, returning fallback:', err?.message || err)
+    return NextResponse.json({ notifications: [], unreadCount: 0 })
   }
 }

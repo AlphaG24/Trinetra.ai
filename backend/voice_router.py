@@ -90,6 +90,87 @@ router = APIRouter(prefix="/api/voice", tags=["Voice Agent"])
 # Retain strong references to running background agent tasks to prevent GC
 _active_agent_tasks: set[asyncio.Task] = set()
 
+async def safe_run_agent(r_name: str, a_id: str | None = None):
+    try:
+        # Minimal sleep guard: 0.3s for outbound telephony (SIP needs setup time), 0.05s for web calls
+        is_outbound = r_name.startswith(("twilio--", "exotel--", "sip-"))
+        await asyncio.sleep(0.3 if is_outbound else 0.05)
+
+        # Check if an external worker already joined the room
+        lk_url = os.getenv("LIVEKIT_URL")
+        lk_key = os.getenv("LIVEKIT_API_KEY")
+        lk_sec = os.getenv("LIVEKIT_API_SECRET")
+        if lk_url and lk_key and lk_sec:
+            try:
+                from livekit import api
+                lk = api.LiveKitAPI(lk_url, lk_key, lk_sec)
+                part_res = await lk.room.list_participants(api.ListParticipantsRequest(room=r_name))
+                await lk.aclose()
+                for p in getattr(part_res, 'participants', []):
+                    p_id = (getattr(p, 'identity', '') or '').lower()
+                    p_nm = (getattr(p, 'name', '') or '').lower()
+                    p_kd = getattr(p, 'kind', None)
+                    is_worker = (
+                        p_kd == api.ParticipantInfo.Kind.AGENT or
+                        p_id.startswith("agent") or
+                        "agent" in p_id or
+                        "vikram" in p_id or
+                        "agent" in p_nm
+                    )
+                    if is_worker:
+                        print(f"[LIVEKIT AGENT] Dedicated worker '{p.identity}' already joined room '{r_name}'. Skipping in-process agent fallback.", flush=True)
+                        return
+            except Exception as check_err:
+                logger.warning(f"[LIVEKIT AGENT] Room participant check error: {check_err}")
+
+        print(f"[LIVEKIT AGENT] Spawning fallback in-process agent for room: {r_name} with agent_id: {a_id}", flush=True)
+        from agent import run_agent
+        # If a_id is empty, resolve from DB
+        if not a_id:
+            try:
+                def_agent = supabase_admin.table("agents").select("id").limit(1).execute()
+                if def_agent.data:
+                    a_id = def_agent.data[0]["id"]
+            except Exception:
+                pass
+        await run_agent(r_name, a_id)
+    except Exception as run_err:
+        import traceback
+        print(f"[LIVEKIT AGENT RUN ERROR] Exception in run_agent: {run_err}", flush=True)
+        traceback.print_exc()
+
+def dispatch_agent_to_room(room_name: str, agent_id: str | None = None):
+    in_process_enabled = os.getenv("ENABLE_IN_PROCESS_AGENT", "true").lower() in ("true", "1", "yes")
+    if in_process_enabled:
+        try:
+            agent_task = asyncio.create_task(safe_run_agent(room_name, agent_id))
+            _active_agent_tasks.add(agent_task)
+            agent_task.add_done_callback(_active_agent_tasks.discard)
+            print(f"[LIVEKIT AGENT] Dispatched in-process agent task for room {room_name}", flush=True)
+        except Exception as spawn_err:
+            print(f"[LIVEKIT AGENT SPAWN ERROR] Failed to spawn agent task: {spawn_err}", flush=True)
+
+    # Also attempt LiveKit Cloud agent dispatch for standalone worker
+    try:
+        from livekit import api
+        from livekit.protocol import agent_dispatch
+        lk_url = os.getenv("LIVEKIT_URL")
+        lk_key = os.getenv("LIVEKIT_API_KEY")
+        lk_sec = os.getenv("LIVEKIT_API_SECRET")
+        if lk_url and lk_key and lk_sec:
+            async def dispatch_cloud():
+                try:
+                    lk = api.LiveKitAPI(lk_url, lk_key, lk_sec)
+                    await lk.agent_dispatch.create_dispatch(
+                        agent_dispatch.CreateAgentDispatchRequest(agent_name="", room=room_name, metadata=agent_id or "")
+                    )
+                    await lk.aclose()
+                except Exception as d_err:
+                    print(f"[LIVEKIT DISPATCH WARNING] {d_err}", flush=True)
+            asyncio.create_task(dispatch_cloud())
+    except Exception as e:
+        print(f"[LIVEKIT DISPATCH ERROR] {e}", flush=True)
+
 # Initialize Gemini Client
 genai_client = genai.Client()
 
@@ -365,85 +446,8 @@ async def generate_livekit_token(req: LiveKitTokenRequest):
         except Exception as vc_pre_err:
             print(f"[LIVEKIT TOKEN] voice_calls pre-create notice: {vc_pre_err}", flush=True)
 
-    # Spawn in-process agent worker (or fallback) to guarantee agent presence in web call
-    in_process_enabled = os.getenv("ENABLE_IN_PROCESS_AGENT", "true").lower() in ("true", "1", "yes")
-    if in_process_enabled:
-        try:
-            async def safe_run_agent(r_name: str, a_id: str):
-                try:
-                    # Minimal sleep guard: 0.3s for outbound telephony (SIP needs setup time), 0.05s for web calls
-                    is_outbound = r_name.startswith(("twilio--", "exotel--", "sip-"))
-                    await asyncio.sleep(0.3 if is_outbound else 0.05)
-
-                    # Check if an external worker already joined the room
-                    lk_url = os.getenv("LIVEKIT_URL")
-                    lk_key = os.getenv("LIVEKIT_API_KEY")
-                    lk_sec = os.getenv("LIVEKIT_API_SECRET")
-                    if lk_url and lk_key and lk_sec:
-                        try:
-                            from livekit import api
-                            lk = api.LiveKitAPI(lk_url, lk_key, lk_sec)
-                            part_res = await lk.room.list_participants(api.ListParticipantsRequest(room=r_name))
-                            await lk.aclose()
-                            for p in getattr(part_res, 'participants', []):
-                                p_id = (getattr(p, 'identity', '') or '').lower()
-                                p_nm = (getattr(p, 'name', '') or '').lower()
-                                p_kd = getattr(p, 'kind', None)
-                                is_worker = (
-                                    p_kd == api.ParticipantInfo.Kind.AGENT or
-                                    p_id.startswith("agent") or
-                                    "agent" in p_id or
-                                    "vikram" in p_id or
-                                    "agent" in p_nm
-                                )
-                                if is_worker:
-                                    print(f"[LIVEKIT AGENT] Dedicated worker '{p.identity}' already joined room '{r_name}'. Skipping in-process agent fallback.", flush=True)
-                                    return
-                        except Exception as check_err:
-                            logger.warning(f"[LIVEKIT AGENT] Room participant check error: {check_err}")
-
-                    print(f"[LIVEKIT AGENT] Spawning fallback in-process agent for room: {r_name} with agent_id: {a_id}", flush=True)
-                    from agent import run_agent
-                    # If a_id is empty, resolve from DB
-                    if not a_id:
-                        try:
-                            def_agent = supabase_admin.table("agents").select("id").limit(1).execute()
-                            if def_agent.data:
-                                a_id = def_agent.data[0]["id"]
-                        except Exception:
-                            pass
-                    await run_agent(r_name, a_id)
-                except Exception as run_err:
-                    import traceback
-                    print(f"[LIVEKIT AGENT RUN ERROR] Exception in run_agent: {run_err}", flush=True)
-                    traceback.print_exc()
-
-            agent_task = asyncio.create_task(safe_run_agent(room_name, req.agent_id))
-            _active_agent_tasks.add(agent_task)
-            agent_task.add_done_callback(_active_agent_tasks.discard)
-        except Exception as spawn_err:
-            print(f"[LIVEKIT AGENT SPAWN ERROR] Failed to spawn agent task: {spawn_err}", flush=True)
-    else:
-        # Also attempt LiveKit Cloud agent dispatch for standalone worker
-        try:
-            from livekit import api
-            from livekit.protocol import agent_dispatch
-            lk_url = os.getenv("LIVEKIT_URL")
-            lk_key = os.getenv("LIVEKIT_API_KEY")
-            lk_sec = os.getenv("LIVEKIT_API_SECRET")
-            if lk_url and lk_key and lk_sec:
-                async def dispatch_cloud():
-                    try:
-                        lk = api.LiveKitAPI(lk_url, lk_key, lk_sec)
-                        await lk.agent_dispatch.create_dispatch(
-                            agent_dispatch.CreateAgentDispatchRequest(agent_name="", room=room_name, metadata=req.agent_id or "")
-                        )
-                        await lk.aclose()
-                    except Exception as d_err:
-                        print(f"[LIVEKIT DISPATCH WARNING] {d_err}", flush=True)
-                asyncio.create_task(dispatch_cloud())
-        except Exception as e:
-            print(f"[LIVEKIT DISPATCH ERROR] {e}", flush=True)
+    # Dispatch agent to join the room (in-process fallback + cloud dispatch)
+    dispatch_agent_to_room(room_name, req.agent_id)
 
     return {
         "status": "success",
@@ -451,6 +455,18 @@ async def generate_livekit_token(req: LiveKitTokenRequest):
         "url": livekit_url,
         "roomName": room_name,
         "participantIdentity": identity
+    }
+
+@router.post("/dispatch-agent")
+async def dispatch_agent_endpoint(req: LiveKitTokenRequest):
+    """Explicit endpoint to dispatch an agent worker to join a LiveKit room."""
+    if not req.room_name:
+        raise HTTPException(status_code=400, detail="room_name is required")
+    dispatch_agent_to_room(req.room_name, req.agent_id)
+    return {
+        "status": "dispatched",
+        "room_name": req.room_name,
+        "agent_id": req.agent_id
     }
 
 class TTSTestRequest(BaseModel):
@@ -860,6 +876,81 @@ ENDING: {req.ending or '(empty)'}"""
     except Exception as err:
         print(f"[Enhance Messages] Exception during enhance: {err}", flush=True)
         return fallback_result
+
+class LiveDemoReplyRequest(BaseModel):
+    agent_id: Optional[str] = None
+    agent_name: Optional[str] = "Vaakriti"
+    personality: Optional[str] = "Warm & Consultative"
+    system_prompt: Optional[str] = None
+    language: Optional[str] = "hi-IN"
+    user_message: str
+    conversation_history: Optional[list] = None
+
+@agents_router.post("/live-demo-reply")
+async def live_demo_reply(req: LiveDemoReplyRequest):
+    """
+    Generate conversational reply for the homepage live demo call using the agent's real personality and instructions.
+    """
+    groq_key = os.getenv("GROQ_API_KEY")
+    prompt = req.system_prompt
+    
+    # If no system prompt provided, pull from agents table if agent_id given
+    if not prompt and req.agent_id:
+        try:
+            db_res = supabase_admin.table("agents").select("system_prompt, personality, name").eq("id", req.agent_id).limit(1).execute()
+            if db_res.data and len(db_res.data) > 0:
+                agent_row = db_res.data[0]
+                prompt = agent_row.get("system_prompt")
+                if not req.personality and agent_row.get("personality"):
+                    req.personality = agent_row.get("personality")
+        except Exception as e:
+            print(f"[LiveDemoReply] Agent prompt fetch notice: {e}", flush=True)
+
+    if not prompt:
+        prompt = f"""You are {req.agent_name}, an autonomous Indian AI voice agent with personality: {req.personality}.
+You speak natural Indian conversational language (fluent Hinglish or Hindi/English).
+Keep responses concise, natural, conversational, and direct (1-2 sentences maximum) suitable for low-latency live telephone speech.
+Do not use markdown, emojis, asterisks, or bullet points."""
+    else:
+        # Augment with spoken voice constraints
+        prompt += f"\n\nVOICE CALL CONSTRAINTS: You are on a live voice call. Keep responses concise (1 to 2 sentences), natural, conversational, and direct for speech synthesis. Do NOT output markdown, bullet points, asterisks, or emojis."
+
+    messages = [{"role": "system", "content": prompt}]
+    
+    if req.conversation_history and isinstance(req.conversation_history, list):
+        for msg in req.conversation_history[-6:]:
+            role = "assistant" if msg.get("speaker") != "You" else "user"
+            messages.append({"role": role, "content": msg.get("text", "")})
+            
+    messages.append({"role": "user", "content": req.user_message})
+
+    # Call LLM via Groq or fallback
+    if groq_key:
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                res = await client.post(
+                    "https://api.groq.com/openai/v1/chat/completions",
+                    headers={"Authorization": f"Bearer {groq_key}", "Content-Type": "application/json"},
+                    json={
+                        "model": os.getenv("GROQ_LLM_MODEL", "llama-3.3-70b-versatile"),
+                        "messages": messages,
+                        "temperature": 0.6,
+                        "max_tokens": 120
+                    }
+                )
+                if res.status_code == 200:
+                    data = res.json()
+                    reply_text = data.get("choices", [{}])[0].get("message", {}).get("content", "").strip()
+                    # Clean any asterisks or formatting
+                    reply_text = reply_text.replace("*", "").replace("#", "").strip()
+                    if reply_text:
+                        return {"success": True, "reply": reply_text}
+        except Exception as err:
+            print(f"[LiveDemoReply] Groq exception: {err}", flush=True)
+
+    # Clean default conversational fallback
+    fallback_reply = f"Thank you for sharing that. As {req.agent_name}, I am fully calibrated to handle complex enterprise inquiries with real-time Indian conversational precision."
+    return {"success": True, "reply": fallback_reply}
 
 # --- EXOTEL INBOUND & OUTBOUND VOICE WEBHOOKS ---
 

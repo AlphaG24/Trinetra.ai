@@ -1,0 +1,56 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+language: "en-US"
+early_access: false
+
+reviews:
+  profile: "assertive"
+  request_changes_workflow: false
+  high_level_summary: true
+  poem: false
+  review_status: true
+  collapse_walkthrough: false
+  auto_review:
+    enabled: true
+    drafts: false
+    base_branches:
+      - "main"
+      - "master"
+      - "dev"
+      - "develop"
+
+  path_filters:
+    - "!**/*.lock"
+    - "!**/package-lock.json"
+    - "!**/node_modules/**"
+    - "!**/.next/**"
+    - "!**/dist/**"
+    - "!**/build/**"
+    - "!**/__pycache__/**"
+    - "!**/.pytest_cache/**"
+    - "!**/*.pyc"
+    - "!**/.git/**"
+
+  path_instructions:
+    - path: "backend/**"
+      instructions: |
+        - CRITICAL SECURITY (SEC-001, SEC-011): Ensure no hardcoded secrets, tokens, or API keys are introduced.
+        - COMPLIANCE GUARDRAIL: Never allow bypassing or degrading AI identity disclosure ("Arika from Trinetra, an AI assistant") or call recording notification ("This call may be recorded for service quality").
+        - MULTI-TENANCY: Enforce strict multi-tenant isolation (`organization_id` scoping) on all database queries and service calls.
+        - TELEPHONY SAFETY: Ensure outbound calling windows strictly observe the 09:00 - 21:00 floor and honor internal/national DND lists.
+        - PII SANITIZATION: Verify that logging statements never leak raw PII (phone numbers, Aadhaar, JWTs, or auth headers).
+
+    - path: "frontend/**"
+      instructions: |
+        - CRITICAL SECURITY (SEC-002, TRI-001): Never prefix sensitive environment variables with `NEXT_PUBLIC_`. Never allow `SUPABASE_SERVICE_ROLE_KEY` in client components or browser bundles.
+        - AUTH INTEGRITY (SEC-003): Always verify authentication using `supabase.auth.getUser()`, never `supabase.auth.getSession()`.
+        - ARCHITECTURE (FE-001): Prefer Next.js Server Components. Only mark components with 'use client' when client hooks or browser APIs are required.
+        - INPUT VALIDATION & ERROR HANDLING: Sanitize client-facing errors to avoid leaking stack traces or internal schema details (SEC-007).
+
+    - path: "supabase/migrations/**"
+      instructions: |
+        - DATABASE INTEGRITY (DB-001, SEC-004): Every migration modifying or adding tables must have Row-Level Security enabled (`ENABLE ROW LEVEL SECURITY`) with scoped RLS policies.
+        - FOREIGN KEYS (DB-002, DB-003): Foreign keys must specify explicit `ON DELETE CASCADE` or `SET NULL` and include an index.
+        - MIGRATION SYMMETRY: Verify that table creations have corresponding clean rollback steps.
+
+chat:
+  auto_reply: true

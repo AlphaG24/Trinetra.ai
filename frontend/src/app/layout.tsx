@@ -171,33 +171,6 @@ export default async function RootLayout({
       className={`${initialTheme} ${inter.variable} ${jetbrainsMono.variable} ${calSans.variable} ${playfair.variable} ${montserrat.variable} ${merriweather.variable}`}
       data-scroll-behavior="smooth"
     >
-      <head>
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              (function() {
-                try {
-                  var explicit = localStorage.getItem('trinetra-theme-explicit');
-                  var activeTheme = 'light';
-                  if (explicit === 'true') {
-                    var saved = localStorage.getItem('trinetra-theme');
-                    if (saved === 'dark' || saved === 'light') {
-                      activeTheme = saved;
-                    }
-                  } else {
-                    localStorage.setItem('trinetra-theme', 'light');
-                    document.cookie = 'trinetra-theme=light; path=/; max-age=31536000; SameSite=Lax';
-                  }
-                  
-                  document.documentElement.setAttribute('data-theme', activeTheme);
-                  document.documentElement.classList.remove('light', 'dark');
-                  document.documentElement.classList.add(activeTheme);
-                } catch (e) {}
-              })();
-            `,
-          }}
-        />
-      </head>
       <body suppressHydrationWarning className="antialiased">
         <script
           type="application/ld+json"

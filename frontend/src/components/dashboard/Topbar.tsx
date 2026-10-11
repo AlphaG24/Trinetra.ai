@@ -207,9 +207,9 @@ export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
         <div className="flex items-center gap-3">
           <Link href="/dashboard" className="flex items-center gap-2">
             <img
-              src="/trident.png"
-              alt="Trinetra"
-              className="dynamic-logo h-12 md:h-14 w-auto object-contain -mt-0.5"
+              src="/logo-transparent.png"
+              alt="Vaakriti"
+              className="dynamic-logo h-8 md:h-9 w-auto object-contain -mt-0.5"
             />
           </Link>
         </div>

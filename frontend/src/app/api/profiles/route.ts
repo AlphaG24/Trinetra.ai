@@ -28,22 +28,43 @@ function getAdminClient() {
 export async function GET() {
   try {
     const supabase = await createClient()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    
+    let user: any = null
+    try {
+      const authPromise = supabase.auth.getUser()
+      const timeoutPromise = new Promise<any>((_, reject) =>
+        setTimeout(() => reject(new Error('Auth timeout')), 2500)
+      )
+      const authRes = await Promise.race([authPromise, timeoutPromise])
+      user = authRes?.data?.user ?? null
+    } catch {
+      user = null
+    }
 
-    if (authError || !user) {
+    if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     const admin = getAdminClient()
-    const { data: profile, error: dbError } = await admin
-      .from('profiles')
-      .select('*')
-      .eq('id', user.id)
-      .maybeSingle()
+    let profile: any = null
 
-    if (dbError) {
-      console.error('[/api/profiles GET] Error querying profile:', dbError)
-      return NextResponse.json({ error: dbError.message }, { status: 500 })
+    try {
+      const dbPromise = admin
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .maybeSingle()
+      const timeoutPromise = new Promise<any>((_, reject) =>
+        setTimeout(() => reject(new Error('DB timeout')), 2500)
+      )
+      const { data, error: dbError } = await Promise.race([dbPromise, timeoutPromise])
+      if (!dbError && data) {
+        profile = data
+      } else if (dbError) {
+        console.warn('[/api/profiles GET] Supabase DB notice:', dbError?.message || dbError)
+      }
+    } catch (timeoutErr) {
+      console.warn('[/api/profiles GET] Profile query timed out, using fallback profile.')
     }
 
     if (!profile) {
@@ -55,7 +76,6 @@ export async function GET() {
         plan_tier: 'free',
         onboarding_complete: false,
       }
-      await admin.from('profiles').upsert(fallbackProfile)
       return NextResponse.json({ profile: fallbackProfile })
     }
 

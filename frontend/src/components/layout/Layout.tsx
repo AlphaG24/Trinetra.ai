@@ -10,9 +10,9 @@ interface LayoutProps {
 export function Layout({ children, theme = "dark" }: LayoutProps) {
     const isDark = theme === "dark";
     return (
-        <div className={`min-h-screen flex flex-col ${isDark ? "bg-[#080010] text-[#E2E0FD] dark" : "bg-[#FAF7F2] text-[#1C1714]"}`}>
+        <div className={`min-h-screen flex flex-col ${isDark ? "bg-[#080010] text-[#E2E0FD] dark" : "bg-white text-[#0B0F17]"}`}>
             <Navbar />
-            <main className="flex-grow" style={{ paddingTop: 72 }}>
+            <main className="flex-grow" style={{ paddingTop: isDark ? 72 : 0 }}>
                 {children}
             </main>
             <Footer />

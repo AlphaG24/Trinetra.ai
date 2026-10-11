@@ -4,152 +4,78 @@ import { motion } from "framer-motion";
 
 const steps = [
   {
-    num: "1",
-    title: "Tell Us About Your Business",
-    desc: "Answer 5 quick questions about your business, services, and typical customer queries.",
-    color: "#8B5CF6",
-    shadow: "rgba(139,92,246,0.2)",
+    num: "01",
+    title: "Configure Persona & Dialect",
+    desc: "Define your business knowledge, target dialect, greeting script, and appointment calendar rules in minutes.",
   },
   {
-    num: "2",
-    title: "We Configure Your AI Agent",
-    desc: "Our team trains and configures your AI agent with your specific knowledge base in under 24 hours.",
-    color: "#F59E0B",
-    shadow: "rgba(245,158,11,0.2)",
+    num: "02",
+    title: "Autonomous Pipeline Training",
+    desc: "Our engine fine-tunes speech recognition, latency routing, and guardrail safeguards with custom verification.",
   },
   {
-    num: "3",
-    title: "Go Live & Start Saving",
-    desc: "Your AI agent goes live. Monitor performance, see ROI, and scale as you grow.",
-    color: "#06B6D4",
-    shadow: "rgba(6,182,212,0.2)",
+    num: "03",
+    title: "Deploy Live Virtual Number",
+    desc: "Receive your verified virtual telephony number or connect existing SIP trunks. Live production in under 24 hours.",
   }
 ];
 
 export function HowItWorks() {
   return (
     <section 
-      className="relative w-full py-[100px] overflow-hidden" 
-      style={{
-        background: 'radial-gradient(ellipse at bottom center, rgba(139,92,246,0.05) 0%, #080010 60%)',
-        backgroundColor: '#080010'
-      }}
+      className="relative w-full py-20 overflow-hidden bg-white px-6 sm:px-10 lg:px-16"
     >
-      <div className="max-w-[1280px] mx-auto px-[20px] md:px-[80px]">
+      <div className="max-w-[1536px] mx-auto">
         
-        {/* HEADER */}
-        <div className="flex flex-col items-center text-center mb-[72px]">
-          {/* Badge */}
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.6 }}
-            className="inline-block bg-[rgba(139,92,246,0.1)] border border-[rgba(139,92,246,0.15)] text-[#D7C4F7] font-sans font-medium text-[13px] px-[16px] py-[6px] rounded-full mb-[20px]"
-          >
-            How It Works
-          </motion.div>
-
-          {/* Heading */}
-          <motion.h2 
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.6, delay: 0.1 }}
-            className="font-display font-bold text-[34px] md:text-[42px] text-[#FAF7FF] tracking-[-0.02em] mb-[16px] leading-tight"
-          >
-            From Zero to AI-Powered in <span className="text-transparent bg-clip-text" style={{ backgroundImage: 'linear-gradient(135deg, #8B5CF6 0%, #FBBF24 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>24 Hours.</span>
-          </motion.h2>
-
-          {/* Subtitle */}
-          <motion.p 
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.6, delay: 0.2 }}
-            className="font-sans font-normal text-[16px] md:text-[18px] text-[#B8B0D1] max-w-[500px] mx-auto leading-[1.6]"
-          >
-            No complex setup. No coding required. Just three simple steps.
-          </motion.p>
+        {/* Section Top Bar */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-8 mb-12 border-b border-slate-200/90 gap-4">
+          <div className="flex items-center gap-2.5">
+            <span className="w-2.5 h-2.5 rounded-[1px] bg-[#84CC16]" />
+            <h2 className="text-[13px] font-mono tracking-[0.2em] uppercase font-bold text-[#0B0F17]">
+              HOW IT WORKS
+            </h2>
+          </div>
+          <span className="text-[11px] font-mono tracking-[0.2em] uppercase text-slate-500 font-semibold">
+            ZERO TO LIVE IN 24 HOURS →
+          </span>
         </div>
 
-        {/* STEPS TIMELINE */}
-        <div className="relative w-full pb-[40px] md:pb-0">
-          
-          {/* Desktop Connecting Line */}
-          <div className="hidden md:block absolute top-[27px] h-[2px] z-0" style={{ left: '16.666%', right: '16.666%' }}>
+        {/* Steps Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 relative">
+          {steps.map((step, idx) => (
             <motion.div 
-              initial={{ width: 0 }}
-              whileInView={{ width: "100%" }}
+              key={step.num}
+              initial={{ opacity: 0, y: 25 }}
+              whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
-              transition={{ duration: 1.5, ease: "easeInOut", delay: 0.4 }}
-              className="h-full relative overflow-hidden"
-              style={{ background: 'linear-gradient(90deg, #8B5CF6, #F59E0B, #06B6D4)' }}
+              transition={{ duration: 0.5, delay: 0.1 * idx }}
+              className="group relative flex flex-col justify-between rounded-3xl bg-white border border-slate-200/90 p-8 shadow-[0_4px_20px_rgba(0,0,0,0.03)] hover:border-lime-400 hover:shadow-[0_12px_36px_rgba(132,204,22,0.12)] transition-all duration-300"
             >
-              <motion.div 
-                animate={{ left: ["-5%", "105%"] }}
-                transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
-                className="absolute top-1/2 -translate-y-1/2 w-[6px] h-[6px] bg-white rounded-full shadow-[0_0_8px_white]"
-              />
-            </motion.div>
-          </div>
-
-          {/* Mobile Connecting Line */}
-          <div className="md:hidden absolute top-[28px] bottom-[120px] left-[27px] w-[2px] z-0">
-            <motion.div 
-              initial={{ height: 0 }}
-              whileInView={{ height: "100%" }}
-              viewport={{ once: true }}
-              transition={{ duration: 1.5, ease: "easeInOut", delay: 0.4 }}
-              className="w-full relative overflow-hidden"
-              style={{ background: 'linear-gradient(180deg, #8B5CF6, #F59E0B, #06B6D4)' }}
-            >
-              <motion.div 
-                animate={{ top: ["-5%", "105%"] }}
-                transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
-                className="absolute left-1/2 -translate-x-1/2 w-[6px] h-[6px] bg-white rounded-full shadow-[0_0_8px_white]"
-              />
-            </motion.div>
-          </div>
-
-          {/* Cards Flexbox */}
-          <div className="flex flex-col md:flex-row w-full gap-[60px] md:gap-0 relative z-10">
-            {steps.map((step, idx) => (
-              <motion.div 
-                key={step.num}
-                initial={{ opacity: 0, y: 30 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.6, delay: 0.2 * idx }}
-                className="flex-1 flex flex-row md:flex-col gap-[20px] md:gap-0 items-start md:items-center text-left md:text-center"
-              >
-                {/* Circle */}
-                <div 
-                  className="w-[56px] h-[56px] rounded-full bg-[#130224] shrink-0 flex items-center justify-center mb-0 md:mb-[28px] border-[2px]"
-                  style={{ 
-                    borderColor: step.color,
-                    boxShadow: `0 0 20px ${step.shadow}`
-                  }}
-                >
-                  <span className="font-display font-bold text-[20px]" style={{ color: step.color }}>
+              <div>
+                <div className="flex items-center justify-between mb-6">
+                  <span className="font-mono text-2xl font-black text-[#84CC16]">
                     {step.num}
                   </span>
+                  <span className="w-2 h-2 rounded-full bg-[#84CC16]" />
                 </div>
 
-                {/* Text Content */}
-                <div className="flex flex-col items-start md:items-center md:max-w-[280px]">
-                  <h3 className="font-display font-semibold text-[18px] md:text-[20px] text-[#FAF7FF] mb-[12px] leading-snug">
-                    {step.title}
-                  </h3>
-                  <p className="font-sans font-normal text-[14px] md:text-[15px] text-[#B8B0D1] leading-[1.6]">
-                    {step.desc}
-                  </p>
-                </div>
-              </motion.div>
-            ))}
-          </div>
+                <h3 className="font-mono text-base font-bold text-[#0B0F17] uppercase tracking-tight mb-3">
+                  {step.title}
+                </h3>
+                <p className="font-sans text-xs sm:text-[13px] text-slate-600 leading-relaxed">
+                  {step.desc}
+                </p>
+              </div>
 
+              <div className="mt-8 flex justify-end">
+                <span className="text-slate-400 group-hover:text-[#84CC16] group-hover:translate-x-1 transition-all text-sm">
+                  →
+                </span>
+              </div>
+            </motion.div>
+          ))}
         </div>
+
       </div>
     </section>
   );

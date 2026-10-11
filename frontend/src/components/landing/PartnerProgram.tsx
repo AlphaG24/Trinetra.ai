@@ -2,134 +2,122 @@
 
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { BadgePercent, CircleDollarSign, Link2 } from "lucide-react";
+import { BadgePercent, CircleDollarSign, Link2, ArrowRight } from "lucide-react";
 
 const partnerFeatures = [
   {
-    title: "Recurring commissions",
-    description: "Track partner earnings, approved payouts, and paid commissions in one place.",
+    num: "01",
+    title: "Recurring Monthly Commissions",
+    description: "Earn predictable revenue on every active virtual line, minutes volume, and enterprise subscription.",
     icon: CircleDollarSign,
-    color: "text-[#F59E0B]",
-    bg: "bg-[rgba(245,158,11,0.08)]",
   },
   {
-    title: "Unique referral code",
-    description: "Each partner receives a dedicated referral code and shareable referral link.",
+    num: "02",
+    title: "Dedicated Partner Portal",
+    description: "Track live lead conversions, custom referral links, qualification milestones, and automatic payouts.",
     icon: Link2,
-    color: "text-[#8B5CF6]",
-    bg: "bg-[rgba(139,92,246,0.08)]",
   },
   {
-    title: "Referral visibility",
-    description: "See referral history, qualification status, and conversion value from the dashboard.",
+    num: "03",
+    title: "White-Label & Agency Support",
+    description: "Deploy branded voice receptionists for your clients with co-selling assistance and direct API tokens.",
     icon: BadgePercent,
-    color: "text-[#22D3EE]",
-    bg: "bg-[rgba(34,211,238,0.08)]",
   },
 ];
 
 export function PartnerProgram() {
   return (
-    <section className="relative overflow-hidden bg-[#080010] py-[100px]">
-      <div
-        className="pointer-events-none absolute inset-0"
-        style={{
-          background:
-            "radial-gradient(circle at center, rgba(139,92,246,0.08) 0%, rgba(8,0,16,0) 55%)",
-        }}
-      />
+    <section className="relative overflow-hidden bg-white py-20 px-6 sm:px-10 lg:px-16">
+      <div className="relative mx-auto max-w-[1536px]">
+        
+        {/* Section Top Bar */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-8 mb-10 border-b border-slate-200/90 gap-4">
+          <div className="flex items-center gap-2.5">
+            <span className="w-2.5 h-2.5 rounded-[1px] bg-[#84CC16]" />
+            <h2 className="text-[13px] font-mono tracking-[0.2em] uppercase font-bold text-[#0B0F17]">
+              PARTNER ECOSYSTEM
+            </h2>
+          </div>
+          <span className="text-[11px] font-mono tracking-[0.2em] uppercase text-slate-500 font-semibold">
+            AGENCY &amp; ENTERPRISE ALLIANCES →
+          </span>
+        </div>
 
-      <div className="relative mx-auto max-w-[1280px] px-[20px] md:px-[80px]">
-        <div className="rounded-[28px] border border-[#1E0A35] bg-[linear-gradient(180deg,rgba(19,2,36,0.95),rgba(12,1,24,0.98))] p-[28px] md:p-[40px]">
-          <div className="grid gap-[32px] lg:grid-cols-[0.95fr_1.05fr] lg:items-center">
-            <div>
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.6 }}
-                className="inline-block rounded-full border border-[rgba(139,92,246,0.15)] bg-[rgba(139,92,246,0.1)] px-[16px] py-[6px] font-sans text-[13px] font-medium text-[#D7C4F7]"
-              >
-                Partner With Trinetra
-              </motion.div>
+        <div className="rounded-3xl border border-slate-200/90 bg-white p-8 sm:p-12 shadow-[0_8px_30px_rgba(0,0,0,0.04)]">
+          <div className="grid gap-10 lg:grid-cols-12 lg:items-center">
+            
+            <div className="lg:col-span-5">
+              <span className="inline-block px-3 py-1 rounded-full bg-lime-500/10 border border-lime-500/30 text-[11px] font-mono font-bold text-lime-800 uppercase tracking-wider mb-4">
+                REVENUE SHARE
+              </span>
 
-              <motion.h2
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.6, delay: 0.1 }}
-                className="mt-[18px] font-display text-[34px] font-bold leading-tight tracking-[-0.02em] text-[#FAF7FF] md:text-[44px]"
-              >
-                Join the referral network and manage your partner performance from a dedicated portal.
-              </motion.h2>
+              <h3 className="text-3xl sm:text-4xl font-black text-[#0B0F17] tracking-tight leading-tight mb-4">
+                Scale Your Agency with{" "}
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#65A30D] via-[#84CC16] to-[#A3E635]">
+                  Voice AI.
+                </span>
+              </h3>
 
-              <motion.p
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.6, delay: 0.2 }}
-                className="mt-[16px] max-w-[560px] font-sans text-[16px] leading-[1.7] text-[#B8B0D1] md:text-[18px]"
-              >
-                If you bring clients to Trinetra, your dashboard should already know your code, your
-                commissions, and your referral history.
-              </motion.p>
+              <p className="text-xs sm:text-sm text-slate-600 leading-relaxed font-sans mb-8">
+                Join our certified partner program to deploy multilingual voice receptionists for healthcare, education, retail, and real estate clients.
+              </p>
 
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.6, delay: 0.3 }}
-                className="mt-[28px] flex flex-wrap gap-[14px]"
-              >
+              <div className="flex flex-wrap items-center gap-3">
                 <Link
-                  href="/contact"
-                  className="inline-flex items-center justify-center rounded-full bg-[#F59E0B] px-[24px] py-[14px] font-sans text-[15px] font-semibold text-[#080010] transition-colors hover:bg-[#D97706]"
+                  href="/partner/apply"
+                  className="inline-flex items-center gap-2 rounded-full bg-[#0B0F17] px-6 py-3 font-mono text-xs font-bold uppercase tracking-wider text-white hover:bg-black hover:shadow-[0_0_20px_rgba(132,204,22,0.35)] transition-all"
                 >
-                  Join as Partner
+                  <span>Apply as Partner</span>
+                  <ArrowRight size={14} className="text-[#84CC16]" />
                 </Link>
+
                 <Link
-                  href="/contact"
-                  className="inline-flex items-center justify-center rounded-full border border-[#2D1255] bg-[#0C0118] px-[24px] py-[14px] font-sans text-[15px] font-medium text-[#D7C4F7] transition-colors hover:border-[#8B5CF6] hover:text-[#FAF7FF]"
+                  href="/partner/login"
+                  className="inline-flex items-center rounded-full border border-slate-200 bg-white px-5 py-3 font-mono text-xs font-bold uppercase tracking-wider text-slate-700 hover:border-[#84CC16] hover:text-[#0B0F17] transition-all"
                 >
-                  Discuss Partnership
+                  Partner Login
                 </Link>
-              </motion.div>
+              </div>
             </div>
 
-            <div className="grid gap-[16px]">
-              {partnerFeatures.map((feature, index) => {
+            {/* Right Features Cards */}
+            <div className="lg:col-span-7 grid gap-4 sm:grid-cols-3">
+              {partnerFeatures.map((feature, idx) => {
                 const Icon = feature.icon;
-
                 return (
                   <motion.div
                     key={feature.title}
-                    initial={{ opacity: 0, x: 24 }}
-                    whileInView={{ opacity: 1, x: 0 }}
+                    initial={{ opacity: 0, y: 20 }}
+                    whileInView={{ opacity: 1, y: 0 }}
                     viewport={{ once: true }}
-                    transition={{ duration: 0.55, delay: 0.1 * index }}
-                    className="rounded-[18px] border border-[#1E0A35] bg-[#130224] p-[22px]"
+                    transition={{ duration: 0.5, delay: idx * 0.1 }}
+                    className="flex flex-col justify-between rounded-2xl border border-slate-200/80 bg-slate-50/60 p-6 hover:border-lime-400 hover:bg-white transition-all"
                   >
-                    <div className="flex items-start gap-[16px]">
-                      <div
-                        className={`flex h-[46px] w-[46px] shrink-0 items-center justify-center rounded-[14px] ${feature.bg} ${feature.color}`}
-                      >
-                        <Icon size={22} />
+                    <div>
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white border border-slate-200 text-[#84CC16]">
+                          <Icon size={18} />
+                        </div>
+                        <span className="font-mono text-xs font-bold text-[#84CC16]">
+                          {feature.num}
+                        </span>
                       </div>
-                      <div>
-                        <h3 className="font-display text-[18px] font-semibold text-[#FAF7FF]">
-                          {feature.title}
-                        </h3>
-                        <p className="mt-[8px] font-sans text-[14px] leading-[1.7] text-[#B8B0D1]">
-                          {feature.description}
-                        </p>
-                      </div>
+
+                      <h4 className="font-mono text-xs font-bold text-[#0B0F17] uppercase tracking-tight mb-2">
+                        {feature.title}
+                      </h4>
+                      <p className="text-[11px] text-slate-500 leading-relaxed font-sans">
+                        {feature.description}
+                      </p>
                     </div>
                   </motion.div>
                 );
               })}
             </div>
+
           </div>
         </div>
+
       </div>
     </section>
   );

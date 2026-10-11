@@ -1007,7 +1007,7 @@ export function AgentOverviewTab({
                         Start call to stream transcript.
                       </div>
                     ) : (
-                      transcripts.map((t, idx) => {
+                      transcripts.map((t: any, idx: number) => {
                         const isAgent = t.speaker.toLowerCase() === 'agent' || t.speaker.toLowerCase() === 'system'
                         return (
                           <div
