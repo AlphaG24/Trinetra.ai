@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import {
   CreditCard,
   Plus,
@@ -32,9 +32,71 @@ import {
   Wallet,
   Send,
   Layers,
-  CheckCircle2
+  CheckCircle2,
+  Bot,
+  RotateCcw
 } from 'lucide-react'
 import toast from 'react-hot-toast'
+
+export interface TrialPersonality {
+  id: string
+  name: string
+  role: string
+  description: string
+  iconBadge: string
+  is_active?: boolean
+}
+
+export const DEFAULT_TRIAL_PERSONALITIES: TrialPersonality[] = [
+  {
+    id: 'sales_agent',
+    name: 'Sales Agent',
+    role: 'Revenue Generation',
+    description: 'An AI voice sales agent that calls prospects in natural Hinglish, handles objections, and closes deals.',
+    iconBadge: '🎯',
+    is_active: true
+  },
+  {
+    id: 'appointment_agent',
+    name: 'Appointment Booker',
+    role: 'Calendar Automation',
+    description: 'A precise, friendly AI appointment booking agent that collects details, confirms availability, and handles rescheduling.',
+    iconBadge: '📅',
+    is_active: true
+  },
+  {
+    id: 'support_agent',
+    name: 'Support Agent',
+    role: '24/7 Issue Resolution',
+    description: 'An empathetic AI customer support agent that troubleshoots step by step and handles customer inquiries with warmth.',
+    iconBadge: '🎧',
+    is_active: true
+  },
+  {
+    id: 'lead_qualifier',
+    name: 'Lead Qualifier',
+    role: 'B2B Discovery',
+    description: 'An AI lead qualification agent that asks BANT questions conversationally and scores leads automatically.',
+    iconBadge: '⚡',
+    is_active: true
+  },
+  {
+    id: 'multi_agent',
+    name: 'Multi-Personality Agent',
+    role: 'Omnichannel AI',
+    description: 'One AI agent that handles Sales, Support, Appointments, and Lead Qualification from a single phone number. Detects caller intent instantly.',
+    iconBadge: '🔮',
+    is_active: true
+  },
+  {
+    id: 'anika-voice',
+    name: 'Vikram - AI Voice Assistant',
+    role: 'Enterprise Workflows',
+    description: 'An enterprise conversational AI agent capable of managing voice and phone workflows.',
+    iconBadge: '🤖',
+    is_active: true
+  }
+]
 
 interface Plan {
   id: string
@@ -183,6 +245,56 @@ export default function PricingPlansAdminPage() {
 
   const handleConfigChange = (key: string, val: string) => {
     setConfigs(prev => ({ ...prev, [key]: val }))
+  }
+
+  // Trial Personalities Helpers
+  const trialPersonalities: TrialPersonality[] = useMemo(() => {
+    if (configs.trial_agent_personalities) {
+      try {
+        const parsed = JSON.parse(configs.trial_agent_personalities)
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed
+      } catch (e) {
+        console.warn('Could not parse trial_agent_personalities:', e)
+      }
+    }
+    return DEFAULT_TRIAL_PERSONALITIES
+  }, [configs.trial_agent_personalities])
+
+  const handleUpdatePersonality = (index: number, field: keyof TrialPersonality, value: any) => {
+    const updated = [...trialPersonalities]
+    updated[index] = { ...updated[index], [field]: value }
+    handleConfigChange('trial_agent_personalities', JSON.stringify(updated))
+  }
+
+  const handleAddPersonality = () => {
+    const newId = `custom_${Date.now()}`
+    const newRole: TrialPersonality = {
+      id: newId,
+      name: 'Custom AI Specialist',
+      role: 'SPECIALIZED TASK',
+      description: 'Handles custom business processes, workflows, and automated voice tasks.',
+      iconBadge: '🤖',
+      is_active: true
+    }
+    handleConfigChange('trial_agent_personalities', JSON.stringify([...trialPersonalities, newRole]))
+    toast.success('Added new personality slot! Configure and click "Save All Changes".')
+  }
+
+  const handleDeletePersonality = (index: number) => {
+    if (trialPersonalities.length <= 1) {
+      toast.error('At least 1 trial personality role must be maintained.')
+      return
+    }
+    const updated = trialPersonalities.filter((_, i) => i !== index)
+    handleConfigChange('trial_agent_personalities', JSON.stringify(updated))
+    toast.success('Personality role removed.')
+  }
+
+  const handleResetPersonalities = () => {
+    if (confirm('Reset trial agent personality roles back to default 6 blueprints?')) {
+      handleConfigChange('trial_agent_personalities', JSON.stringify(DEFAULT_TRIAL_PERSONALITIES))
+      toast.success('Reset to standard 6 personality blueprints.')
+    }
   }
 
   const handleRupeeChange = (key: string, rupeeStr: string) => {
@@ -807,6 +919,124 @@ export default function PricingPlansAdminPage() {
                   <span className="text-[9px] text-[var(--muted)] block">Amount charged on first account activation.</span>
                 </div>
               </div>
+            </div>
+          </div>
+
+          {/* TRIAL PERSONALITY ROLES CONFIGURATION */}
+          <div className="md:col-span-2 bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-6 space-y-6 shadow-xs">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-[var(--border)] gap-3">
+              <div className="space-y-1">
+                <h2 className="text-sm font-bold text-[var(--heading)] uppercase tracking-wider flex items-center gap-2">
+                  <Bot className="w-4 h-4 text-violet-500" />
+                  Trial Agent Personality Roles (Customer Step 2 Selection)
+                </h2>
+                <p className="text-xs text-[var(--muted)]">
+                  These are the AI Agent personas presented to customers in Step 2 of the ₹99 Trial setup modal. Changes saved here reflect live on the user portal without code conflicts.
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleResetPersonalities}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[var(--border)] bg-[var(--hover-bg)] text-xs text-[var(--muted)] hover:text-[var(--heading)] transition cursor-pointer"
+                  title="Reset to default 6 roles"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  <span>Reset Defaults</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleAddPersonality}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-700 text-white text-xs font-semibold transition shadow-xs cursor-pointer"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Add Role</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {trialPersonalities.map((item, idx) => (
+                <div 
+                  key={item.id || idx}
+                  className={`p-4 rounded-xl border transition-all space-y-3 ${
+                    item.is_active !== false 
+                      ? 'bg-[var(--hover-bg)]/50 border-[var(--border)]' 
+                      : 'bg-zinc-100/50 dark:bg-zinc-900/30 border-dashed border-zinc-300 dark:border-zinc-800 opacity-60'
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 flex-1">
+                      <input
+                        type="text"
+                        value={item.iconBadge || '🤖'}
+                        onChange={(e) => handleUpdatePersonality(idx, 'iconBadge', e.target.value)}
+                        className="w-9 h-9 text-center text-lg bg-[var(--card-bg)] border border-[var(--border)] rounded-lg outline-none focus:border-violet-500"
+                        title="Emoji Icon"
+                        maxLength={4}
+                      />
+                      <input
+                        type="text"
+                        value={item.name}
+                        onChange={(e) => handleUpdatePersonality(idx, 'name', e.target.value)}
+                        placeholder="Agent Role Title"
+                        className="flex-1 bg-[var(--card-bg)] border border-[var(--border)] rounded-lg px-2.5 py-1.5 text-xs font-bold text-[var(--heading)] outline-none focus:border-violet-500"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleDeletePersonality(idx)}
+                      className="p-1.5 text-[var(--muted)] hover:text-rose-500 transition cursor-pointer rounded-md hover:bg-rose-500/10"
+                      title="Delete role"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+
+                  <div>
+                    <label className="text-[9px] font-bold text-[var(--muted)] uppercase tracking-widest block mb-1">
+                      Category Tag (e.g. REVENUE GENERATION)
+                    </label>
+                    <input
+                      type="text"
+                      value={item.role}
+                      onChange={(e) => handleUpdatePersonality(idx, 'role', e.target.value)}
+                      placeholder="Category Tag"
+                      className="w-full bg-[var(--card-bg)] border border-[var(--border)] rounded-lg px-2.5 py-1.5 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 outline-none focus:border-violet-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-[9px] font-bold text-[var(--muted)] uppercase tracking-widest block mb-1">
+                      Role Description (Shown to customer)
+                    </label>
+                    <textarea
+                      value={item.description}
+                      onChange={(e) => handleUpdatePersonality(idx, 'description', e.target.value)}
+                      rows={2}
+                      placeholder="Describe what this AI agent does..."
+                      className="w-full bg-[var(--card-bg)] border border-[var(--border)] rounded-lg p-2 text-[11px] text-[var(--body)] outline-none focus:border-violet-500 resize-none leading-relaxed"
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between pt-1 border-t border-[var(--border)]">
+                    <span className="text-[10px] text-[var(--muted)] font-medium">
+                      Status: {item.is_active !== false ? 'Active in Trial' : 'Disabled'}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleUpdatePersonality(idx, 'is_active', item.is_active === false ? true : false)}
+                      className={`px-2.5 py-1 rounded text-[10px] font-bold uppercase transition cursor-pointer ${
+                        item.is_active !== false
+                          ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
+                          : 'bg-zinc-200 dark:bg-zinc-800 text-[var(--muted)]'
+                      }`}
+                    >
+                      {item.is_active !== false ? 'Enabled' : 'Disabled'}
+                    </button>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         </div>

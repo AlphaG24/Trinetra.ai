@@ -77,7 +77,7 @@ export async function POST(request: Request) {
     const config: Record<string, string> = {}
     configs?.forEach(c => { config[c.config_key] = c.config_value })
     
-    const keySecret = config.razorpay_test_key_secret || config.razorpay_key_secret
+    const keySecret = config.razorpay_test_key_secret || config.razorpay_key_secret || process.env.RAZORPAY_KEY_SECRET
     
     if (!keySecret) {
       return NextResponse.json({ error: 'Payment gateway not configured' }, { status: 500 })
@@ -223,6 +223,114 @@ export async function POST(request: Request) {
             is_trial: true,
             invoice_type: 'trial'
           })
+
+          // Instant auto-provisioning of selected trial personality agents
+          const selectedPersonalities: string[] = Array.isArray(trialMeta.selectedPersonalities) && trialMeta.selectedPersonalities.length > 0
+            ? trialMeta.selectedPersonalities
+            : ['sales_agent', 'support_agent'].slice(0, targetCount)
+
+          const trialDays = selectedPlan?.days || 7
+          const trialExpiresAt = new Date(Date.now() + trialDays * 86400000).toISOString()
+          const companyName = profile.company_name || profile.full_name || 'My Company'
+
+          for (const roleId of selectedPersonalities) {
+            const dbAgentType = roleId.toLowerCase()
+            const agentTypeKey = dbAgentType.endsWith('_agent') ? dbAgentType : `${dbAgentType}_agent`
+
+            let voiceId = 'shubh'
+            let cleanName = roleId.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())
+
+            if (dbAgentType.includes('support')) {
+              voiceId = 'anushka'
+              cleanName = 'Customer Support Agent'
+            } else if (dbAgentType.includes('sales')) {
+              voiceId = 'shubh'
+              cleanName = 'Sales Executive Agent'
+            } else if (dbAgentType.includes('appointment')) {
+              voiceId = 'anushka'
+              cleanName = 'Appointment Booking Agent'
+            } else if (dbAgentType.includes('lead')) {
+              voiceId = 'shubh'
+              cleanName = 'Lead Qualifier Agent'
+            } else if (dbAgentType.includes('multi')) {
+              voiceId = 'shubh'
+              cleanName = 'Multi-Personality Agent'
+            } else if (dbAgentType.includes('anika') || dbAgentType.includes('vikram')) {
+              voiceId = 'shubh'
+              cleanName = 'Vikram - AI Voice Assistant'
+            }
+
+            const agentName = `[Trial] ${cleanName}`
+
+            let systemPrompt = ''
+            try {
+              const promptFileName = (dbAgentType === 'anika-voice' || dbAgentType.includes('vikram'))
+                ? 'vikram_sharma.txt'
+                : `${agentTypeKey}.txt`
+              const possiblePaths = [
+                path.resolve(process.cwd(), '../backend/prompts', promptFileName),
+                path.resolve(process.cwd(), 'backend/prompts', promptFileName),
+                path.resolve('/app/backend/prompts', promptFileName),
+              ]
+              for (const filePath of possiblePaths) {
+                if (fs.existsSync(filePath)) {
+                  systemPrompt = fs.readFileSync(filePath, 'utf-8')
+                  break
+                }
+              }
+            } catch (e) {}
+
+            if (!systemPrompt) {
+              systemPrompt = `You are a helpful, courteous ${cleanName} for ${companyName}. Speak clearly and assist customers professionally.`
+            }
+
+            try {
+              const businessDescription = profile.business_description || 'General business'
+              const contextBlock = `=== BUSINESS CONTEXT ===\nBusiness Description: ${businessDescription}\nCompany Name: ${companyName}\nIndustry: ${profile.business_type || 'General'}\n========================\n\n`
+              systemPrompt = contextBlock + systemPrompt
+            } catch (e) {}
+
+            const greetingMessage = (dbAgentType.includes('support') || dbAgentType.includes('appointment'))
+              ? `Hello, main ${cleanName} bol rahi hoon ${companyName} se. Kaise help kar sakti hoon?`
+              : `Hello, main ${cleanName} bol raha hoon ${companyName} se. Kaise help kar sakta hoon?`
+
+            const agentPayload = {
+              user_id: user.id,
+              organization_id: profile.organization_id || null,
+              name: agentName,
+              agent_type: 'voice',
+              voice_provider: 'sarvam',
+              voice_id: voiceId,
+              status: 'active',
+              system_prompt: systemPrompt,
+              greeting_message: greetingMessage,
+              fallback_message: 'Mujhe yeh samajh nahi aaya, kripya dubara bataiye.',
+              validity_days: trialDays,
+              subscription_expires_at: trialExpiresAt,
+              expiry_alerts_sent: [],
+              config: {
+                plan_tier: 'trial',
+                target_plan: trialMeta.targetPlanSlug || 'starter',
+                personality_role: roleId,
+                slug: roleId,
+                minutes_limit: 50
+              }
+            }
+
+            const { data: newAgents, error: insertAgentErr } = await adminClient
+              .from('agents')
+              .insert(agentPayload)
+              .select()
+
+            if (insertAgentErr) {
+              console.error('[Verify Payment] Trial Personality Agent Creation Error:', insertAgentErr)
+            } else if (newAgents && newAgents.length > 0) {
+              if (!firstAgentId) {
+                firstAgentId = newAgents[0].id
+              }
+              console.log('[Verify Payment] Instantly created trial personality agent:', agentName)
+            }
+          }
         } else {
           invoiceLines.push({
             item: `${item.key.toUpperCase()} Subscription Plan Upgrade`,
@@ -715,6 +823,18 @@ export async function POST(request: Request) {
       updated_at: new Date().toISOString()
     }
 
+    if (isPureTrial) {
+      const trialMeta = (body as any).trial_metadata || {}
+      updates.mandate_status = 'scheduled'
+      updates.mandate_id = razorpay_payment_id || razorpay_order_id
+      updates.mandate_target_plan = trialMeta.targetPlanSlug || 'starter'
+      updates.mandate_renewal_date = trialMeta.renewalDate || new Date(Date.now() + 7 * 86400000).toISOString()
+      updates.mandate_target_price_paisa = (trialMeta.targetPriceRupees || 4999) * 100
+      updates.mandate_personalities = trialMeta.selectedPersonalities || ['sales', 'support']
+    } else if (planTierToSet !== 'free' && planTierToSet !== 'free_demo') {
+      updates.mandate_status = 'active'
+    }
+
     if (save_gst_to_profile && cleanGSTIN) {
       updates.gst_number = cleanGSTIN
       if (customer_legal_name) updates.company_name = customer_legal_name
@@ -737,7 +857,30 @@ export async function POST(request: Request) {
       console.error('[Verify Payment] Profiles Update Error:', profileUpdateErr)
       return NextResponse.json({ error: 'Failed to update plan limits' }, { status: 500 })
     }
-    console.log('[Verify Payment] 1F LOG: User profile limits updated successfully in DB:', JSON.stringify(updates))
+    // Extend validity on active agents by 30 days upon paid plan upgrade or recurring renewal
+    if (planTierToSet !== 'trial' && planTierToSet !== 'free' && planTierToSet !== 'free_demo') {
+      try {
+        const renewalExpiresAt = new Date(Date.now() + 30 * 86400000).toISOString()
+        let agentQuery = adminClient
+          .from('agents')
+          .update({
+            subscription_expires_at: renewalExpiresAt,
+            status: 'active',
+            updated_at: new Date().toISOString()
+          })
+          .neq('status', 'deleted')
+
+        if (profile.organization_id) {
+          agentQuery = agentQuery.eq('organization_id', profile.organization_id)
+        } else {
+          agentQuery = agentQuery.eq('user_id', user.id)
+        }
+        await agentQuery
+        console.log('[Verify Payment] Successfully extended subscription_expires_at for active agents to:', renewalExpiresAt)
+      } catch (agentRenewErr) {
+        console.warn('[Verify Payment] Could not extend agents subscription_expires_at:', agentRenewErr)
+      }
+    }
 
     // Record coupon redemption if applicable
     if (validCouponCode) {

@@ -154,11 +154,7 @@ h6 {
 .dashboard-theme-root {
   font-family: var(--font-merriweather), Merriweather, Georgia, serif !important;
   background-color: #F8FBFB !important;
-  background-image: 
-    radial-gradient(100% 650px at 50% -50px, rgba(137, 212, 194, 0.40) 0%, rgba(137, 212, 194, 0.18) 45%, rgba(137, 212, 194, 0.03) 75%, transparent 100%),
-    linear-gradient(180deg, rgba(137, 212, 194, 0.22) 0%, rgba(137, 212, 194, 0.06) 350px, transparent 650px) !important;
-  background-repeat: no-repeat !important;
-  background-attachment: local !important;
+  background-image: none !important;
   color: var(--body);
 }
 
@@ -167,6 +163,22 @@ html[data-theme='dark'] .dashboard-theme-root,
 html.dark .dashboard-theme-root,
 .dark .dashboard-theme-root {
   background-color: #080010 !important;
+  background-image: none !important;
+}
+
+/* Admin portal retains the background gradient */
+.dashboard-theme-root.admin-portal {
+  background-image: 
+    radial-gradient(100% 650px at 50% -50px, rgba(137, 212, 194, 0.40) 0%, rgba(137, 212, 194, 0.18) 45%, rgba(137, 212, 194, 0.03) 75%, transparent 100%),
+    linear-gradient(180deg, rgba(137, 212, 194, 0.22) 0%, rgba(137, 212, 194, 0.06) 350px, transparent 650px) !important;
+  background-repeat: no-repeat !important;
+  background-attachment: local !important;
+}
+
+:root[data-theme='dark'] .dashboard-theme-root.admin-portal,
+html[data-theme='dark'] .dashboard-theme-root.admin-portal,
+html.dark .dashboard-theme-root.admin-portal,
+.dark .dashboard-theme-root.admin-portal {
   background-image: 
     radial-gradient(100% 650px at 50% -50px, rgba(137, 212, 194, 0.15) 0%, rgba(137, 212, 194, 0.05) 50%, transparent 100%) !important;
 }
@@ -894,7 +906,7 @@ html.light .navbar__link:hover {
   background: linear-gradient(
     90deg,
     transparent 0%,
-    rgba(137, 212, 194, 0.22) 50%,
+    rgba(0, 0, 0, 0.04) 50%,
     transparent 100%
   );
   animation: ambientSheen 4.2s cubic-bezier(0.4, 0, 0.2, 1) infinite;

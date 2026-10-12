@@ -48,46 +48,46 @@ export interface PersonalityOption {
 
 const PERSONALITY_OPTIONS: PersonalityOption[] = [
   {
-    id: 'sales',
-    name: 'Sales & Outbound Executive',
+    id: 'sales_agent',
+    name: 'Sales Agent',
     role: 'Revenue Generation',
-    description: 'Proactively contacts prospects, pitches offerings, handles objections, and closes deals.',
+    description: 'An AI voice sales agent that calls prospects in natural Hinglish, handles objections, and closes deals.',
     iconBadge: '🎯'
   },
   {
-    id: 'appointment',
-    name: 'Appointment Setter & Scheduler',
+    id: 'appointment_agent',
+    name: 'Appointment Booker',
     role: 'Calendar Automation',
-    description: 'Books product demonstrations, consultations, and meetings directly onto Google/Outlook calendars.',
+    description: 'A precise, friendly AI appointment booking agent that collects details, confirms availability, and handles rescheduling.',
     iconBadge: '📅'
   },
   {
-    id: 'support',
-    name: 'Customer Support Specialist',
+    id: 'support_agent',
+    name: 'Support Agent',
     role: '24/7 Issue Resolution',
-    description: 'Resolves inbound customer inquiries, troubleshooting, FAQs, and ticket logging in real-time.',
+    description: 'An empathetic AI customer support agent that troubleshoots step by step and handles customer inquiries with warmth.',
     iconBadge: '🎧'
   },
   {
     id: 'lead_qualifier',
-    name: 'High-Intent Lead Qualifier',
+    name: 'Lead Qualifier',
     role: 'B2B Discovery',
-    description: 'Verifies caller budgets, authority, need, and timelines (BANT) before passing to human reps.',
+    description: 'An AI lead qualification agent that asks BANT questions conversationally and scores leads automatically.',
     iconBadge: '⚡'
   },
   {
-    id: 'collections',
-    name: 'Payment Follow-ups & Collections',
-    role: 'Dues & Reminders',
-    description: 'Courteously contacts customers about pending invoices, subscription renewals, and sends instant payment links.',
-    iconBadge: '💳'
+    id: 'multi_agent',
+    name: 'Multi-Personality Agent',
+    role: 'Omnichannel AI',
+    description: 'One AI agent that handles Sales, Support, Appointments, and Lead Qualification from a single phone number. Detects caller intent instantly.',
+    iconBadge: '🔮'
   },
   {
-    id: 'survey',
-    name: 'Feedback & CSAT Survey Agent',
-    role: 'Customer Intelligence',
-    description: 'Conducts post-purchase check-ins, Net Promoter Score surveys, and records structured sentiment metrics.',
-    iconBadge: '📊'
+    id: 'anika-voice',
+    name: 'Vikram - AI Voice Assistant',
+    role: 'Enterprise Workflows',
+    description: 'An enterprise conversational AI agent capable of managing voice and phone workflows.',
+    iconBadge: '🤖'
   }
 ]
 
@@ -113,10 +113,11 @@ export default function TrialSetupModal({
   const [submitting, setSubmitting] = useState(false)
   const [plans, setPlans] = useState<Plan[]>([])
   const [loadingPlans, setLoadingPlans] = useState(true)
+  const [personalities, setPersonalities] = useState<PersonalityOption[]>(PERSONALITY_OPTIONS)
   const [selectedPlanId, setSelectedPlanId] = useState<string>('')
-  const [selectedPersonalities, setSelectedPersonalities] = useState<string[]>(['sales', 'support'])
+  const [selectedPersonalities, setSelectedPersonalities] = useState<string[]>(['sales_agent', 'support_agent'])
 
-  // Fetch active plans directly configured by admin in /admin/plans
+  // Fetch active plans & admin-configured trial personalities
   useEffect(() => {
     if (!isOpen) return
     let isMounted = true
@@ -128,23 +129,22 @@ export default function TrialSetupModal({
         if (!res.ok) throw new Error('Failed to load pricing plans')
         const data = await res.json()
         const fetchedPlans: Plan[] = data.plans || []
+        const fetchedPersonalities: PersonalityOption[] = (Array.isArray(data.trial_personalities) && data.trial_personalities.length > 0)
+          ? data.trial_personalities
+          : PERSONALITY_OPTIONS
 
         if (isMounted) {
           setPlans(fetchedPlans)
+          setPersonalities(fetchedPersonalities)
           if (fetchedPlans.length > 0) {
             // Find default plan (popular plan or 2-agent growth plan or 1st plan)
             const popular = fetchedPlans.find(p => p.is_popular) || fetchedPlans.find(p => p.max_agents === 2) || fetchedPlans[0]
             setSelectedPlanId(popular.id)
             
-            // Default personality selection based on agent count
+            // Default personality selection based on agent count and admin-configured roles
             const defaultQuota = popular.max_agents || 1
-            if (defaultQuota === 1) {
-              setSelectedPersonalities(['sales'])
-            } else if (defaultQuota === 2) {
-              setSelectedPersonalities(['sales', 'support'])
-            } else if (defaultQuota >= 4) {
-              setSelectedPersonalities(['sales', 'appointment', 'support', 'lead_qualifier'])
-            }
+            const defaultIds = fetchedPersonalities.slice(0, defaultQuota).map(p => p.id)
+            setSelectedPersonalities(defaultIds)
           }
         }
       } catch (err) {
@@ -233,6 +233,10 @@ export default function TrialSetupModal({
     const newCount = plan.max_agents || 1
     if (selectedPersonalities.length > newCount) {
       setSelectedPersonalities(selectedPersonalities.slice(0, newCount))
+    } else if (selectedPersonalities.length < newCount) {
+      const needed = newCount - selectedPersonalities.length
+      const unselected = personalities.filter(p => !selectedPersonalities.includes(p.id)).map(p => p.id)
+      setSelectedPersonalities([...selectedPersonalities, ...unselected.slice(0, needed)])
     }
   }
 
@@ -409,7 +413,7 @@ export default function TrialSetupModal({
           </p>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-            {PERSONALITY_OPTIONS.map((item) => {
+            {(personalities && personalities.length > 0 ? personalities : PERSONALITY_OPTIONS).map((item) => {
               const isChecked = selectedPersonalities.includes(item.id)
               return (
                 <div

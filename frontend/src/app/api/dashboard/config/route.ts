@@ -126,6 +126,12 @@ export async function GET() {
         paid_minutes_used: profile.paid_minutes_used || 0,
         demo_minutes_limit: profile.demo_minutes_limit || 0,
         demo_minutes_used: profile.demo_minutes_used || 0,
+        mandate_status: profile.mandate_status || null,
+        mandate_id: profile.mandate_id || null,
+        mandate_renewal_date: profile.mandate_renewal_date || null,
+        mandate_target_plan: profile.mandate_target_plan || null,
+        mandate_target_price_paisa: profile.mandate_target_price_paisa || null,
+        mandate_personalities: profile.mandate_personalities || null,
       },
       bundles: bundles || []
     })

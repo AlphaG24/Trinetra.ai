@@ -33,6 +33,7 @@ from app.services.outbound_safety_guardrails import (
     check_national_dnd_registry,
     validate_whatsapp_outbound,
     generate_pre_send_campaign_report,
+    validate_outbound_cli,
     HARD_FLOOR_START,
     HARD_FLOOR_END,
     PROMOTIONAL_CALLING_HOURS_WINDOW,
@@ -344,6 +345,74 @@ class TestOutboundSafetyGuardrails(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(report["breakdown"]["failed_invalid_phone"], 1)
         self.assertIn("CONFIRM WITH A LAWYER", report["legal_notice"])
 
+    def test_cli_integrity_spoof_attempt_blocked_and_audit_logged(self):
+        """Task 3.9: Outbound caller ID spoof attempt must be blocked and recorded in audit_logs."""
+        mock_db = MagicMock()
+        mock_table = MagicMock()
+        mock_db.table.return_value = mock_table
+        
+        # Phone numbers query returns empty (number does not belong to this org)
+        mock_select = MagicMock()
+        mock_table.select.return_value = mock_select
+        mock_select.eq.return_value = mock_select
+        mock_select.in_.return_value = mock_select
+        mock_select.limit.return_value = mock_select
+        mock_select.execute.return_value = MagicMock(data=[])
+
+        is_valid, reason, details = validate_outbound_cli(
+            caller_id="+919999999999",
+            organization_id="org_test_123",
+            supabase_client=mock_db
+        )
+
+        self.assertFalse(is_valid)
+        self.assertTrue(details["spoof_blocked"])
+        self.assertIn("spoofing prohibited", reason.lower())
+
+        # Verify audit_logs insert occurred
+        mock_db.table.assert_any_call("audit_logs")
+        insert_calls = [c for c in mock_table.insert.call_args_list]
+        self.assertTrue(len(insert_calls) > 0)
+        logged_data = insert_calls[0][0][0]
+        self.assertEqual(logged_data["action"], "telephony.cli_spoof_attempt_blocked")
+        self.assertEqual(logged_data["organization_id"], "org_test_123")
+        self.assertEqual(logged_data["details"]["attempted_caller_id"], "+919999999999")
+
+    def test_cli_integrity_assigned_number_allowed(self):
+        """Task 3.9: Assigned virtual number owned by tenant passes CLI check."""
+        mock_db = MagicMock()
+        mock_table = MagicMock()
+        mock_db.table.return_value = mock_table
+        
+        # Phone numbers query returns the matching record
+        mock_select = MagicMock()
+        mock_table.select.return_value = mock_select
+        mock_select.eq.return_value = mock_select
+        mock_select.in_.return_value = mock_select
+        mock_select.limit.return_value = mock_select
+        mock_select.execute.return_value = MagicMock(data=[{"id": "pn_1", "phone_number": "+918012345678"}])
+
+        is_valid, reason, details = validate_outbound_cli(
+            caller_id="+918012345678",
+            organization_id="org_test_123",
+            supabase_client=mock_db
+        )
+
+        self.assertTrue(is_valid)
+        self.assertFalse(details["spoof_blocked"])
+        self.assertEqual(details["source"], "organization_assigned")
+
+    def test_cli_integrity_empty_caller_id_blocked(self):
+        """Task 3.9: Empty or blank caller ID is strictly rejected."""
+        is_valid, reason, details = validate_outbound_cli(
+            caller_id="",
+            organization_id="org_test_123"
+        )
+        self.assertFalse(is_valid)
+        self.assertTrue(details["spoof_blocked"])
+        self.assertEqual(details["reason"], "empty_cli")
+
 
 if __name__ == "__main__":
     unittest.main()
+

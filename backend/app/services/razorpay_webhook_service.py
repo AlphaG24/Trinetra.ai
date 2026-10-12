@@ -227,4 +227,111 @@ class RazorpayWebhookService:
             else:
                 result_details["refund_recorded"] = False
 
+        elif event_type == "subscription.charged":
+            sub_entity = event_payload.get("payload", {}).get("subscription", {}).get("entity", {})
+            pay_entity = event_payload.get("payload", {}).get("payment", {}).get("entity", {})
+            sub_id = sub_entity.get("id") or event_id
+            amount_paisa = int(pay_entity.get("amount", 0) or sub_entity.get("amount", 0))
+            payment_id = pay_entity.get("id", event_id)
+            notes = sub_entity.get("notes", {}) or pay_entity.get("notes", {}) or {}
+            org_id = notes.get("organization_id")
+            user_id = notes.get("user_id")
+            target_plan = (notes.get("target_plan") or "starter").lower()
+
+            result_details["subscription_id"] = sub_id
+            result_details["target_plan"] = target_plan
+
+            # 1. Extend active agents validity by 30 days
+            renewal_expiry = time.strftime(
+                "%Y-%m-%dT%H:%M:%SZ",
+                time.gmtime(time.time() + 30 * 86400)
+            )
+            try:
+                if org_id:
+                    self.supabase.table("agents").update({
+                        "subscription_expires_at": renewal_expiry,
+                        "status": "active",
+                    }).eq("organization_id", org_id).neq("status", "deleted").execute()
+                elif user_id:
+                    self.supabase.table("agents").update({
+                        "subscription_expires_at": renewal_expiry,
+                        "status": "active",
+                    }).eq("user_id", user_id).neq("status", "deleted").execute()
+                result_details["agents_renewed"] = True
+            except Exception as agent_err:
+                logger.warning(f"Could not extend agent validity on subscription charge: {agent_err}")
+
+            # 2. Upgrade profile tier and refill minutes
+            plan_minutes = 2000 if "pro" in target_plan else 500
+            try:
+                prof_query = self.supabase.table("profiles").update({
+                    "plan_tier": target_plan,
+                    "paid_minutes_limit": plan_minutes,
+                    "paid_minutes_used": 0,
+                    "trial_ends_at": None,
+                    "mandate_status": "active",
+                })
+                if org_id:
+                    prof_query.eq("organization_id", org_id).execute()
+                elif user_id:
+                    prof_query.eq("id", user_id).execute()
+                result_details["profile_upgraded"] = True
+            except Exception as prof_err:
+                logger.warning(f"Could not update profile on subscription charge: {prof_err}")
+
+            # 3. Generate GST tax invoice
+            if org_id and amount_paisa > 0:
+                try:
+                    invoice = self.invoice_service.create_invoice_for_wallet_topup(
+                        organization_id=org_id,
+                        amount_paisa=amount_paisa,
+                        payment_reference_id=payment_id,
+                        customer_legal_name=notes.get("legal_name") or notes.get("customer_name"),
+                        customer_gstin=notes.get("gstin"),
+                        customer_state=notes.get("state"),
+                        customer_state_code=notes.get("state_code"),
+                        transaction_type="subscription_renewal",
+                    )
+                    result_details["invoice_generated"] = True
+                    result_details["invoice_number"] = invoice.get("invoice_number")
+                except Exception as inv_err:
+                    logger.warning(f"Could not auto-generate subscription invoice: {inv_err}")
+
+        elif event_type in ("subscription.authenticated", "subscription.activated"):
+            sub_entity = event_payload.get("payload", {}).get("subscription", {}).get("entity", {})
+            notes = sub_entity.get("notes", {}) or {}
+            org_id = notes.get("organization_id")
+            user_id = notes.get("user_id")
+
+            try:
+                prof_query = self.supabase.table("profiles").update({
+                    "mandate_status": "active",
+                    "mandate_id": sub_entity.get("id"),
+                })
+                if org_id:
+                    prof_query.eq("organization_id", org_id).execute()
+                elif user_id:
+                    prof_query.eq("id", user_id).execute()
+                result_details["mandate_activated"] = True
+            except Exception as e:
+                logger.warning(f"Error marking mandate active: {e}")
+
+        elif event_type in ("subscription.cancelled", "subscription.halted"):
+            sub_entity = event_payload.get("payload", {}).get("subscription", {}).get("entity", {})
+            notes = sub_entity.get("notes", {}) or {}
+            org_id = notes.get("organization_id")
+            user_id = notes.get("user_id")
+
+            try:
+                prof_query = self.supabase.table("profiles").update({
+                    "mandate_status": "cancelled",
+                })
+                if org_id:
+                    prof_query.eq("organization_id", org_id).execute()
+                elif user_id:
+                    prof_query.eq("id", user_id).execute()
+                result_details["mandate_cancelled"] = True
+            except Exception as e:
+                logger.warning(f"Error marking mandate cancelled: {e}")
+
         return True, "EVENT_PROCESSED", result_details

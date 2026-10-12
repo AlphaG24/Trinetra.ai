@@ -433,13 +433,14 @@ function CheckoutContent() {
       }
 
       // 2. Open Razorpay Modal
-      const options = {
+      const options: any = {
         key: data.key,
         amount: data.amount,
         currency: data.currency,
         name: 'trinetraedu-ai',
         description: 'Provision voice agents & lines',
         order_id: data.order_id,
+        subscription_id: data.subscription_id || undefined,
         prefill: {
           email: data.user_email,
           name: data.user_name
@@ -463,6 +464,7 @@ function CheckoutContent() {
                 razorpay_payment_id: response.razorpay_payment_id,
                 razorpay_order_id: response.razorpay_order_id,
                 razorpay_signature: response.razorpay_signature,
+                razorpay_subscription_id: response.razorpay_subscription_id,
                 items: formattedItems,
                 use_same_profile: useSameProfile,
                 coupon_code: appliedCoupon?.code,

@@ -55,8 +55,8 @@ export async function POST(request: Request) {
     const config: Record<string, string> = {}
     configs?.forEach(c => { config[c.config_key] = c.config_value })
 
-    const keyId = config.razorpay_test_key_id || config.razorpay_key_id
-    const keySecret = config.razorpay_test_key_secret || config.razorpay_key_secret
+    const keyId = config.razorpay_test_key_id || config.razorpay_key_id || process.env.RAZORPAY_KEY_ID || process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID
+    const keySecret = config.razorpay_test_key_secret || config.razorpay_key_secret || process.env.RAZORPAY_KEY_SECRET
 
     if (!keyId || !keySecret) {
       return NextResponse.json({ error: 'Payment gateway not configured' }, { status: 500 })
@@ -243,6 +243,50 @@ export async function POST(request: Request) {
     console.log('[CHECKOUT] isPureTrial:', isPureTrial, 'Subtotal:', subtotal, 'Taxable:', taxableSubtotal, 'Tax:', taxBreakdown.totalTaxAmount, 'Total:', totalAmount)
 
     const auth = btoa(`${keyId}:${keySecret}`)
+    const trialMeta = (body as any).trial_metadata || {}
+    const targetPlanSlug = (trialMeta.targetPlanSlug || 'starter').toLowerCase()
+    const rzpPlanKey = `razorpay_${targetPlanSlug}_plan_id`
+    const rzpPlanId = config[rzpPlanKey] || (targetPlanSlug === 'professional' ? (config.razorpay_pro_plan_id || process.env.RAZORPAY_PROFESSIONAL_PLAN_ID || process.env.RAZORPAY_PRO_PLAN_ID) : (config.razorpay_starter_plan_id || process.env.RAZORPAY_STARTER_PLAN_ID))
+    let subscriptionId: string | null = null
+
+    // If admin has configured Razorpay Subscription plan ID, initiate recurring mandate via /v1/subscriptions
+    if (isPureTrial && rzpPlanId) {
+      try {
+        const subRes = await fetch('https://api.razorpay.com/v1/subscriptions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Basic ${auth}`
+          },
+          body: JSON.stringify({
+            plan_id: rzpPlanId,
+            total_count: 12,
+            quantity: 1,
+            customer_notify: 1,
+            start_at: Math.floor((Date.now() + 7 * 86400000) / 1000),
+            notes: {
+              user_id: user.id,
+              is_trial_mandate: 'true',
+              target_plan: targetPlanSlug,
+              selected_personalities: JSON.stringify(trialMeta.selectedPersonalities || []),
+              agent_count: (trialMeta.agentCount || 2).toString(),
+              use_same_profile: use_same_profile ? 'true' : 'false'
+            }
+          })
+        })
+        if (subRes.ok) {
+          const subData = await subRes.json()
+          subscriptionId = subData.id
+          console.log('[CHECKOUT] Created Razorpay Subscription Mandate:', subscriptionId)
+        } else {
+          const subErr = await subRes.json().catch(() => ({}))
+          console.warn('[CHECKOUT] Razorpay subscriptions note (falling back to standard order):', subErr)
+        }
+      } catch (e) {
+        console.warn('[CHECKOUT] Error calling Razorpay subscriptions API:', e)
+      }
+    }
+
     const orderRes = await fetch('https://api.razorpay.com/v1/orders', {
       method: 'POST',
       headers: {
@@ -262,7 +306,10 @@ export async function POST(request: Request) {
           customer_gstin: cleanGSTIN || '',
           customer_legal_name: customer_legal_name || '',
           customer_state_code: customerStateCode,
-          save_gst_to_profile: save_gst_to_profile ? 'true' : 'false'
+          save_gst_to_profile: save_gst_to_profile ? 'true' : 'false',
+          is_trial_mandate: isPureTrial ? 'true' : 'false',
+          target_plan: targetPlanSlug,
+          mandate_renewal_date: trialMeta.renewalDate || ''
         }
       })
     })
@@ -279,6 +326,8 @@ export async function POST(request: Request) {
     return NextResponse.json({
       key: keyId,
       order_id: order.id,
+      subscription_id: subscriptionId,
+      is_subscription_mandate: Boolean(subscriptionId),
       amount: totalAmount,
       currency: 'INR',
       cart_items: items,

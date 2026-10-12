@@ -49,6 +49,12 @@ interface UserLimits {
   demo_minutes_used: number
   additional_agents?: number
   additional_phone_numbers?: number
+  mandate_status?: string | null
+  mandate_id?: string | null
+  mandate_renewal_date?: string | null
+  mandate_target_plan?: string | null
+  mandate_target_price_paisa?: number | null
+  mandate_personalities?: string[] | null
 }
 
 interface Invoice {
@@ -384,6 +390,31 @@ function BillingContent() {
     setIsTrialModalOpen(true)
   }
 
+  const [cancellingMandate, setCancellingMandate] = useState(false)
+
+  const handleCancelMandate = async () => {
+    if (!window.confirm('Are you sure you want to cancel your scheduled autopay mandate? Your active trial agents will remain operational until day 7, but no recurring payments will be debited.')) {
+      return
+    }
+    try {
+      setCancellingMandate(true)
+      const res = await fetch('/api/billing/cancel-mandate', {
+        method: 'POST'
+      })
+      const data = await res.json()
+      if (res.ok) {
+        toast.success(data.message || 'Autopay mandate cancelled successfully.')
+        fetchBillingData(false)
+      } else {
+        toast.error(data.error || 'Failed to cancel mandate')
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Cancellation request failed')
+    } finally {
+      setCancellingMandate(false)
+    }
+  }
+
   const handleTrialModalCheckout = async (trialPayload: {
     agentCount: number
     targetPlanSlug: string
@@ -411,13 +442,14 @@ function BillingContent() {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Failed to initiate trial checkout')
 
-      const options = {
+      const options: any = {
         key: data.key,
         amount: data.amount,
         currency: data.currency || 'INR',
         name: 'Trinetra AI',
         description: `7-Day All-Access Trial (${trialPayload.agentCount} Agents)`,
         order_id: data.order_id,
+        subscription_id: data.subscription_id || undefined,
         prefill: {
           email: data.user_email,
           name: data.user_name
@@ -439,6 +471,7 @@ function BillingContent() {
                 razorpay_payment_id: response.razorpay_payment_id,
                 razorpay_order_id: response.razorpay_order_id,
                 razorpay_signature: response.razorpay_signature,
+                razorpay_subscription_id: response.razorpay_subscription_id,
                 items: trialItems,
                 trial_metadata: trialPayload
               })
@@ -1236,6 +1269,92 @@ function BillingContent() {
               >
                 {updatingPlan ? 'Activating...' : 'Activate for ₹99'}
               </button>
+            </div>
+          )}
+
+          {/* Active / Scheduled Trial Autopay Mandate Card */}
+          {(currentTier === 'trial' || userLimits.mandate_status === 'scheduled') && (
+            <div className="bg-zinc-100/90 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-6 shadow-sm space-y-4 text-left">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[var(--border)] pb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-500 shrink-0">
+                    <CreditCard className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-bold text-sm text-[var(--heading)] font-display">
+                        7-Day Trial Scheduled Autopay Mandate
+                      </h3>
+                      <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider border ${
+                        userLimits.mandate_status === 'cancelled'
+                          ? 'bg-amber-500/10 text-amber-500 border-amber-500/20'
+                          : 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
+                      }`}>
+                        {userLimits.mandate_status === 'cancelled' ? 'Mandate Revoked' : 'Mandate Scheduled'}
+                      </span>
+                    </div>
+                    <p className="text-xs text-[var(--muted)] mt-0.5">
+                      RBI-compliant recurring mandate for automated plan renewal on Day 7.
+                    </p>
+                  </div>
+                </div>
+
+                {userLimits.mandate_status !== 'cancelled' ? (
+                  <button
+                    type="button"
+                    disabled={cancellingMandate}
+                    onClick={handleCancelMandate}
+                    className="px-4 py-2 border border-red-500/30 hover:bg-red-500/10 text-red-500 hover:text-red-400 font-bold text-xs uppercase tracking-wider rounded-xl transition-all cursor-pointer shrink-0 disabled:opacity-50"
+                  >
+                    {cancellingMandate ? 'Revoking...' : 'Cancel Autopay Mandate'}
+                  </button>
+                ) : (
+                  <span className="text-[11px] font-mono text-zinc-500 bg-zinc-200/50 dark:bg-zinc-800/50 px-3 py-1.5 rounded-lg border border-[var(--border)]">
+                    No Upcoming Debits
+                  </span>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                <div className="p-3 rounded-xl bg-white dark:bg-black/30 border border-zinc-200 dark:border-zinc-800/80 space-y-1">
+                  <span className="text-[10px] text-[var(--muted)] uppercase font-semibold">Scheduled Target Plan</span>
+                  <div className="font-bold font-mono text-[var(--heading)] capitalize">
+                    {userLimits.mandate_target_plan || 'Starter'} Plan Upgrade
+                  </div>
+                  <span className="text-[10px] text-zinc-500">
+                    ₹{(userLimits.mandate_target_price_paisa ? Math.round(userLimits.mandate_target_price_paisa / 100) : 4999).toLocaleString('en-IN')}/mo + 18% GST
+                  </span>
+                </div>
+
+                <div className="p-3 rounded-xl bg-white dark:bg-black/30 border border-zinc-200 dark:border-zinc-800/80 space-y-1">
+                  <span className="text-[10px] text-[var(--muted)] uppercase font-semibold">Scheduled Debit Date</span>
+                  <div className="font-bold font-mono text-emerald-600 dark:text-emerald-400">
+                    {userLimits.mandate_renewal_date
+                      ? new Date(userLimits.mandate_renewal_date).toLocaleDateString('en-IN', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })
+                      : userLimits.trial_ends_at
+                      ? new Date(userLimits.trial_ends_at).toLocaleDateString('en-IN', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })
+                      : 'Day 7 of Trial'}
+                  </div>
+                  <span className="text-[10px] text-zinc-500">Automated UPI / Card debit</span>
+                </div>
+
+                <div className="p-3 rounded-xl bg-white dark:bg-black/30 border border-zinc-200 dark:border-zinc-800/80 space-y-1">
+                  <span className="text-[10px] text-[var(--muted)] uppercase font-semibold">Selected Personality Agents</span>
+                  <div className="font-bold text-[var(--heading)] line-clamp-1">
+                    {Array.isArray(userLimits.mandate_personalities) && userLimits.mandate_personalities.length > 0
+                      ? userLimits.mandate_personalities.map(p => p.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())).join(', ')
+                      : 'Sales & Support Agents'}
+                  </div>
+                  <span className="text-[10px] text-zinc-500">Will carry forward uninterrupted</span>
+                </div>
+              </div>
+
+              <div className="p-2.5 rounded-xl bg-white dark:bg-black/30 border border-zinc-200 dark:border-zinc-800 text-[10px] text-[var(--muted)] flex items-start gap-2 leading-relaxed">
+                <ShieldCheckIcon className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
+                <span>
+                  <strong>Zero-Surprise Guarantee:</strong> Your selected personality agents, prompts, phone numbers, and call logs are guaranteed to carry on without interruption. If cancelled before the scheduled debit date, the mandate is revoked with zero cancellation fee.
+                </span>
+              </div>
             </div>
           )}
 

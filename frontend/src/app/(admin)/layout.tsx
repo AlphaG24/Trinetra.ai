@@ -70,7 +70,7 @@ export default async function AdminLayout({
 
   return (
     <ThemeProvider>
-      <DashboardThemeWrapper>
+      <DashboardThemeWrapper className="admin-portal">
         <AdminTopbar />
         <AdminSidebar />
         <main className="pt-16 md:pl-64 pl-0 transition-all duration-300 min-h-screen">
