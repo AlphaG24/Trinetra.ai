@@ -482,6 +482,8 @@ export function AgentDetailPageClient({
     if (agentData?.config?.plan_tier) {
       const aTier = agentData.config.plan_tier.toLowerCase()
       if (aTier === 'professional' || aTier === 'enterprise' || aTier === 'pro') return 'pro'
+      if (aTier === 'credit_based') return 'credit_based'
+      if (aTier === 'outcome_based') return 'outcome_based'
       return aTier
     }
     // 2. If agent is explicitly marked demo
@@ -494,16 +496,16 @@ export function AgentDetailPageClient({
       if (pTier === 'professional' || pTier === 'enterprise' || pTier === 'pro') return 'pro'
       if (pTier === 'starter') return 'starter'
       if (pTier === 'trial') return 'trial'
+      if (pTier === 'credit_based') return 'credit_based'
+      if (pTier === 'outcome_based') return 'outcome_based'
     }
     return 'free_demo'
   }
 
   const tier = getAgentTier(agent, profile)
 
-
-
-  // Trial users are treated as fully paid for feature access
-  const isPaid = tier === 'starter' || tier === 'pro' || tier === 'trial'
+  // Paid users are treated as fully paid for feature access
+  const isPaid = tier === 'starter' || tier === 'pro' || tier === 'trial' || tier === 'credit_based' || tier === 'outcome_based'
 
   const userTier = (profile?.plan_tier || 'free').toLowerCase()
   let demoMinutesLimit = 10
@@ -608,7 +610,7 @@ export function AgentDetailPageClient({
           <div className="flex flex-col gap-3 pt-2">
             <Link
               href={upgradeUrl}
-              className="w-full py-3 bg-violet-600 hover:bg-violet-555 text-white font-bold text-xs uppercase rounded-xl tracking-wider shadow-md hover:scale-[1.02] transition-all block text-center cursor-pointer font-montserrat"
+              className="w-full py-3 bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 font-bold text-xs uppercase rounded-xl tracking-wider shadow-sm transition-all block text-center cursor-pointer font-montserrat active:scale-[0.99]"
             >
               Upgrade Plan
             </Link>
@@ -677,13 +679,13 @@ export function AgentDetailPageClient({
                   }}
                   autoFocus
                   disabled={savingName}
-                  className="px-3 py-1 bg-[var(--background)] border border-violet-500 rounded-lg text-lg font-bold text-[var(--heading)] font-display focus:outline-none focus:ring-2 focus:ring-violet-500/30 min-w-[200px]"
+                  className="px-3 py-1 bg-[var(--background)] border border-zinc-900 dark:border-white rounded-lg text-lg font-bold text-[var(--heading)] font-display focus:outline-none focus:ring-2 focus:ring-zinc-900/20 dark:focus:ring-white/20 min-w-[200px]"
                   placeholder="Enter agent name..."
                 />
                 <button
                   onClick={handleSaveName}
                   disabled={savingName}
-                  className="p-1.5 bg-violet-600 hover:bg-violet-700 text-white rounded-lg transition-colors shadow-sm cursor-pointer"
+                  className="p-1.5 bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 rounded-lg transition-colors shadow-sm cursor-pointer"
                   title="Save Name (Enter)"
                 >
                   {savingName ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
@@ -702,7 +704,7 @@ export function AgentDetailPageClient({
                 <h1 className="text-xl font-bold text-[var(--heading)] font-display tracking-tight">{agent.agent_name}</h1>
                 <button
                   onClick={handleStartEditName}
-                  className="p-1 text-[var(--muted)] hover:text-violet-500 hover:bg-[var(--hover-bg)] rounded-md transition-colors cursor-pointer opacity-70 group-hover:opacity-100"
+                  className="p-1 text-[var(--muted)] hover:text-zinc-900 dark:hover:text-white hover:bg-[var(--hover-bg)] rounded-md transition-colors cursor-pointer opacity-70 group-hover:opacity-100"
                   title="Rename Agent"
                 >
                   <Pencil className="w-3.5 h-3.5" />
@@ -740,13 +742,30 @@ export function AgentDetailPageClient({
 
           {/* Tier Badge */}
           <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-[9px] font-black uppercase border border-[var(--border)] bg-[var(--background)] text-[var(--heading)] font-montserrat tracking-wide">
-            {tier === 'pro' ? 'Pro Plan' : tier === 'starter' ? 'Starter Plan' : tier === 'trial' ? 'Trial Plan' : 'Free Demo'}
+            {tier === 'pro'
+              ? 'Pro Plan'
+              : tier === 'starter'
+              ? 'Starter Plan'
+              : tier === 'trial'
+              ? 'Trial Plan'
+              : tier === 'credit_based'
+              ? 'Credit-Based Plan'
+              : tier === 'outcome_based'
+              ? 'Outcome-Based Plan'
+              : 'Free Demo'}
           </span>
 
           {/* Minutes Remaining — only show for free demo */}
           {tier === 'free_demo' && (
             <span className="text-[10px] font-mono text-[var(--muted)] bg-[var(--background)] px-2.5 py-1 rounded-lg border border-[var(--border)]">
               {remainingMinutes} min left
+            </span>
+          )}
+
+          {/* Prepaid Wallet Active Indicator */}
+          {(tier === 'credit_based' || tier === 'outcome_based') && (
+            <span className="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-lg border border-emerald-500/20">
+              Prepaid Wallet Active
             </span>
           )}
 
@@ -856,7 +875,7 @@ export function AgentDetailPageClient({
             </p>
             <Link 
               href={upgradeUrl}
-              className="px-6 py-2.5 bg-violet-600 hover:bg-violet-700 text-white font-bold text-[10px] uppercase tracking-wider rounded-xl transition-all shadow-md hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0"
+              className="px-6 py-2.5 bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 font-bold text-[10px] uppercase tracking-wider rounded-xl transition-all shadow-sm active:scale-[0.98]"
             >
               Upgrade Now
             </Link>

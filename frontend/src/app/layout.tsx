@@ -151,14 +151,23 @@ export default async function RootLayout({
     const { createClient: createSupabaseClient } = await import('@supabase/supabase-js');
     const supabaseAdmin = createSupabaseClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        auth: { persistSession: false, autoRefreshToken: false }
+      }
     );
-    const { data: configRow } = await supabaseAdmin
+    const queryPromise = supabaseAdmin
       .from('system_config')
       .select('config_value')
       .eq('config_key', 'maintenance_mode')
       .maybeSingle();
-    initialMaintenanceMode = configRow?.config_value === 'true';
+
+    const timeoutPromise = new Promise<any>((_, reject) =>
+      setTimeout(() => reject(new Error('Supabase layout check timeout')), 1500)
+    );
+
+    const result = await Promise.race([queryPromise, timeoutPromise]);
+    initialMaintenanceMode = result?.data?.config_value === 'true';
   } catch {
     initialMaintenanceMode = false;
   }

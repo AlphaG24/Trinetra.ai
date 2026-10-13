@@ -170,21 +170,26 @@ const nextConfig: NextConfig = {
       });
     }
 
-    return [
+    const headersList = [
       {
         source: '/(.*)',
         headers: securityHeaders
-      },
-      {
-        source: '/:path*\\.(js|css|png|jpg|jpeg|gif|svg|ico|woff2)',
+      }
+    ];
+
+    if (isProd) {
+      headersList.push({
+        source: '/_next/static/:path*',
         headers: [
           {
             key: 'Cache-Control',
             value: 'public, max-age=31536000, immutable'
           }
         ]
-      }
-    ];
+      });
+    }
+
+    return headersList;
   },
 };
 

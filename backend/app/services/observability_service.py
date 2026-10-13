@@ -98,7 +98,7 @@ class ObservabilityService:
             return False
 
         try:
-            import sentry_sdk
+            import sentry_sdk  # pyrefly: ignore [missing-import]  # type: ignore
             sentry_sdk.init(
                 dsn=sentry_dsn,
                 before_send=sentry_before_send,
@@ -247,6 +247,128 @@ class ObservabilityService:
                     if os.environ.get(f"HEALTHCHECKS_{job.upper()}_URL") or os.environ.get(f"HC_PING_{job.upper()}_URL")
                 ]
             }
+        }
+
+    @classmethod
+    def dispatch_p1_incident_alert(
+        cls,
+        title: str,
+        details: str,
+        component: str = "core_telephony",
+        trigger_context: Optional[Dict[str, Any]] = None,
+        supabase_client = None
+    ) -> Dict[str, Any]:
+        """
+        Dispatches immediate alerts for P1 Critical Incidents via Telegram and Email.
+        Implements Master Plan Section 1.5 Decision M5.
+        
+        Deeply scrubs all PII before transmission and writes an immutable audit record.
+        """
+        now_utc = time.strftime("%Y-%m-%d %H:%M:%S UTC", time.gmtime())
+        clean_title = PIIScrubber.scrub_text(title)
+        clean_details = PIIScrubber.scrub_text(details)
+        clean_context = PIIScrubber.scrub_dict(trigger_context or {})
+
+        telegram_msg = (
+            f"🚨 *[P1 CRITICAL INCIDENT]*\n"
+            f"*Component:* {component}\n"
+            f"*Summary:* {clean_title}\n"
+            f"*Details:* {clean_details}\n"
+            f"*Time:* {now_utc}"
+        )
+
+        channels_dispatched = []
+
+        # 1. Telegram Dispatch
+        bot_token = os.environ.get("TELEGRAM_BOT_TOKEN")
+        chat_id = os.environ.get("TELEGRAM_CHAT_ID")
+        telegram_sent = False
+
+        if bot_token and chat_id:
+            try:
+                import json
+                tg_url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+                req = urllib.request.Request(
+                    tg_url,
+                    data=json.dumps({
+                        "chat_id": chat_id,
+                        "text": telegram_msg,
+                        "parse_mode": "Markdown"
+                    }).encode("utf-8"),
+                    headers={"Content-Type": "application/json"},
+                    method="POST"
+                )
+                with urllib.request.urlopen(req, timeout=3.0) as resp:
+                    if resp.getcode() == 200:
+                        telegram_sent = True
+                        channels_dispatched.append("telegram")
+            except Exception as tg_err:
+                logger.warning(f"[Observability:P1Alert] Telegram alert dispatch failed: {tg_err}")
+        else:
+            logger.info(f"[Observability:P1Alert:DryRun] Telegram alert: {clean_title}")
+            channels_dispatched.append("telegram_dry_run")
+
+        # 2. Email Dispatch
+        alert_email = os.environ.get("ALERT_EMAIL") or os.environ.get("SMTP_USER") or "security@trinetraedu-ai.com"
+        email_sent = False
+        resend_key = os.environ.get("RESEND_PRIVATE_KEY") or os.environ.get("RESEND_API_KEY")
+
+        if resend_key:
+            try:
+                import json
+                req = urllib.request.Request(
+                    "https://api.resend.com/emails",
+                    data=json.dumps({
+                        "from": "Trinetra Security Alerts <alerts@trinetraedu-ai.com>",
+                        "to": [alert_email],
+                        "subject": f"🚨 [P1 Incident] {clean_title}",
+                        "text": f"P1 CRITICAL INCIDENT DETECTED\nComponent: {component}\nTime: {now_utc}\n\nDetails:\n{clean_details}"
+                    }).encode("utf-8"),
+                    headers={
+                        "Authorization": f"Bearer {resend_key}",
+                        "Content-Type": "application/json"
+                    },
+                    method="POST"
+                )
+                with urllib.request.urlopen(req, timeout=3.0) as resp:
+                    if resp.getcode() in (200, 201):
+                        email_sent = True
+                        channels_dispatched.append("email")
+            except Exception as email_err:
+                logger.warning(f"[Observability:P1Alert] Email alert dispatch failed: {email_err}")
+        else:
+            logger.info(f"[Observability:P1Alert:DryRun] Email alert to {alert_email}: {clean_title}")
+            channels_dispatched.append("email_dry_run")
+
+        # 3. Immutable Security Audit Log
+        sb = supabase_client or supabase_admin
+        if hasattr(sb, "table"):
+            try:
+                sb.table("audit_logs").insert({
+                    "action": "P1_INCIDENT_ALERT",
+                    "resource_type": "system_health",
+                    "details": {
+                        "severity": "P1",
+                        "component": component,
+                        "title": clean_title,
+                        "details": clean_details,
+                        "context": clean_context,
+                        "channels": channels_dispatched
+                    },
+                    "created_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+                }).execute()
+                channels_dispatched.append("audit_log")
+            except Exception as audit_err:
+                logger.warning(f"[Observability:P1Alert] Audit log recording failed: {audit_err}")
+
+        return {
+            "severity": "P1",
+            "component": component,
+            "title": clean_title,
+            "details": clean_details,
+            "channels_dispatched": channels_dispatched,
+            "timestamp": now_utc,
+            "status": "ALERT_DISPATCHED"
         }
 
 

@@ -1,10 +1,12 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { ApiKeyManager } from '@/components/admin/ApiKeyManager'
+import Link from 'next/link'
+import { ApiKeyManager } from '@/src/components/admin/ApiKeyManager'
 import { 
   Sliders, Key, Send, CreditCard, RefreshCw, Save, Loader2, AlertTriangle,
-  Gift, DollarSign, ShieldAlert, Cpu, Percent, WrenchIcon, Globe
+  Gift, DollarSign, ShieldAlert, Cpu, Percent, WrenchIcon, Globe, Lock,
+  Coins, Target, Activity, Phone, Euro
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { createClient } from '@/lib/client'
@@ -24,11 +26,13 @@ export default function SystemConfigPage() {
     RAZORPAY_KEY_ID: '',
     RAZORPAY_KEY_SECRET: '',
     
-    // Default values for billing & plan features
+    // Default values for billing & plan features (Master Plan Decisions P1-P11)
     free_demo_minutes: '10',
-    trial_price_paisa: '9900',
-    trial_days: '7',
-    trial_minutes: '100',
+    trial_price_paisa: '9900', // P2: ₹99
+    trial_days: '7',           // P2: 7 days
+    trial_minutes: '50',       // P2: 50 min quota (editable via admin panel)
+    max_agents_trial: '2',     // P2: 2 agents limit (editable via admin panel)
+    trial_can_assign_numbers: 'true', // P2: can buy & assign numbers
     starter_price_paisa: '499900',
     starter_minutes: '500',
     professional_price_paisa: '1499900',
@@ -39,21 +43,58 @@ export default function SystemConfigPage() {
     max_agents_starter: '3',
     max_agents_professional: '10',
     inbound_number_cost_paisa: '49900',
-    overage_per_minute_paisa: '1100',
+    overage_per_minute_paisa: '1100', // P6: ₹11/min (range ₹10–₹12/min)
     maintenance_mode: 'false',
 
-    // International (USD) plan pricing & numbers
+    // P3: Credit-based plans (Admin-editable pricing; prepaid wallet)
+    credit_per_minute_paisa: '150',   // ₹1.50/min
+    wallet_min_topup_paisa: '50000',  // ₹500 min topup
+
+    // P4: Outcome-based plans (Admin-editable per-outcome pricing; prepaid wallet)
+    outcome_appointment_paisa: '4900', // ₹49/appointment
+    outcome_lead_paisa: '2900',        // ₹29/lead
+
+    // P7: Free emergency minutes (50 free overdraft buffer mins, Reliability Score > 80, 30-day cooldown)
+    emergency_minutes_quota: '50',
+    emergency_minutes_min_reliability_score: '80',
+    emergency_minutes_cooldown_days: '30',
+
+    // P8: Spend limit (₹2,500 default; admin can override per customer)
+    default_spend_limit_paisa: '250000', // ₹2,500 default
+
+    // P9: Onboarding fee (Not active now; enabled via admin toggle; shown in pricing plan editor)
+    onboarding_fee_enabled: 'false',
+    onboarding_fee_paisa: '0',
+
+    // Number limits & lifecycle configurations
+    max_pooled_numbers_per_org: '10',
+    hold_period_days: '14',
+    auto_pool_threshold: '10',
+
+    // P11: Multi-currency aware (INR, USD, EUR) — International (USD)
     starter_price_usd_cents: '8900',
     professional_price_usd_cents: '24900',
     enterprise_price_usd_cents: '59900',
     trial_price_usd_cents: '500',
     foreign_number_cost_usd_cents: '1500',
     overage_per_minute_usd_cents: '12',
+
+    // P11: European (EUR) Plan Pricing
+    starter_price_eur_cents: '7900',
+    professional_price_eur_cents: '21900',
+    enterprise_price_eur_cents: '49900',
+    trial_price_eur_cents: '400',
+    foreign_number_cost_eur_cents: '1500',
+    overage_per_minute_eur_cents: '11',
   })
 
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [showRotateModal, setShowRotateModal] = useState(false)
+  const [stepUpModalOpen, setStepUpModalOpen] = useState(false)
+  const [stepUpPassword, setStepUpPassword] = useState('')
+  const [stepUpLoading, setStepUpLoading] = useState(false)
+  const [pendingSaveRotation, setPendingSaveRotation] = useState(false)
 
   useEffect(() => {
     async function loadConfigs() {
@@ -161,6 +202,17 @@ export default function SystemConfigPage() {
     handleChange(key, String(cents))
   }
 
+  const displayEuros = (centsStr: string) => {
+    const cents = parseInt(centsStr || '0', 10)
+    return isNaN(cents) ? 0 : cents / 100
+  }
+
+  const handleEuroChange = (key: string, euroValueStr: string) => {
+    const euros = parseFloat(euroValueStr || '0')
+    const cents = isNaN(euros) ? 0 : Math.round(euros * 100)
+    handleChange(key, String(cents))
+  }
+
   const handleRotateSingle = (key: string) => {
     const randomHex = Array.from({ length: 32 }, () => Math.floor(Math.random() * 16).toString(16)).join('')
     const rotatedVal = `rotated_${key.toLowerCase()}_${randomHex}`
@@ -168,14 +220,30 @@ export default function SystemConfigPage() {
     toast.success(`Rotated ${key}. Click "Save All Changes" to persist.`)
   }
 
-  const handleSaveAll = async (isRotation = false) => {
+  const handleSaveAll = async (isRotation = false, stepUpToken?: string) => {
     try {
       setSaving(true)
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+      if (stepUpToken) {
+        headers['x-step-up-token'] = stepUpToken
+      }
+
       const res = await fetch('/api/admin/system-config', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ configs, is_rotation: isRotation }),
+        headers,
+        body: JSON.stringify({ configs, is_rotation: isRotation, step_up_token: stepUpToken }),
       })
+
+      if (res.status === 403) {
+        const json = await res.json()
+        if (json.step_up_required) {
+          setPendingSaveRotation(isRotation)
+          setStepUpModalOpen(true)
+          toast.error('Privileged action requires Super Admin re-authentication')
+          return
+        }
+        throw new Error(json.error || 'Access forbidden')
+      }
 
       if (!res.ok) {
         const json = await res.json()
@@ -184,10 +252,47 @@ export default function SystemConfigPage() {
 
       toast.success(isRotation ? 'All keys successfully rotated & persisted 🔄' : 'System configuration saved successfully 🚀')
       setShowRotateModal(false)
+      setStepUpModalOpen(false)
+      setStepUpPassword('')
     } catch (err: any) {
       toast.error(err.message || 'Save failed')
     } finally {
       setSaving(false)
+    }
+  }
+
+  const handleStepUpSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!stepUpPassword) {
+      toast.error('Please enter your admin password')
+      return
+    }
+
+    try {
+      setStepUpLoading(true)
+      const res = await fetch('/api/admin/step-up', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: pendingSaveRotation ? 'credential_update' : 'price_change',
+          credential: stepUpPassword,
+          credential_type: 'password'
+        })
+      })
+
+      const data = await res.json()
+      if (!res.ok) {
+        throw new Error(data.error || 'Step-up verification failed')
+      }
+
+      toast.success('Admin verified! Applying changes...')
+      setStepUpModalOpen(false)
+      setStepUpPassword('')
+      await handleSaveAll(pendingSaveRotation, data.token)
+    } catch (err: any) {
+      toast.error(err.message || 'Authentication failed')
+    } finally {
+      setStepUpLoading(false)
     }
   }
 
@@ -293,296 +398,27 @@ export default function SystemConfigPage() {
         </button>
       </div>
 
-      {/* Grid containing configuration blocks */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-
-        {/* TRIAL & DEMO SETTINGS */}
-        <div className="bg-zinc-950/60 border border-zinc-900 rounded-2xl p-6 space-y-6">
-          <h2 className="text-sm font-bold text-white uppercase tracking-wider border-b border-zinc-900 pb-3 flex items-center gap-2">
-            <Gift className="w-4 h-4 text-violet-400" />
-            Trial & Demo Settings
-          </h2>
-
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Free Demo Minutes</label>
-                <input 
-                  type="number"
-                  value={configs.free_demo_minutes || ''}
-                  onChange={(e) => handleChange('free_demo_minutes', e.target.value)}
-                  className="w-full bg-black border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:border-violet-500 outline-none"
-                  min="0"
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Trial Price (₹)</label>
-                <input 
-                  type="number"
-                  value={displayRupees(configs.trial_price_paisa || '0')}
-                  onChange={(e) => handleRupeeChange('trial_price_paisa', e.target.value)}
-                  className="w-full bg-black border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:border-violet-500 outline-none"
-                  min="0"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Trial Duration (Days)</label>
-                <input 
-                  type="number"
-                  value={configs.trial_days || ''}
-                  onChange={(e) => handleChange('trial_days', e.target.value)}
-                  className="w-full bg-black border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:border-violet-500 outline-none"
-                  min="0"
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Trial Included Minutes</label>
-                <input 
-                  type="number"
-                  value={configs.trial_minutes || ''}
-                  onChange={(e) => handleChange('trial_minutes', e.target.value)}
-                  className="w-full bg-black border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:border-violet-500 outline-none"
-                  min="0"
-                />
-              </div>
-            </div>
+      {/* Pricing Settings Centralized in /admin/plans */}
+      <div className="bg-gradient-to-r from-violet-600/10 via-indigo-600/10 to-violet-600/5 border border-violet-500/20 rounded-2xl p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xs">
+        <div className="flex items-center gap-3">
+          <div className="p-3 bg-violet-600/15 rounded-xl text-violet-600 dark:text-violet-400">
+            <CreditCard className="w-6 h-6" />
+          </div>
+          <div>
+            <h3 className="text-sm font-bold text-[var(--heading)]">
+              Pricing Plans, Trial Packages & Overdraft Centralized
+            </h3>
+            <p className="text-xs text-[var(--muted)] mt-0.5">
+              All subscription catalogs, ₹99 trial settings, per-minute credits, outcome rates, and emergency buffers are now managed in the dedicated Pricing Plans console.
+            </p>
           </div>
         </div>
-
-        {/* PLAN PRICING */}
-        <div className="bg-zinc-950/60 border border-zinc-900 rounded-2xl p-6 space-y-6">
-          <h2 className="text-sm font-bold text-white uppercase tracking-wider border-b border-zinc-900 pb-3 flex items-center gap-2">
-            <DollarSign className="w-4 h-4 text-emerald-400" />
-            Plan Pricing & Minutes
-          </h2>
-
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Starter Price (₹/mo)</label>
-                <input 
-                  type="number"
-                  value={displayRupees(configs.starter_price_paisa || '0')}
-                  onChange={(e) => handleRupeeChange('starter_price_paisa', e.target.value)}
-                  className="w-full bg-black border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:border-violet-500 outline-none"
-                  min="0"
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Starter Included Mins</label>
-                <input 
-                  type="number"
-                  value={configs.starter_minutes || ''}
-                  onChange={(e) => handleChange('starter_minutes', e.target.value)}
-                  className="w-full bg-black border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:border-violet-500 outline-none"
-                  min="0"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Pro Price (₹/mo)</label>
-                <input 
-                  type="number"
-                  value={displayRupees(configs.professional_price_paisa || '0')}
-                  onChange={(e) => handleRupeeChange('professional_price_paisa', e.target.value)}
-                  className="w-full bg-black border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:border-violet-500 outline-none"
-                  min="0"
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Pro Included Mins</label>
-                <input 
-                  type="number"
-                  value={configs.professional_minutes || ''}
-                  onChange={(e) => handleChange('professional_minutes', e.target.value)}
-                  className="w-full bg-black border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:border-violet-500 outline-none"
-                  min="0"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Enterprise Price (₹, 0 = Custom)</label>
-                <input 
-                  type="number"
-                  value={displayRupees(configs.enterprise_price_paisa || '0')}
-                  onChange={(e) => handleRupeeChange('enterprise_price_paisa', e.target.value)}
-                  className="w-full bg-black border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:border-violet-500 outline-none"
-                  min="0"
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Enterprise Included Mins</label>
-                <input 
-                  type="number"
-                  value={configs.enterprise_minutes || ''}
-                  onChange={(e) => handleChange('enterprise_minutes', e.target.value)}
-                  className="w-full bg-black border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:border-violet-500 outline-none"
-                  min="0"
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* INTERNATIONAL (USD) PLAN PRICING */}
-        <div className="bg-zinc-950/60 border border-zinc-900 rounded-2xl p-6 space-y-6">
-          <h2 className="text-sm font-bold text-white uppercase tracking-wider border-b border-zinc-900 pb-3 flex items-center gap-2">
-            <Globe className="w-4 h-4 text-sky-400" />
-            International (USD) Plan Pricing
-          </h2>
-
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Global Starter Price ($/mo)</label>
-                <input 
-                  type="number"
-                  value={displayDollars(configs.starter_price_usd_cents || '8900')}
-                  onChange={(e) => handleDollarChange('starter_price_usd_cents', e.target.value)}
-                  className="w-full bg-black border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:border-sky-500 outline-none"
-                  min="0"
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Global Pro Price ($/mo)</label>
-                <input 
-                  type="number"
-                  value={displayDollars(configs.professional_price_usd_cents || '24900')}
-                  onChange={(e) => handleDollarChange('professional_price_usd_cents', e.target.value)}
-                  className="w-full bg-black border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:border-sky-500 outline-none"
-                  min="0"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Global Enterprise ($/mo)</label>
-                <input 
-                  type="number"
-                  value={displayDollars(configs.enterprise_price_usd_cents || '59900')}
-                  onChange={(e) => handleDollarChange('enterprise_price_usd_cents', e.target.value)}
-                  className="w-full bg-black border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:border-sky-500 outline-none"
-                  min="0"
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Global Trial Price ($)</label>
-                <input 
-                  type="number"
-                  value={displayDollars(configs.trial_price_usd_cents || '500')}
-                  onChange={(e) => handleDollarChange('trial_price_usd_cents', e.target.value)}
-                  className="w-full bg-black border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:border-sky-500 outline-none"
-                  min="0"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Foreign Number Cost ($/mo)</label>
-                <input 
-                  type="number"
-                  value={displayDollars(configs.foreign_number_cost_usd_cents || '1500')}
-                  onChange={(e) => handleDollarChange('foreign_number_cost_usd_cents', e.target.value)}
-                  className="w-full bg-black border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:border-sky-500 outline-none"
-                  min="0"
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Overage Rate ($/min)</label>
-                <input 
-                  type="number"
-                  step="0.01"
-                  value={displayDollars(configs.overage_per_minute_usd_cents || '12')}
-                  onChange={(e) => handleDollarChange('overage_per_minute_usd_cents', e.target.value)}
-                  className="w-full bg-black border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:border-sky-500 outline-none"
-                  min="0"
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* AGENT LIMITS */}
-        <div className="bg-zinc-950/60 border border-zinc-900 rounded-2xl p-6 space-y-6">
-          <h2 className="text-sm font-bold text-white uppercase tracking-wider border-b border-zinc-900 pb-3 flex items-center gap-2">
-            <ShieldAlert className="w-4 h-4 text-rose-400" />
-            Agent Creation Limits
-          </h2>
-
-          <div className="grid grid-cols-3 gap-4">
-            <div className="space-y-2">
-              <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Free Plan Limit</label>
-              <input 
-                type="number"
-                value={configs.max_agents_free || ''}
-                onChange={(e) => handleChange('max_agents_free', e.target.value)}
-                className="w-full bg-black border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:border-violet-500 outline-none"
-                min="0"
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Starter Plan Limit</label>
-              <input 
-                type="number"
-                value={configs.max_agents_starter || ''}
-                onChange={(e) => handleChange('max_agents_starter', e.target.value)}
-                className="w-full bg-black border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:border-violet-500 outline-none"
-                min="0"
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Pro Plan Limit</label>
-              <input 
-                type="number"
-                value={configs.max_agents_professional || ''}
-                onChange={(e) => handleChange('max_agents_professional', e.target.value)}
-                className="w-full bg-black border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:border-violet-500 outline-none"
-                min="0"
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* ADD-ONS */}
-        <div className="bg-zinc-950/60 border border-zinc-900 rounded-2xl p-6 space-y-6">
-          <h2 className="text-sm font-bold text-white uppercase tracking-wider border-b border-zinc-900 pb-3 flex items-center gap-2">
-            <Percent className="w-4 h-4 text-cyan-400" />
-            Add-ons & Overages
-          </h2>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Phone Cost (₹/mo)</label>
-              <input 
-                type="number"
-                value={displayRupees(configs.inbound_number_cost_paisa || '0')}
-                onChange={(e) => handleRupeeChange('inbound_number_cost_paisa', e.target.value)}
-                className="w-full bg-black border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:border-violet-500 outline-none"
-                min="0"
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Overage Rate (₹/min)</label>
-              <input 
-                type="number"
-                value={displayRupees(configs.overage_per_minute_paisa || '0')}
-                onChange={(e) => handleRupeeChange('overage_per_minute_paisa', e.target.value)}
-                className="w-full bg-black border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:border-violet-500 outline-none"
-                min="0"
-              />
-            </div>
-          </div>
-        </div>
-
+        <Link
+          href="/admin/plans"
+          className="inline-flex items-center gap-2 px-4 py-2 bg-violet-600 hover:bg-violet-500 text-white rounded-xl text-xs font-bold transition shadow-sm shrink-0"
+        >
+          Open Pricing Plans &rarr;
+        </Link>
       </div>
 
       {/* API Keys Credentials Section */}
@@ -726,6 +562,62 @@ export default function SystemConfigPage() {
                 Confirm Rotation
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Step-Up Re-Authentication Modal (Master Plan Section 18.4 & 18.5) */}
+      {stepUpModalOpen && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-zinc-950 border border-violet-500/30 rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center gap-3 text-violet-400">
+              <Lock className="w-6 h-6 shrink-0" />
+              <div>
+                <h3 className="text-lg font-bold text-white">Privileged Step-Up Auth</h3>
+                <p className="text-xs text-zinc-400">Master Plan Section 18.4 Re-authentication</p>
+              </div>
+            </div>
+
+            <p className="text-xs text-zinc-300 leading-relaxed">
+              Modifying commercial pricing plans or rotating live credentials is a high-security action. Enter your admin password to proceed.
+            </p>
+
+            <form onSubmit={handleStepUpSubmit} className="space-y-4 pt-2">
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest block">Admin Password</label>
+                <input
+                  type="password"
+                  required
+                  autoFocus
+                  value={stepUpPassword}
+                  onChange={(e) => setStepUpPassword(e.target.value)}
+                  placeholder="Enter administrator password..."
+                  className="w-full bg-black border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white focus:border-violet-500 outline-none"
+                />
+              </div>
+
+              <div className="flex justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  disabled={stepUpLoading}
+                  onClick={() => {
+                    setStepUpModalOpen(false)
+                    setStepUpPassword('')
+                  }}
+                  className="px-4 py-2 rounded-xl text-xs font-bold text-zinc-400 hover:text-white bg-zinc-900 border border-zinc-800 cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={stepUpLoading || !stepUpPassword}
+                  className="px-4 py-2 rounded-xl text-xs font-bold bg-violet-600 hover:bg-violet-500 text-white flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                >
+                  {stepUpLoading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                  Verify & Persist
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

@@ -383,7 +383,7 @@ export async function POST(request: Request) {
         
         let limit = 1; // Default Free: 1 agent
         if (normalizedTier === 'trial') {
-            limit = 3; // Trial: 3 agents
+            limit = 2; // Trial: 2 agents (Decision P2)
         } else if (normalizedTier === 'starter') {
             limit = 5; // Starter: 5 agents
         } else if (normalizedTier === 'professional') {
@@ -564,7 +564,7 @@ Industry: ${profile?.business_type || 'General'}
         // Calculate trial parameters if this agent is a trial agent
         let agentConfig = {};
         if (is_trial) {
-            let trialMinutes = 100;
+            let trialMinutes = 50; // Decision P2: 50 min quota
             let trialDays = 7;
             try {
                 const { data: configMinutes } = await supabaseAdmin

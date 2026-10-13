@@ -410,7 +410,7 @@ export function IntegrationsTab() {
   if (initializing) {
     return (
       <div className="flex flex-col items-center justify-center py-20 gap-2">
-        <Loader2 className="w-8 h-8 text-violet-500 animate-spin" />
+        <Loader2 className="w-8 h-8 text-zinc-900 dark:text-white animate-spin" />
         <p className="text-xs text-zinc-500 dark:text-zinc-400 font-mono">Initializing integrations hub...</p>
       </div>
     )
@@ -418,8 +418,8 @@ export function IntegrationsTab() {
 
   return (
     <div className="space-y-4 text-left">
-      <div className="bg-gradient-to-r from-violet-600/10 to-indigo-600/5 border border-violet-500/10 rounded-2xl p-4 flex items-start gap-3 mb-2">
-        <ShieldAlert className="w-5 h-5 text-violet-500 shrink-0 mt-0.5" />
+      <div className="bg-zinc-100/80 dark:bg-zinc-900/40 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-4 flex items-start gap-3 mb-2">
+        <ShieldAlert className="w-5 h-5 text-zinc-900 dark:text-white shrink-0 mt-0.5" />
         <div className="flex-1">
           <h4 className="text-xs font-bold text-zinc-900 dark:text-white uppercase tracking-wider">Global System Integrations</h4>
           <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-1 leading-relaxed">
@@ -446,7 +446,7 @@ export function IntegrationsTab() {
                 value={exotel.accountSid}
                 onChange={e => setExotel({ ...exotel, accountSid: e.target.value })}
                 placeholder="e.g. your_exotel_sid"
-                className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-white/10 text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-650 text-xs font-semibold font-mono rounded-xl p-3 focus:outline-none focus:ring-1 focus:ring-violet-500"
+                className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-white/10 text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-650 text-xs font-semibold font-mono rounded-xl p-3 focus:outline-none focus:ring-1 focus:ring-zinc-900 dark:focus:ring-white"
               />
             </div>
             <div>
@@ -458,7 +458,7 @@ export function IntegrationsTab() {
                 value={exotel.apiKey}
                 onChange={e => setExotel({ ...exotel, apiKey: e.target.value })}
                 placeholder="e.g. 9a8b7c6d5e4f"
-                className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-white/10 text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-650 text-xs font-semibold font-mono rounded-xl p-3 focus:outline-none focus:ring-1 focus:ring-violet-500"
+                className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-white/10 text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-650 text-xs font-semibold font-mono rounded-xl p-3 focus:outline-none focus:ring-1 focus:ring-zinc-900 dark:focus:ring-white"
               />
             </div>
           </div>
@@ -472,7 +472,7 @@ export function IntegrationsTab() {
                 value={exotel.apiToken}
                 onChange={e => setExotel({ ...exotel, apiToken: e.target.value })}
                 placeholder="••••••••••••••••••••••••"
-                className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-white/10 text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-650 text-xs font-semibold font-mono rounded-xl p-3 focus:outline-none focus:ring-1 focus:ring-violet-500"
+                className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-white/10 text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-650 text-xs font-semibold font-mono rounded-xl p-3 focus:outline-none focus:ring-1 focus:ring-zinc-900 dark:focus:ring-white"
               />
             </div>
             <div>
@@ -484,7 +484,7 @@ export function IntegrationsTab() {
                 value={exotel.subdomain}
                 onChange={e => setExotel({ ...exotel, subdomain: e.target.value })}
                 placeholder="api.exotel.com or api.in.exotel.com"
-                className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-white/10 text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-650 text-xs font-semibold font-mono rounded-xl p-3 focus:outline-none focus:ring-1 focus:ring-violet-500"
+                className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-white/10 text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-650 text-xs font-semibold font-mono rounded-xl p-3 focus:outline-none focus:ring-1 focus:ring-zinc-900 dark:focus:ring-white"
               />
             </div>
           </div>
@@ -502,15 +502,15 @@ export function IntegrationsTab() {
               type="button"
               onClick={() => handleTestCarrier('exotel')}
               disabled={testingCarrier !== null || !exotel.accountSid}
-              className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-zinc-200 dark:border-white/10 hover:border-violet-500/40 text-zinc-800 dark:text-zinc-200 font-bold text-xs uppercase tracking-wider transition-all cursor-pointer disabled:opacity-50"
+              className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-zinc-200 dark:border-white/10 hover:border-zinc-400 dark:hover:border-zinc-500 text-zinc-800 dark:text-zinc-200 font-bold text-xs uppercase tracking-wider transition-all cursor-pointer disabled:opacity-50"
             >
-              {testingCarrier === 'exotel' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Radio className="w-3.5 h-3.5 text-violet-500" />}
+              {testingCarrier === 'exotel' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Radio className="w-3.5 h-3.5 text-zinc-900 dark:text-white" />}
               <span>{testingCarrier === 'exotel' ? 'Testing Ping...' : 'Test Connection'}</span>
             </button>
             <button
               onClick={() => handleSaveByon('exotel')}
               disabled={loadingSection !== null}
-              className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-700 text-white border border-violet-500/20 font-bold text-xs uppercase tracking-wider transition-all cursor-pointer disabled:opacity-50"
+              className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 shadow-sm active:scale-[0.98] font-bold text-xs uppercase tracking-wider transition-all cursor-pointer disabled:opacity-50"
             >
               {loadingSection === 'exotel' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
               <span>{loadingSection === 'exotel' ? 'Saving...' : 'Save & Connect'}</span>
@@ -537,7 +537,7 @@ export function IntegrationsTab() {
                 value={twilio.accountSid}
                 onChange={e => setTwilio({ ...twilio, accountSid: e.target.value })}
                 placeholder="ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-                className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-white/10 text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-650 text-xs font-semibold font-mono rounded-xl p-3 focus:outline-none focus:ring-1 focus:ring-violet-500"
+                className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-white/10 text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-650 text-xs font-semibold font-mono rounded-xl p-3 focus:outline-none focus:ring-1 focus:ring-zinc-900 dark:focus:ring-white"
               />
             </div>
             <div>
@@ -549,7 +549,7 @@ export function IntegrationsTab() {
                 value={twilio.authToken}
                 onChange={e => setTwilio({ ...twilio, authToken: e.target.value })}
                 placeholder="••••••••••••••••••••••••"
-                className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-white/10 text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-650 text-xs font-semibold font-mono rounded-xl p-3 focus:outline-none focus:ring-1 focus:ring-violet-500"
+                className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-white/10 text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-650 text-xs font-semibold font-mono rounded-xl p-3 focus:outline-none focus:ring-1 focus:ring-zinc-900 dark:focus:ring-white"
               />
             </div>
           </div>
@@ -562,7 +562,7 @@ export function IntegrationsTab() {
               value={twilio.apiKeyOrSid}
               onChange={e => setTwilio({ ...twilio, apiKeyOrSid: e.target.value })}
               placeholder="SKxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx (Optional)"
-              className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-white/10 text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-650 text-xs font-semibold font-mono rounded-xl p-3 focus:outline-none focus:ring-1 focus:ring-violet-500"
+              className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-white/10 text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-650 text-xs font-semibold font-mono rounded-xl p-3 focus:outline-none focus:ring-1 focus:ring-zinc-900 dark:focus:ring-white"
             />
           </div>
           <div className="pt-2 flex justify-end gap-3">
@@ -579,15 +579,15 @@ export function IntegrationsTab() {
               type="button"
               onClick={() => handleTestCarrier('twilio')}
               disabled={testingCarrier !== null || !twilio.accountSid}
-              className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-zinc-200 dark:border-white/10 hover:border-violet-500/40 text-zinc-800 dark:text-zinc-200 font-bold text-xs uppercase tracking-wider transition-all cursor-pointer disabled:opacity-50"
+              className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-zinc-200 dark:border-white/10 hover:border-zinc-400 dark:hover:border-zinc-500 text-zinc-800 dark:text-zinc-200 font-bold text-xs uppercase tracking-wider transition-all cursor-pointer disabled:opacity-50"
             >
-              {testingCarrier === 'twilio' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Radio className="w-3.5 h-3.5 text-violet-500" />}
+              {testingCarrier === 'twilio' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Radio className="w-3.5 h-3.5 text-zinc-900 dark:text-white" />}
               <span>{testingCarrier === 'twilio' ? 'Testing Ping...' : 'Test Connection'}</span>
             </button>
             <button
               onClick={() => handleSaveByon('twilio')}
               disabled={loadingSection !== null}
-              className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-700 text-white border border-violet-500/20 font-bold text-xs uppercase tracking-wider transition-all cursor-pointer disabled:opacity-50"
+              className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 shadow-sm active:scale-[0.98] font-bold text-xs uppercase tracking-wider transition-all cursor-pointer disabled:opacity-50"
             >
               {loadingSection === 'twilio' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
               <span>{loadingSection === 'twilio' ? 'Saving...' : 'Save & Connect'}</span>
@@ -613,7 +613,7 @@ export function IntegrationsTab() {
               value={telegram.token}
               onChange={e => setTelegram({ ...telegram, token: e.target.value })}
               placeholder="e.g. 123456:ABC-def1234ghIkl-zyx"
-              className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-white/10 text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-650 text-xs font-semibold font-mono rounded-xl p-3 focus:outline-none focus:ring-1 focus:ring-violet-500"
+              className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-white/10 text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-650 text-xs font-semibold font-mono rounded-xl p-3 focus:outline-none focus:ring-1 focus:ring-zinc-900 dark:focus:ring-white"
             />
           </div>
           <div>
@@ -625,7 +625,7 @@ export function IntegrationsTab() {
               value={telegram.chatId}
               onChange={e => setTelegram({ ...telegram, chatId: e.target.value })}
               placeholder="e.g. -100123456789"
-              className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-white/10 text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-650 text-xs font-semibold font-mono rounded-xl p-3 focus:outline-none focus:ring-1 focus:ring-violet-500"
+              className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-white/10 text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-650 text-xs font-semibold font-mono rounded-xl p-3 focus:outline-none focus:ring-1 focus:ring-zinc-900 dark:focus:ring-white"
             />
           </div>
           <div className="md:col-span-2 pt-2 flex justify-end gap-3">
@@ -641,7 +641,7 @@ export function IntegrationsTab() {
             <button
               onClick={() => handleSave('telegram')}
               disabled={loadingSection !== null}
-              className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-700 text-white border border-violet-500/20 font-bold text-xs uppercase tracking-wider transition-all cursor-pointer disabled:opacity-50"
+              className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 shadow-sm active:scale-[0.98] font-bold text-xs uppercase tracking-wider transition-all cursor-pointer disabled:opacity-50"
             >
               {loadingSection === 'telegram' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
               {loadingSection === 'telegram' ? 'Connecting...' : 'Save & Connect'}
@@ -667,7 +667,7 @@ export function IntegrationsTab() {
               value={whatsapp.sid}
               onChange={e => setWhatsapp({ ...whatsapp, sid: e.target.value })}
               placeholder="ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-              className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-white/10 text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-650 text-xs font-semibold font-mono rounded-xl p-3 focus:outline-none focus:ring-1 focus:ring-violet-500"
+              className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-white/10 text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-650 text-xs font-semibold font-mono rounded-xl p-3 focus:outline-none focus:ring-1 focus:ring-zinc-900 dark:focus:ring-white"
             />
           </div>
           <div>
@@ -679,7 +679,7 @@ export function IntegrationsTab() {
               value={whatsapp.token}
               onChange={e => setWhatsapp({ ...whatsapp, token: e.target.value })}
               placeholder="••••••••••••••••••••••••••••••••"
-              className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-white/10 text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-650 text-xs font-semibold font-mono rounded-xl p-3 focus:outline-none focus:ring-1 focus:ring-violet-500"
+              className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-white/10 text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-650 text-xs font-semibold font-mono rounded-xl p-3 focus:outline-none focus:ring-1 focus:ring-zinc-900 dark:focus:ring-white"
             />
           </div>
           <div>
@@ -691,7 +691,7 @@ export function IntegrationsTab() {
               value={whatsapp.from}
               onChange={e => setWhatsapp({ ...whatsapp, from: e.target.value })}
               placeholder="whatsapp:+14155238886"
-              className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-white/10 text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-650 text-xs font-semibold font-mono rounded-xl p-3 focus:outline-none focus:ring-1 focus:ring-violet-500"
+              className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-white/10 text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-650 text-xs font-semibold font-mono rounded-xl p-3 focus:outline-none focus:ring-1 focus:ring-zinc-900 dark:focus:ring-white"
             />
           </div>
           <div className="md:col-span-3 pt-2 pb-1 border-t border-zinc-100 dark:border-white/5">
@@ -704,7 +704,7 @@ export function IntegrationsTab() {
                 value={testWhatsappPhone}
                 onChange={e => setTestWhatsappPhone(e.target.value)}
                 placeholder="+919876543210"
-                className="flex-1 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-white/10 text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-650 text-xs font-semibold font-mono rounded-xl p-3 focus:outline-none focus:ring-1 focus:ring-violet-500"
+                className="flex-1 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-white/10 text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-650 text-xs font-semibold font-mono rounded-xl p-3 focus:outline-none focus:ring-1 focus:ring-zinc-900 dark:focus:ring-white"
               />
               <button
                 type="button"
@@ -734,7 +734,7 @@ export function IntegrationsTab() {
             <button
               onClick={() => handleSave('whatsapp')}
               disabled={loadingSection !== null}
-              className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-700 text-white border border-violet-500/20 font-bold text-xs uppercase tracking-wider transition-all cursor-pointer disabled:opacity-50"
+              className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 shadow-sm active:scale-[0.98] font-bold text-xs uppercase tracking-wider transition-all cursor-pointer disabled:opacity-50"
             >
               {loadingSection === 'whatsapp' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
               {loadingSection === 'whatsapp' ? 'Connecting...' : 'Save & Connect'}
@@ -761,7 +761,7 @@ export function IntegrationsTab() {
                 value={email.smtpHost}
                 onChange={e => setEmail({ ...email, smtpHost: e.target.value })}
                 placeholder="smtp.sendgrid.net or mail.mybusiness.com"
-                className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-white/10 text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-650 text-xs font-semibold font-mono rounded-xl p-3 focus:outline-none focus:ring-1 focus:ring-violet-500"
+                className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-white/10 text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-650 text-xs font-semibold font-mono rounded-xl p-3 focus:outline-none focus:ring-1 focus:ring-zinc-900 dark:focus:ring-white"
               />
             </div>
             <div>
@@ -773,7 +773,7 @@ export function IntegrationsTab() {
                 value={email.smtpPort}
                 onChange={e => setEmail({ ...email, smtpPort: e.target.value })}
                 placeholder="587"
-                className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-white/10 text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-650 text-xs font-semibold font-mono rounded-xl p-3 focus:outline-none focus:ring-1 focus:ring-violet-500"
+                className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-white/10 text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-650 text-xs font-semibold font-mono rounded-xl p-3 focus:outline-none focus:ring-1 focus:ring-zinc-900 dark:focus:ring-white"
               />
             </div>
           </div>
@@ -787,7 +787,7 @@ export function IntegrationsTab() {
                 value={email.smtpUsername}
                 onChange={e => setEmail({ ...email, smtpUsername: e.target.value })}
                 placeholder="apikey or username"
-                className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-white/10 text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-650 text-xs font-semibold font-mono rounded-xl p-3 focus:outline-none focus:ring-1 focus:ring-violet-500"
+                className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-white/10 text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-650 text-xs font-semibold font-mono rounded-xl p-3 focus:outline-none focus:ring-1 focus:ring-zinc-900 dark:focus:ring-white"
               />
             </div>
             <div>
@@ -799,7 +799,7 @@ export function IntegrationsTab() {
                 value={email.smtpPassword}
                 onChange={e => setEmail({ ...email, smtpPassword: e.target.value })}
                 placeholder="••••••••••••••••••••••••"
-                className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-white/10 text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-650 text-xs font-semibold font-mono rounded-xl p-3 focus:outline-none focus:ring-1 focus:ring-violet-500"
+                className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-white/10 text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-650 text-xs font-semibold font-mono rounded-xl p-3 focus:outline-none focus:ring-1 focus:ring-zinc-900 dark:focus:ring-white"
               />
             </div>
             <div>
@@ -811,7 +811,7 @@ export function IntegrationsTab() {
                 value={email.smtpFrom}
                 onChange={e => setEmail({ ...email, smtpFrom: e.target.value })}
                 placeholder="no-reply@mybusiness.com"
-                className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-white/10 text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-650 text-xs font-semibold font-mono rounded-xl p-3 focus:outline-none focus:ring-1 focus:ring-violet-500"
+                className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-white/10 text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-650 text-xs font-semibold font-mono rounded-xl p-3 focus:outline-none focus:ring-1 focus:ring-zinc-900 dark:focus:ring-white"
               />
             </div>
           </div>
@@ -828,7 +828,7 @@ export function IntegrationsTab() {
             <button
               onClick={() => handleSave('email')}
               disabled={loadingSection !== null}
-              className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-700 text-white border border-violet-500/20 font-bold text-xs uppercase tracking-wider transition-all cursor-pointer disabled:opacity-50"
+              className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 shadow-sm active:scale-[0.98] font-bold text-xs uppercase tracking-wider transition-all cursor-pointer disabled:opacity-50"
             >
               {loadingSection === 'email' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
               {loadingSection === 'email' ? 'Connecting...' : 'Save & Connect'}
@@ -855,7 +855,7 @@ export function IntegrationsTab() {
                 value={webhook.url}
                 onChange={e => setWebhook({ ...webhook, url: e.target.value })}
                 placeholder="https://api.mycrm.com/v1/leads"
-                className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-white/10 text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-650 text-xs font-semibold font-mono rounded-xl p-3 focus:outline-none focus:ring-1 focus:ring-violet-500"
+                className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-white/10 text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-650 text-xs font-semibold font-mono rounded-xl p-3 focus:outline-none focus:ring-1 focus:ring-zinc-900 dark:focus:ring-white"
               />
             </div>
           </div>
@@ -873,7 +873,7 @@ export function IntegrationsTab() {
             <button
               onClick={() => handleSave('crm')}
               disabled={loadingSection !== null}
-              className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-700 text-white border border-violet-500/20 font-bold text-xs uppercase tracking-wider transition-all cursor-pointer disabled:opacity-50"
+              className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 shadow-sm active:scale-[0.98] font-bold text-xs uppercase tracking-wider transition-all cursor-pointer disabled:opacity-50"
             >
               {loadingSection === 'crm' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
               {loadingSection === 'crm' ? 'Connecting...' : 'Save & Connect'}
@@ -899,7 +899,7 @@ export function IntegrationsTab() {
               value={calendar.apiKey}
               onChange={e => setCalendar({ ...calendar, apiKey: e.target.value })}
               placeholder="cal_live_xxxxxxxxxxxxxxxxxxxxxxxx"
-              className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-white/10 text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-650 text-xs font-semibold font-mono rounded-xl p-3 focus:outline-none focus:ring-1 focus:ring-violet-500"
+              className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-white/10 text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-650 text-xs font-semibold font-mono rounded-xl p-3 focus:outline-none focus:ring-1 focus:ring-zinc-900 dark:focus:ring-white"
             />
           </div>
           <div>
@@ -911,7 +911,7 @@ export function IntegrationsTab() {
               value={calendar.eventTypeId}
               onChange={e => setCalendar({ ...calendar, eventTypeId: e.target.value })}
               placeholder="e.g. 123456"
-              className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-white/10 text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-650 text-xs font-semibold font-mono rounded-xl p-3 focus:outline-none focus:ring-1 focus:ring-violet-500"
+              className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-white/10 text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-650 text-xs font-semibold font-mono rounded-xl p-3 focus:outline-none focus:ring-1 focus:ring-zinc-900 dark:focus:ring-white"
             />
           </div>
           <div className="md:col-span-2 pt-2 flex justify-end gap-3">
@@ -928,15 +928,15 @@ export function IntegrationsTab() {
               type="button"
               onClick={handleTestCalendar}
               disabled={testingCalendar || !calendar.apiKey}
-              className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-zinc-200 dark:border-white/10 hover:border-violet-500/40 text-zinc-800 dark:text-zinc-200 font-bold text-xs uppercase tracking-wider transition-all cursor-pointer disabled:opacity-50"
+              className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-zinc-200 dark:border-white/10 hover:border-zinc-400 dark:hover:border-zinc-500 text-zinc-800 dark:text-zinc-200 font-bold text-xs uppercase tracking-wider transition-all cursor-pointer disabled:opacity-50"
             >
-              {testingCalendar ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Calendar className="w-3.5 h-3.5 text-violet-500" />}
+              {testingCalendar ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Calendar className="w-3.5 h-3.5 text-zinc-900 dark:text-white" />}
               <span>{testingCalendar ? 'Testing...' : 'Test Connection'}</span>
             </button>
             <button
               onClick={() => handleSave('calendar')}
               disabled={loadingSection !== null}
-              className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-700 text-white border border-violet-500/20 font-bold text-xs uppercase tracking-wider transition-all cursor-pointer disabled:opacity-50"
+              className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 shadow-sm active:scale-[0.98] font-bold text-xs uppercase tracking-wider transition-all cursor-pointer disabled:opacity-50"
             >
               {loadingSection === 'calendar' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
               {loadingSection === 'calendar' ? 'Connecting...' : 'Save & Connect'}

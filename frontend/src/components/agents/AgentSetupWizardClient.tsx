@@ -127,8 +127,8 @@ Target Audience: ${targetAudience}
     <div className="max-w-2xl mx-auto py-12 px-4 font-montserrat">
       {/* Wizard Header */}
       <div className="text-center space-y-3 mb-10">
-        <div className="w-14 h-14 bg-violet-600/10 border border-violet-500/30 rounded-2xl flex items-center justify-center text-violet-400 mx-auto shadow-lg">
-          <Sparkles className="w-7 h-7 animate-pulse" />
+        <div className="w-14 h-14 bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-2xl flex items-center justify-center text-zinc-900 dark:text-white mx-auto shadow-sm">
+          <Sparkles className="w-7 h-7" />
         </div>
         <h1 className="text-2xl sm:text-3xl font-extrabold text-[var(--heading)] tracking-tight leading-tight" style={{ fontFamily: 'Playfair Display, Georgia, serif' }}>
           Configure Your Premium Assistant
@@ -141,14 +141,14 @@ Target Audience: ${targetAudience}
       {/* Progress Bar */}
       <div className="flex items-center justify-between mb-8 max-w-xs mx-auto">
         <div className="flex items-center gap-2">
-          <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${step >= 1 ? 'bg-violet-600 text-white' : 'bg-[var(--background)] border border-[var(--border)] text-[var(--muted)]'}`}>
+          <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${step >= 1 ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-950 shadow-sm' : 'bg-[var(--background)] border border-[var(--border)] text-[var(--muted)]'}`}>
             1
           </span>
           <span className="text-[10px] uppercase font-bold text-[var(--heading)] tracking-wider">Business</span>
         </div>
         <div className="flex-1 h-0.5 bg-[var(--border)] mx-3" />
         <div className="flex items-center gap-2">
-          <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${step >= 2 ? 'bg-violet-600 text-white' : 'bg-[var(--background)] border border-[var(--border)] text-[var(--muted)]'}`}>
+          <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${step >= 2 ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-950 shadow-sm' : 'bg-[var(--background)] border border-[var(--border)] text-[var(--muted)]'}`}>
             2
           </span>
           <span className="text-[10px] uppercase font-bold text-[var(--heading)] tracking-wider">Services</span>
@@ -156,15 +156,15 @@ Target Audience: ${targetAudience}
       </div>
 
       {/* Form Container */}
-      <form onSubmit={handleSubmit} className="bg-[var(--card-bg)] border border-[var(--border)] rounded-3xl p-6 sm:p-8 space-y-6 shadow-2xl relative overflow-hidden">
+      <form onSubmit={handleSubmit} className="bg-[var(--card-bg)] border border-[var(--border)] rounded-3xl p-6 sm:p-8 space-y-6 shadow-xl relative overflow-hidden">
         
         {isBundleMode && (
-          <div className="p-4 bg-violet-950/20 border border-violet-500/20 rounded-2xl space-y-3">
-            <div className="text-[10px] uppercase font-bold text-violet-400 tracking-wider">📦 Purchased Bundle Agents</div>
+          <div className="p-4 bg-zinc-100/80 dark:bg-zinc-900/40 border border-zinc-200 dark:border-zinc-800 rounded-2xl space-y-3">
+            <div className="text-[10px] uppercase font-bold text-zinc-700 dark:text-zinc-300 tracking-wider">📦 Purchased Bundle Agents</div>
             <div className="flex flex-wrap gap-2">
               {bundleAgents.map((a: any) => (
-                <div key={a.id} className="flex items-center gap-1.5 px-3 py-1 bg-[var(--background)] border border-[var(--border)] rounded-xl text-xs text-[var(--heading)] font-semibold">
-                  <Bot className="w-3.5 h-3.5 text-violet-400" />
+                <div key={a.id} className="flex items-center gap-1.5 px-3 py-1 bg-[var(--background)] border border-[var(--border)] rounded-xl text-xs text-[var(--heading)] font-semibold shadow-xs">
+                  <Bot className="w-3.5 h-3.5 text-zinc-500 dark:text-zinc-400" />
                   <span>{a.name.replace(/^\[[^\]]+\]\s*/, '')}</span>
                 </div>
               ))}
@@ -176,9 +176,9 @@ Target Audience: ${targetAudience}
                 id="useSameProfile"
                 checked={useSameProfile}
                 onChange={(e) => setUseSameProfile(e.target.checked)}
-                className="w-4 h-4 rounded border-[var(--border)] text-violet-600 focus:ring-violet-500 bg-[var(--background)]"
+                className="w-4 h-4 rounded border-[var(--border)] accent-zinc-900 dark:accent-white text-zinc-900 dark:text-white focus:ring-zinc-900 dark:focus:ring-white bg-[var(--background)] cursor-pointer"
               />
-              <label htmlFor="useSameProfile" className="text-xs font-bold text-[var(--heading)] select-none">
+              <label htmlFor="useSameProfile" className="text-xs font-bold text-[var(--heading)] select-none cursor-pointer">
                 Use same business profile for all agents?
               </label>
             </div>
@@ -188,7 +188,7 @@ Target Audience: ${targetAudience}
         {step === 1 && (
           <div className="space-y-6 animate-in fade-in duration-200">
             <div className="flex items-center gap-2 pb-3 border-b border-[var(--border)]">
-              <Building className="w-4 h-4 text-violet-400" />
+              <Building className="w-4 h-4 text-zinc-700 dark:text-zinc-300" />
               <h3 className="text-xs uppercase font-extrabold tracking-wider text-[var(--heading)]">Business Settings</h3>
             </div>
 
@@ -203,7 +203,7 @@ Target Audience: ${targetAudience}
                   value={businessName}
                   onChange={(e) => setBusinessName(e.target.value)}
                   placeholder="Acme Corp"
-                  className="w-full bg-[var(--background)] border border-[var(--border)] text-[var(--heading)] text-xs rounded-xl p-3 focus:outline-none focus:ring-1 focus:ring-violet-600 transition-all font-semibold shadow-inner"
+                  className="w-full bg-[var(--background)] border border-[var(--border)] text-[var(--heading)] text-xs rounded-xl p-3 focus:outline-none focus:ring-1 focus:ring-zinc-900 dark:focus:ring-white focus:border-zinc-900 dark:focus:border-white transition-all font-semibold shadow-inner"
                 />
               </div>
 
@@ -217,7 +217,7 @@ Target Audience: ${targetAudience}
                   value={industry}
                   onChange={(e) => setIndustry(e.target.value)}
                   placeholder="Healthcare, Legal Services, Real Estate..."
-                  className="w-full bg-[var(--background)] border border-[var(--border)] text-[var(--heading)] text-xs rounded-xl p-3 focus:outline-none focus:ring-1 focus:ring-violet-600 transition-all font-semibold shadow-inner"
+                  className="w-full bg-[var(--background)] border border-[var(--border)] text-[var(--heading)] text-xs rounded-xl p-3 focus:outline-none focus:ring-1 focus:ring-zinc-900 dark:focus:ring-white focus:border-zinc-900 dark:focus:border-white transition-all font-semibold shadow-inner"
                 />
               </div>
             </div>
@@ -231,7 +231,7 @@ Target Audience: ${targetAudience}
                   toast.error('Please enter Business Name and Industry to proceed.')
                 }
               }}
-              className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-violet-600 hover:bg-violet-700 text-white font-bold text-xs uppercase tracking-wider transition-all cursor-pointer shadow-md"
+              className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 font-bold text-xs uppercase tracking-wider transition-all cursor-pointer shadow-sm active:scale-[0.99]"
             >
               <span>Next Step</span>
               <ArrowRight className="w-4 h-4" />
@@ -242,7 +242,7 @@ Target Audience: ${targetAudience}
         {step === 2 && (
           <div className="space-y-6 animate-in fade-in duration-200">
             <div className="flex items-center gap-2 pb-3 border-b border-[var(--border)]">
-              <Briefcase className="w-4 h-4 text-violet-400" />
+              <Briefcase className="w-4 h-4 text-zinc-700 dark:text-zinc-300" />
               <h3 className="text-xs uppercase font-extrabold tracking-wider text-[var(--heading)]">Services & Audience</h3>
             </div>
 
@@ -257,7 +257,7 @@ Target Audience: ${targetAudience}
                   onChange={(e) => setServicesOffered(e.target.value)}
                   placeholder="We schedule dental appointments, explain pricing plans, and capture inbound lead intents..."
                   rows={3}
-                  className="w-full bg-[var(--background)] border border-[var(--border)] text-[var(--heading)] text-xs rounded-xl p-3 focus:outline-none focus:ring-1 focus:ring-violet-600 transition-all font-semibold shadow-inner resize-none leading-relaxed"
+                  className="w-full bg-[var(--background)] border border-[var(--border)] text-[var(--heading)] text-xs rounded-xl p-3 focus:outline-none focus:ring-1 focus:ring-zinc-900 dark:focus:ring-white focus:border-zinc-900 dark:focus:border-white transition-all font-semibold shadow-inner resize-none leading-relaxed"
                 />
               </div>
 
@@ -271,7 +271,7 @@ Target Audience: ${targetAudience}
                   onChange={(e) => setTargetAudience(e.target.value)}
                   placeholder="Local patients needing cosmetic dentistry, new homeowners needing insurance quotes..."
                   rows={3}
-                  className="w-full bg-[var(--background)] border border-[var(--border)] text-[var(--heading)] text-xs rounded-xl p-3 focus:outline-none focus:ring-1 focus:ring-violet-600 transition-all font-semibold shadow-inner resize-none leading-relaxed"
+                  className="w-full bg-[var(--background)] border border-[var(--border)] text-[var(--heading)] text-xs rounded-xl p-3 focus:outline-none focus:ring-1 focus:ring-zinc-900 dark:focus:ring-white focus:border-zinc-900 dark:focus:border-white transition-all font-semibold shadow-inner resize-none leading-relaxed"
                 />
               </div>
             </div>
@@ -280,16 +280,16 @@ Target Audience: ${targetAudience}
               <button
                 type="button"
                 onClick={() => setStep(1)}
-                className="flex-1 py-3 rounded-xl border border-[var(--border)] bg-transparent text-[var(--body)] hover:text-[var(--heading)] text-xs font-bold uppercase tracking-wider transition-all cursor-pointer"
+                className="flex-1 py-3 rounded-xl border border-[var(--border)] bg-transparent text-[var(--body)] hover:text-[var(--heading)] hover:bg-[var(--hover-bg)] text-xs font-bold uppercase tracking-wider transition-all cursor-pointer"
               >
                 Back
               </button>
               <button
                 type="submit"
                 disabled={loading}
-                className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-violet-600 hover:bg-violet-700 text-white font-bold text-xs uppercase tracking-wider transition-all disabled:opacity-50 cursor-pointer shadow-md"
+                className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 font-bold text-xs uppercase tracking-wider transition-all disabled:opacity-50 cursor-pointer shadow-sm active:scale-[0.99]"
               >
-                {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5 animate-pulse" />}
+                {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
                 <span>{loading ? 'Compiling Prompt...' : 'Complete & Save'}</span>
               </button>
             </div>

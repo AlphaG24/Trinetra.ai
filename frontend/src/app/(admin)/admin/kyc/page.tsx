@@ -224,11 +224,24 @@ export default function AdminKYCVerificationPage() {
   const formatDocType = (type: string) => {
     switch (type) {
       case 'authorized_signatory_id':
-        return 'Signatory ID (Aadhaar)'
+        return 'Signatory ID (Masked Aadhaar)'
+      case 'passport':
+        return 'Passport (Signatory Proof)'
+      case 'national_id':
+        return 'National ID / Driver License'
       case 'company_pan':
         return 'Company PAN'
+      case 'gstin_certificate':
+        return 'GSTIN Certificate'
+      case 'incorporation_cert':
       case 'certificate_of_incorporation':
         return 'Certificate of Incorporation'
+      case 'company_registration':
+        return 'Company Registration'
+      case 'business_ein':
+        return 'Business Tax ID / EIN'
+      case 'trade_license':
+        return 'Trade License'
       default:
         return type.replace(/_/g, ' ').toUpperCase()
     }

@@ -206,7 +206,7 @@ export function QuickSetupModal({ isOpen, onClose, isDemo }: QuickSetupModalProp
                   onClose()
                   router.push('/dashboard/billing')
                 }}
-                className="px-6 py-3 bg-violet-600 hover:bg-violet-700 text-white font-bold text-xs uppercase tracking-wider rounded-xl transition-all shadow-md cursor-pointer"
+                className="px-6 py-3 bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 font-bold text-xs uppercase tracking-wider rounded-xl transition-all shadow-sm active:scale-[0.98] cursor-pointer"
               >
                 Upgrade Plan
               </button>
@@ -335,7 +335,7 @@ export function QuickSetupModal({ isOpen, onClose, isDemo }: QuickSetupModalProp
               <button
                 onClick={triggerCreateAgent}
                 disabled={loading || loadingBlueprints}
-                className="flex-1.5 py-3 bg-[var(--primary-bg)] text-[var(--heading)] hover:bg-[var(--hover-bg)] border border-[var(--border)] text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg cursor-pointer disabled:opacity-50"
+                className="flex-1.5 py-3 bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 font-bold text-xs uppercase tracking-wider rounded-xl transition-all flex items-center justify-center gap-2 shadow-sm cursor-pointer disabled:opacity-50 active:scale-[0.98]"
               >
                 {loading ? (
                   <Loader2 className="w-4 h-4 animate-spin text-[var(--heading)]" />

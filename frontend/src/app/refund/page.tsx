@@ -148,8 +148,8 @@ export default function RefundPage() {
                   <h3 className="text-[#FAF7FF] font-medium text-[16px] mt-[16px] mb-[8px]">3.5 Usage-Based Billing</h3>
                   <ul className="list-disc list-inside pl-[16px] space-y-2">
                     <li><strong>No Refunds for Consumed Usage:</strong> Charges under usage-based billing are levied strictly on actual consumption. No refunds will be issued for usage already consumed.</li>
-                    <li><strong>Unused Credit Rollover:</strong> Unused prepaid credits will roll over for a period of 30 (thirty) calendar days from the date of credit issuance, after which they will expire and hold no value.</li>
-                    <li><strong>No Refund for Expired Credits:</strong> No refunds or extensions will be provided for credits that have expired due to the passage of the 30-day rollover period.</li>
+                    <li><strong>Unused Credit Rollover:</strong> Unused prepaid credits will roll over for a period of 180 (one hundred eighty) calendar days from the date of credit issuance (per the revised refund policy), after which they will expire and hold no value.</li>
+                    <li><strong>No Refund for Expired Credits:</strong> No refunds or extensions will be provided for credits that have expired due to the passage of the 180-day rollover period.</li>
                     <li><strong>Disputed Charges:</strong> If you believe you were billed for usage you did not generate, you must raise a formal dispute with the Company within 14 days. We will review platform logs and respond within 7 business days.</li>
                   </ul>
 

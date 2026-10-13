@@ -300,11 +300,11 @@ function ExternalDataWorkspace({ tool, quota, user, logs, router }: ExternalData
       
       {/* Top - Sleek, Minimalist Banner */}
       <div className="flex flex-col md:flex-row items-center justify-between gap-6 border border-zinc-800 bg-[#0f1117]/60 backdrop-blur-md rounded-2xl p-6 shadow-xl relative overflow-hidden group">
-        <div className="absolute inset-0 bg-gradient-to-r from-violet-600/5 to-transparent pointer-events-none" />
+        <div className="absolute inset-0 bg-gradient-to-r from-zinc-500/5 to-transparent pointer-events-none" />
         
         <div className="flex items-center gap-4 text-left">
-          <div className="w-10 h-10 rounded-xl bg-violet-500/10 border border-violet-500/20 flex items-center justify-center text-violet-400 shrink-0">
-            <ExternalLink className="w-5 h-5 text-amber-500" />
+          <div className="w-10 h-10 rounded-xl bg-zinc-800/80 border border-zinc-700/60 flex items-center justify-center text-zinc-300 shrink-0">
+            <ExternalLink className="w-5 h-5 text-zinc-300" />
           </div>
           <div>
             <h4 className="text-sm font-semibold text-white">External Compute Environment</h4>
@@ -323,7 +323,7 @@ function ExternalDataWorkspace({ tool, quota, user, logs, router }: ExternalData
           </button>
           <Link
             href={`/dashboard/tools/${tool.slug}`}
-            className="bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 border border-violet-400/20 shadow-[0_0_20px_rgba(139,92,246,0.25)] text-white font-semibold tracking-wide uppercase text-xs px-6 py-2.5 rounded-xl text-center transition-all duration-200 flex items-center gap-1.5 cursor-pointer hover:scale-[1.02] active:scale-[0.98]"
+            className="bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 font-bold tracking-wider uppercase text-xs px-6 py-2.5 rounded-xl text-center transition-all duration-200 flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-[0.98]"
           >
             Launch Console ↗
           </Link>

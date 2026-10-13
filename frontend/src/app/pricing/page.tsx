@@ -8,6 +8,7 @@ import Link from "next/link";
 
 import { Layout } from "@/components/layout/Layout";
 import { PlanRecord, getConfigString, hasConfiguredValue, useActivePlans, useSiteConfig } from "@/lib/site-content";
+import EnterpriseContactModal from "@/components/enterprise/EnterpriseContactModal";
 
 type BillingMode = "monthly" | "annual";
 type FeatureTone = "default" | "included" | "excluded" | "addon";
@@ -36,7 +37,7 @@ const FAQS = [
   {
     question: "What does the setup fee cover?",
     answer:
-      "The one-time setup fee covers initial agent configuration, knowledge base training, custom prompt engineering, testing, deployment, and your onboarding sessions. It's a one-time charge - no recurring setup costs.",
+      "The onboarding setup fee is currently waived during our launch phase. Initial agent configuration, voice prompt tuning, testing, and your onboarding sessions are included with your subscription.",
   },
   {
     question: "What happens if I exceed my plan limits?",
@@ -56,7 +57,7 @@ const FAQS = [
   {
     question: "Is there a free trial?",
     answer:
-      "We don't offer a free trial, but we provide a thorough demo during your onboarding call so you can see exactly how your agent will work before going live.",
+      "Yes! You can get started immediately with our Free Trial (1 agent, 10 minutes of web calls, zero credit card required). For full dashboard access including dedicated phone numbers and 50 call minutes, you can activate the ₹99 7-Day Trial.",
   },
   {
     question: "Can I cancel my subscription?",
@@ -113,7 +114,7 @@ function asBoolean(value: unknown) {
   return false;
 }
 
-function formatPrice(value: number | null, currency: "INR" | "USD" = "INR") {
+function formatPrice(value: number | null, currency: "INR" | "USD" | "EUR" = "INR") {
   if (value === null || !Number.isFinite(value)) return "";
   if (currency === "USD") {
     const dollars = value / 100;
@@ -123,15 +124,23 @@ function formatPrice(value: number | null, currency: "INR" | "USD" = "INR") {
       maximumFractionDigits: whole ? 0 : 2,
     }).format(dollars)}`;
   }
+  if (currency === "EUR") {
+    const euros = value / 100;
+    const whole = Number.isInteger(euros);
+    return `€${new Intl.NumberFormat("de-DE", {
+      minimumFractionDigits: whole ? 0 : 2,
+      maximumFractionDigits: whole ? 0 : 2,
+    }).format(euros)}`;
+  }
   const rupees = value / 100;
   const whole = Number.isInteger(rupees);
-  return `\u20B9${new Intl.NumberFormat("en-IN", {
+  return `₹${new Intl.NumberFormat("en-IN", {
     minimumFractionDigits: whole ? 0 : 2,
     maximumFractionDigits: whole ? 0 : 2,
   }).format(rupees)}`;
 }
 
-function formatPaise(value: number | null, currency: "INR" | "USD" = "INR") {
+function formatPaise(value: number | null, currency: "INR" | "USD" | "EUR" = "INR") {
   return formatPrice(value, currency);
 }
 
@@ -174,7 +183,7 @@ function formatIncludedValue(value: number | null, unit: string) {
   return `${value.toLocaleString("en-IN")} ${unit}`;
 }
 
-function getMonthlyDisplayPrice(plan: PlanRecord, billingMode: BillingMode, currency: "INR" | "USD" = "INR") {
+function getMonthlyDisplayPrice(plan: PlanRecord, billingMode: BillingMode, currency: "INR" | "USD" | "EUR" = "INR") {
   if (plan.priceMonthly === 0) return "Custom";
   return formatPrice(billingMode === "annual" ? plan.priceAnnual : plan.priceMonthly, currency);
 }
@@ -522,22 +531,26 @@ function PricingCard({
   billingMode,
   currencyMode = "INR",
   publicConfig,
+  onOpenEnterprise,
 }: {
   plan: PlanRecord;
   index: number;
   billingMode: BillingMode;
-  currencyMode?: "INR" | "USD";
+  currencyMode?: "INR" | "USD" | "EUR";
   publicConfig?: any;
+  onOpenEnterprise?: () => void;
 }) {
   const isPopular = plan.isPopular;
   const cardFeatures = getCardFeatures(plan);
-  const setupFee = currencyMode === "USD" ? null : getSetupFee(plan);
+  const setupFee = currencyMode !== "INR" ? null : getSetupFee(plan);
   const minimumMonths = getMinimumMonths(plan);
   const savings = getAnnualSavings(plan);
   const displayPrice = getMonthlyDisplayPrice(plan, billingMode, currencyMode);
   const monthlyPrice = formatPrice(plan.priceMonthly, currencyMode);
   const overageLine = currencyMode === "USD"
     ? `${publicConfig?.overage_per_minute_usd_cents ? `$${(parseInt(publicConfig.overage_per_minute_usd_cents, 10) / 100).toFixed(2)}` : "$0.12"}/min`
+    : currencyMode === "EUR"
+    ? `${publicConfig?.overage_per_minute_eur_cents ? `€${(parseInt(publicConfig.overage_per_minute_eur_cents, 10) / 100).toFixed(2)}` : "€0.11"}/min`
     : [
         plan.overageVoicePerMinute !== null ? `${formatPrice(plan.overageVoicePerMinute, currencyMode)}/min` : "",
         plan.overageChatPerConversation !== null ? `${formatPrice(plan.overageChatPerConversation, currencyMode)}/chat` : "",
@@ -610,16 +623,26 @@ function PricingCard({
         </div>
 
         <div className="mt-[24px]">
-          <Link
-            href={`/contact?plan=${plan.slug}`}
-            className={`block w-full rounded-[12px] px-[18px] py-[14px] text-center font-sans text-[15px] font-medium transition-all duration-300 ${
-              isPopular
-                ? "bg-[#8B5CF6] text-white shadow-[0_0_24px_rgba(139,92,246,0.28)] hover:bg-[#7C3AED]"
-                : "border border-[#2D1255] bg-transparent text-[#E9D5FF] hover:border-[#8B5CF6] hover:bg-[rgba(139,92,246,0.08)]"
-            }`}
-          >
-            {index === 2 ? "Talk to Us ->" : "Get Started ->"}
-          </Link>
+          {index === 2 || plan.slug === 'scale' ? (
+            <button
+              type="button"
+              onClick={onOpenEnterprise}
+              className="block w-full rounded-[12px] px-[18px] py-[14px] text-center font-sans text-[15px] font-medium transition-all duration-300 border border-[#2D1255] bg-transparent text-[#E9D5FF] hover:border-[#8B5CF6] hover:bg-[rgba(139,92,246,0.08)] cursor-pointer"
+            >
+              Contact Enterprise {"->"}
+            </button>
+          ) : (
+            <Link
+              href="/dashboard/billing"
+              className={`block w-full rounded-[12px] px-[18px] py-[14px] text-center font-sans text-[15px] font-medium transition-all duration-300 ${
+                isPopular
+                  ? "bg-[#8B5CF6] text-white shadow-[0_0_24px_rgba(139,92,246,0.28)] hover:bg-[#7C3AED]"
+                  : "border border-[#2D1255] bg-transparent text-[#E9D5FF] hover:border-[#8B5CF6] hover:bg-[rgba(139,92,246,0.08)]"
+              }`}
+            >
+              Get Started {"->"}
+            </Link>
+          )}
 
           {overageLine ? <div className="mt-[12px] text-center font-sans text-[12px] leading-[1.5] text-[#6B6088]">Overage: {overageLine}</div> : null}
         </div>
@@ -631,12 +654,14 @@ function PricingCard({
 export default function PricingPage() {
   const { data: dbPlans, loading } = useActivePlans();
   const [publicConfig, setPublicConfig] = useState<any>(null);
-  const [currencyMode, setCurrencyMode] = useState<"INR" | "USD">("INR");
+  const [currencyMode, setCurrencyMode] = useState<"INR" | "USD" | "EUR">("INR");
 
   useEffect(() => {
     try {
       const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || "";
-      if (tz && !tz.includes("Calcutta") && !tz.includes("Kolkata") && !tz.includes("Asia/Colombo")) {
+      if (tz.startsWith("Europe/")) {
+        setCurrencyMode("EUR");
+      } else if (tz && !tz.includes("Calcutta") && !tz.includes("Kolkata") && !tz.includes("Asia/Colombo")) {
         setCurrencyMode("USD");
       }
     } catch {
@@ -677,6 +702,23 @@ export default function PricingPage() {
           p.includedVoiceMinutes = parseInt(publicConfig?.enterprise_minutes || '10000', 10);
           p.description = 'Global tailored limits, international numbers, and dedicated SLA.';
         }
+      } else if (currencyMode === "EUR") {
+        if (p.slug === 'starter') {
+          p.priceMonthly = parseInt(publicConfig?.starter_price_eur_cents || '7900', 10);
+          p.priceAnnual = Math.round(p.priceMonthly * 0.8);
+          p.includedVoiceMinutes = parseInt(publicConfig?.starter_minutes || '500', 10);
+        } else if (p.slug === 'growth') {
+          p.name = 'Professional';
+          p.priceMonthly = parseInt(publicConfig?.professional_price_eur_cents || '21900', 10);
+          p.priceAnnual = Math.round(p.priceMonthly * 0.8);
+          p.includedVoiceMinutes = parseInt(publicConfig?.professional_minutes || '2000', 10);
+        } else if (p.slug === 'scale') {
+          p.name = 'Enterprise';
+          p.priceMonthly = parseInt(publicConfig?.enterprise_price_eur_cents || '49900', 10);
+          p.priceAnnual = Math.round(p.priceMonthly * 0.8);
+          p.includedVoiceMinutes = parseInt(publicConfig?.enterprise_minutes || '10000', 10);
+          p.description = 'European GDPR-compliant limits, EU virtual numbers, and dedicated SLA.';
+        }
       } else {
         if (p.slug === 'starter') {
           p.priceMonthly = parseInt(publicConfig?.starter_price_paisa || '499900', 10);
@@ -695,6 +737,9 @@ export default function PricingPage() {
           p.description = 'Tailored limits, custom integrations, and dedicated SLA for large enterprises.';
         }
       }
+      if (currencyMode === "INR" && publicConfig?.overage_per_minute_paisa) {
+        p.overageVoicePerMinute = parseInt(publicConfig.overage_per_minute_paisa, 10);
+      }
       return p;
     });
   }, [dbPlans, publicConfig, currencyMode]);
@@ -703,6 +748,7 @@ export default function PricingPage() {
   const [billingMode, setBillingMode] = useState<BillingMode>("monthly");
   const [comparisonOpen, setComparisonOpen] = useState(false);
   const [openFaq, setOpenFaq] = useState<number | null>(0);
+  const [isEnterpriseModalOpen, setIsEnterpriseModalOpen] = useState(false);
 
   const companyPhone = getConfigString(siteConfig, "company_phone_1");
 
@@ -731,7 +777,7 @@ export default function PricingPage() {
 
           <div className="relative z-10 mx-auto max-w-[760px]">
             <div className="mb-[24px] inline-flex rounded-full border border-[rgba(139,92,246,0.15)] bg-[rgba(139,92,246,0.1)] px-[16px] py-[6px] font-sans text-[13px] font-medium text-[#D7C4F7]">
-              {"\u2726"} Pricing
+              {"✦"} Pricing
             </div>
             <h1 className="font-display text-[38px] font-bold tracking-[-0.02em] text-[#FAF7FF] md:text-[52px]">
               Simple Plans. Real Results.
@@ -746,7 +792,7 @@ export default function PricingPage() {
                 <button
                   type="button"
                   onClick={() => setCurrencyMode("INR")}
-                  className={`flex items-center gap-1.5 px-3.5 py-1 rounded-full text-xs font-semibold transition-all ${
+                  className={`flex items-center gap-1.5 px-3.5 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer ${
                     currencyMode === "INR"
                       ? "bg-[#8B5CF6] text-white shadow-sm"
                       : "text-[#8D86A8] hover:text-[#FAF7FF]"
@@ -757,13 +803,24 @@ export default function PricingPage() {
                 <button
                   type="button"
                   onClick={() => setCurrencyMode("USD")}
-                  className={`flex items-center gap-1.5 px-3.5 py-1 rounded-full text-xs font-semibold transition-all ${
+                  className={`flex items-center gap-1.5 px-3.5 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer ${
                     currencyMode === "USD"
                       ? "bg-[#8B5CF6] text-white shadow-sm"
                       : "text-[#8D86A8] hover:text-[#FAF7FF]"
                   }`}
                 >
                   <span>🌐</span> Global (USD $)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCurrencyMode("EUR")}
+                  className={`flex items-center gap-1.5 px-3.5 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer ${
+                    currencyMode === "EUR"
+                      ? "bg-[#8B5CF6] text-white shadow-sm"
+                      : "text-[#8D86A8] hover:text-[#FAF7FF]"
+                  }`}
+                >
+                  <span>🇪🇺</span> Europe (EUR €)
                 </button>
               </div>
             </div>
@@ -829,6 +886,7 @@ export default function PricingPage() {
                     billingMode={billingMode} 
                     currencyMode={currencyMode}
                     publicConfig={publicConfig}
+                    onOpenEnterprise={() => setIsEnterpriseModalOpen(true)}
                   />
                 ))}
               </div>
@@ -1122,6 +1180,11 @@ export default function PricingPage() {
           </>
         )}
       </div>
+
+      <EnterpriseContactModal
+        isOpen={isEnterpriseModalOpen}
+        onClose={() => setIsEnterpriseModalOpen(false)}
+      />
     </Layout>
   );
 }

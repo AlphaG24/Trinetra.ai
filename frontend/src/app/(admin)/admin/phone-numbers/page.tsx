@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import { 
   Phone, Plus, Upload, Trash2, Edit2, Search, RefreshCw, 
-  CheckCircle, AlertCircle, PhoneCall, Smartphone, MapPin, DollarSign, FileText, UserX, Gavel, Calendar
+  CheckCircle, AlertCircle, PhoneCall, Smartphone, MapPin, DollarSign, FileText, UserX, Gavel, Calendar,
+  Clock, ShieldAlert
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -292,12 +293,20 @@ export default function AdminPhoneNumbersPage() {
     }
   };
 
+  const isGrace = (num: any) => num.status === "grace_period";
+  const isHold = (num: any) => num.status === "hold_period";
   const isNumAssigned = (num: any) => {
     return (
-      num.is_assigned === true ||
+      (num.is_assigned === true ||
       num.status?.toLowerCase() === "assigned" ||
-      Boolean(num.assigned_organization || num.assigned_org_id || num.assigned_agent_id)
+      num.status?.toLowerCase() === "active" ||
+      Boolean(num.assigned_organization || num.assigned_org_id || num.assigned_agent_id)) &&
+      !isGrace(num) &&
+      !isHold(num)
     );
+  };
+  const isAvailable = (num: any) => {
+    return (num.status === "available" || !num.status) && !isNumAssigned(num) && !isGrace(num) && !isHold(num);
   };
 
   const filteredNumbers = numbers.filter((num) => {
@@ -306,8 +315,10 @@ export default function AdminPhoneNumbersPage() {
       num.city?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       num.provider?.toLowerCase().includes(searchQuery.toLowerCase());
     
-    if (filterStatus === "available") return matchesSearch && !isNumAssigned(num);
+    if (filterStatus === "available") return matchesSearch && isAvailable(num);
     if (filterStatus === "assigned") return matchesSearch && isNumAssigned(num);
+    if (filterStatus === "grace") return matchesSearch && isGrace(num);
+    if (filterStatus === "hold") return matchesSearch && isHold(num);
     return matchesSearch;
   });
 
@@ -341,39 +352,63 @@ export default function AdminPhoneNumbersPage() {
         </div>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+      {/* Stats Cards - Task 3.6 Available/Assigned/Grace/Hold real-time counts */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5 mb-6">
         <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-xl p-4 flex items-center justify-between">
           <div>
-            <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted)]">Total Pool Inventory</p>
+            <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted)]">Total Pool</p>
             <h3 className="text-2xl font-black text-[var(--heading)] mt-1">{numbers.length}</h3>
           </div>
           <div className="w-10 h-10 rounded-lg bg-violet-500/10 flex items-center justify-center text-violet-500">
-            <Phone size={20} />
+            <Phone size={18} />
           </div>
         </div>
 
         <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-xl p-4 flex items-center justify-between">
           <div>
-            <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted)]">Available for Purchase</p>
+            <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted)]">Available</p>
             <h3 className="text-2xl font-black text-emerald-500 mt-1">
-              {numbers.filter(n => !isNumAssigned(n)).length}
+              {numbers.filter(isAvailable).length}
             </h3>
           </div>
           <div className="w-10 h-10 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-500">
-            <CheckCircle size={20} />
+            <CheckCircle size={18} />
           </div>
         </div>
 
         <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-xl p-4 flex items-center justify-between">
           <div>
-            <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted)]">Assigned / Sold</p>
+            <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted)]">Assigned Active</p>
+            <h3 className="text-2xl font-black text-blue-500 mt-1">
+              {numbers.filter(isNumAssigned).length}
+            </h3>
+          </div>
+          <div className="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center text-blue-500">
+            <Smartphone size={18} />
+          </div>
+        </div>
+
+        <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-xl p-4 flex items-center justify-between">
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-wider text-amber-400">Grace (15d)</p>
             <h3 className="text-2xl font-black text-amber-500 mt-1">
-              {numbers.filter(n => isNumAssigned(n)).length}
+              {numbers.filter(isGrace).length}
             </h3>
           </div>
           <div className="w-10 h-10 rounded-lg bg-amber-500/10 flex items-center justify-center text-amber-500">
-            <Smartphone size={20} />
+            <Clock size={18} />
+          </div>
+        </div>
+
+        <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-xl p-4 flex items-center justify-between">
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-wider text-rose-400">Admin Hold (14d)</p>
+            <h3 className="text-2xl font-black text-rose-500 mt-1">
+              {numbers.filter(isHold).length}
+            </h3>
+          </div>
+          <div className="w-10 h-10 rounded-lg bg-rose-500/10 flex items-center justify-center text-rose-500">
+            <ShieldAlert size={18} />
           </div>
         </div>
       </div>
@@ -391,7 +426,7 @@ export default function AdminPhoneNumbersPage() {
           />
         </div>
 
-        <div className="flex items-center gap-2 w-full sm:w-auto">
+        <div className="flex items-center gap-2 w-full sm:w-auto flex-wrap">
           <button
             onClick={() => setFilterStatus("all")}
             className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
@@ -410,17 +445,37 @@ export default function AdminPhoneNumbersPage() {
                 : "bg-[var(--secondary)] text-[var(--muted)] hover:text-[var(--heading)]"
             }`}
           >
-            Available
+            Available ({numbers.filter(isAvailable).length})
           </button>
           <button
             onClick={() => setFilterStatus("assigned")}
             className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
               filterStatus === "assigned"
+                ? "bg-blue-600 text-white"
+                : "bg-[var(--secondary)] text-[var(--muted)] hover:text-[var(--heading)]"
+            }`}
+          >
+            Assigned ({numbers.filter(isNumAssigned).length})
+          </button>
+          <button
+            onClick={() => setFilterStatus("grace")}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+              filterStatus === "grace"
                 ? "bg-amber-600 text-white"
                 : "bg-[var(--secondary)] text-[var(--muted)] hover:text-[var(--heading)]"
             }`}
           >
-            Assigned
+            Grace ({numbers.filter(isGrace).length})
+          </button>
+          <button
+            onClick={() => setFilterStatus("hold")}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+              filterStatus === "hold"
+                ? "bg-rose-600 text-white"
+                : "bg-[var(--secondary)] text-[var(--muted)] hover:text-[var(--heading)]"
+            }`}
+          >
+            Hold ({numbers.filter(isHold).length})
           </button>
           <button
             onClick={fetchPoolNumbers}
@@ -476,12 +531,20 @@ export default function AdminPhoneNumbersPage() {
                       ₹{((num.retail_price_paisa || 29900) / 100).toFixed(2)}/mo
                     </td>
                     <td className="py-3.5 px-4">
-                      {!isNumAssigned(num) ? (
+                      {isGrace(num) ? (
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase bg-amber-500/10 text-amber-400 border border-amber-500/30 animate-pulse">
+                          Grace (15d)
+                        </span>
+                      ) : isHold(num) ? (
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase bg-rose-500/10 text-rose-400 border border-rose-500/30">
+                          Hold (14d)
+                        </span>
+                      ) : isAvailable(num) ? (
                         <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
                           Available
                         </span>
                       ) : (
-                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase bg-blue-500/10 text-blue-400 border border-blue-500/20">
                           Assigned
                         </span>
                       )}

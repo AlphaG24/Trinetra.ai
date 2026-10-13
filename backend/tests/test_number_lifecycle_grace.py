@@ -75,6 +75,10 @@ class MockQueryBuilder:
         self._or_filter = or_clause
         return self
 
+    def in_(self, col, vals):
+        self.filters.append((col, vals, "in"))
+        return self
+
     def limit(self, n):
         self._limit_n = n
         return self
@@ -93,6 +97,18 @@ class MockQueryBuilder:
         self._action = "delete"
         return self
 
+    def _matches_filters(self, row):
+        for f in self.filters:
+            if len(f) == 3 and f[2] == "in":
+                col, vals = f[0], f[1]
+                if row.get(col) not in vals:
+                    return False
+            else:
+                col, val = f[0], f[1]
+                if row.get(col) != val:
+                    return False
+        return True
+
     def execute(self):
         if self._action == "insert":
             if isinstance(self._insert_payload, list):
@@ -108,8 +124,7 @@ class MockQueryBuilder:
         elif self._action == "update":
             matching = []
             for row in self.table_data:
-                match = all(row.get(col) == val for col, val in self.filters)
-                if match:
+                if self._matches_filters(row):
                     row.update(self._update_payload)
                     matching.append(dict(row))
             return MagicMock(data=matching)
@@ -118,7 +133,7 @@ class MockQueryBuilder:
             initial_len = len(self.table_data)
             self.table_data[:] = [
                 row for row in self.table_data
-                if not all(row.get(col) == val for col, val in self.filters)
+                if not self._matches_filters(row)
             ]
             deleted_count = initial_len - len(self.table_data)
             return MagicMock(data=[{"count": deleted_count}])
@@ -126,7 +141,7 @@ class MockQueryBuilder:
         else:  # select
             results = []
             for row in self.table_data:
-                match = all(row.get(col) == val for col, val in self.filters)
+                match = self._matches_filters(row)
                 if match and self._or_filter:
                     # Parse simple or clauses like phone_number.eq.X,phone_number.eq.Y
                     clauses = self._or_filter.split(",")
@@ -158,6 +173,8 @@ class MockSupabaseClient:
             "number_lifecycle_missed_calls": [],
             "number_lifecycle_digests": [],
             "phone_number_pool": [],
+            "profiles": [],
+            "notifications": [],
         }
 
     def table(self, table_name: str):
@@ -362,6 +379,87 @@ class TestNumberLifecycleTransitions:
         # Verify DB status updates
         assert mock_db.tables["phone_numbers"][0]["status"] == "hold_period"
         assert mock_db.tables["phone_numbers"][1]["status"] == "released"
+
+    def test_lifecycle_reminders_milestones(self):
+        """Asserts Day 1, 7, 14, 21, 28 reminders are dispatched for active numbers (Decision N4)."""
+        mock_db = MockSupabaseClient()
+        now = datetime.now(timezone.utc)
+        
+        # Provisioned 7 days ago -> milestone day 7
+        seven_days_ago = (now - timedelta(days=7)).isoformat()
+        mock_db.tables["phone_numbers"].append({
+            "id": "num-reminder-7d",
+            "organization_id": "org-reminder",
+            "phone_number": "+919876543210",
+            "status": "active",
+            "provisioned_at": seven_days_ago,
+            "renewal_date": (now + timedelta(days=23)).isoformat(),
+        })
+        mock_db.tables["profiles"].append({
+            "id": "user-reminder-1",
+            "organization_id": "org-reminder",
+        })
+
+        service = NumberLifecycleService(supabase_client=mock_db)
+        reminders = service.check_lifecycle_reminders()
+
+        assert len(reminders) == 1
+        assert reminders[0]["phone_number_id"] == "num-reminder-7d"
+        assert reminders[0]["milestone_day"] == 7
+        assert "email" in reminders[0]["channels"]
+        assert "whatsapp" in reminders[0]["channels"]
+
+        # Verify notification was logged
+        assert len(mock_db.tables["notifications"]) == 1
+        assert "Day 7" in mock_db.tables["notifications"][0]["title"]
+
+    def test_auto_pool_expansion_triggered_when_below_10(self):
+        """Asserts auto-pool expansion event triggers when available pool numbers < 10 (Decision N6)."""
+        mock_db = MockSupabaseClient()
+        # Add 5 available numbers (less than threshold of 10)
+        for i in range(5):
+            mock_db.tables["phone_numbers"].append({
+                "id": f"pool-num-{i}",
+                "phone_number": f"+91980000000{i}",
+                "status": "available",
+                "is_assigned": False,
+                "organization_id": None,
+            })
+        mock_db.tables["profiles"].append({
+            "id": "admin-1",
+            "role": "admin",
+        })
+
+        service = NumberLifecycleService(supabase_client=mock_db)
+        status = service.check_pool_inventory_expansion(threshold=10)
+
+        assert status["available_count"] == 5
+        assert status["threshold"] == 10
+        assert status["expansion_triggered"] is True
+
+        # Verify admin was alerted
+        assert len(mock_db.tables["notifications"]) >= 1
+        assert "Auto-Pool Expansion Triggered" in mock_db.tables["notifications"][0]["title"]
+
+    def test_auto_pool_expansion_not_triggered_when_healthy(self):
+        """Asserts auto-pool expansion does NOT trigger when available pool numbers >= 10 (Decision N6)."""
+        mock_db = MockSupabaseClient()
+        # Add 12 available numbers (healthy pool)
+        for i in range(12):
+            mock_db.tables["phone_numbers"].append({
+                "id": f"pool-num-{i}",
+                "phone_number": f"+91980000000{i}",
+                "status": "available",
+                "is_assigned": False,
+                "organization_id": None,
+            })
+
+        service = NumberLifecycleService(supabase_client=mock_db)
+        status = service.check_pool_inventory_expansion(threshold=10)
+
+        assert status["available_count"] == 12
+        assert status["expansion_triggered"] is False
+        assert len(mock_db.tables["notifications"]) == 0
 
 
 # ==============================================================================

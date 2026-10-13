@@ -27,10 +27,13 @@ export default async function AdminAnalyticsPage() {
     redirect('/dashboard')
   }
 
-  // Fetch all voice calls and leads across the entire platform
+  // Fetch all voice calls, leads, invoices, and organizations across the platform
   const [
     { data: voiceCalls },
-    { data: leads }
+    { data: leads },
+    { data: invoices },
+    { data: organizations },
+    { data: plans }
   ] = await Promise.all([
     supabase
       .from('voice_calls')
@@ -38,13 +41,25 @@ export default async function AdminAnalyticsPage() {
       .order('created_at', { ascending: true }),
     supabase
       .from('leads')
-      .select('id, created_at, interest_level, lead_score')
+      .select('id, created_at, interest_level, lead_score'),
+    supabase
+      .from('invoices')
+      .select('id, created_at, grand_total_paisa, subtotal_paisa, status, organization_id'),
+    supabase
+      .from('organizations')
+      .select('id, name, plan_tier, created_at, is_active'),
+    supabase
+      .from('plans')
+      .select('slug, name, price_monthly, price_annual')
   ])
 
   return (
     <GlobalAnalyticsClient 
       voiceCalls={voiceCalls || []} 
-      leads={leads || []} 
+      leads={leads || []}
+      invoices={invoices || []}
+      organizations={organizations || []}
+      plans={plans || []}
     />
   )
 }

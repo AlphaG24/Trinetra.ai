@@ -28,6 +28,8 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '50', 10)
     const action = searchParams.get('action')
     const userId = searchParams.get('user_id')
+    const userQuery = searchParams.get('user')
+    const ip = searchParams.get('ip')
     const search = searchParams.get('search')
     const fromDate = searchParams.get('from')
     const toDate = searchParams.get('to')
@@ -47,7 +49,17 @@ export async function GET(request: NextRequest) {
 
     if (userId) {
       query = query.eq('user_id', userId)
-    } else if (search) {
+    }
+
+    if (userQuery) {
+      query = query.or(`user_email.ilike.%${userQuery}%,user_id.ilike.%${userQuery}%`)
+    }
+
+    if (ip) {
+      query = query.ilike('ip_address', `%${ip}%`)
+    }
+
+    if (search) {
       query = query.or(`user_email.ilike.%${search}%,action.ilike.%${search}%,ip_address.ilike.%${search}%`)
     }
 

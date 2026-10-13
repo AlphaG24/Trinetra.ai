@@ -22,6 +22,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "User has no organization assigned" }, { status: 400 });
     }
 
+    // Gating for Free Trial Tier (Master Plan Decision P1: No number purchase on free trial tier)
+    const userPlanTier = ((profile as any).plan_tier || "free").toLowerCase();
+    if (userPlanTier === "free" && profile.role !== "developer_tester" && profile.role !== "admin") {
+      return NextResponse.json(
+        { error: "Phone number purchase is not available on the free trial tier. Please upgrade to the ₹99 Trial or a paid plan." },
+        { status: 403 }
+      );
+    }
+
     const body = await request.json().catch(() => null);
     if (!body || !body.number_id) {
       return NextResponse.json({ error: "Missing number_id" }, { status: 400 });
@@ -53,9 +62,10 @@ export async function POST(request: Request) {
         .eq("organization_id", profile.organization_id)
         .eq("status", "verified");
 
-      const entityTypes = ["company_pan", "gstin_certificate", "incorporation_cert"];
+      const entityTypes = ["company_pan", "gstin_certificate", "incorporation_cert", "company_registration", "business_ein", "trade_license"];
+      const signatoryTypes = ["authorized_signatory_id", "passport", "national_id", "drivers_license"];
       const hasVerifiedEntity = kycDocs?.some((d) => entityTypes.includes(d.document_type));
-      const hasVerifiedSignatory = kycDocs?.some((d) => d.document_type === "authorized_signatory_id");
+      const hasVerifiedSignatory = kycDocs?.some((d) => signatoryTypes.includes(d.document_type));
 
       if (!hasVerifiedEntity || !hasVerifiedSignatory) {
         return NextResponse.json(

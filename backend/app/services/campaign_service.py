@@ -763,6 +763,27 @@ class CampaignService:
         if agent_phone and not str(agent_phone).startswith("+"):
             agent_phone = f"+{agent_phone}"
 
+        # Task 3.9 & Decision N8: CLI integrity check (Never spoof)
+        from app.services.outbound_safety_guardrails import validate_outbound_cli
+        is_cli_valid, cli_reason, _ = validate_outbound_cli(
+            caller_id=agent_phone,
+            organization_id=organization_id,
+            supabase_client=supabase_admin
+        )
+        if not is_cli_valid:
+            logger.warning(f"[Campaign Call Blocked] CLI spoof rejected for org {organization_id}: {cli_reason}")
+            try:
+                await asyncio.to_thread(
+                    supabase_admin.table("campaign_contacts").update({
+                        "status": "failed",
+                        "error_message": f"CLI spoof blocked: {cli_reason}",
+                        "updated_at": datetime.now(timezone.utc).isoformat()
+                    }).eq("id", contact_id).execute
+                )
+            except Exception:
+                pass
+            return {"success": False, "error": cli_reason, "status": "blocked_cli_spoof"}
+
         call_sid = None
         outcome = "failed"
         duration = 0

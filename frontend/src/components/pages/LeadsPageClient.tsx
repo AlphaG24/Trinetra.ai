@@ -954,7 +954,7 @@ export function LeadsPageClient({ initialLeads, agents = [], services = [], init
                       setSelectedLead(null)
                       handleViewTranscript(cid, name)
                     }}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-violet-600 hover:bg-violet-500 text-white rounded-xl text-xs font-semibold shadow-sm transition-all"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 rounded-xl text-xs font-bold uppercase tracking-wider shadow-sm transition-all active:scale-[0.98] cursor-pointer"
                   >
                     <Eye className="w-3.5 h-3.5" /> View Transcript
                   </button>

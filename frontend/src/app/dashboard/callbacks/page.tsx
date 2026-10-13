@@ -140,7 +140,7 @@ export default function CallbacksDashboardPage() {
   if (!profile) {
     return (
       <div className="flex h-[50vh] w-full items-center justify-center">
-        <div className="w-8 h-8 border-2 border-violet-500 border-t-transparent rounded-full animate-spin" />
+        <div className="w-8 h-8 border-2 border-zinc-900 dark:border-white border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
@@ -243,7 +243,7 @@ export default function CallbacksDashboardPage() {
         </div>
         <button
           onClick={() => setIsScheduleOpen(true)}
-          className="flex items-center gap-2 px-5 py-2.5 bg-violet-600 hover:bg-violet-700 text-white font-bold text-xs uppercase tracking-wider rounded-xl transition-all shadow-lg cursor-pointer"
+          className="flex items-center gap-2 px-5 py-2.5 bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 font-bold text-xs uppercase tracking-wider rounded-xl transition-all shadow-sm active:scale-[0.98] cursor-pointer"
         >
           <Plus className="w-4 h-4" /> Schedule Callback
         </button>

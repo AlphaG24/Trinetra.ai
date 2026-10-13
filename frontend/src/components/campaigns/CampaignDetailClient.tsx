@@ -507,7 +507,7 @@ export function CampaignDetailClient({ campaignId }: CampaignDetailClientProps) 
           {/* Analytics Link */}
           <Link
             href={`/dashboard/campaigns/${campaignId}/analytics`}
-            className="px-4 py-2 border border-violet-500/30 bg-violet-500/10 hover:bg-violet-500/20 text-violet-700 dark:text-violet-300 text-xs font-bold uppercase rounded-xl tracking-wider transition-all flex items-center gap-1.5 shadow-sm cursor-pointer"
+            className="px-4 py-2 border border-[var(--border)] bg-[var(--card-bg)] hover:bg-[var(--hover-bg)] text-[var(--heading)] text-xs font-bold uppercase rounded-xl tracking-wider transition-all flex items-center gap-1.5 shadow-sm cursor-pointer"
           >
             <BarChart3 className="w-4 h-4" />
             Analytics
@@ -765,7 +765,7 @@ export function CampaignDetailClient({ campaignId }: CampaignDetailClientProps) 
                           <button
                             onClick={() => handleRetryContact(item.id)}
                             disabled={isRetrying || item.call_status.toLowerCase() === 'dnd' || isDialing}
-                            className="px-3 py-1.5 rounded-lg border border-violet-500/40 bg-violet-500/15 hover:bg-violet-500/25 text-violet-700 dark:text-violet-300 text-[11px] font-bold uppercase tracking-wider transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5 ml-auto shadow-sm"
+                            className="px-3 py-1.5 rounded-lg border border-[var(--border)] bg-[var(--card-bg)] hover:bg-[var(--hover-bg)] text-[var(--heading)] text-[11px] font-bold uppercase tracking-wider transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5 ml-auto shadow-sm"
                             title={item.call_status.toLowerCase() === 'dnd' ? "DND numbers cannot be retried" : "Retry/Dial this contact"}
                           >
                             <RefreshCw className={`w-3.5 h-3.5 ${isDialing || isRetrying ? 'animate-spin text-amber-500' : ''}`} />

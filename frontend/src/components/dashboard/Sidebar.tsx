@@ -116,15 +116,15 @@ export function Sidebar({ isOpen, onClose }: { isOpen?: boolean; onClose?: () =>
           collapsed ? 'justify-center px-2' : 'gap-3 px-4'
         } py-2.5 rounded-[10px] text-sm font-medium transition-all duration-150 ${
           active
-            ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-950 font-bold shadow-sm'
-            : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-white/5 hover:text-zinc-900 dark:hover:text-white'
+            ? 'sidebar-item-active bg-zinc-900 text-white dark:bg-white dark:text-zinc-950 font-bold shadow-sm'
+            : 'sidebar-item-inactive text-zinc-900 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-white/5'
         }`}
       >
         <item.icon
-          className={`w-5 h-5 shrink-0 ${
+          className={`w-5 h-5 shrink-0 transition-colors ${
             active
               ? 'text-white dark:text-zinc-950'
-              : 'text-zinc-400 dark:text-zinc-500 group-hover:text-zinc-900 dark:group-hover:text-white'
+              : 'text-zinc-900 dark:text-zinc-400 group-hover:text-black dark:group-hover:text-white'
           }`}
         />
         {!collapsed && (
@@ -132,7 +132,7 @@ export function Sidebar({ isOpen, onClose }: { isOpen?: boolean; onClose?: () =>
             className={`font-playfair font-semibold text-[15px] transition-colors truncate ${
               active
                 ? '!text-white dark:!text-zinc-950'
-                : 'text-zinc-600 dark:text-zinc-400 group-hover:text-zinc-900 dark:group-hover:text-white'
+                : 'text-zinc-900 dark:text-zinc-300 group-hover:text-black dark:group-hover:text-white'
             }`}
           >
             {item.label}

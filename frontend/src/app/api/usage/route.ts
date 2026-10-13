@@ -19,7 +19,7 @@ export async function GET() {
     // Fetch user's profile
     const { data: profile } = await supabaseAdmin
       .from('profiles')
-      .select('id, organization_id, company_name, full_name')
+      .select('id, organization_id, company_name, full_name, plan_tier')
       .eq('id', user.id)
       .maybeSingle()
       
@@ -58,16 +58,17 @@ export async function GET() {
       }
     }
 
-    // Default fallback usage stats
+    // Default fallback usage stats tailored to plan tier
+    const isTrial = profile?.plan_tier === 'trial'
     const defaultUsage = {
       success: true,
       data: {
         organization_id: orgId || user.id,
         minutes_used: 0,
-        minutes_limit: 100,
+        minutes_limit: isTrial ? 50 : 100,
         percentage_used: 0,
         agents_count: 0,
-        agents_limit: 5,
+        agents_limit: isTrial ? 2 : 5,
         can_make_calls: true
       }
     }

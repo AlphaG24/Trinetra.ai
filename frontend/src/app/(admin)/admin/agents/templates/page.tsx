@@ -174,12 +174,12 @@ export default function AdminAgentTemplatesPage() {
   return (
     <div className="space-y-6 max-w-6xl animate-in fade-in duration-300 py-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-6 border-b border-white/5">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-6 border-b border-[var(--border)]">
         <div>
-          <h1 className="text-3xl font-extrabold tracking-tight text-white flex items-center gap-2 font-display">
+          <h1 className="text-3xl font-extrabold tracking-tight text-[var(--heading)] flex items-center gap-2 font-display">
             <Bot className="w-8 h-8 text-violet-500" /> Agent Templates
           </h1>
-          <p className="text-zinc-400 text-sm mt-1">
+          <p className="text-[var(--body)] text-sm mt-1">
             Configure default prompt structures, greetings, and system functions applied during onboarding setup.
           </p>
         </div>
@@ -187,13 +187,13 @@ export default function AdminAgentTemplatesPage() {
           <button
             onClick={handleSaveChanges}
             disabled={saving || !selectedRole}
-            className="px-4 py-2 bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-lg shadow-violet-600/10"
+            className="px-4 py-2 bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-lg shadow-violet-600/15"
           >
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} Save All Templates
           </button>
           <Link
             href="/admin"
-            className="inline-flex items-center gap-2 text-xs font-semibold text-zinc-400 hover:text-white transition-colors bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-2 hover:bg-zinc-800"
+            className="inline-flex items-center gap-2 text-xs font-semibold text-[var(--muted)] hover:text-[var(--heading)] transition-colors bg-[var(--card-bg)] border border-[var(--border)] rounded-xl px-4 py-2 hover:bg-[var(--hover-bg)] shadow-xs"
           >
             <ArrowLeft className="w-3.5 h-3.5" /> Back to Dashboard
           </Link>
@@ -201,28 +201,28 @@ export default function AdminAgentTemplatesPage() {
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center min-h-[300px] text-zinc-400 gap-2">
+        <div className="flex items-center justify-center min-h-[300px] text-[var(--muted)] gap-2">
           <Loader2 className="w-6 h-6 animate-spin text-violet-500" /> Loading templates console...
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
           
           {/* Left Column: Templates Sidebar */}
-          <div className="lg:col-span-1 bg-[#0f111a]/60 border border-white/5 rounded-2xl p-5 space-y-4">
-            <div className="flex justify-between items-center pb-2 border-b border-white/5">
-              <h3 className="text-xs font-bold text-white uppercase tracking-wider">Templates List</h3>
+          <div className="lg:col-span-1 bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-5 space-y-4 shadow-xs">
+            <div className="flex justify-between items-center pb-2 border-b border-[var(--border)]">
+              <h3 className="text-xs font-bold text-[var(--muted)] uppercase tracking-wider">Templates List</h3>
               
               {!isAddingNew ? (
                 <button
                   onClick={() => setIsAddingNew(true)}
-                  className="p-1.5 rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white transition-colors cursor-pointer"
+                  className="p-1.5 rounded-lg bg-[var(--hover-bg)] border border-[var(--border)] text-[var(--muted)] hover:text-[var(--heading)] transition-colors cursor-pointer"
                 >
                   <Plus className="w-4 h-4" />
                 </button>
               ) : (
                 <button
                   onClick={() => setIsAddingNew(false)}
-                  className="p-1.5 rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white transition-colors cursor-pointer"
+                  className="p-1.5 rounded-lg bg-[var(--hover-bg)] border border-[var(--border)] text-[var(--muted)] hover:text-[var(--heading)] transition-colors cursor-pointer"
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -230,24 +230,24 @@ export default function AdminAgentTemplatesPage() {
             </div>
 
             {isAddingNew && (
-              <div className="p-3 bg-black/40 border border-white/5 rounded-xl space-y-2 animate-in slide-in-from-top duration-200">
+              <div className="p-3 bg-[var(--hover-bg)] border border-[var(--border)] rounded-xl space-y-2 animate-in slide-in-from-top duration-200">
                 <input
                   type="text"
                   placeholder="e.g. Real Estate Agent"
                   value={newRoleName}
                   onChange={(e) => setNewRoleName(e.target.value)}
-                  className="w-full bg-black border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-white focus:border-violet-500 outline-none"
+                  className="w-full bg-[var(--card-bg)] border border-[var(--border)] rounded-lg px-2.5 py-1.5 text-xs text-[var(--heading)] placeholder-[var(--muted)] focus:border-violet-500 outline-none"
                 />
                 <div className="flex gap-2 justify-end">
                   <button
                     onClick={() => setIsAddingNew(false)}
-                    className="px-2.5 py-1 text-[10px] bg-zinc-900 border border-zinc-800 text-zinc-400 rounded-lg hover:text-white cursor-pointer"
+                    className="px-2.5 py-1 text-[10px] bg-[var(--hover-bg)] border border-[var(--border)] text-[var(--muted)] rounded-lg hover:text-[var(--heading)] cursor-pointer"
                   >
                     Cancel
                   </button>
                   <button
                     onClick={handleAddNewTemplate}
-                    className="px-2.5 py-1 text-[10px] bg-violet-600 text-white rounded-lg hover:bg-violet-500 cursor-pointer"
+                    className="px-2.5 py-1 text-[10px] bg-violet-600 text-white rounded-lg hover:bg-violet-500 cursor-pointer font-semibold shadow-xs"
                   >
                     Create
                   </button>
@@ -262,8 +262,8 @@ export default function AdminAgentTemplatesPage() {
                   onClick={() => selectRole(role)}
                   className={`flex justify-between items-center p-3 border rounded-xl cursor-pointer transition-all ${
                     selectedRole === role
-                      ? 'bg-violet-600/10 border-violet-500/50 text-white font-semibold'
-                      : 'bg-black/30 border-white/5 text-zinc-400 hover:border-white/10 hover:text-zinc-200'
+                      ? 'bg-violet-500/10 border-violet-500/30 text-violet-700 dark:text-violet-300 font-semibold shadow-xs'
+                      : 'bg-[var(--hover-bg)] border-[var(--border)] text-[var(--body)] hover:border-[var(--muted)]/40 hover:text-[var(--heading)]'
                   }`}
                 >
                   <span className="text-xs truncate">{role}</span>
@@ -273,7 +273,7 @@ export default function AdminAgentTemplatesPage() {
                         e.stopPropagation()
                         handleDeleteTemplate(role)
                       }}
-                      className="text-zinc-600 hover:text-rose-400 p-1 rounded hover:bg-white/5 opacity-0 group-hover:opacity-100 transition-all cursor-pointer"
+                      className="text-[var(--muted)] hover:text-rose-500 p-1 rounded hover:bg-[var(--card-bg)] transition-all cursor-pointer"
                       style={{ opacity: selectedRole === role ? 1 : undefined }}
                     >
                       <Trash2 className="w-3.5 h-3.5" />
@@ -287,15 +287,15 @@ export default function AdminAgentTemplatesPage() {
           {/* Right Column: Template Editor */}
           <div className="lg:col-span-2">
             {selectedRole ? (
-              <div className="bg-[#0f111a]/60 border border-white/5 rounded-2xl p-6 space-y-6">
-                <div className="flex justify-between items-center pb-3 border-b border-white/5">
+              <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-6 space-y-6 shadow-xs">
+                <div className="flex justify-between items-center pb-3 border-b border-[var(--border)]">
                   <div>
-                    <h3 className="text-base font-bold text-white flex items-center gap-1.5">
-                      <Edit3 className="w-4 h-4 text-violet-400" />
+                    <h3 className="text-base font-bold text-[var(--heading)] flex items-center gap-1.5">
+                      <Edit3 className="w-4 h-4 text-violet-500" />
                       Configure: {selectedRole}
                     </h3>
-                    <p className="text-[10px] text-zinc-500 mt-0.5">
-                      Use placeholders <code className="text-violet-400 font-mono">&#123;agentName&#125;</code> and <code className="text-violet-400 font-mono">&#123;userName&#125;</code> inside greetings & prompts.
+                    <p className="text-[10px] text-[var(--muted)] mt-0.5">
+                      Use placeholders <code className="text-violet-600 dark:text-violet-400 font-mono">&#123;agentName&#125;</code> and <code className="text-violet-600 dark:text-violet-400 font-mono">&#123;userName&#125;</code> inside greetings & prompts.
                     </p>
                   </div>
                 </div>
@@ -303,46 +303,46 @@ export default function AdminAgentTemplatesPage() {
                 <div className="space-y-4">
                   {/* First Message */}
                   <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest block">Greeting / First Message</label>
+                    <label className="text-[10px] font-bold text-[var(--muted)] uppercase tracking-widest block">Greeting / First Message</label>
                     <input
                       type="text"
                       value={firstMessage}
                       onChange={(e) => setFirstMessage(e.target.value)}
-                      className="w-full bg-black border border-white/10 rounded-lg px-3.5 py-2.5 text-xs text-white focus:border-violet-500 outline-none"
+                      className="w-full bg-[var(--hover-bg)] border border-[var(--border)] rounded-lg px-3.5 py-2.5 text-xs text-[var(--heading)] placeholder-[var(--muted)] focus:border-violet-500 outline-none"
                       placeholder="Enter the greeting message..."
                     />
                   </div>
 
                   {/* System Prompt */}
                   <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest block">System Directive / Prompt</label>
+                    <label className="text-[10px] font-bold text-[var(--muted)] uppercase tracking-widest block">System Directive / Prompt</label>
                     <textarea
                       rows={6}
                       value={systemPrompt}
                       onChange={(e) => setSystemPrompt(e.target.value)}
-                      className="w-full bg-black border border-white/10 rounded-lg p-3.5 text-xs text-white focus:border-violet-500 outline-none"
+                      className="w-full bg-[var(--hover-bg)] border border-[var(--border)] rounded-lg p-3.5 text-xs text-[var(--heading)] placeholder-[var(--muted)] focus:border-violet-500 outline-none"
                       placeholder="Specify AI system directive prompt..."
                     />
                   </div>
 
                   {/* Functions JSON */}
                   <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest block flex items-center gap-1">
-                      <Code className="w-3.5 h-3.5 text-zinc-400" /> System Functions (JSON Array)
+                    <label className="text-[10px] font-bold text-[var(--muted)] uppercase tracking-widest block flex items-center gap-1">
+                      <Code className="w-3.5 h-3.5 text-[var(--muted)]" /> System Functions (JSON Array)
                     </label>
                     <textarea
                       rows={8}
                       value={functionsInput}
                       onChange={(e) => setFunctionsInput(e.target.value)}
-                      className="w-full bg-black border border-white/10 rounded-lg p-3.5 text-xs text-white focus:border-violet-500 outline-none font-mono"
+                      className="w-full bg-[var(--hover-bg)] border border-[var(--border)] rounded-lg p-3.5 text-xs text-[var(--heading)] placeholder-[var(--muted)] focus:border-violet-500 outline-none font-mono"
                       placeholder="e.g. [] or [{ name: 'save_lead', ... }]"
                     />
                   </div>
                 </div>
               </div>
             ) : (
-              <div className="bg-[#0f111a]/40 border border-dashed border-white/5 rounded-2xl p-16 text-center text-zinc-500 text-xs flex flex-col items-center justify-center min-h-[300px]">
-                <Bot className="w-10 h-10 text-zinc-700 mb-2 animate-pulse" />
+              <div className="bg-[var(--card-bg)] border border-dashed border-[var(--border)] rounded-2xl p-16 text-center text-[var(--muted)] text-xs flex flex-col items-center justify-center min-h-[300px] shadow-xs">
+                <Bot className="w-10 h-10 text-[var(--muted)] mb-2 animate-pulse" />
                 Select or create an agent prompt blueprint from the list.
               </div>
             )}

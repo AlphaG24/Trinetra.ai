@@ -67,12 +67,12 @@ export function AdminIdleWatcher() {
   return (
     <div
       role="alert"
-      className="fixed bottom-6 right-6 z-50 flex items-center gap-3 rounded-2xl border border-amber-500/40 bg-[#160b24]/95 p-4 text-amber-200 shadow-2xl backdrop-blur-md animate-pulse"
+      className="fixed bottom-6 right-6 z-50 flex items-center gap-3 rounded-2xl border border-amber-500/40 bg-[var(--card-bg)] p-4 text-[var(--foreground)] shadow-2xl backdrop-blur-md animate-pulse"
     >
-      <Clock className="h-6 w-6 text-amber-400 shrink-0" />
+      <Clock className="h-6 w-6 text-amber-500 shrink-0" />
       <div>
-        <p className="text-sm font-semibold text-white">Admin Session Inactivity Warning</p>
-        <p className="text-xs text-amber-300/90">
+        <p className="text-sm font-bold text-[var(--heading)] font-playfair">Admin Session Inactivity Warning</p>
+        <p className="text-xs text-[var(--text-muted)] font-merriweather">
           Your admin session will expire in {Math.floor(secondsRemaining / 60)}m {secondsRemaining % 60}s due to the 30-minute security timeout. Move your mouse or click to stay logged in.
         </p>
       </div>
@@ -82,10 +82,12 @@ export function AdminIdleWatcher() {
           touchAdminSession()
           setShowWarning(false)
         }}
-        className="ml-2 rounded-xl bg-amber-500 px-3 py-1.5 text-xs font-bold text-black hover:bg-amber-400 transition"
+        className="ml-2 rounded-xl bg-amber-500 px-3 py-1.5 text-xs font-bold text-black hover:bg-amber-400 transition font-playfair"
       >
         Keep Session Active
       </button>
     </div>
   )
 }
+
+export default AdminIdleWatcher

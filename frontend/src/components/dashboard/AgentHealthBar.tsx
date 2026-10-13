@@ -32,7 +32,7 @@ export function AgentHealthBar({ agents }: { agents: Agent[] }) {
 
       <Link 
         href="/dashboard/demo"
-        className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-violet-500/40 text-violet-400 text-sm font-medium hover:bg-violet-500/10 transition-colors whitespace-nowrap"
+        className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-[var(--border)] bg-[var(--card-bg)] hover:bg-[var(--hover-bg)] text-[var(--heading)] text-xs font-bold uppercase tracking-wider transition-colors whitespace-nowrap shadow-xs"
       >
         <Activity className="w-4 h-4" />
         <span className="hidden sm:inline">Test Your Agent</span>

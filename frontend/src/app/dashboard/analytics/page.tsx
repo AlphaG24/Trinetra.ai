@@ -269,11 +269,11 @@ function AnalyticsDashboardContent() {
               </div>
 
               {/* Revenue Teaser Banner */}
-              <div className="p-6 rounded-2xl bg-gradient-to-r from-violet-950/40 via-purple-900/20 to-[var(--card-bg)] border border-violet-500/25 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm">
+              <div className="p-6 rounded-2xl bg-[var(--card-bg)] border border-[var(--border)] flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm">
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
-                    <Sparkles className="w-4 h-4 text-violet-400" />
-                    <span className="text-xs font-bold uppercase tracking-wider text-violet-300">
+                    <Sparkles className="w-4 h-4 text-zinc-400" />
+                    <span className="text-xs font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
                       Revenue Attribution & Pipeline
                     </span>
                   </div>
@@ -287,7 +287,7 @@ function AnalyticsDashboardContent() {
                 <button
                   type="button"
                   onClick={() => handleTabChange('revenue')}
-                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 text-white font-bold text-xs uppercase tracking-wider transition-all shadow-md shrink-0 cursor-pointer"
+                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 font-bold text-xs uppercase tracking-wider transition-all shadow-sm shrink-0 cursor-pointer active:scale-[0.98]"
                 >
                   <span>Open Revenue & ROI</span>
                   <ArrowRight className="w-3.5 h-3.5" />

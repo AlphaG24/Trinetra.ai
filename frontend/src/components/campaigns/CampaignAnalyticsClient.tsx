@@ -268,7 +268,7 @@ export function CampaignAnalyticsClient({ campaignId }: CampaignAnalyticsClientP
           </div>
           <Link
             href={`/dashboard/campaigns/${campaignId}`}
-            className="inline-block px-5 py-2.5 bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold uppercase rounded-xl tracking-wider transition-all cursor-pointer"
+            className="inline-block px-5 py-2.5 bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 text-xs font-bold uppercase rounded-xl tracking-wider transition-all cursor-pointer shadow-sm active:scale-[0.98]"
           >
             Go to Campaign Detail
           </Link>

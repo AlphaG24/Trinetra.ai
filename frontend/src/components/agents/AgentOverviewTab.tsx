@@ -183,7 +183,11 @@ export function AgentOverviewTab({
   // Resolve agent-specific tier
   const getAgentTier = (agentData: any, profileData: any) => {
     if (agentData?.config?.plan_tier) {
-      return agentData.config.plan_tier.toLowerCase()
+      const aTier = agentData.config.plan_tier.toLowerCase()
+      if (aTier === 'professional' || aTier === 'enterprise' || aTier === 'pro') return 'pro'
+      if (aTier === 'credit_based') return 'credit_based'
+      if (aTier === 'outcome_based') return 'outcome_based'
+      return aTier
     }
     if (agentData?.is_demo) {
       return 'free_demo'
@@ -193,6 +197,8 @@ export function AgentOverviewTab({
       if (pTier === 'professional' || pTier === 'enterprise' || pTier === 'pro') return 'pro'
       if (pTier === 'starter') return 'starter'
       if (pTier === 'trial') return 'trial'
+      if (pTier === 'credit_based') return 'credit_based'
+      if (pTier === 'outcome_based') return 'outcome_based'
     }
     return 'free_demo'
   }
@@ -219,6 +225,8 @@ export function AgentOverviewTab({
       limit = parseInt(sysConfig?.professional_minutes || '2000', 10)
     } else if (agentTier === 'enterprise') {
       limit = parseInt(sysConfig?.enterprise_minutes || '10000', 10)
+    } else if (agentTier === 'credit_based' || agentTier === 'outcome_based') {
+      limit = 999999
     } else {
       limit = parseInt(sysConfig?.free_demo_minutes || '10', 10)
     }

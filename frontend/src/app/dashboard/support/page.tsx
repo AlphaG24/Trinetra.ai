@@ -138,6 +138,12 @@ export default function SupportPage() {
     return 'bg-zinc-100 dark:bg-white/5 border-zinc-200 dark:border-white/5 text-zinc-500'
   }
 
+  const formatCategory = (cat: string) => {
+    if (cat === 'cfu_forwarding') return 'Call Forwarding (CFU)'
+    if (cat === 'number_porting') return 'Number Porting (Premium)'
+    return cat.replace(/_/g, ' ')
+  }
+
   const statusColor = (st: string) => {
     const s = st.toLowerCase()
     if (s === 'open') {
@@ -189,7 +195,7 @@ export default function SupportPage() {
               </div>
 
               <h3 className="text-xs font-bold text-[var(--heading)] font-display mt-3 truncate">{t.subject}</h3>
-              <p className="text-[10px] text-[var(--muted)] uppercase tracking-widest mt-1 font-montserrat">{t.category.replace('_', ' ')}</p>
+              <p className="text-[10px] text-[var(--muted)] uppercase tracking-widest mt-1 font-montserrat">{formatCategory(t.category)}</p>
             </div>
 
             <div className="flex justify-between items-center pt-3 border-t border-[var(--border)] mt-4">
@@ -277,7 +283,7 @@ export default function SupportPage() {
         {/* Email Support */}
         <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-5 flex flex-col justify-between items-start space-y-4 shadow-sm">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-violet-500/10 rounded-xl flex items-center justify-center text-violet-500">
+            <div className="w-10 h-10 bg-zinc-500/10 rounded-xl flex items-center justify-center text-zinc-400">
               <Mail className="w-5 h-5" />
             </div>
             <div>
@@ -287,7 +293,7 @@ export default function SupportPage() {
           </div>
           <button
             onClick={() => window.open(`https://mail.google.com/mail/?view=cm&fs=1&to=${SUPPORT_EMAIL}`, '_blank')}
-            className="px-4 py-2 bg-[var(--primary-bg)] text-[var(--heading)] hover:bg-[var(--hover-bg)] border border-[var(--border)] text-xs font-semibold rounded-xl transition cursor-pointer"
+            className="px-4 py-2 bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 text-xs font-bold uppercase tracking-wider rounded-xl transition-all shadow-sm active:scale-[0.98] cursor-pointer"
           >
             Send Support Mail
           </button>
@@ -306,7 +312,7 @@ export default function SupportPage() {
           </div>
           <button
             onClick={() => window.open(`https://wa.me/${WHATSAPP_NUMBER}`, '_blank')}
-            className="px-4 py-2 bg-[var(--primary-bg)] text-[var(--heading)] hover:bg-[var(--hover-bg)] border border-[var(--border)] text-xs font-semibold rounded-xl transition cursor-pointer"
+            className="px-4 py-2 bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 text-xs font-bold uppercase tracking-wider rounded-xl transition-all shadow-sm active:scale-[0.98] cursor-pointer"
           >
             Launch WhatsApp Chat
           </button>
@@ -390,7 +396,8 @@ export default function SupportPage() {
                     onChange={(e) => setCategory(e.target.value)}
                     className="w-full px-3 py-2.5 bg-[var(--background)] border border-[var(--border)] rounded-xl text-xs text-[var(--heading)] cursor-pointer focus:outline-none"
                   >
-                    <option value="cfu_forwarding">Call Forwarding (CFU) Setup</option>
+                    <option value="cfu_forwarding">Call Forwarding (CFU Unconditional - Default)</option>
+                    <option value="number_porting">Number Porting Request (Premium)</option>
                     <option value="general">General Inquiry</option>
                     <option value="billing">Billing & Pricing</option>
                     <option value="agent_issue">Voice Agent Concerns</option>

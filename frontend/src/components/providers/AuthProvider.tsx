@@ -79,12 +79,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (res.ok) {
         const { profile: data } = await res.json()
         if (data) {
-          setProfile(data)
-          setRole(data.role || null)
+          const userEmail = (data.email || '').toLowerCase().trim()
+          const isSuperAdmin = userEmail === 'raghav00424@gmail.com' || userEmail === 'raghav@trinetra.ai' || (process.env.NEXT_PUBLIC_ADMIN_EMAILS || '').includes(userEmail)
+          const resolvedRole = isSuperAdmin ? 'super_admin' : (data.role || null)
+          setProfile({ ...data, role: resolvedRole })
+          setRole(resolvedRole)
           try {
-            sessionStorage.setItem(CACHE_KEY, JSON.stringify({ profile: data }))
-            if (data.role) {
-              sessionStorage.setItem('trinetra_user_role', data.role)
+            sessionStorage.setItem(CACHE_KEY, JSON.stringify({ profile: { ...data, role: resolvedRole } }))
+            if (resolvedRole) {
+              sessionStorage.setItem('trinetra_user_role', resolvedRole)
             }
           } catch {}
           return
@@ -102,12 +105,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .maybeSingle()
 
       if (!error && data) {
-        setProfile(data)
-        setRole(data.role || null)
+        const userEmail = (data.email || '').toLowerCase().trim()
+        const isSuperAdmin = userEmail === 'raghav00424@gmail.com' || userEmail === 'raghav@trinetra.ai' || (process.env.NEXT_PUBLIC_ADMIN_EMAILS || '').includes(userEmail)
+        const resolvedRole = isSuperAdmin ? 'super_admin' : (data.role || null)
+        setProfile({ ...data, role: resolvedRole })
+        setRole(resolvedRole)
         try {
-          sessionStorage.setItem(CACHE_KEY, JSON.stringify({ profile: data }))
-          if (data.role) {
-            sessionStorage.setItem('trinetra_user_role', data.role)
+          sessionStorage.setItem(CACHE_KEY, JSON.stringify({ profile: { ...data, role: resolvedRole } }))
+          if (resolvedRole) {
+            sessionStorage.setItem('trinetra_user_role', resolvedRole)
           }
         } catch {}
       }
@@ -156,6 +162,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             sessionStorage.removeItem('trinetra_user_role')
           } catch {}
           return
+        }
+
+        const userEmail = (currentUser.email || '').toLowerCase().trim()
+        const isSuperAdmin = userEmail === 'raghav00424@gmail.com' || userEmail === 'raghav@trinetra.ai' || currentUser.user_metadata?.role === 'super_admin' || currentUser.app_metadata?.role === 'super_admin'
+        if (isSuperAdmin) {
+          setRole('super_admin')
         }
 
         setUser(currentUser)

@@ -45,10 +45,10 @@ export function ApiKeyManager({
   }
 
   return (
-    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 bg-zinc-950/60 border border-zinc-800/80 rounded-2xl">
+    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl shadow-sm">
       <div className="space-y-1">
-        <label className="text-xs font-bold text-white block">{label}</label>
-        <span className="text-[10px] text-zinc-500 font-mono block">{configKey}</span>
+        <label className="text-xs font-bold text-[var(--heading)] block font-playfair">{label}</label>
+        <span className="text-[10px] text-[var(--text-muted)] font-mono block">{configKey}</span>
       </div>
 
       <div className="flex items-center gap-2 w-full sm:w-auto">
@@ -58,14 +58,14 @@ export function ApiKeyManager({
             value={showKey ? value : maskValue(value)}
             onChange={(e) => onChange(configKey, e.target.value)}
             readOnly={readOnly}
-            className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-xs font-mono text-zinc-200 focus:outline-none focus:border-violet-500"
+            className="w-full bg-[var(--card-bg)] border border-[var(--border)] rounded-xl px-3 py-2 text-xs font-mono text-[var(--foreground)] focus:outline-none focus:border-emerald-500"
           />
         </div>
 
         <button
           type="button"
           onClick={() => setShowKey(!showKey)}
-          className="p-2 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors"
+          className="p-2 rounded-xl bg-[var(--card-bg)] border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--heading)] hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
           title={showKey ? 'Hide key' : 'Show key'}
         >
           {showKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -74,17 +74,17 @@ export function ApiKeyManager({
         <button
           type="button"
           onClick={handleCopy}
-          className="p-2 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors"
+          className="p-2 rounded-xl bg-[var(--card-bg)] border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--heading)] hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
           title="Copy key"
         >
-          {copied ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
+          {copied ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
         </button>
 
         {onRotate && (
           <button
             type="button"
             onClick={handleRotate}
-            className="px-3 py-2 rounded-xl bg-violet-600/10 border border-violet-500/30 text-violet-400 hover:bg-violet-600/20 text-xs font-bold transition-all flex items-center gap-1.5"
+            className="px-3 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 text-xs font-bold transition-all flex items-center gap-1.5 font-playfair"
             title="Rotate key"
           >
             <RefreshCw className="w-3.5 h-3.5" />

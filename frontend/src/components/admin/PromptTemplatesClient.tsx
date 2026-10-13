@@ -151,7 +151,7 @@ export function PromptTemplatesClient({ templates: initialTemplates }: PromptTem
         return (
           <div
             key={t.id}
-            className="rounded-xl border border-zinc-800/60 bg-zinc-900/40 overflow-hidden"
+            className="rounded-xl border border-[var(--border)] bg-[var(--card-bg)] shadow-sm overflow-hidden"
           >
             {/* Header Row */}
             <div className="flex items-center justify-between px-5 py-4">
@@ -161,18 +161,18 @@ export function PromptTemplatesClient({ templates: initialTemplates }: PromptTem
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
-                    <span className="text-sm font-semibold text-zinc-100">{meta.label}</span>
+                    <span className="text-sm font-bold text-[var(--heading)] font-playfair">{meta.label}</span>
                     {t.is_active ? (
-                      <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/25">
+                      <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25">
                         <CheckCircle2 className="w-3 h-3" /> Active
                       </span>
                     ) : (
-                      <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-zinc-700/30 text-zinc-500 border border-zinc-700/30">
+                      <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-zinc-500/10 text-[var(--text-muted)] border border-[var(--border)]">
                         <Circle className="w-3 h-3" /> Inactive
                       </span>
                     )}
                   </div>
-                  <p className="text-xs text-zinc-500 mt-0.5">{t.description || '—'}</p>
+                  <p className="text-xs text-[var(--text-muted)] mt-0.5 font-merriweather">{t.description || '—'}</p>
                 </div>
               </div>
 
@@ -181,24 +181,24 @@ export function PromptTemplatesClient({ templates: initialTemplates }: PromptTem
                 <button
                   onClick={() => handleToggleActive(t)}
                   title={t.is_active ? 'Deactivate' : 'Activate'}
-                  className="p-2 rounded-lg hover:bg-zinc-800 text-zinc-500 hover:text-zinc-300 transition-colors"
+                  className="p-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 text-[var(--text-muted)] hover:text-[var(--heading)] transition-colors"
                 >
-                  {t.is_active ? <CheckCircle2 className="w-4 h-4 text-emerald-400" /> : <Circle className="w-4 h-4" />}
+                  {t.is_active ? <CheckCircle2 className="w-4 h-4 text-emerald-500" /> : <Circle className="w-4 h-4" />}
                 </button>
                 <button
                   onClick={() => handleReset(t.personality_type)}
                   disabled={isResetting}
                   title="Reset to default file"
-                  className="p-2 rounded-lg hover:bg-zinc-800 text-zinc-500 hover:text-amber-400 transition-colors disabled:opacity-50"
+                  className="p-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 text-[var(--text-muted)] hover:text-amber-500 transition-colors disabled:opacity-50"
                 >
                   <RotateCcw className={`w-4 h-4 ${isResetting ? 'animate-spin' : ''}`} />
                 </button>
                 <button
                   onClick={() => (isEditing ? cancelEdit() : startEdit(t))}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors font-playfair ${
                     isEditing
-                      ? 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'
-                      : 'bg-violet-600/20 text-violet-400 border border-violet-500/30 hover:bg-violet-600/30'
+                      ? 'bg-zinc-200 dark:bg-zinc-800 text-[var(--foreground)] hover:bg-zinc-300 dark:hover:bg-zinc-700'
+                      : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20'
                   }`}
                 >
                   {isEditing ? <><X className="w-3 h-3" /> Cancel</> : <><Edit2 className="w-3 h-3" /> Edit</>}
@@ -208,28 +208,28 @@ export function PromptTemplatesClient({ templates: initialTemplates }: PromptTem
 
             {/* Expanded editor */}
             {isEditing && (
-              <div className="border-t border-zinc-800/60 px-5 py-5 space-y-4">
+              <div className="border-t border-[var(--border)] px-5 py-5 space-y-4 bg-zinc-50/50 dark:bg-zinc-900/30">
                 <div className="space-y-1">
-                  <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Description</label>
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)] font-playfair">Description</label>
                   <input
                     type="text"
                     value={editDesc}
                     onChange={(e) => setEditDesc(e.target.value)}
                     placeholder="Short description of this personality type..."
-                    className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:ring-1 focus:ring-violet-500/40"
+                    className="w-full bg-[var(--card-bg)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm text-[var(--foreground)] focus:outline-none focus:ring-1 focus:ring-emerald-500/40"
                   />
                 </div>
 
                 <div className="space-y-1">
                   <div className="flex items-center justify-between">
-                    <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">System Prompt</label>
-                    <span className="text-[10px] text-zinc-600 font-mono">{editPrompt.length} chars</span>
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)] font-playfair">System Prompt</label>
+                    <span className="text-[10px] text-[var(--text-muted)] font-mono">{editPrompt.length} chars</span>
                   </div>
                   <textarea
                     value={editPrompt}
                     onChange={(e) => setEditPrompt(e.target.value)}
                     rows={16}
-                    className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-4 py-3 text-xs text-zinc-200 font-mono focus:outline-none focus:ring-1 focus:ring-violet-500/40 resize-y"
+                    className="w-full bg-[var(--card-bg)] border border-[var(--border)] rounded-lg px-4 py-3 text-xs text-[var(--foreground)] font-mono focus:outline-none focus:ring-1 focus:ring-emerald-500/40 resize-y"
                     placeholder="Enter the full system prompt for this personality..."
                   />
                 </div>
@@ -237,17 +237,17 @@ export function PromptTemplatesClient({ templates: initialTemplates }: PromptTem
                 <div className="flex justify-end gap-3">
                   <button
                     onClick={cancelEdit}
-                    className="px-4 py-2 rounded-lg text-sm text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 transition-colors"
+                    className="px-4 py-2 rounded-lg text-sm text-[var(--text-muted)] hover:text-[var(--heading)] hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors font-playfair"
                   >
                     Cancel
                   </button>
                   <button
                     onClick={() => handleSave(t.personality_type)}
                     disabled={saving}
-                    className="flex items-center gap-2 px-5 py-2 rounded-lg bg-violet-600 hover:bg-violet-700 text-white text-sm font-semibold transition-colors disabled:opacity-60"
+                    className="flex items-center gap-2 px-5 py-2 rounded-lg bg-zinc-900 dark:bg-white text-white dark:text-zinc-950 text-sm font-bold shadow-sm hover:opacity-90 transition-all disabled:opacity-60 font-playfair"
                   >
                     {saving ? (
-                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <div className="w-4 h-4 border-2 border-white dark:border-zinc-950 border-t-transparent rounded-full animate-spin" />
                     ) : (
                       <Save className="w-4 h-4" />
                     )}
@@ -255,7 +255,7 @@ export function PromptTemplatesClient({ templates: initialTemplates }: PromptTem
                   </button>
                 </div>
 
-                <p className="text-[10px] text-zinc-600">
+                <p className="text-[10px] text-[var(--text-muted)] font-mono">
                   Updated: {new Date(t.updated_at).toLocaleString()}. Changes take effect immediately for new calls after the backend restarts.
                 </p>
               </div>

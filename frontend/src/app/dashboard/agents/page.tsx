@@ -126,7 +126,7 @@ export default function AgentsDashboardPage() {
         <div className="flex items-center gap-3 shrink-0">
           <button
             onClick={() => router.push('/dashboard/marketplace')}
-            className="px-4 py-2.5 rounded-xl text-xs font-bold bg-violet-600 hover:bg-violet-700 text-white shadow-md transition-all flex items-center gap-1.5 hover:scale-[1.02] cursor-pointer"
+            className="px-4 py-2.5 rounded-xl text-xs font-bold bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 shadow-sm transition-all flex items-center gap-1.5 active:scale-[0.98] cursor-pointer"
           >
             <Plus className="w-4 h-4" /> Deploy Agent
           </button>
@@ -145,7 +145,7 @@ export default function AgentsDashboardPage() {
           </div>
           <button
             onClick={() => router.push('/dashboard/marketplace')}
-            className="px-4 py-2.5 rounded-xl text-xs font-bold bg-violet-600 hover:bg-violet-700 text-white shadow-md transition-all flex items-center gap-1.5 mx-auto hover:scale-[1.02] cursor-pointer"
+            className="px-4 py-2.5 rounded-xl text-xs font-bold bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 shadow-sm transition-all flex items-center gap-1.5 mx-auto active:scale-[0.98] cursor-pointer"
           >
             <Plus className="w-4 h-4" /> Deploy your first agent
           </button>

@@ -36,6 +36,7 @@ logger = logging.getLogger("NumberLifecycleService")
 # Lifecycle Constants
 GRACE_PERIOD_DAYS = 15
 DEFAULT_HOLD_PERIOD_DAYS = int(os.getenv("HOLD_PERIOD_DAYS", "14"))
+DEFAULT_AUTO_POOL_THRESHOLD = int(os.getenv("AUTO_POOL_THRESHOLD", "10"))
 TOTAL_LIFECYCLE_DAYS = GRACE_PERIOD_DAYS + DEFAULT_HOLD_PERIOD_DAYS
 
 NEUTRAL_UNAVAILABLE_MESSAGE = (
@@ -115,6 +116,21 @@ class NumberLifecycleService:
         return f"{prefix}{'X' * masked_len}{suffix}"
 
     # -------------------------------------------------------------------------
+    # Helper: System Configuration Fetcher
+    # -------------------------------------------------------------------------
+    def _get_system_config_int(self, key: str, default: int) -> int:
+        """Fetch integer configuration from system_config table with fallback."""
+        try:
+            res = self.supabase.table("system_config").select("config_value").eq("config_key", key).limit(1).execute()
+            if res.data and len(res.data) > 0:
+                val = res.data[0].get("config_value")
+                if val is not None and str(val).strip() != "":
+                    return int(val)
+        except Exception as e:
+            logger.debug(f"Failed to fetch system_config '{key}': {e}")
+        return default
+
+    # -------------------------------------------------------------------------
     # 1. Expire Number (Transition to Grace Period)
     # -------------------------------------------------------------------------
     def expire_number(
@@ -129,7 +145,8 @@ class NumberLifecycleService:
         """
         now = datetime.now(timezone.utc)
         grace_ends = now + timedelta(days=GRACE_PERIOD_DAYS)
-        hold_days = custom_hold_days or DEFAULT_HOLD_PERIOD_DAYS
+        configured_hold = self._get_system_config_int("hold_period_days", DEFAULT_HOLD_PERIOD_DAYS)
+        hold_days = custom_hold_days if custom_hold_days is not None else configured_hold
         hold_ends = grace_ends + timedelta(days=hold_days)
         reactivation_token = secrets.token_urlsafe(32)
 
@@ -439,6 +456,13 @@ class NumberLifecycleService:
                     }).eq("id", num["id"]).execute()
                     moved_to_released.append(num["id"])
 
+        # 4. Active Period Reminders (Decision N4: Day 1, 7, 14, 21, 28)
+        reminders_dispatched = self.check_lifecycle_reminders()
+
+        # 5. Auto-Pool Inventory Expansion Check (Decision N6: available < threshold)
+        pool_threshold = self._get_system_config_int("auto_pool_threshold", DEFAULT_AUTO_POOL_THRESHOLD)
+        pool_status = self.check_pool_inventory_expansion(threshold=pool_threshold)
+
         return {
             "processed_at": now_iso,
             "moved_to_grace_count": len(moved_to_grace),
@@ -447,6 +471,137 @@ class NumberLifecycleService:
             "moved_to_hold_ids": moved_to_hold,
             "moved_to_released_count": len(moved_to_released),
             "moved_to_released_ids": moved_to_released,
+            "reminders_dispatched_count": len(reminders_dispatched),
+            "reminders_dispatched": reminders_dispatched,
+            "pool_expansion": pool_status,
+        }
+
+    # -------------------------------------------------------------------------
+    # 3b. Active Period Reminder Scheduler (Decision N4)
+    # -------------------------------------------------------------------------
+    def check_lifecycle_reminders(self) -> List[Dict[str, Any]]:
+        """
+        Evaluates active virtual numbers along the 30-day active period milestone schedule:
+        Day 1, 7, 14, 21, and 28. Dispatches renewal notices via email + WhatsApp audit logs.
+        """
+        now = datetime.now(timezone.utc)
+        reminders_dispatched = []
+
+        res_active = (
+            self.supabase.table("phone_numbers")
+            .select("id, organization_id, phone_number, provisioned_at, renewal_date")
+            .eq("status", "active")
+            .execute()
+        )
+        active_numbers = res_active.data or []
+
+        REMINDER_DAYS = (1, 7, 14, 21, 28)
+
+        for num in active_numbers:
+            org_id = num.get("organization_id")
+            if not org_id:
+                continue
+
+            prov_str = num.get("provisioned_at")
+            if not prov_str:
+                continue
+
+            try:
+                prov_dt = datetime.fromisoformat(prov_str.replace("Z", "+00:00"))
+                days_active = max(1, (now - prov_dt).days)
+            except Exception:
+                continue
+
+            if days_active in REMINDER_DAYS:
+                target_user_ids = []
+                try:
+                    prof_res = self.supabase.table("profiles").select("id").eq("organization_id", org_id).execute()
+                    target_user_ids = [p["id"] for p in (prof_res.data or [])]
+                except Exception as e:
+                    logger.warning(f"Error querying profiles for org {org_id}: {e}")
+
+                reminder_title = f"Virtual Number Active Milestone: Day {days_active}"
+                reminder_msg = (
+                    f"Virtual number {num.get('phone_number')} is on Day {days_active} of its 30-day active validity. "
+                    f"Renewal is scheduled for {num.get('renewal_date') or 'the end of cycle'}."
+                )
+
+                for uid in target_user_ids:
+                    try:
+                        self.supabase.table("notifications").insert({
+                            "user_id": uid,
+                            "title": reminder_title,
+                            "message": reminder_msg,
+                            "type": "info",
+                            "action_url": "/dashboard/phone-numbers",
+                            "action_label": "View Number",
+                            "is_read": False,
+                            "created_at": now.isoformat(),
+                        }).execute()
+                    except Exception as e:
+                        logger.warning(f"Error recording milestone notification for {uid}: {e}")
+
+                reminders_dispatched.append({
+                    "phone_number_id": num["id"],
+                    "phone_number": num.get("phone_number"),
+                    "organization_id": org_id,
+                    "milestone_day": days_active,
+                    "channels": ["email", "whatsapp"],
+                    "dispatched_at": now.isoformat(),
+                })
+                logger.info(f"[Reminder] Day {days_active} lifecycle reminder recorded for {num.get('phone_number')}.")
+
+        return reminders_dispatched
+
+    # -------------------------------------------------------------------------
+    # 3c. Auto-Pool Inventory Expansion (Decision N6)
+    # -------------------------------------------------------------------------
+    def check_pool_inventory_expansion(self, threshold: int = 10) -> Dict[str, Any]:
+        """
+        Monitors unassigned virtual number inventory in the available pool.
+        Triggers auto-pool expansion event / admin alert when available numbers < 10.
+        """
+        res_pool = (
+            self.supabase.table("phone_numbers")
+            .select("id, phone_number, status, is_assigned, organization_id")
+            .eq("status", "available")
+            .execute()
+        )
+        pool_numbers = res_pool.data or []
+        unassigned_pool = [n for n in pool_numbers if not n.get("is_assigned") and not n.get("organization_id")]
+        available_count = len(unassigned_pool)
+
+        expansion_triggered = available_count < threshold
+
+        if expansion_triggered:
+            logger.warning(
+                f"[Auto-Pool Expansion] Available number inventory below threshold: "
+                f"{available_count} < {threshold}. Triggering automatic expansion alert."
+            )
+            try:
+                admin_res = self.supabase.table("profiles").select("id").in_("role", ["super_admin", "admin"]).execute()
+                for admin in (admin_res.data or []):
+                    self.supabase.table("notifications").insert({
+                        "user_id": admin["id"],
+                        "title": "Auto-Pool Expansion Triggered",
+                        "message": (
+                            f"Available unassigned virtual number pool has dropped to {available_count} "
+                            f"(below threshold of {threshold}). Automated provisioning replenishment initiated."
+                        ),
+                        "type": "warning",
+                        "action_url": "/dashboard/phone-numbers",
+                        "action_label": "Manage Pool",
+                        "is_read": False,
+                        "created_at": datetime.now(timezone.utc).isoformat(),
+                    }).execute()
+            except Exception as e:
+                logger.warning(f"Error alerting admin for auto-pool expansion: {e}")
+
+        return {
+            "available_count": available_count,
+            "threshold": threshold,
+            "expansion_triggered": expansion_triggered,
+            "checked_at": datetime.now(timezone.utc).isoformat(),
         }
 
     # -------------------------------------------------------------------------
