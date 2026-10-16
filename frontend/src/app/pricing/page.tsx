@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-
 import { AnimatePresence, motion } from "framer-motion";
 import { Check, ChevronDown, Info, Plus, X } from "lucide-react";
 import Link from "next/link";
@@ -67,7 +66,7 @@ const FAQS = [
   {
     question: "What payment methods do you accept?",
     answer:
-      "We accept UPI, bank transfers, and online payment via Razorpay (credit/debit cards, net banking, wallets). All payments are in INR.",
+      "We accept UPI, bank transfers, and online payment via Razorpay (credit/debit cards, net banking, wallets). All payments are processed securely.",
   },
   {
     question: "What's included in the WhatsApp add-on?",
@@ -88,7 +87,7 @@ const ADD_ONS = [
   { title: "Custom Integration", description: "Connect with your existing CRM/tools", price: "Rs 9,999 one-time" },
 ];
 
-const PLAN_ACCENTS = ["#D7C4F7", "#06B6D4", "#F59E0B"];
+const PLAN_ACCENTS = ["#2563EB", "#0284C7", "#D97706"];
 
 function asNumber(value: unknown) {
   if (typeof value === "number" && Number.isFinite(value)) return value;
@@ -178,11 +177,6 @@ function getAnnualSavingsPercent(plan: PlanRecord) {
   return Math.round(((plan.priceMonthly - plan.priceAnnual) / plan.priceMonthly) * 100);
 }
 
-function formatIncludedValue(value: number | null, unit: string) {
-  if (value === null || value <= 0) return "";
-  return `${value.toLocaleString("en-IN")} ${unit}`;
-}
-
 function getMonthlyDisplayPrice(plan: PlanRecord, billingMode: BillingMode, currency: "INR" | "USD" | "EUR" = "INR") {
   if (plan.priceMonthly === 0) return "Custom";
   return formatPrice(billingMode === "annual" ? plan.priceAnnual : plan.priceMonthly, currency);
@@ -224,7 +218,7 @@ function getCardFeatures(plan: PlanRecord) {
   } else if (whatsappAddon !== null) {
     features.push({ text: `WhatsApp: Add-on (${formatPaise(whatsappAddon)}/mo)`, tone: "addon" });
   }
-  features.push({ text: "Hindi + English", tone: "included" });
+  features.push({ text: "Hindi + English Included", tone: "included" });
   if (regionalLanguages && regionalLanguagesCount !== null) {
     features.push({ text: `+ ${regionalLanguagesCount} regional language${regionalLanguagesCount === 1 ? "" : "s"}`, tone: "included" });
   }
@@ -240,48 +234,20 @@ function getCardFeatures(plan: PlanRecord) {
   return features;
 }
 
-function getCommitmentSummary(plan: PlanRecord, billingMode: BillingMode) {
-  const setupFee = getSetupFee(plan);
-  const minimumMonths = getMinimumMonths(plan);
-  const annualSavings = getAnnualSavings(plan);
-
-  if (billingMode === "monthly") {
-    const subtotal = minimumMonths !== null && plan.priceMonthly !== null ? minimumMonths * plan.priceMonthly : null;
-    const total = subtotal !== null && setupFee !== null ? subtotal + setupFee : subtotal ?? setupFee;
-    return {
-      line1: minimumMonths !== null && plan.priceMonthly !== null ? `${minimumMonths} months x ${formatPaise(plan.priceMonthly)} = ${formatPaise(subtotal)}` : "",
-      line2: setupFee !== null ? `+ Setup: ${formatPaise(setupFee)}` : "",
-      total: total !== null ? formatPaise(total) : "",
-      savings: "",
-    };
-  }
-
-  const annualBase = plan.priceAnnual !== null ? plan.priceAnnual * 12 : null;
-  const total = annualBase !== null && setupFee !== null ? annualBase + setupFee : annualBase ?? setupFee;
-  return {
-    line1: annualBase !== null ? `Annual: ${formatPaise(annualBase)}` : "",
-    line2: setupFee !== null ? `+ Setup: ${formatPaise(setupFee)}` : "",
-    total: total !== null ? formatPaise(total) : "",
-    savings: annualSavings !== null ? `You save: ${formatPaise(annualSavings)}` : "",
-  };
-}
-
 function getFeatureToneIcon(tone: Exclude<FeatureTone, "default">) {
   if (tone === "included") {
-    return <Check size={16} className="mt-[2px] shrink-0 text-[#10B981]" />;
+    return <Check size={16} className="mt-0.5 shrink-0 text-emerald-600" />;
   }
-
   if (tone === "addon") {
-    return <Plus size={16} className="mt-[2px] shrink-0 text-[#FBBF24]" />;
+    return <Plus size={16} className="mt-0.5 shrink-0 text-blue-600" />;
   }
-
-  return <X size={16} className="mt-[2px] shrink-0 text-[#6B6088]" />;
+  return <X size={16} className="mt-0.5 shrink-0 text-slate-400" />;
 }
 
 function getFeatureToneTextClass(tone: Exclude<FeatureTone, "default">) {
-  if (tone === "included") return "text-[#FAF7FF]";
-  if (tone === "addon") return "text-[#E9D5FF]";
-  return "text-[#8D86A8]";
+  if (tone === "included") return "text-[#1E293B] font-medium";
+  if (tone === "addon") return "text-[#2563EB] font-medium";
+  return "text-[#94A3B8]";
 }
 
 function buildComparisonGroups(plans: PlanRecord[]): ComparisonGroup[] {
@@ -300,35 +266,36 @@ function buildComparisonGroups(plans: PlanRecord[]): ComparisonGroup[] {
           values: plans.map((plan) => ({ text: getFeatureString(plan, "agent_types") || "-" })),
         },
         {
-          label: "Voice Minutes",
-          values: plans.map((plan) => ({ text: formatIncludedValue(plan.includedVoiceMinutes, "month") || "-" })),
+          label: "Voice Minutes / Month",
+          values: plans.map((plan) => ({
+            text: plan.includedVoiceMinutes === null ? "-" : plan.includedVoiceMinutes.toLocaleString("en-IN"),
+          })),
         },
         {
-          label: "Chat Conversations",
-          values: plans.map((plan) => ({ text: formatIncludedValue(plan.includedChatConversations, "month") || "-" })),
+          label: "Chat Conversations / Month",
+          values: plans.map((plan) => ({
+            text: plan.includedChatConversations === null ? "-" : plan.includedChatConversations.toLocaleString("en-IN"),
+          })),
         },
         {
-          label: "Social Media Posts",
-          values: plans.map((plan) => ({ text: formatIncludedValue(plan.includedSocialPosts, "month") || "-" })),
+          label: "Social Posts / Month",
+          values: plans.map((plan) => ({
+            text: plan.includedSocialPosts === null ? "-" : plan.includedSocialPosts.toLocaleString("en-IN"),
+          })),
         },
         {
-          label: "WhatsApp",
+          label: "WhatsApp Integration",
           values: plans.map((plan) => {
             const included = getFeatureBoolean(plan, "whatsapp_included");
-            const conversations = getFeatureNumber(plan, "whatsapp_conversations");
+            const count = getFeatureNumber(plan, "whatsapp_conversations");
             const addonPrice = getFeatureNumber(plan, "whatsapp_addon_price");
-            const overage = getFeatureNumber(plan, "whatsapp_overage");
-
             if (included) {
-              const detail = conversations !== null ? `${conversations.toLocaleString("en-IN")}/month included` : "Included";
-              return { text: overage !== null ? `${detail} (${formatPaise(overage)}/conv overage)` : detail, tone: "included" };
+              return { text: count ? `Included (${count.toLocaleString("en-IN")}/mo)` : "Included", tone: "included" };
             }
-
             if (addonPrice !== null) {
-              return { text: `Add-on ${formatPaise(addonPrice)}/mo`, tone: "addon" };
+              return { text: `Add-on (${formatPaise(addonPrice)}/mo)`, tone: "addon" };
             }
-
-            return { text: "Not included", tone: "excluded" };
+            return { text: "Not available", tone: "excluded" };
           }),
         },
       ],
@@ -337,14 +304,14 @@ function buildComparisonGroups(plans: PlanRecord[]): ComparisonGroup[] {
       title: "Languages",
       rows: [
         {
-          label: "Hindi",
+          label: "Hindi Support",
           values: plans.map((plan) => ({
             text: getFeatureBoolean(plan, "hindi") ? "Included" : "Not included",
             tone: getFeatureBoolean(plan, "hindi") ? "included" : "excluded",
           })),
         },
         {
-          label: "English",
+          label: "English Support",
           values: plans.map((plan) => ({
             text: getFeatureBoolean(plan, "english") ? "Included" : "Not included",
             tone: getFeatureBoolean(plan, "english") ? "included" : "excluded",
@@ -358,54 +325,10 @@ function buildComparisonGroups(plans: PlanRecord[]): ComparisonGroup[] {
             return { text: included ? `+${count ?? 0}` : "Not included", tone: included ? "included" : "excluded" };
           }),
         },
-        {
-          label: "Additional Languages",
-          values: plans.map((plan) => {
-            const price =
-              getFeatureNumber(plan, "additional_language_price_monthly") ??
-              getFeatureNumber(plan, "additional_language_price");
-            return { text: price !== null ? `${formatPaise(price)}/mo per language` : "Not available", tone: price !== null ? "addon" : "excluded" };
-          }),
-        },
       ],
     },
     {
-      title: "Analytics & Reporting",
-      rows: [
-        { label: "Basic Analytics", values: plans.map((plan) => ({ text: getFeatureString(plan, "analytics_detail") || "Included" })) },
-        {
-          label: "ROI Dashboard",
-          values: plans.map((plan) => {
-            const included = getFeatureBoolean(plan, "roi_dashboard");
-            return { text: included ? getFeatureString(plan, "roi_dashboard_detail") || "Included" : "Not included", tone: included ? "included" : "excluded" };
-          }),
-        },
-        { label: "Report Frequency", values: plans.map((plan) => ({ text: getFeatureString(plan, "report_frequency") || "-" })) },
-        {
-          label: "Data Export",
-          values: plans.map((plan) => {
-            const included = getFeatureBoolean(plan, "data_export");
-            return { text: included ? "Included" : "Not included", tone: included ? "included" : "excluded" };
-          }),
-        },
-        {
-          label: "API Access",
-          values: plans.map((plan) => {
-            const included = getFeatureBoolean(plan, "api_access");
-            return { text: included ? getFeatureString(plan, "api_access_detail") || "Included" : "Not included", tone: included ? "included" : "excluded" };
-          }),
-        },
-        {
-          label: "Monthly Review Call",
-          values: plans.map((plan) => {
-            const included = getFeatureBoolean(plan, "monthly_review_call");
-            return { text: included ? getFeatureString(plan, "monthly_review_detail") || "Included" : "Not included", tone: included ? "included" : "excluded" };
-          }),
-        },
-      ],
-    },
-    {
-      title: "AI Features",
+      title: "AI Features & Customization",
       rows: [
         {
           label: "Custom Personality",
@@ -424,11 +347,10 @@ function buildComparisonGroups(plans: PlanRecord[]): ComparisonGroup[] {
         { label: "Knowledge Base", values: plans.map((plan) => ({ text: getFeatureString(plan, "knowledge_base") || "-" })) },
         { label: "Human Handoff", values: plans.map((plan) => ({ text: getFeatureString(plan, "human_handoff") || "-" })) },
         { label: "Appointment Booking", values: plans.map((plan) => ({ text: getFeatureString(plan, "appointment_booking") || "-" })) },
-        { label: "After-Hours Handling", values: plans.map((plan) => ({ text: getFeatureString(plan, "after_hours") || "-" })) },
       ],
     },
     {
-      title: "Support",
+      title: "Support & Infrastructure",
       rows: [
         { label: "Support Channel", values: plans.map((plan) => ({ text: getFeatureString(plan, "support_channel") || "-" })) },
         {
@@ -438,55 +360,8 @@ function buildComparisonGroups(plans: PlanRecord[]): ComparisonGroup[] {
             return { text: hours !== null ? `${hours} hours` : "-" };
           }),
         },
-        { label: "Support Hours", values: plans.map((plan) => ({ text: getFeatureString(plan, "support_hours") || "-" })) },
-        { label: "Onboarding Sessions", values: plans.map((plan) => ({ text: getFeatureString(plan, "onboarding_sessions") || "-" })) },
-        {
-          label: "Dedicated Slack",
-          values: plans.map((plan) => {
-            const included = getFeatureBoolean(plan, "dedicated_slack");
-            return { text: included ? "Included" : "Not included", tone: included ? "included" : "excluded" };
-          }),
-        },
-        {
-          label: "Account Manager",
-          values: plans.map((plan) => {
-            const included = getFeatureBoolean(plan, "account_manager");
-            return { text: included ? getFeatureString(plan, "account_manager_detail") || "Included" : "Not included", tone: included ? "included" : "excluded" };
-          }),
-        },
-      ],
-    },
-    {
-      title: "Setup & Deployment",
-      rows: [
-        { label: "Setup Timeline", values: plans.map((plan) => ({ text: getFeatureString(plan, "setup_timeline") || "-" })) },
-        { label: "Setup Includes", values: plans.map((plan) => ({ text: getFeatureString(plan, "setup_includes") || "-" })) },
-        {
-          label: "Testing",
-          values: plans.map((plan) => {
-            const interactions = getFeatureNumber(plan, "testing_interactions");
-            const detail = getFeatureString(plan, "testing_detail");
-            if (interactions !== null && detail) return { text: `${interactions} interactions (${detail})` };
-            if (interactions !== null) return { text: `${interactions} interactions` };
-            return { text: detail || "-" };
-          }),
-        },
-        { label: "Documentation", values: plans.map((plan) => ({ text: getFeatureString(plan, "documentation") || "-" })) },
-      ],
-    },
-    {
-      title: "Infrastructure",
-      rows: [
-        { label: "Uptime Target", values: plans.map((plan) => ({ text: getFeatureString(plan, "uptime_target") || "-" })) },
-        { label: "Data Encryption", values: plans.map((plan) => ({ text: getFeatureString(plan, "data_encryption") || "-" })) },
-        { label: "Data Backup", values: plans.map((plan) => ({ text: getFeatureString(plan, "data_backup") || "-" })) },
-        {
-          label: "Call Recording",
-          values: plans.map((plan) => {
-            const included = getFeatureBoolean(plan, "call_recording");
-            return { text: included ? getFeatureString(plan, "call_recording_detail") || "Included" : "Not included", tone: included ? "included" : "excluded" };
-          }),
-        },
+        { label: "Uptime Target", values: plans.map((plan) => ({ text: getFeatureString(plan, "uptime_target") || "99.9%" })) },
+        { label: "Data Encryption", values: plans.map((plan) => ({ text: getFeatureString(plan, "data_encryption") || "AES-256 / In-Transit TLS" })) },
       ],
     },
   ];
@@ -496,13 +371,13 @@ function renderComparisonCell(value: ComparisonValue) {
   const tone = value.tone ?? "default";
 
   if (tone === "default") {
-    return <span className="text-[#FAF7FF]">{value.text}</span>;
+    return <span className="text-[#1E293B]">{value.text}</span>;
   }
 
   if (tone === "included") {
     return (
-      <span className="inline-flex items-center justify-center gap-[8px] text-[#D1FAE5]">
-        <Check size={15} className="shrink-0 text-[#10B981]" />
+      <span className="inline-flex items-center justify-center gap-1.5 text-emerald-700 font-medium">
+        <Check size={15} className="shrink-0 text-emerald-600" />
         <span>{value.text}</span>
       </span>
     );
@@ -510,16 +385,16 @@ function renderComparisonCell(value: ComparisonValue) {
 
   if (tone === "addon") {
     return (
-      <span className="inline-flex items-center justify-center gap-[8px] text-[#FDE68A]">
-        <Plus size={15} className="shrink-0 text-[#FBBF24]" />
+      <span className="inline-flex items-center justify-center gap-1.5 text-blue-700 font-medium">
+        <Plus size={15} className="shrink-0 text-blue-600" />
         <span>{value.text}</span>
       </span>
     );
   }
 
   return (
-    <span className="inline-flex items-center justify-center gap-[8px] text-[#9CA3AF]">
-      <X size={15} className="shrink-0 text-[#6B6088]" />
+    <span className="inline-flex items-center justify-center gap-1.5 text-slate-400">
+      <X size={15} className="shrink-0 text-slate-300" />
       <span>{value.text}</span>
     </span>
   );
@@ -543,7 +418,6 @@ function PricingCard({
   const isPopular = plan.isPopular;
   const cardFeatures = getCardFeatures(plan);
   const setupFee = currencyMode !== "INR" ? null : getSetupFee(plan);
-  const minimumMonths = getMinimumMonths(plan);
   const savings = getAnnualSavings(plan);
   const displayPrice = getMonthlyDisplayPrice(plan, billingMode, currencyMode);
   const monthlyPrice = formatPrice(plan.priceMonthly, currencyMode);
@@ -554,7 +428,6 @@ function PricingCard({
     : [
         plan.overageVoicePerMinute !== null ? `${formatPrice(plan.overageVoicePerMinute, currencyMode)}/min` : "",
         plan.overageChatPerConversation !== null ? `${formatPrice(plan.overageChatPerConversation, currencyMode)}/chat` : "",
-        plan.overageSocialPerPost !== null ? `${formatPrice(plan.overageSocialPerPost, currencyMode)}/post` : "",
       ]
         .filter(Boolean)
         .join(" • ");
@@ -564,37 +437,40 @@ function PricingCard({
       initial={{ opacity: 0, y: 22 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.45, delay: index * 0.08 }}
-      className="relative flex h-full flex-col rounded-[20px] border border-[#1E0A35] bg-[#130224] p-[28px] shadow-[0_18px_48px_rgba(0,0,0,0.22)] transition-all duration-300 hover:-translate-y-[4px] hover:border-[#3A1C68]"
-      style={isPopular ? { borderColor: "#6D28D9", boxShadow: "0 20px 60px rgba(109,40,217,0.22)" } : undefined}
+      className={`relative flex h-full flex-col rounded-2xl border bg-white p-7 shadow-xs transition-all duration-300 hover:-translate-y-1 hover:shadow-md ${
+        isPopular
+          ? "border-[#2563EB] shadow-[0_12px_36px_rgba(37,99,235,0.12)] ring-1 ring-[#2563EB]/20"
+          : "border-[#E2E8F0]"
+      }`}
     >
       {isPopular ? (
-        <div className="absolute left-1/2 top-[-14px] -translate-x-1/2 rounded-full bg-[linear-gradient(135deg,#8B5CF6,#6D28D9)] px-[14px] py-[5px] text-center font-sans text-[11px] font-semibold uppercase tracking-[0.06em] text-white shadow-[0_10px_30px_rgba(109,40,217,0.35)]">
+        <div className="absolute left-1/2 top-[-13px] -translate-x-1/2 rounded-full bg-[#2563EB] px-3.5 py-1 text-center font-sans text-[10.5px] font-bold uppercase tracking-wider text-white shadow-xs">
           {plan.badgeText || "MOST POPULAR"}
         </div>
       ) : null}
 
       <div className="flex h-full flex-col">
-        <h3 className="font-display text-[24px] font-semibold text-[#FAF7FF]">{plan.name}</h3>
+        <h3 className="font-sans text-[22px] font-bold text-[#0F172A]">{plan.name}</h3>
 
-        <div className="mt-[20px] min-h-[128px]">
+        <div className="mt-5 min-h-[110px]">
           {billingMode === "annual" && monthlyPrice ? (
-            <div className="mb-[4px] font-sans text-[15px] text-[#6B6088] line-through">{monthlyPrice}</div>
+            <div className="mb-1 font-sans text-[14px] text-[#94A3B8] line-through">{monthlyPrice}</div>
           ) : null}
 
-          <div className="relative min-h-[58px] overflow-hidden">
+          <div className="relative min-h-[54px] overflow-hidden">
             <AnimatePresence mode="wait">
               <motion.div
                 key={`${plan.slug}-${billingMode}`}
-                initial={{ opacity: 0, y: 12 }}
+                initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -12 }}
+                exit={{ opacity: 0, y: -10 }}
                 transition={{ duration: 0.2 }}
                 className="absolute inset-0"
               >
-                <div className="font-display text-[46px] font-bold leading-none tracking-[-0.03em] text-[#FAF7FF]">
+                <div className="font-sans text-[42px] font-black leading-none tracking-tight text-[#0F172A]">
                   {displayPrice}
                 </div>
-                <div className="mt-[8px] font-sans text-[13px] text-[#8D86A8]">
+                <div className="mt-1.5 font-sans text-[12.5px] text-[#64748B]">
                   {billingMode === "monthly" ? "/month" : "/month (billed annually)"}
                 </div>
               </motion.div>
@@ -602,49 +478,64 @@ function PricingCard({
           </div>
 
           {billingMode === "annual" && savings ? (
-            <div className="mt-[18px] inline-flex rounded-full bg-[rgba(16,185,129,0.12)] px-[10px] py-[4px] font-sans text-[12px] font-medium text-[#34D399]">
+            <div className="mt-4 inline-flex rounded-full bg-emerald-50 border border-emerald-200/60 px-2.5 py-1 font-sans text-[11.5px] font-semibold text-emerald-700">
               Save {formatPrice(savings, currencyMode)}/year
             </div>
           ) : null}
         </div>
 
-        {setupFee ? <div className="mt-[8px] font-sans text-[13px] text-[#8D86A8]">One-time setup: {formatPrice(setupFee, currencyMode)}</div> : null}
-        {plan.description ? <p className="mt-[14px] min-h-[42px] font-sans text-[14px] leading-[1.6] text-[#B8B0D1]">{plan.description}</p> : null}
+        {setupFee ? (
+          <div className="mt-2 font-sans text-[12.5px] text-[#64748B]">
+            One-time setup: {formatPrice(setupFee, currencyMode)}
+          </div>
+        ) : null}
 
-        <div className="my-[20px] h-px w-full bg-[#1E0A35]" />
+        {plan.description ? (
+          <p className="mt-3.5 min-h-[40px] font-sans text-[13.5px] leading-relaxed text-[#475569]">
+            {plan.description}
+          </p>
+        ) : null}
 
-        <div className="flex flex-1 flex-col gap-[12px]">
+        <div className="my-5 h-px w-full bg-[#E2E8F0]" />
+
+        <div className="flex flex-1 flex-col gap-3">
           {cardFeatures.map((feature) => (
-            <div key={`${plan.slug}-${feature.text}`} className="flex items-start gap-[10px]">
+            <div key={`${plan.slug}-${feature.text}`} className="flex items-start gap-2.5">
               {getFeatureToneIcon(feature.tone)}
-              <span className={`font-sans text-[14px] leading-[1.5] ${getFeatureToneTextClass(feature.tone)}`}>{feature.text}</span>
+              <span className={`font-sans text-[13.5px] leading-snug ${getFeatureToneTextClass(feature.tone)}`}>
+                {feature.text}
+              </span>
             </div>
           ))}
         </div>
 
-        <div className="mt-[24px]">
-          {index === 2 || plan.slug === 'scale' ? (
+        <div className="mt-6">
+          {index === 2 || plan.slug === "scale" ? (
             <button
               type="button"
               onClick={onOpenEnterprise}
-              className="block w-full rounded-[12px] px-[18px] py-[14px] text-center font-sans text-[15px] font-medium transition-all duration-300 border border-[#2D1255] bg-transparent text-[#E9D5FF] hover:border-[#8B5CF6] hover:bg-[rgba(139,92,246,0.08)] cursor-pointer"
+              className="block w-full rounded-xl px-4 py-3 text-center font-sans text-[14px] font-semibold transition-all duration-200 border border-[#CBD5E1] bg-white text-[#0F172A] hover:border-[#2563EB] hover:text-[#2563EB] cursor-pointer shadow-2xs"
             >
-              Contact Enterprise {"->"}
+              Contact Enterprise →
             </button>
           ) : (
             <Link
               href="/dashboard/billing"
-              className={`block w-full rounded-[12px] px-[18px] py-[14px] text-center font-sans text-[15px] font-medium transition-all duration-300 ${
+              className={`block w-full rounded-xl px-4 py-3 text-center font-sans text-[14px] font-semibold transition-all duration-200 ${
                 isPopular
-                  ? "bg-[#8B5CF6] text-white shadow-[0_0_24px_rgba(139,92,246,0.28)] hover:bg-[#7C3AED]"
-                  : "border border-[#2D1255] bg-transparent text-[#E9D5FF] hover:border-[#8B5CF6] hover:bg-[rgba(139,92,246,0.08)]"
+                  ? "bg-[#2563EB] text-white shadow-xs hover:bg-[#1D4ED8]"
+                  : "border border-[#CBD5E1] bg-white text-[#0F172A] hover:border-[#2563EB] hover:text-[#2563EB] shadow-2xs"
               }`}
             >
-              Get Started {"->"}
+              Get Started →
             </Link>
           )}
 
-          {overageLine ? <div className="mt-[12px] text-center font-sans text-[12px] leading-[1.5] text-[#6B6088]">Overage: {overageLine}</div> : null}
+          {overageLine ? (
+            <div className="mt-3 text-center font-sans text-[11.5px] leading-relaxed text-[#64748B]">
+              Overage: {overageLine}
+            </div>
+          ) : null}
         </div>
       </div>
     </motion.div>
@@ -670,71 +561,71 @@ export default function PricingPage() {
   }, []);
 
   useEffect(() => {
-    fetch('/api/public/config')
-      .then(res => res.json())
-      .then(data => {
+    fetch("/api/public/config")
+      .then((res) => res.json())
+      .then((data) => {
         if (data.configs) {
-          setPublicConfig(data.configs)
+          setPublicConfig(data.configs);
         }
       })
-      .catch(err => console.error("Error loading config:", err))
+      .catch((err) => console.error("Error loading config:", err));
   }, []);
 
   const plans = useMemo(() => {
     if (!publicConfig && !dbPlans.length) return dbPlans;
 
-    return dbPlans.map(plan => {
+    return dbPlans.map((plan) => {
       const p = { ...plan };
       if (currencyMode === "USD") {
-        if (p.slug === 'starter') {
-          p.priceMonthly = parseInt(publicConfig?.starter_price_usd_cents || '8900', 10);
+        if (p.slug === "starter") {
+          p.priceMonthly = parseInt(publicConfig?.starter_price_usd_cents || "8900", 10);
           p.priceAnnual = Math.round(p.priceMonthly * 0.8);
-          p.includedVoiceMinutes = parseInt(publicConfig?.starter_minutes || '500', 10);
-        } else if (p.slug === 'growth') {
-          p.name = 'Professional';
-          p.priceMonthly = parseInt(publicConfig?.professional_price_usd_cents || '24900', 10);
+          p.includedVoiceMinutes = parseInt(publicConfig?.starter_minutes || "500", 10);
+        } else if (p.slug === "growth") {
+          p.name = "Professional";
+          p.priceMonthly = parseInt(publicConfig?.professional_price_usd_cents || "24900", 10);
           p.priceAnnual = Math.round(p.priceMonthly * 0.8);
-          p.includedVoiceMinutes = parseInt(publicConfig?.professional_minutes || '2000', 10);
-        } else if (p.slug === 'scale') {
-          p.name = 'Enterprise';
-          p.priceMonthly = parseInt(publicConfig?.enterprise_price_usd_cents || '59900', 10);
+          p.includedVoiceMinutes = parseInt(publicConfig?.professional_minutes || "2000", 10);
+        } else if (p.slug === "scale") {
+          p.name = "Enterprise";
+          p.priceMonthly = parseInt(publicConfig?.enterprise_price_usd_cents || "59900", 10);
           p.priceAnnual = Math.round(p.priceMonthly * 0.8);
-          p.includedVoiceMinutes = parseInt(publicConfig?.enterprise_minutes || '10000', 10);
-          p.description = 'Global tailored limits, international numbers, and dedicated SLA.';
+          p.includedVoiceMinutes = parseInt(publicConfig?.enterprise_minutes || "10000", 10);
+          p.description = "Global tailored limits, international numbers, and dedicated SLA.";
         }
       } else if (currencyMode === "EUR") {
-        if (p.slug === 'starter') {
-          p.priceMonthly = parseInt(publicConfig?.starter_price_eur_cents || '7900', 10);
+        if (p.slug === "starter") {
+          p.priceMonthly = parseInt(publicConfig?.starter_price_eur_cents || "7900", 10);
           p.priceAnnual = Math.round(p.priceMonthly * 0.8);
-          p.includedVoiceMinutes = parseInt(publicConfig?.starter_minutes || '500', 10);
-        } else if (p.slug === 'growth') {
-          p.name = 'Professional';
-          p.priceMonthly = parseInt(publicConfig?.professional_price_eur_cents || '21900', 10);
+          p.includedVoiceMinutes = parseInt(publicConfig?.starter_minutes || "500", 10);
+        } else if (p.slug === "growth") {
+          p.name = "Professional";
+          p.priceMonthly = parseInt(publicConfig?.professional_price_eur_cents || "21900", 10);
           p.priceAnnual = Math.round(p.priceMonthly * 0.8);
-          p.includedVoiceMinutes = parseInt(publicConfig?.professional_minutes || '2000', 10);
-        } else if (p.slug === 'scale') {
-          p.name = 'Enterprise';
-          p.priceMonthly = parseInt(publicConfig?.enterprise_price_eur_cents || '49900', 10);
+          p.includedVoiceMinutes = parseInt(publicConfig?.professional_minutes || "2000", 10);
+        } else if (p.slug === "scale") {
+          p.name = "Enterprise";
+          p.priceMonthly = parseInt(publicConfig?.enterprise_price_eur_cents || "49900", 10);
           p.priceAnnual = Math.round(p.priceMonthly * 0.8);
-          p.includedVoiceMinutes = parseInt(publicConfig?.enterprise_minutes || '10000', 10);
-          p.description = 'European GDPR-compliant limits, EU virtual numbers, and dedicated SLA.';
+          p.includedVoiceMinutes = parseInt(publicConfig?.enterprise_minutes || "10000", 10);
+          p.description = "European GDPR-compliant limits, EU virtual numbers, and dedicated SLA.";
         }
       } else {
-        if (p.slug === 'starter') {
-          p.priceMonthly = parseInt(publicConfig?.starter_price_paisa || '499900', 10);
+        if (p.slug === "starter") {
+          p.priceMonthly = parseInt(publicConfig?.starter_price_paisa || "499900", 10);
           p.priceAnnual = Math.round(p.priceMonthly * 0.8);
-          p.includedVoiceMinutes = parseInt(publicConfig?.starter_minutes || '500', 10);
-        } else if (p.slug === 'growth') {
-          p.name = 'Professional';
-          p.priceMonthly = parseInt(publicConfig?.professional_price_paisa || '1499900', 10);
+          p.includedVoiceMinutes = parseInt(publicConfig?.starter_minutes || "500", 10);
+        } else if (p.slug === "growth") {
+          p.name = "Professional";
+          p.priceMonthly = parseInt(publicConfig?.professional_price_paisa || "1499900", 10);
           p.priceAnnual = Math.round(p.priceMonthly * 0.8);
-          p.includedVoiceMinutes = parseInt(publicConfig?.professional_minutes || '2000', 10);
-        } else if (p.slug === 'scale') {
-          p.name = 'Enterprise';
-          p.priceMonthly = parseInt(publicConfig?.enterprise_price_paisa || '0', 10);
+          p.includedVoiceMinutes = parseInt(publicConfig?.professional_minutes || "2000", 10);
+        } else if (p.slug === "scale") {
+          p.name = "Enterprise";
+          p.priceMonthly = parseInt(publicConfig?.enterprise_price_paisa || "0", 10);
           p.priceAnnual = 0;
-          p.includedVoiceMinutes = parseInt(publicConfig?.enterprise_minutes || '10000', 10);
-          p.description = 'Tailored limits, custom integrations, and dedicated SLA for large enterprises.';
+          p.includedVoiceMinutes = parseInt(publicConfig?.enterprise_minutes || "10000", 10);
+          p.description = "Tailored limits, custom integrations, and dedicated SLA for large enterprises.";
         }
       }
       if (currencyMode === "INR" && publicConfig?.overage_per_minute_paisa) {
@@ -764,38 +655,31 @@ export default function PricingPage() {
   const comparisonGroups = useMemo(() => buildComparisonGroups(plans), [plans]);
 
   return (
-    <Layout>
-      <div className="min-h-screen bg-[#080010]">
-        <section className="relative overflow-hidden px-[20px] pb-[54px] pt-[140px] text-center">
-          <div
-            className="pointer-events-none absolute inset-0"
-            style={{
-              background:
-                "radial-gradient(ellipse 640px 420px at top center, rgba(139,92,246,0.12) 0%, transparent 65%)",
-            }}
-          />
-
-          <div className="relative z-10 mx-auto max-w-[760px]">
-            <div className="mb-[24px] inline-flex rounded-full border border-[rgba(139,92,246,0.15)] bg-[rgba(139,92,246,0.1)] px-[16px] py-[6px] font-sans text-[13px] font-medium text-[#D7C4F7]">
-              {"✦"} Pricing
+    <Layout theme="vaakriti">
+      <div className="min-h-screen bg-[#FAFAFA] text-[#0F172A] pt-24 sm:pt-28">
+        {/* HERO SECTION */}
+        <section className="relative overflow-hidden px-5 pb-12 pt-8 text-center">
+          <div className="relative z-10 mx-auto max-w-3xl">
+            <div className="mb-5 inline-flex items-center gap-1.5 rounded-full border border-[#2563EB]/25 bg-[#2563EB]/10 px-4 py-1.5 font-sans text-[12.5px] font-semibold text-[#2563EB]">
+              <span>✦</span> Transparent Pricing
             </div>
-            <h1 className="font-display text-[38px] font-bold tracking-[-0.02em] text-[#FAF7FF] md:text-[52px]">
+            <h1 className="font-sans text-[36px] md:text-[48px] font-extrabold tracking-tight text-[#0F172A]">
               Simple Plans. Real Results.
             </h1>
-            <p className="mx-auto mt-[18px] max-w-[500px] font-sans text-[16px] leading-[1.7] text-[#B8B0D1]">
-              Choose the plan that fits your business. Scale anytime.
+            <p className="mx-auto mt-4 max-w-xl font-sans text-[16px] leading-relaxed text-[#475569]">
+              Live pricing configured directly from our enterprise console. Scale voice automation seamlessly.
             </p>
 
             {/* Currency Selector */}
-            <div className="mt-[28px] flex justify-center">
-              <div className="inline-flex items-center gap-1 rounded-full border border-[#1E0A35] bg-[#130224] p-[3px] shadow-[0_0_20px_rgba(139,92,246,0.08)]">
+            <div className="mt-7 flex justify-center">
+              <div className="inline-flex items-center gap-1 rounded-full border border-[#E2E8F0] bg-white p-1 shadow-2xs">
                 <button
                   type="button"
                   onClick={() => setCurrencyMode("INR")}
                   className={`flex items-center gap-1.5 px-3.5 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer ${
                     currencyMode === "INR"
-                      ? "bg-[#8B5CF6] text-white shadow-sm"
-                      : "text-[#8D86A8] hover:text-[#FAF7FF]"
+                      ? "bg-[#2563EB] text-white shadow-xs"
+                      : "text-[#64748B] hover:text-[#0F172A]"
                   }`}
                 >
                   <span>🇮🇳</span> India (INR ₹)
@@ -805,8 +689,8 @@ export default function PricingPage() {
                   onClick={() => setCurrencyMode("USD")}
                   className={`flex items-center gap-1.5 px-3.5 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer ${
                     currencyMode === "USD"
-                      ? "bg-[#8B5CF6] text-white shadow-sm"
-                      : "text-[#8D86A8] hover:text-[#FAF7FF]"
+                      ? "bg-[#2563EB] text-white shadow-xs"
+                      : "text-[#64748B] hover:text-[#0F172A]"
                   }`}
                 >
                   <span>🌐</span> Global (USD $)
@@ -816,8 +700,8 @@ export default function PricingPage() {
                   onClick={() => setCurrencyMode("EUR")}
                   className={`flex items-center gap-1.5 px-3.5 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer ${
                     currencyMode === "EUR"
-                      ? "bg-[#8B5CF6] text-white shadow-sm"
-                      : "text-[#8D86A8] hover:text-[#FAF7FF]"
+                      ? "bg-[#2563EB] text-white shadow-xs"
+                      : "text-[#64748B] hover:text-[#0F172A]"
                   }`}
                 >
                   <span>🇪🇺</span> Europe (EUR €)
@@ -825,10 +709,11 @@ export default function PricingPage() {
               </div>
             </div>
 
-            <div className="mt-[20px] flex justify-center">
-              <div className="relative flex h-[44px] w-full max-w-[280px] items-center rounded-full border border-[#1E0A35] bg-[#130224] p-[4px] shadow-[0_0_20px_rgba(139,92,246,0.05)]">
+            {/* Monthly / Annual Toggle */}
+            <div className="mt-5 flex justify-center">
+              <div className="relative flex h-[42px] w-full max-w-[280px] items-center rounded-full border border-[#E2E8F0] bg-white p-1 shadow-2xs">
                 <motion.div
-                  className="absolute bottom-[4px] top-[4px] rounded-full bg-[#8B5CF6]"
+                  className="absolute bottom-1 top-1 rounded-full bg-[#2563EB]"
                   initial={false}
                   animate={{
                     left: billingMode === "monthly" ? 4 : "calc(50% + 2px)",
@@ -839,8 +724,8 @@ export default function PricingPage() {
                 <button
                   type="button"
                   onClick={() => setBillingMode("monthly")}
-                  className={`relative z-10 flex w-1/2 items-center justify-center font-sans text-[14px] font-semibold transition-colors ${
-                    billingMode === "monthly" ? "text-white" : "text-[#8D86A8]"
+                  className={`relative z-10 flex w-1/2 items-center justify-center font-sans text-[13.5px] font-semibold transition-colors cursor-pointer ${
+                    billingMode === "monthly" ? "text-white" : "text-[#64748B]"
                   }`}
                 >
                   Monthly
@@ -848,13 +733,13 @@ export default function PricingPage() {
                 <button
                   type="button"
                   onClick={() => setBillingMode("annual")}
-                  className={`relative z-10 flex w-1/2 items-center justify-center gap-[6px] font-sans text-[14px] font-semibold transition-colors ${
-                    billingMode === "annual" ? "text-white" : "text-[#8D86A8]"
+                  className={`relative z-10 flex w-1/2 items-center justify-center gap-1.5 font-sans text-[13.5px] font-semibold transition-colors cursor-pointer ${
+                    billingMode === "annual" ? "text-white" : "text-[#64748B]"
                   }`}
                 >
                   Annual
-                  <span className="rounded-full bg-[rgba(16,185,129,0.12)] px-[7px] py-[2px] text-[10px] font-semibold text-[#34D399]">
-                    {maxSavingsPercent > 0 ? `Save up to ${maxSavingsPercent}%` : "Save annually"}
+                  <span className="rounded-full bg-emerald-50 border border-emerald-200/60 px-1.5 py-0.5 text-[9.5px] font-bold text-emerald-700">
+                    {maxSavingsPercent > 0 ? `-${maxSavingsPercent}%` : "Save"}
                   </span>
                 </button>
               </div>
@@ -863,27 +748,28 @@ export default function PricingPage() {
         </section>
 
         {loading ? (
-          <section className="px-[20px] pb-[100px]">
-            <div className="mx-auto max-w-[1180px] rounded-[20px] border border-[#1E0A35] bg-[#130224] px-[24px] py-[48px] text-center font-sans text-[16px] text-[#B8B0D1]">
-              Loading pricing...
+          <section className="px-5 pb-24">
+            <div className="mx-auto max-w-5xl rounded-2xl border border-[#E2E8F0] bg-white px-6 py-12 text-center font-sans text-sm text-[#64748B] shadow-xs">
+              Loading pricing plans...
             </div>
           </section>
         ) : plans.length === 0 ? (
-          <section className="px-[20px] pb-[100px]">
-            <div className="mx-auto max-w-[1180px] rounded-[20px] border border-[#1E0A35] bg-[#130224] px-[24px] py-[48px] text-center font-sans text-[16px] text-[#B8B0D1]">
+          <section className="px-5 pb-24">
+            <div className="mx-auto max-w-5xl rounded-2xl border border-[#E2E8F0] bg-white px-6 py-12 text-center font-sans text-sm text-[#64748B] shadow-xs">
               Pricing coming soon.
             </div>
           </section>
         ) : (
           <>
-            <section className="px-[20px] pb-[54px]">
-              <div className="mx-auto grid max-w-[1180px] grid-cols-1 items-stretch gap-[24px] lg:grid-cols-3">
+            {/* PRICING CARDS */}
+            <section className="px-5 pb-16">
+              <div className="mx-auto grid max-w-6xl grid-cols-1 items-stretch gap-6 lg:grid-cols-3">
                 {plans.map((plan, index) => (
-                  <PricingCard 
-                    key={plan.slug} 
-                    plan={plan} 
-                    index={index} 
-                    billingMode={billingMode} 
+                  <PricingCard
+                    key={plan.slug}
+                    plan={plan}
+                    index={index}
+                    billingMode={billingMode}
                     currencyMode={currencyMode}
                     publicConfig={publicConfig}
                     onOpenEnterprise={() => setIsEnterpriseModalOpen(true)}
@@ -892,31 +778,31 @@ export default function PricingPage() {
               </div>
             </section>
 
-
-            <section className="px-[20px] pb-[60px]">
-              <div className="mx-auto max-w-[1180px]">
+            {/* COMPARISON TABLE */}
+            <section className="px-5 pb-16">
+              <div className="mx-auto max-w-6xl">
                 <div className="text-center">
-                  <h2 className="font-display text-[30px] font-semibold text-[#FAF7FF]">
+                  <h2 className="font-sans text-[28px] font-bold text-[#0F172A]">
                     Detailed Feature Comparison
                   </h2>
-                  <p className="mx-auto mt-[12px] max-w-[560px] font-sans text-[15px] leading-[1.7] text-[#B8B0D1]">
+                  <p className="mx-auto mt-2.5 max-w-md font-sans text-[14.5px] text-[#64748B]">
                     Everything included in each plan, side by side.
                   </p>
                 </div>
 
-                <div className="mt-[24px] flex justify-center">
+                <div className="mt-6 flex justify-center">
                   <button
                     type="button"
                     onClick={() => setComparisonOpen((current) => !current)}
-                    className="inline-flex items-center gap-[10px] rounded-full border border-[#2D1255] bg-[#130224] px-[18px] py-[10px] font-sans text-[14px] font-medium text-[#E9D5FF] transition-colors hover:border-[#8B5CF6] hover:text-white"
+                    className="inline-flex items-center gap-2 rounded-full border border-[#CBD5E1] bg-white px-5 py-2 font-sans text-[13.5px] font-semibold text-[#0F172A] shadow-2xs hover:border-[#2563EB] hover:text-[#2563EB] transition-colors cursor-pointer"
                   >
                     {comparisonOpen ? "Hide Comparison" : "View Full Comparison"}
-                    <ChevronDown size={16} className={`transition-transform ${comparisonOpen ? "rotate-180" : ""}`} />
+                    <ChevronDown size={15} className={`transition-transform ${comparisonOpen ? "rotate-180" : ""}`} />
                   </button>
                 </div>
 
                 <AnimatePresence initial={false}>
-                  {comparisonOpen ? (
+                  {comparisonOpen && (
                     <motion.div
                       initial={{ height: 0, opacity: 0 }}
                       animate={{ height: "auto", opacity: 1 }}
@@ -924,22 +810,22 @@ export default function PricingPage() {
                       transition={{ duration: 0.28, ease: "easeInOut" }}
                       className="overflow-hidden"
                     >
-                      <div className="mt-[24px] overflow-hidden rounded-[24px] border border-[#1E0A35] bg-[#130224]">
+                      <div className="mt-6 overflow-hidden rounded-2xl border border-[#E2E8F0] bg-white shadow-xs">
                         <div className="overflow-x-auto">
-                          <table className="w-full min-w-[920px] border-collapse">
-                            <thead className="sticky top-0 z-10 bg-[#1E0A35]">
-                              <tr className="border-b border-[#1E0A35]">
-                                <th className="px-[16px] py-[16px] text-left font-sans text-[13px] uppercase tracking-[0.08em] text-[#8D86A8]">
+                          <table className="w-full min-w-[880px] border-collapse">
+                            <thead className="sticky top-0 z-10 bg-[#F8FAFC]">
+                              <tr className="border-b border-[#E2E8F0]">
+                                <th className="px-4 py-3.5 text-left font-sans text-[12px] uppercase tracking-wider text-[#64748B]">
                                   Feature
                                 </th>
                                 {plans.map((plan, index) => (
                                   <th
                                     key={`${plan.slug}-head`}
-                                    className="px-[16px] py-[16px] text-center font-sans text-[14px] font-semibold text-[#FAF7FF]"
+                                    className="px-4 py-3.5 text-center font-sans text-[13.5px] font-bold text-[#0F172A]"
                                   >
-                                    <div className="inline-flex items-center gap-[8px]">
+                                    <div className="inline-flex items-center gap-2">
                                       <span
-                                        className="h-[8px] w-[8px] rounded-full"
+                                        className="h-2 w-2 rounded-full"
                                         style={{ backgroundColor: PLAN_ACCENTS[index % PLAN_ACCENTS.length] }}
                                       />
                                       {plan.name}
@@ -950,23 +836,26 @@ export default function PricingPage() {
                             </thead>
                             {comparisonGroups.map((group) => (
                               <tbody key={group.title}>
-                                <tr className="bg-[rgba(255,255,255,0.02)]">
+                                <tr className="bg-[#F1F5F9]/60">
                                   <td
                                     colSpan={plans.length + 1}
-                                    className="px-[16px] py-[12px] text-left font-sans text-[12px] font-semibold uppercase tracking-[0.12em] text-[#D7C4F7]"
+                                    className="px-4 py-2.5 text-left font-sans text-[11px] font-bold uppercase tracking-wider text-[#2563EB]"
                                   >
                                     {group.title}
                                   </td>
                                 </tr>
                                 {group.rows.map((row, rowIndex) => (
-                                  <tr key={`${group.title}-${row.label}`} className={rowIndex % 2 === 0 ? "bg-transparent" : "bg-[rgba(255,255,255,0.015)]"}>
-                                    <td className="border-t border-[rgba(255,255,255,0.04)] px-[16px] py-[14px] font-sans text-[14px] text-[#B8B0D1]">
+                                  <tr
+                                    key={`${group.title}-${row.label}`}
+                                    className={rowIndex % 2 === 0 ? "bg-white" : "bg-[#FAFAFA]"}
+                                  >
+                                    <td className="border-t border-[#E2E8F0] px-4 py-3 font-sans text-[13.5px] text-[#334155]">
                                       {row.label}
                                     </td>
                                     {row.values.map((value, valueIndex) => (
                                       <td
                                         key={`${group.title}-${row.label}-${valueIndex}`}
-                                        className="border-t border-[rgba(255,255,255,0.04)] px-[16px] py-[14px] text-center font-sans text-[14px] leading-[1.6]"
+                                        className="border-t border-[#E2E8F0] px-4 py-3 text-center font-sans text-[13.5px]"
                                       >
                                         {renderComparisonCell(value)}
                                       </td>
@@ -979,171 +868,85 @@ export default function PricingPage() {
                         </div>
                       </div>
                     </motion.div>
-                  ) : null}
+                  )}
                 </AnimatePresence>
               </div>
             </section>
 
-            <section className="px-[20px] pb-[60px]">
-              <div className="mx-auto max-w-[1180px]">
+            {/* ADD-ONS SECTION */}
+            <section className="px-5 pb-16">
+              <div className="mx-auto max-w-6xl">
                 <div className="text-center">
-                  <h2 className="font-display text-[30px] font-semibold text-[#FAF7FF]">Overage Charges</h2>
-                  <p className="mx-auto mt-[12px] max-w-[420px] font-sans text-[15px] leading-[1.7] text-[#B8B0D1]">
-                    When you exceed your plan limits
+                  <h2 className="font-sans text-[28px] font-bold text-[#0F172A]">Add-Ons</h2>
+                  <p className="mx-auto mt-2 max-w-lg font-sans text-[14.5px] text-[#64748B]">
+                    Available for any plan. Add modular capabilities when you need them.
                   </p>
                 </div>
 
-                <div className="mt-[24px] overflow-hidden rounded-[24px] border border-[#1E0A35] bg-[#130224]">
-                  <div className="overflow-x-auto">
-                    <table className="w-full min-w-[860px] border-collapse">
-                      <thead className="bg-[#1E0A35]">
-                        <tr className="border-b border-[#1E0A35]">
-                          <th className="px-[16px] py-[16px] text-left font-sans text-[13px] uppercase tracking-[0.08em] text-[#8D86A8]">
-                            Type
-                          </th>
-                          {plans.map((plan) => (
-                            <th
-                              key={`${plan.slug}-overage`}
-                              className="px-[16px] py-[16px] text-center font-sans text-[14px] font-semibold text-[#FAF7FF]"
-                            >
-                              {plan.name}
-                            </th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {[
-                          {
-                            label: "Extra Voice Minutes",
-                            values: plans.map((plan) => (formatPaise(plan.overageVoicePerMinute) ? `${formatPaise(plan.overageVoicePerMinute)}/min` : "-")),
-                          },
-                          {
-                            label: "Extra Chat Conversations",
-                            values: plans.map((plan) =>
-                              formatPaise(plan.overageChatPerConversation) ? `${formatPaise(plan.overageChatPerConversation)}/conv` : "-"
-                            ),
-                          },
-                          {
-                            label: "Extra Social Posts",
-                            values: plans.map((plan) =>
-                              formatPaise(plan.overageSocialPerPost) ? `${formatPaise(plan.overageSocialPerPost)}/post` : "-"
-                            ),
-                          },
-                          {
-                            label: "Extra WhatsApp",
-                            values: plans.map((plan) => {
-                              const included = getFeatureBoolean(plan, "whatsapp_included");
-                              const overage = getFeatureNumber(plan, "whatsapp_overage");
-                              return included && overage !== null ? `${formatPaise(overage)}/conv` : "N/A";
-                            }),
-                          },
-                          {
-                            label: "Additional AI Agent",
-                            values: plans.map((plan) => {
-                              const price = getFeatureNumber(plan, "additional_agent_price");
-                              return price !== null ? `${formatPaise(price)}/mo` : "N/A";
-                            }),
-                          },
-                        ].map((row, index) => (
-                          <tr key={row.label} className={index % 2 === 0 ? "bg-transparent" : "bg-[rgba(255,255,255,0.015)]"}>
-                            <td className="border-t border-[rgba(255,255,255,0.04)] px-[16px] py-[14px] font-sans text-[14px] text-[#B8B0D1]">
-                              {row.label}
-                            </td>
-                            {row.values.map((value, valueIndex) => (
-                              <td
-                                key={`${row.label}-${valueIndex}`}
-                                className="border-t border-[rgba(255,255,255,0.04)] px-[16px] py-[14px] text-center font-sans text-[14px] text-[#FAF7FF]"
-                              >
-                                {value}
-                              </td>
-                            ))}
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-
-                <div className="mt-[20px] rounded-[20px] border border-[rgba(139,92,246,0.15)] bg-[rgba(139,92,246,0.06)] p-[20px]">
-                  <div className="flex items-start gap-[12px]">
-                    <Info size={18} className="mt-[2px] shrink-0 text-[#D7C4F7]" />
-                    <div>
-                      <div className="font-sans text-[14px] font-semibold text-[#FAF7FF]">How overages work:</div>
-                      <div className="mt-[10px] space-y-[6px] font-sans text-[14px] leading-[1.6] text-[#B8B0D1]">
-                        <div>1. You receive alerts at usage thresholds</div>
-                        <div>2. Service continues beyond limits (never cut off)</div>
-                        <div>3. Overage charges added to next month&apos;s invoice</div>
-                        <div>4. Upgrade anytime to avoid overages</div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </section>
-
-            <section className="px-[20px] pb-[60px]">
-              <div className="mx-auto max-w-[1180px]">
-                <div className="text-center">
-                  <h2 className="font-display text-[30px] font-semibold text-[#FAF7FF]">Add-Ons</h2>
-                  <p className="mx-auto mt-[12px] max-w-[520px] font-sans text-[15px] leading-[1.7] text-[#B8B0D1]">
-                    Available for any plan. Add when you need them.
-                  </p>
-                </div>
-
-                <div className="mt-[24px] grid grid-cols-1 gap-[16px] md:grid-cols-2 xl:grid-cols-3">
+                <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
                   {ADD_ONS.map((addon) => (
-                    <div key={addon.title} className="rounded-[20px] border border-[#1E0A35] bg-[#130224] p-[20px]">
-                      <div className="font-display text-[18px] font-semibold text-[#FAF7FF]">{addon.title}</div>
-                      <p className="mt-[10px] font-sans text-[13px] leading-[1.7] text-[#B8B0D1]">{addon.description}</p>
-                      <div className="mt-[16px] font-sans text-[15px] font-semibold text-[#FBBF24]">{addon.price}</div>
+                    <div
+                      key={addon.title}
+                      className="rounded-2xl border border-[#E2E8F0] bg-white p-5 shadow-xs hover:border-[#2563EB]/40 transition-colors"
+                    >
+                      <div className="font-sans text-[16px] font-bold text-[#0F172A]">{addon.title}</div>
+                      <p className="mt-2 font-sans text-[12.5px] leading-relaxed text-[#64748B]">{addon.description}</p>
+                      <div className="mt-4 font-sans text-[14px] font-bold text-[#2563EB]">{addon.price}</div>
                     </div>
                   ))}
                 </div>
               </div>
             </section>
 
-            <section className="border-t border-[#1E0A35] bg-[#0C0118] px-[20px] py-[100px]">
-              <div className="mx-auto max-w-[820px]">
+            {/* FAQ SECTION */}
+            <section className="border-t border-[#E2E8F0] bg-white px-5 py-20">
+              <div className="mx-auto max-w-3xl">
                 <div className="text-center">
-                  <h2 className="font-display text-[32px] font-semibold text-[#FAF7FF]">
+                  <h2 className="font-sans text-[30px] font-bold text-[#0F172A]">
                     Frequently Asked Questions
                   </h2>
                 </div>
 
-                <div className="mt-[34px] rounded-[24px] border border-[#1E0A35] bg-[#130224] px-[22px]">
+                <div className="mt-8 rounded-2xl border border-[#E2E8F0] bg-[#FAFAFA] px-6">
                   {FAQS.map((faq, index) => {
                     const isOpen = openFaq === index;
 
                     return (
                       <div
                         key={faq.question}
-                        className={`border-b border-[rgba(255,255,255,0.05)] py-[18px] ${index === FAQS.length - 1 ? "border-b-0" : ""}`}
+                        className={`border-b border-[#E2E8F0] py-4.5 ${
+                          index === FAQS.length - 1 ? "border-b-0" : ""
+                        }`}
                       >
                         <button
                           type="button"
                           onClick={() => setOpenFaq((current) => (current === index ? null : index))}
-                          className="flex w-full items-center justify-between gap-[20px] text-left"
+                          className="flex w-full items-center justify-between gap-4 text-left cursor-pointer"
                         >
-                          <span className="font-sans text-[16px] font-semibold text-[#FAF7FF]">{faq.question}</span>
+                          <span className="font-sans text-[15px] font-semibold text-[#0F172A]">{faq.question}</span>
                           <span
-                            className={`inline-flex h-[24px] w-[24px] items-center justify-center rounded-full border border-[#2D1255] text-[#D7C4F7] transition-transform duration-200 ${isOpen ? "rotate-45" : ""}`}
+                            className={`inline-flex h-6 w-6 items-center justify-center rounded-full border border-[#CBD5E1] text-[#64748B] text-sm font-semibold transition-transform duration-200 ${
+                              isOpen ? "rotate-45" : ""
+                            }`}
                           >
                             +
                           </span>
                         </button>
 
                         <AnimatePresence initial={false}>
-                          {isOpen ? (
+                          {isOpen && (
                             <motion.div
                               initial={{ height: 0, opacity: 0 }}
                               animate={{ height: "auto", opacity: 1 }}
                               exit={{ height: 0, opacity: 0 }}
-                              transition={{ duration: 0.24, ease: "easeInOut" }}
+                              transition={{ duration: 0.22, ease: "easeInOut" }}
                               className="overflow-hidden"
                             >
-                              <p className="pt-[12px] font-sans text-[15px] leading-[1.7] text-[#B8B0D1]">{faq.answer}</p>
+                              <p className="pt-3 font-sans text-[13.5px] leading-relaxed text-[#475569]">
+                                {faq.answer}
+                              </p>
                             </motion.div>
-                          ) : null}
+                          )}
                         </AnimatePresence>
                       </div>
                     );
@@ -1152,24 +955,25 @@ export default function PricingPage() {
               </div>
             </section>
 
-            <section className="px-[20px] pb-[110px] pt-[90px] text-center">
-              <div className="mx-auto max-w-[760px] rounded-[28px] border border-[#1E0A35] bg-[linear-gradient(180deg,rgba(19,2,36,0.95),rgba(12,1,24,0.98))] px-[24px] py-[42px] shadow-[0_20px_60px_rgba(0,0,0,0.28)]">
-                <h2 className="font-display text-[34px] font-semibold text-[#FAF7FF]">Not Sure Which Plan Fits?</h2>
-                <p className="mx-auto mt-[14px] max-w-[520px] font-sans text-[16px] leading-[1.7] text-[#B8B0D1]">
-                  Talk to our team. We&apos;ll help you choose the right plan for your business.
+            {/* NOT SURE CALLOUT BANNER */}
+            <section className="px-5 pb-24 pt-12 text-center bg-[#FAFAFA]">
+              <div className="mx-auto max-w-3xl rounded-3xl border border-[#E2E8F0] bg-white px-6 py-10 shadow-xs">
+                <h2 className="font-sans text-[28px] font-bold text-[#0F172A]">Not Sure Which Plan Fits?</h2>
+                <p className="mx-auto mt-3 max-w-lg font-sans text-[14.5px] leading-relaxed text-[#475569]">
+                  Talk to our enterprise voice specialists. We&apos;ll help calculate your call volumes and ROI.
                 </p>
 
-                <div className="mt-[28px] flex flex-col justify-center gap-[14px] sm:flex-row">
+                <div className="mt-7 flex flex-col justify-center gap-3 sm:flex-row">
                   <Link
                     href="/contact"
-                    className="inline-flex items-center justify-center rounded-full bg-[#F59E0B] px-[28px] py-[15px] font-sans text-[15px] font-semibold text-[#080010] transition-all duration-300 hover:-translate-y-[2px] hover:bg-[#D97706]"
+                    className="inline-flex items-center justify-center rounded-full bg-[#2563EB] px-6 py-3 font-sans text-[14px] font-semibold text-white shadow-xs transition-all duration-200 hover:bg-[#1D4ED8]"
                   >
-                    Talk to Us {"->"}
+                    Talk to Us →
                   </Link>
                   {hasConfiguredValue(companyPhone) ? (
                     <a
                       href={`tel:${companyPhone.replace(/\s+/g, "")}`}
-                      className="inline-flex items-center justify-center rounded-full border border-[#2D1255] bg-transparent px-[28px] py-[15px] font-sans text-[15px] font-medium text-[#E9D5FF] transition-all duration-300 hover:border-[#8B5CF6] hover:bg-[rgba(139,92,246,0.08)]"
+                      className="inline-flex items-center justify-center rounded-full border border-[#CBD5E1] bg-white px-6 py-3 font-sans text-[14px] font-semibold text-[#0F172A] transition-all duration-200 hover:border-[#2563EB] hover:text-[#2563EB] shadow-2xs"
                     >
                       {`Call Now: ${companyPhone}`}
                     </a>

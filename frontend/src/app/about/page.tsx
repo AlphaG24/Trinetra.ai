@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { Layout } from "@/components/layout/Layout";
 import { motion } from "framer-motion";
-import { Linkedin, Target, Eye } from "lucide-react";
+import { Linkedin, Target, Eye, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { createClient } from "@/utils/supabase/client";
 
@@ -17,9 +17,9 @@ interface TeamMember {
 }
 
 const GRADIENTS = [
-  "linear-gradient(135deg, #8B5CF6, #6D28D9)",
-  "linear-gradient(135deg, #F59E0B, #D97706)",
-  "linear-gradient(135deg, #06B6D4, #0891B2)",
+  "linear-gradient(135deg, #2563EB, #1D4ED8)",
+  "linear-gradient(135deg, #0284C7, #0369A1)",
+  "linear-gradient(135deg, #4F46E5, #3730A3)",
 ];
 
 function getInitials(name: string) {
@@ -56,29 +56,25 @@ export default function AboutPage() {
   }, []);
 
   return (
-    <Layout>
-      <div className="flex flex-col bg-[#080010] min-h-screen pb-[120px]">
+    <Layout theme="vaakriti">
+      <div className="flex flex-col bg-[#FAFAFA] min-h-screen pb-24 text-[#0F172A] pt-24 sm:pt-28">
         {/* HERO SECTION */}
-        <section className="w-full pt-[140px] pb-[80px] text-center px-[20px] relative overflow-hidden">
-          <div 
-            className="absolute inset-0 z-0 pointer-events-none" 
-            style={{ 
-              background: 'radial-gradient(ellipse 800px 400px at top center, rgba(139,92,246,0.08) 0%, transparent 70%)' 
-            }} 
-          />
-          
+        <section className="w-full pt-10 pb-16 text-center px-5 relative overflow-hidden">
           <motion.div 
-            initial={{ opacity: 0, y: 30 }}
+            initial={{ opacity: 0, y: 24 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8 }}
-            className="relative z-10 max-w-[800px] mx-auto flex flex-col items-center"
+            transition={{ duration: 0.6 }}
+            className="relative z-10 max-w-3xl mx-auto flex flex-col items-center"
           >
-            <div className="inline-block bg-[rgba(139,92,246,0.1)] border border-[rgba(139,92,246,0.15)] text-[#D7C4F7] font-sans font-medium text-[13px] px-[16px] py-[6px] rounded-full mb-[24px]">
-              About Us
+            <div className="inline-flex items-center gap-1.5 bg-[#2563EB]/10 border border-[#2563EB]/25 text-[#2563EB] font-sans font-semibold text-[12.5px] px-4 py-1.5 rounded-full mb-6">
+              <span>✦</span> About Us
             </div>
-            <h1 className="font-display font-bold text-[36px] md:text-[48px] text-[#FAF7FF] tracking-[-0.02em] leading-tight">
-              Vision <span className="text-transparent bg-clip-text" style={{ backgroundImage: 'linear-gradient(135deg, #D7C4F7 0%, #FBBF24 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Beyond</span> the Surface
+            <h1 className="font-sans font-extrabold text-[36px] md:text-[50px] text-[#0F172A] tracking-tight leading-tight">
+              Vision <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#2563EB] to-[#0284C7]">Beyond</span> the Surface
             </h1>
+            <p className="mt-4 text-[#475569] text-base md:text-lg max-w-xl">
+              Sovereign voice intelligence and autonomous customer experience pipelines built for India and the world.
+            </p>
           </motion.div>
         </section>
 
@@ -87,82 +83,78 @@ export default function AboutPage() {
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
-          transition={{ duration: 0.8, delay: 0.2 }}
-          className="w-full max-w-[750px] mx-auto px-[20px]"
+          transition={{ duration: 0.6, delay: 0.1 }}
+          className="w-full max-w-3xl mx-auto px-5"
         >
-          <div className="font-sans font-normal text-[17px] text-[#B8B0D1] leading-[1.8] flex flex-col gap-[24px]">
-            <h2 className="font-display font-bold text-[22px] md:text-[24px] text-[#FAF7FF]">
+          <div className="font-sans text-[16px] text-[#334155] leading-relaxed flex flex-col gap-6">
+            <h2 className="font-sans font-bold text-[22px] md:text-[26px] text-[#0F172A]">
               The Meaning Behind the Name
             </h2>
             <p>
-              In ancient wisdom, Trinetra refers to the 'Third Eye' — the divine vision that sees beyond physical reality. It is the ability to perceive patterns, truths, and futures that remain invisible to the naked eye.
+              In ancient wisdom, Trinetra refers to the &apos;Third Eye&apos; — the divine vision that sees beyond physical reality. It is the ability to perceive patterns, truths, and futures that remain invisible to the naked eye.
             </p>
             <p>
-              We chose this name deliberately. In a world drowning in data but starving for insight, Trinetra is the vision that cuts through the noise. We don't just build AI tools — we build the eyes that help businesses see what they've been missing.
+              We chose this name deliberately. In a world drowning in data but starving for insight, Trinetra is the vision that cuts through the noise. We don&apos;t just build AI tools — we build the infrastructure of intelligence that helps businesses see what they&apos;ve been missing.
             </p>
             
-            <blockquote className="border-l-[3px] border-[#8B5CF6] pl-[20px] py-[2px] my-[8px] italic text-[#FAF7FF] leading-[1.6]">
-              "We didn't want to build another AI tool. We wanted to build the infrastructure of intelligence itself."
+            <blockquote className="border-l-[3px] border-[#2563EB] pl-5 py-3 my-2 italic text-[#0F172A] bg-blue-50/50 rounded-r-xl leading-relaxed">
+              &quot;We didn&apos;t want to build another AI tool. We wanted to build the infrastructure of intelligence itself.&quot;
             </blockquote>
             
-            <h2 className="font-display font-bold text-[22px] md:text-[24px] text-[#FAF7FF] mt-[24px]">
+            <h2 className="font-sans font-bold text-[22px] md:text-[26px] text-[#0F172A] mt-6">
               From Experimentation to Infrastructure
             </h2>
             <p>
-              Every meaningful venture has an origin story shaped by failure and obsession. Ours began when we started building specialized tools — extraction engines, data pipelines, automation scripts — and discovered a fundamental truth: individual AI tools solve individual problems, but fragmented solutions create fragmented businesses.
+              Every meaningful venture has an origin story shaped by obsession with craft. Ours began when we started building specialized tools — extraction engines, data pipelines, automation scripts — and discovered a fundamental truth: individual AI tools solve individual problems, but fragmented solutions create fragmented businesses.
             </p>
             <p>
-              That realization changed everything. We stopped building tools and started building infrastructure. An intelligent layer that sits beneath a business and makes everything — calls, conversations, decisions, operations — smarter, faster, and autonomous.
+              That realization changed everything. We stopped building isolated point solutions and started building foundational voice infrastructure. An intelligent layer that sits beneath a business and makes everything — calls, conversations, decisions, operations — smarter, faster, and autonomous.
             </p>
 
-            <h2 className="font-display font-bold text-[22px] md:text-[24px] text-[#FAF7FF] mt-[24px]">
+            <h2 className="font-sans font-bold text-[22px] md:text-[26px] text-[#0F172A] mt-6">
               The Mission: World-Class AI, Indian Heart
             </h2>
             <p>
-              The global AI landscape is dominated by solutions built for Silicon Valley budgets and Western workflows. A dental clinic in Jaipur, a restaurant in Kochi, a salon in Pune — they deserve the same caliber of AI that a Manhattan startup gets. But at a price point and in a language that makes sense for them.
+              The global AI landscape is dominated by solutions built for Silicon Valley budgets and Western workflows. A dental clinic in Jaipur, a hospital in Kochi, a regional distributor in Pune — they deserve the same caliber of voice intelligence that a global enterprise commands. But at a price point and in a language that makes sense for them.
             </p>
             <p>
-              Trinetra AI was born to close this gap. We are building world-class autonomous AI agents — self-healing, multilingual, and deeply intelligent — with pricing that works for Indian businesses. Our architecture is designed for what we call 'Silent Intelligence': systems that work in the background, learn continuously, and never need supervision.
+              Trinetra AI was born to close this gap. We are building world-class autonomous AI agents — self-healing, multilingual, and deeply contextual — with transparent pricing and real-time sovereign telecom integrations.
             </p>
 
-            <blockquote className="border-l-[3px] border-[#8B5CF6] pl-[20px] py-[2px] my-[8px] italic text-[#FAF7FF] leading-[1.6]">
-              "While our ambition is global, our heart beats for the businesses and builders of India. We're not building the future of AI for India — we're building India's AI for the future."
+            <blockquote className="border-l-[3px] border-[#2563EB] pl-5 py-3 my-2 italic text-[#0F172A] bg-blue-50/50 rounded-r-xl leading-relaxed">
+              &quot;While our ambition is global, our heart beats for the businesses and builders of India. We&apos;re not building the future of AI for India — we&apos;re building India&apos;s AI for the future.&quot;
             </blockquote>
 
-            <h2 className="font-display font-bold text-[22px] md:text-[24px] text-[#FAF7FF] mt-[24px]">
-              What We're Building Toward
+            <h2 className="font-sans font-bold text-[22px] md:text-[26px] text-[#0F172A] mt-6">
+              What We&apos;re Building Toward
             </h2>
             <p>
-              Trinetra is more than an AI automation company. We are building an ecosystem across three dimensions:
+              Trinetra is an end-to-end intelligence ecosystem across three core dimensions:
             </p>
 
-            <ul className="flex flex-col gap-[16px] my-[8px]">
-              <li className="flex items-start gap-[12px]">
-                <span className="shrink-0 text-[18px]">🔱</span>
-                <span className="font-sans font-normal text-[17px] text-[#B8B0D1]">
-                  <strong className="text-[#FAF7FF] font-medium">Autonomous Business Agents</strong> — AI that handles calls, chats, social media, and operations with zero human intervention
+            <ul className="flex flex-col gap-4 my-2">
+              <li className="flex items-start gap-3 p-4 rounded-xl bg-white border border-[#E2E8F0] shadow-xs">
+                <span className="shrink-0 text-xl">🔱</span>
+                <span className="font-sans text-[15px] text-[#334155]">
+                  <strong className="text-[#0F172A] font-semibold">Autonomous Business Agents</strong> — AI that handles calls, chats, social media, and operations with zero human friction.
                 </span>
               </li>
-              <li className="flex items-start gap-[12px]">
-                <span className="shrink-0 text-[18px]">🎯</span>
-                <span className="font-sans font-normal text-[17px] text-[#B8B0D1]">
-                  <strong className="text-[#FAF7FF] font-medium">Adaptive Intelligence for Education</strong> — Exam platforms that understand each student's mind and personalize every question
+              <li className="flex items-start gap-3 p-4 rounded-xl bg-white border border-[#E2E8F0] shadow-xs">
+                <span className="shrink-0 text-xl">🎯</span>
+                <span className="font-sans text-[15px] text-[#334155]">
+                  <strong className="text-[#0F172A] font-semibold">Adaptive Intelligence for Education</strong> — Scalable examination platforms through Trinetra Shiksha that understand each student&apos;s needs.
                 </span>
               </li>
-              <li className="flex items-start gap-[12px]">
-                <span className="shrink-0 text-[18px]">🤝</span>
-                <span className="font-sans font-normal text-[17px] text-[#B8B0D1]">
-                  <strong className="text-[#FAF7FF] font-medium">Human Connection Platforms</strong> — Systems that bridge wisdom and need — connecting knowledge with those who seek it
+              <li className="flex items-start gap-3 p-4 rounded-xl bg-white border border-[#E2E8F0] shadow-xs">
+                <span className="shrink-0 text-xl">🤝</span>
+                <span className="font-sans text-[15px] text-[#334155]">
+                  <strong className="text-[#0F172A] font-semibold">Human Connection Platforms</strong> — Systems that bridge knowledge and enterprise scale, connecting insights with action.
                 </span>
               </li>
             </ul>
 
-            <p>
-              We're in the early chapters of this story. Every line of code we write, every agent we deploy, every business we serve brings us closer to a vision where AI doesn't replace humans — it amplifies them. Where technology serves everyone, not just those who can afford it.
-            </p>
-
-            <div className="font-display font-semibold text-[20px] md:text-[22px] mt-[48px] text-center text-transparent bg-clip-text" style={{ backgroundImage: 'linear-gradient(135deg, #D7C4F7 0%, #FBBF24 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-              The third eye sees what others cannot. And we're just getting started.
+            <div className="font-sans font-bold text-[18px] md:text-[20px] mt-10 text-center text-[#2563EB]">
+              The third eye sees what others cannot. And we&apos;re just getting started.
             </div>
           </div>
         </motion.section>
@@ -172,29 +164,29 @@ export default function AboutPage() {
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
-          transition={{ duration: 0.8 }}
-          className="w-full max-w-[800px] mx-auto px-[20px] mt-[80px]"
+          transition={{ duration: 0.6 }}
+          className="w-full max-w-4xl mx-auto px-5 mt-16"
         >
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-[24px]">
-            {/* Mission Component */}
-            <div className="bg-[#130224] border border-[#1E0A35] rounded-[16px] p-[32px] transition-transform hover:-translate-y-[4px] duration-300">
-              <div className="w-[48px] h-[48px] rounded-[12px] bg-[rgba(139,92,246,0.08)] flex items-center justify-center text-[#8B5CF6] mb-[20px]">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Mission */}
+            <div className="bg-white border border-[#E2E8F0] rounded-2xl p-8 shadow-xs hover:shadow-md hover:border-[#2563EB]/40 transition-all">
+              <div className="w-12 h-12 rounded-xl bg-[#2563EB]/10 flex items-center justify-center text-[#2563EB] mb-5">
                 <Target size={24} />
               </div>
-              <h3 className="font-display font-semibold text-[22px] text-[#FAF7FF] mb-[12px]">Our Mission</h3>
-              <p className="font-sans font-normal text-[15px] text-[#B8B0D1] leading-[1.7]">
-                To democratize AI for Indian businesses. We believe every business — from a clinic in Jaipur to a salon in Pune — deserves access to world-class AI at prices that make sense.
+              <h3 className="font-sans font-bold text-[20px] text-[#0F172A] mb-3">Our Mission</h3>
+              <p className="font-sans text-[14.5px] text-[#475569] leading-relaxed">
+                To democratize voice AI for Indian businesses. We believe every enterprise — from regional clinics to nationwide retailers — deserves access to world-class conversational intelligence.
               </p>
             </div>
             
-            {/* Vision Component */}
-            <div className="bg-[#130224] border border-[#1E0A35] rounded-[16px] p-[32px] transition-transform hover:-translate-y-[4px] duration-300">
-              <div className="w-[48px] h-[48px] rounded-[12px] bg-[rgba(139,92,246,0.08)] flex items-center justify-center text-[#8B5CF6] mb-[20px]">
+            {/* Vision */}
+            <div className="bg-white border border-[#E2E8F0] rounded-2xl p-8 shadow-xs hover:shadow-md hover:border-[#2563EB]/40 transition-all">
+              <div className="w-12 h-12 rounded-xl bg-[#2563EB]/10 flex items-center justify-center text-[#2563EB] mb-5">
                 <Eye size={24} />
               </div>
-              <h3 className="font-display font-semibold text-[22px] text-[#FAF7FF] mb-[12px]">Our Vision</h3>
-              <p className="font-sans font-normal text-[15px] text-[#B8B0D1] leading-[1.7]">
-                To become India's leading AI infrastructure company. Building the invisible intelligence layer that powers the next generation of autonomous businesses.
+              <h3 className="font-sans font-bold text-[20px] text-[#0F172A] mb-3">Our Vision</h3>
+              <p className="font-sans text-[14.5px] text-[#475569] leading-relaxed">
+                To become India&apos;s definitive voice infrastructure backbone. Powering millions of sovereign, multilingual telephone interactions daily with sub-500ms latency.
               </p>
             </div>
           </div>
@@ -206,45 +198,45 @@ export default function AboutPage() {
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
-            transition={{ duration: 0.8 }}
-            className="w-full max-w-[1280px] mx-auto px-[20px] mt-[100px] flex flex-col items-center"
+            transition={{ duration: 0.6 }}
+            className="w-full max-w-5xl mx-auto px-5 mt-20 flex flex-col items-center"
           >
-            <h2 className="font-display font-bold text-[32px] md:text-[40px] text-[#FAF7FF] tracking-[-0.02em] leading-tight text-center">
+            <h2 className="font-sans font-bold text-[28px] md:text-[36px] text-[#0F172A] tracking-tight text-center">
               The People Behind Trinetra
             </h2>
-            <p className="font-sans font-normal text-[16px] text-[#B8B0D1] mb-[56px] text-center mt-[12px]">
-              A small team with a big vision.
+            <p className="font-sans text-[15px] text-[#64748B] mb-12 text-center mt-2">
+              Engineers, researchers, and builders shaping conversational intelligence.
             </p>
 
-            <div className="flex flex-col md:flex-row flex-wrap justify-center gap-[24px]">
+            <div className="flex flex-col md:flex-row flex-wrap justify-center gap-6 w-full">
               {teamMembers.map((member, idx) => (
-                <div key={member.id} className="w-full md:w-[320px] bg-[#130224] border border-[#1E0A35] rounded-[20px] p-[32px] flex flex-col items-center text-center transition-all duration-300">
+                <div key={member.id} className="w-full md:w-[320px] bg-white border border-[#E2E8F0] rounded-2xl p-7 flex flex-col items-center text-center shadow-xs hover:shadow-md transition-all">
                   {member.profile_image_url ? (
                     <img 
                       src={member.profile_image_url} 
                       alt={member.full_name} 
-                      className="w-[80px] h-[80px] rounded-full object-cover border-2 border-[#3A1C68]"
+                      className="w-20 h-20 rounded-full object-cover border-2 border-[#E2E8F0]"
                     />
                   ) : (
                     <div 
-                      className="w-[80px] h-[80px] rounded-full flex items-center justify-center"
+                      className="w-20 h-20 rounded-full flex items-center justify-center text-white"
                       style={{ background: GRADIENTS[idx % GRADIENTS.length] }}
                     >
-                      <span className="font-display font-bold text-[24px] text-white">
+                      <span className="font-sans font-bold text-[22px]">
                         {getInitials(member.full_name)}
                       </span>
                     </div>
                   )}
                   
-                  <h3 className="font-display font-bold text-[18px] text-[#FAF7FF] mt-[16px]">
+                  <h3 className="font-sans font-bold text-[17px] text-[#0F172A] mt-4">
                     {member.full_name}
                   </h3>
-                  <p className="font-sans font-normal text-[14px] text-[#B8B0D1] mt-[4px]">
+                  <p className="font-sans text-[13.5px] text-[#2563EB] font-medium mt-1">
                     {member.role_title}
                   </p>
                   
                   {member.bio && (
-                    <p className="font-sans font-normal text-[13px] text-[#8D86A8] leading-[1.6] mt-[12px] line-clamp-3">
+                    <p className="font-sans text-[13px] text-[#64748B] leading-relaxed mt-3 line-clamp-3">
                       {member.bio}
                     </p>
                   )}
@@ -254,20 +246,20 @@ export default function AboutPage() {
                       href={member.linkedin_url} 
                       target="_blank" 
                       rel="noopener noreferrer"
-                      className="mt-[16px] w-[36px] h-[36px] rounded-full flex items-center justify-center text-[#6B6088] bg-[rgba(139,92,246,0.05)] hover:bg-[rgba(139,92,246,0.15)] hover:text-[#FAF7FF] transition-colors"
+                      className="mt-4 w-9 h-9 rounded-full flex items-center justify-center text-[#64748B] bg-[#F1F5F9] hover:bg-[#2563EB]/10 hover:text-[#2563EB] transition-colors"
                     >
-                      <Linkedin size={18} />
+                      <Linkedin size={16} />
                     </a>
                   )}
                 </div>
               ))}
             </div>
 
-            <div className="mt-[60px] flex flex-col items-center">
-              <p className="font-sans font-normal text-[15px] text-[#B8B0D1] text-center">
-                Want to join us? We're looking for builders.
+            <div className="mt-12 flex flex-col items-center">
+              <p className="font-sans text-[14.5px] text-[#64748B] text-center">
+                Want to join us? We&apos;re looking for exceptional builders.
               </p>
-              <Link href="/contact" className="mt-[8px] font-sans font-medium text-[15px] text-[#8B5CF6] hover:text-[#D7C4F7] transition-colors">
+              <Link href="/contact" className="mt-2 font-sans font-semibold text-[14.5px] text-[#2563EB] hover:text-[#1D4ED8] transition-colors">
                 Get in Touch →
               </Link>
             </div>
@@ -275,20 +267,22 @@ export default function AboutPage() {
         )}
 
         {/* BOTTOM CTA SECTION */}
-        <section className="w-full px-[20px] pt-[100px] pb-[40px] text-center">
-          <div className="mx-auto max-w-[760px]">
-            <h2 className="font-display font-bold text-[32px] md:text-[36px] text-[#FAF7FF] tracking-[-0.02em] leading-tight mb-[32px]">
-              Let's Build the Future Together
+        <section className="w-full px-5 pt-20 pb-8 text-center">
+          <div className="mx-auto max-w-2xl bg-white border border-[#E2E8F0] rounded-3xl p-10 shadow-xs">
+            <h2 className="font-sans font-bold text-[28px] md:text-[32px] text-[#0F172A] tracking-tight mb-4">
+              Let&apos;s Build the Future Together
             </h2>
+            <p className="text-[#64748B] text-sm md:text-base max-w-md mx-auto mb-7">
+              Ready to deploy intelligent voice automation for your organization?
+            </p>
             <Link 
               href="/contact"
-              className="inline-flex items-center justify-center rounded-full bg-[#F59E0B] px-[32px] py-[16px] font-sans text-[16px] font-semibold text-[#080010] transition-all duration-300 hover:-translate-y-[2px] hover:bg-[#D97706]"
+              className="inline-flex items-center justify-center rounded-full bg-[#2563EB] px-8 py-3.5 font-sans text-[14px] font-semibold text-white shadow-xs transition-all duration-200 hover:bg-[#1D4ED8]"
             >
               Get in Touch →
             </Link>
           </div>
         </section>
-
       </div>
     </Layout>
   );

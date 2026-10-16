@@ -103,11 +103,6 @@ const nextConfig: NextConfig = {
         permanent: true,
       },
       {
-        source: '/pricing',
-        destination: '/contact',
-        permanent: false,
-      },
-      {
         source: '/dashboard/deploy-agent',
         destination: '/dashboard/deploy',
         permanent: false,

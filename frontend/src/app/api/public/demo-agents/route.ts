@@ -17,6 +17,8 @@ export interface DemoAgentItem {
   badge_color: string;
   suggested_prompts: string[];
   is_managed_by_dev: boolean;
+  campaign_purpose?: string;
+  industry_domain?: string;
 }
 
 // Curated persona configurations matching the Vaakriti design system

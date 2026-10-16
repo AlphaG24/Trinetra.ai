@@ -97,6 +97,8 @@ export default async function MarketplaceDetailPage({ params }: MarketplaceDetai
   let systemConfig: Record<string, string> = {}
   let agents: any[] = []
   let is404 = false
+  let errorOccurred = false
+  let errorMessage = ''
 
   try {
     const supabase = await createClient()
@@ -126,7 +128,7 @@ export default async function MarketplaceDetailPage({ params }: MarketplaceDetai
     if (tool) {
       // 2. Fetch authenticated user profile safely with timeout
       try {
-        const authPromise = supabase.auth.getUser().catch(() => ({ data: { user: null } }))
+        const authPromise = Promise.resolve(supabase.auth.getUser()).catch(() => ({ data: { user: null } }))
         const authTimeout = new Promise<any>((resolve) =>
           setTimeout(() => resolve({ data: { user: null } }), 1500)
         )
@@ -134,25 +136,25 @@ export default async function MarketplaceDetailPage({ params }: MarketplaceDetai
         const user = authData?.user
 
         if (user) {
-          const profilePromise = supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', user.id)
-            .maybeSingle()
-            .then(res => res)
-            .catch(() => ({ data: null }))
+          const profilePromise = Promise.resolve(
+            supabase
+              .from('profiles')
+              .select('*')
+              .eq('id', user.id)
+              .maybeSingle()
+          ).catch(() => ({ data: null }))
           const profileTimeout = new Promise<any>((resolve) =>
             setTimeout(() => resolve({ data: null }), 1500)
           )
           const { data: profileData } = await Promise.race([profilePromise, profileTimeout])
           profile = profileData
 
-          const agentsPromise = supabase
-            .from('agents')
-            .select('*')
-            .eq('user_id', user.id)
-            .then(res => res)
-            .catch(() => ({ data: [] }))
+          const agentsPromise = Promise.resolve(
+            supabase
+              .from('agents')
+              .select('*')
+              .eq('user_id', user.id)
+          ).catch(() => ({ data: [] }))
           const agentsTimeout = new Promise<any>((resolve) =>
             setTimeout(() => resolve({ data: [] }), 1500)
           )
@@ -163,11 +165,11 @@ export default async function MarketplaceDetailPage({ params }: MarketplaceDetai
 
       // 3. Fetch system config keys safely with timeout
       try {
-        const configPromise = supabase
-          .from('system_config')
-          .select('config_key, config_value')
-          .then(res => res)
-          .catch(() => ({ data: null }))
+        const configPromise = Promise.resolve(
+          supabase
+            .from('system_config')
+            .select('config_key, config_value')
+        ).catch(() => ({ data: null }))
         const configTimeout = new Promise<any>((resolve) =>
           setTimeout(() => resolve({ data: null }), 1500)
         )
@@ -180,11 +182,12 @@ export default async function MarketplaceDetailPage({ params }: MarketplaceDetai
         }
       } catch {}
     }
-  } catch {
+  } catch (err: any) {
     if (FALLBACK_SERVICES[slug]) {
       tool = FALLBACK_SERVICES[slug]
     } else {
-      is404 = true
+      errorOccurred = true
+      errorMessage = err?.message || 'Database connection error'
     }
   }
 

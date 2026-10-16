@@ -53,7 +53,7 @@ export async function GET() {
     }
 
     try {
-      const parsed = JSON.parse(data.config_value)
+      const parsed = JSON.parse(configRow.config_value)
       return NextResponse.json({
         success: true,
         data: {

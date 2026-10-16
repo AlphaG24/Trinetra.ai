@@ -96,7 +96,6 @@ export async function GET() {
         })
         return configMap
       }
-<<<<<<< HEAD
       return cachedConfigs || DEFAULT_PUBLIC_CONFIGS
     })()
 
@@ -104,17 +103,7 @@ export async function GET() {
     const timeoutPromise = new Promise<Record<string, string>>((resolve) =>
       setTimeout(() => resolve(cachedConfigs || DEFAULT_PUBLIC_CONFIGS), 1500)
     )
-=======
-      return NextResponse.json({ configs: DEFAULT_PUBLIC_CONFIGS })
-    }
 
-    const configMap: Record<string, string> = { ...DEFAULT_PUBLIC_CONFIGS }
-    ;(configs as any[])?.forEach((item: any) => {
-      if (item && PUBLIC_KEYS.includes(item.config_key)) {
-        configMap[item.config_key] = item.config_value
-      }
-    })
->>>>>>> origin/dev
 
     const resolvedConfigs = await Promise.race([fetchPromise, timeoutPromise])
     cachedConfigs = resolvedConfigs

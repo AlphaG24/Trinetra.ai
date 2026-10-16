@@ -6,11 +6,11 @@ import SubscribeForm from './SubscribeForm'
 export const dynamic = 'force-dynamic'
 
 export const metadata: Metadata = {
-  title: 'Blog & Research | trinetraedu-ai',
-  description: 'Practical guides, architectural deep-dives, and engineering insights on autonomous AI systems, agentic workflows, and scalable intelligence.',
+  title: 'Blog & Research | Trinetra AI',
+  description: 'Practical guides, architectural deep-dives, and engineering insights on autonomous voice AI systems, agentic workflows, and scalable intelligence.',
   openGraph: {
-    title: 'Blog & Research | trinetraedu-ai',
-    description: 'Insights on Autonomous AI Systems, Agentic Workflows & Scalable Intelligence.',
+    title: 'Blog & Research | Trinetra AI',
+    description: 'Insights on Autonomous Voice AI Systems, Agentic Workflows & Scalable Telephony.',
     type: 'website',
   },
 }
@@ -91,36 +91,28 @@ export default async function BlogListingPage({
   }
 
   return (
-    <div className="min-h-screen bg-[#080010] text-white selection:bg-violet-500/30">
-
-      {/* ═══ AMBIENT GLOW ═══ */}
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute top-0 left-1/2 -translate-x-1/2 h-[450px] w-full max-w-[1200px] bg-[radial-gradient(ellipse_at_top,rgba(139,92,246,0.12)_0%,transparent_70%)]"
-      />
-
+    <div className="min-h-screen bg-[#FAFAFA] text-[#0F172A] pt-24 sm:pt-28">
       {/* ═══ PAGE HEADER ═══ */}
-      <div className="relative w-full px-6 sm:px-10 lg:px-16 pt-20 pb-10 text-center">
-        <p className="text-xs sm:text-sm font-extrabold uppercase tracking-[3px] text-violet-400 mb-4">
-          TRINETRAEDU-AI PUBLICATIONS
-        </p>
-        <h1 className="text-3xl sm:text-5xl lg:text-6xl font-extrabold text-white leading-tight max-w-4xl mx-auto tracking-tight">
-          Insights on Agentic AI, Autonomous Workflows &amp; Intelligence
+      <div className="relative w-full px-6 sm:px-10 lg:px-16 pt-10 pb-8 text-center">
+        <div className="inline-flex items-center gap-1.5 bg-[#2563EB]/10 border border-[#2563EB]/25 text-[#2563EB] font-sans font-semibold text-[12.5px] px-4 py-1.5 rounded-full mb-5">
+          <span>✦</span> Research &amp; Publications
+        </div>
+        <h1 className="text-3xl sm:text-5xl font-extrabold text-[#0F172A] leading-tight max-w-4xl mx-auto tracking-tight font-sans">
+          Insights on Autonomous Voice AI, Agentic Systems &amp; Scale
         </h1>
-        <p className="text-base sm:text-lg text-[#9E99E0] mt-4 max-w-2xl mx-auto leading-relaxed">
-          Engineering deep-dives, practical blueprints, and research insights to help you build and scale autonomous AI systems.
+        <p className="text-base sm:text-lg text-[#475569] mt-4 max-w-2xl mx-auto leading-relaxed font-sans">
+          Engineering deep-dives, telephony blueprints, and research insights to help you build and scale conversational AI.
         </p>
       </div>
 
-      <div className="w-full px-6 sm:px-10 lg:px-16 pb-24 max-w-[1400px] mx-auto">
-
-        {/* ═══ FEATURED HERO POST (When on page 1 of default feed) ═══ */}
+      <div className="w-full px-6 sm:px-10 lg:px-16 pb-24 max-w-6xl mx-auto">
+        {/* ═══ FEATURED HERO POST ═══ */}
         {featured && (
           <a
             href={`/blog/${featured.slug}`}
-            className="group block relative w-full rounded-2xl overflow-hidden mb-12 border border-violet-500/20 hover:border-violet-500/50 transition-all duration-300 shadow-2xl shadow-violet-950/20"
+            className="group block relative w-full rounded-3xl overflow-hidden mb-12 border border-[#E2E8F0] bg-white hover:border-[#2563EB]/40 transition-all duration-300 shadow-xs hover:shadow-lg"
           >
-            <div className="relative w-full h-[320px] sm:h-[420px] lg:h-[500px]">
+            <div className="relative w-full h-[320px] sm:h-[420px] lg:h-[480px]">
               {featured.cover_image_url ? (
                 <img
                   src={featured.cover_image_url}
@@ -128,47 +120,51 @@ export default async function BlogListingPage({
                   className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-[1.02]"
                 />
               ) : (
-                <div className="w-full h-full bg-gradient-to-br from-violet-900 to-indigo-950" />
+                <img
+                  src="/images/vaakriti_blog.jpg"
+                  alt={featured.title}
+                  className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-[1.02]"
+                />
               )}
               
-              {/* Dark gradient overlay */}
-              <div className="absolute inset-0 bg-gradient-to-t from-[#080010] via-black/50 to-transparent" />
+              {/* Subtle gradient overlay */}
+              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/35 to-transparent" />
 
-              {/* Content overlay — bottom-left */}
-              <div className="absolute bottom-0 left-0 right-0 p-6 sm:p-10 lg:p-14">
-                <div className="flex items-center gap-2 mb-4">
-                  <span className="text-[11px] font-extrabold uppercase tracking-widest text-amber-300 bg-amber-500/20 border border-amber-500/30 px-3 py-1 rounded-md">
+              {/* Content overlay */}
+              <div className="absolute bottom-0 left-0 right-0 p-6 sm:p-10 lg:p-12 text-white">
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-amber-300 bg-amber-500/20 border border-amber-500/30 px-2.5 py-1 rounded-full backdrop-blur-md">
                     Featured
                   </span>
                   {featured.category && (
-                    <span className="text-[11px] font-bold uppercase tracking-widest text-white bg-violet-600 px-3 py-1 rounded-md">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-white bg-[#2563EB] px-2.5 py-1 rounded-full">
                       {featured.category}
                     </span>
                   )}
                 </div>
 
-                <h2 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-white leading-tight max-w-4xl group-hover:text-violet-200 transition-colors">
+                <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white leading-tight max-w-4xl font-sans drop-shadow-sm">
                   {featured.title}
                 </h2>
 
                 {featured.excerpt && (
-                  <p className="text-sm sm:text-base text-gray-300 mt-3 max-w-2xl line-clamp-2 leading-relaxed">
+                  <p className="text-sm sm:text-base text-slate-200 mt-2.5 max-w-2xl line-clamp-2 leading-relaxed font-sans">
                     {featured.excerpt}
                   </p>
                 )}
 
-                <div className="flex items-center gap-3 mt-6 text-sm text-gray-400">
-                  <div className="w-8 h-8 rounded-full overflow-hidden bg-[#130026] border border-violet-500/30 p-0.5 flex items-center justify-center shrink-0">
+                <div className="flex items-center gap-3 mt-5 text-xs text-slate-300 font-sans">
+                  <div className="w-7 h-7 rounded-full overflow-hidden bg-white/20 border border-white/30 p-0.5 flex items-center justify-center shrink-0">
                     <img
                       src={getAuthorAvatar(featured.author_name, featured.author_avatar_url)}
                       alt={featured.author_name || 'Author'}
                       className="w-full h-full object-contain"
                     />
                   </div>
-                  <span className="font-semibold text-gray-200">{featured.author_name || 'trinetraedu-ai'}</span>
-                  <span className="text-gray-600">·</span>
+                  <span className="font-semibold text-white">{featured.author_name || 'Trinetra AI'}</span>
+                  <span>·</span>
                   <span>{formatDate(featured.published_at || featured.created_at)}</span>
-                  <span className="text-gray-600">·</span>
+                  <span>·</span>
                   <span>{featured.read_time_minutes || 5} min read</span>
                 </div>
               </div>
@@ -177,8 +173,7 @@ export default async function BlogListingPage({
         )}
 
         {/* ═══ TOOLBAR: Search & Category Filter ═══ */}
-        <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4 mb-10 pb-6 border-b border-violet-500/10">
-          
+        <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4 mb-10 pb-6 border-b border-[#E2E8F0]">
           {/* Category Tabs */}
           <nav className="flex flex-wrap items-center gap-2">
             {CATEGORIES.map((cat) => {
@@ -192,10 +187,10 @@ export default async function BlogListingPage({
                 <a
                   key={cat}
                   href={href}
-                  className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all duration-200 ${
+                  className={`px-3.5 py-1.5 rounded-full text-xs font-semibold tracking-wide transition-all duration-200 font-sans ${
                     isActive
-                      ? 'bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-md shadow-violet-600/20 border border-violet-500'
-                      : 'border border-violet-500/20 bg-white/[0.02] text-[#9E99E0] hover:border-violet-500/50 hover:text-white hover:bg-white/[0.04]'
+                      ? 'bg-[#2563EB] text-white shadow-xs'
+                      : 'border border-[#E2E8F0] bg-white text-[#475569] hover:border-[#2563EB] hover:text-[#2563EB]'
                   }`}
                 >
                   {cat}
@@ -207,28 +202,28 @@ export default async function BlogListingPage({
           {/* Search Form */}
           <form action="/blog" method="GET" className="relative w-full md:w-72">
             {activeCategory !== 'All' && <input type="hidden" name="category" value={activeCategory} />}
-            <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-500 pointer-events-none" />
+            <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#94A3B8] pointer-events-none" />
             <input
               type="text"
               name="search"
               defaultValue={searchQuery}
               placeholder="Search articles..."
-              className="w-full h-10 pl-9 pr-4 rounded-xl border border-violet-500/20 bg-white/[0.02] text-xs text-white outline-none focus:border-violet-400 transition-colors placeholder:text-zinc-500"
+              className="w-full h-10 pl-9 pr-4 rounded-xl border border-[#E2E8F0] bg-white text-xs text-[#0F172A] outline-none focus:border-[#2563EB] focus:ring-2 focus:ring-[#2563EB]/15 transition-all placeholder:text-[#94A3B8] font-sans"
             />
           </form>
         </div>
 
         {/* ═══ POSTS GRID ═══ */}
         {allPosts.length === 0 ? (
-          <div className="text-center py-24 border border-violet-500/10 rounded-2xl bg-white/[0.01]">
-            <p className="text-2xl font-bold text-white">No articles found</p>
-            <p className="text-[#9E99E0] mt-2 text-sm">
+          <div className="text-center py-20 border border-[#E2E8F0] rounded-2xl bg-white shadow-xs">
+            <p className="text-2xl font-bold text-[#0F172A] font-sans">No articles found</p>
+            <p className="text-[#64748B] mt-2 text-sm font-sans">
               {searchQuery ? `No matches for "${searchQuery}". Try a different keyword.` : 'Check back soon for new publications.'}
             </p>
             {(searchQuery || activeCategory !== 'All') && (
               <a
                 href="/blog"
-                className="inline-block mt-5 text-xs font-bold text-violet-400 hover:text-violet-300 uppercase tracking-wider underline"
+                className="inline-block mt-4 text-xs font-bold text-[#2563EB] hover:underline uppercase tracking-wider font-sans"
               >
                 Clear all filters
               </a>
@@ -237,23 +232,23 @@ export default async function BlogListingPage({
         ) : (
           <>
             <div className="flex items-baseline justify-between mb-8">
-              <h2 className="text-xl sm:text-2xl font-extrabold text-white tracking-tight">
+              <h2 className="text-xl sm:text-2xl font-bold text-[#0F172A] tracking-tight font-sans">
                 {searchQuery ? `Search Results for "${searchQuery}"` : activeCategory === 'All' ? 'Latest Publications' : `${activeCategory} Articles`}
               </h2>
-              <span className="text-xs sm:text-sm text-gray-500 font-semibold">
+              <span className="text-xs sm:text-sm text-[#64748B] font-medium font-sans">
                 Showing {from + 1}-{Math.min(to + 1, total)} of {total} articles
               </span>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-7">
               {gridPosts.map((post) => (
                 <a
                   key={post.id}
                   href={`/blog/${post.slug}`}
-                  className="group flex flex-col rounded-2xl overflow-hidden bg-[#110D1F] border border-violet-500/15 hover:border-violet-500/40 hover:-translate-y-1.5 hover:shadow-2xl hover:shadow-violet-950/40 transition-all duration-300"
+                  className="group flex flex-col rounded-2xl overflow-hidden bg-white border border-[#E2E8F0] hover:border-[#2563EB]/40 hover:-translate-y-1 hover:shadow-md transition-all duration-300"
                 >
                   {/* Card image with fixed aspect ratio */}
-                  <div className="relative w-full h-52 overflow-hidden bg-[#1a0f30]">
+                  <div className="relative w-full h-48 overflow-hidden bg-slate-100">
                     {post.cover_image_url ? (
                       <img
                         src={post.cover_image_url}
@@ -261,12 +256,14 @@ export default async function BlogListingPage({
                         className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                       />
                     ) : (
-                      <div className="w-full h-full bg-gradient-to-br from-violet-900/40 to-indigo-950/40 flex items-center justify-center text-xs text-zinc-600 font-bold uppercase tracking-wider">
-                        trinetraedu-ai Publication
-                      </div>
+                      <img
+                        src="/images/vaakriti_blog.jpg"
+                        alt={post.title}
+                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                      />
                     )}
                     {post.category && (
-                      <span className="absolute top-3 left-3 text-[10px] font-extrabold uppercase tracking-wider text-white bg-violet-600/90 backdrop-blur-md px-2.5 py-1 rounded-md">
+                      <span className="absolute top-3 left-3 text-[10px] font-bold uppercase tracking-wider text-white bg-[#0F172A]/80 backdrop-blur-md px-2.5 py-1 rounded-full">
                         {post.category}
                       </span>
                     )}
@@ -274,29 +271,29 @@ export default async function BlogListingPage({
 
                   {/* Card body */}
                   <div className="flex-1 flex flex-col p-6">
-                    <h3 className="text-lg font-bold text-white leading-snug line-clamp-2 group-hover:text-violet-300 transition-colors">
+                    <h3 className="text-[17px] font-bold text-[#0F172A] leading-snug line-clamp-2 group-hover:text-[#2563EB] transition-colors font-sans">
                       {post.title}
                     </h3>
                     
                     {post.excerpt && (
-                      <p className="text-xs sm:text-sm text-[#9E99E0] mt-2.5 line-clamp-2 leading-relaxed">
+                      <p className="text-xs sm:text-sm text-[#64748B] mt-2.5 line-clamp-2 leading-relaxed font-sans">
                         {post.excerpt}
                       </p>
                     )}
 
                     {/* Author row */}
-                    <div className="mt-auto pt-5 flex items-center gap-2.5 text-xs text-gray-400 border-t border-white/[0.06]">
-                      <div className="w-6 h-6 rounded-full overflow-hidden bg-[#130026] border border-violet-500/30 p-0.5 flex items-center justify-center shrink-0">
+                    <div className="mt-auto pt-5 flex items-center gap-2.5 text-xs text-[#64748B] border-t border-[#E2E8F0] font-sans">
+                      <div className="w-6 h-6 rounded-full overflow-hidden bg-[#F1F5F9] border border-[#CBD5E1] p-0.5 flex items-center justify-center shrink-0">
                         <img
                           src={getAuthorAvatar(post.author_name, post.author_avatar_url)}
                           alt={post.author_name || 'Author'}
                           className="w-full h-full object-contain"
                         />
                       </div>
-                      <span className="font-semibold text-gray-200 truncate">{post.author_name || 'trinetraedu-ai'}</span>
-                      <span className="text-gray-600">·</span>
+                      <span className="font-semibold text-[#0F172A] truncate">{post.author_name || 'Trinetra AI'}</span>
+                      <span>·</span>
                       <span className="shrink-0">{formatDate(post.published_at || post.created_at)}</span>
-                      <span className="text-gray-600">·</span>
+                      <span>·</span>
                       <span className="shrink-0">{post.read_time_minutes || 5} min</span>
                     </div>
                   </div>
@@ -304,10 +301,10 @@ export default async function BlogListingPage({
               ))}
             </div>
 
-            {/* ═══ PAGINATION CONTROLS (For 100s of blogs) ═══ */}
+            {/* ═══ PAGINATION CONTROLS ═══ */}
             {totalPages > 1 && (
-              <div className="mt-16 flex flex-col sm:flex-row items-center justify-between gap-4 pt-8 border-t border-violet-500/10">
-                <p className="text-xs text-gray-500 font-semibold">
+              <div className="mt-14 flex flex-col sm:flex-row items-center justify-between gap-4 pt-6 border-t border-[#E2E8F0]">
+                <p className="text-xs text-[#64748B] font-semibold font-sans">
                   Page {currentPage} of {totalPages}
                 </p>
 
@@ -316,12 +313,12 @@ export default async function BlogListingPage({
                   {currentPage > 1 ? (
                     <a
                       href={getPageUrl(currentPage - 1)}
-                      className="inline-flex items-center gap-1 px-4 py-2 rounded-xl text-xs font-bold text-white border border-violet-500/20 hover:border-violet-500/50 bg-white/[0.02] hover:bg-white/[0.05] transition-all"
+                      className="inline-flex items-center gap-1 px-4 py-2 rounded-xl text-xs font-semibold text-[#0F172A] border border-[#CBD5E1] bg-white hover:border-[#2563EB] hover:text-[#2563EB] transition-all font-sans"
                     >
                       <ChevronLeft size={14} /> Previous
                     </a>
                   ) : (
-                    <span className="inline-flex items-center gap-1 px-4 py-2 rounded-xl text-xs font-bold text-gray-600 border border-white/5 bg-white/[0.01] cursor-not-allowed">
+                    <span className="inline-flex items-center gap-1 px-4 py-2 rounded-xl text-xs font-semibold text-[#94A3B8] border border-[#E2E8F0] bg-white cursor-not-allowed font-sans">
                       <ChevronLeft size={14} /> Previous
                     </span>
                   )}
@@ -336,13 +333,13 @@ export default async function BlogListingPage({
 
                       return (
                         <span key={p} className="flex items-center">
-                          {showEllipsis && <span className="px-2 text-xs text-gray-600">...</span>}
+                          {showEllipsis && <span className="px-2 text-xs text-[#94A3B8]">...</span>}
                           <a
                             href={getPageUrl(p)}
-                            className={`w-9 h-9 rounded-xl flex items-center justify-center text-xs font-bold transition-all ${
+                            className={`w-8 h-8 rounded-xl flex items-center justify-center text-xs font-bold transition-all font-sans ${
                               isCurrent
-                                ? 'bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-md shadow-violet-600/20'
-                                : 'text-gray-400 border border-violet-500/15 hover:border-violet-500/40 hover:text-white bg-white/[0.02]'
+                                ? 'bg-[#2563EB] text-white shadow-xs'
+                                : 'text-[#475569] border border-[#E2E8F0] bg-white hover:border-[#2563EB] hover:text-[#2563EB]'
                             }`}
                           >
                             {p}
@@ -355,12 +352,12 @@ export default async function BlogListingPage({
                   {currentPage < totalPages ? (
                     <a
                       href={getPageUrl(currentPage + 1)}
-                      className="inline-flex items-center gap-1 px-4 py-2 rounded-xl text-xs font-bold text-white border border-violet-500/20 hover:border-violet-500/50 bg-white/[0.02] hover:bg-white/[0.05] transition-all"
+                      className="inline-flex items-center gap-1 px-4 py-2 rounded-xl text-xs font-semibold text-[#0F172A] border border-[#CBD5E1] bg-white hover:border-[#2563EB] hover:text-[#2563EB] transition-all font-sans"
                     >
                       Next <ChevronRight size={14} />
                     </a>
                   ) : (
-                    <span className="inline-flex items-center gap-1 px-4 py-2 rounded-xl text-xs font-bold text-gray-600 border border-white/5 bg-white/[0.01] cursor-not-allowed">
+                    <span className="inline-flex items-center gap-1 px-4 py-2 rounded-xl text-xs font-semibold text-[#94A3B8] border border-[#E2E8F0] bg-white cursor-not-allowed font-sans">
                       Next <ChevronRight size={14} />
                     </span>
                   )}
@@ -371,22 +368,21 @@ export default async function BlogListingPage({
         )}
 
         {/* ═══ NEWSLETTER SUBSCRIPTION SECTION ═══ */}
-        <section className="mt-24 rounded-3xl bg-gradient-to-br from-violet-950/40 via-[#120E22] to-indigo-950/20 border border-violet-500/20 p-8 sm:p-12 lg:p-16 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-8 shadow-2xl">
-          <div className="space-y-3">
-            <span className="text-xs font-extrabold uppercase tracking-widest text-amber-400">
+        <section className="mt-20 rounded-3xl bg-white border border-[#E2E8F0] p-8 sm:p-12 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-8 shadow-xs">
+          <div className="space-y-2">
+            <span className="text-xs font-bold uppercase tracking-wider text-[#2563EB] font-sans">
               STAY AHEAD OF THE AI FRONTIER
             </span>
-            <h3 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-white tracking-tight">
+            <h3 className="text-2xl sm:text-3xl font-extrabold text-[#0F172A] tracking-tight font-sans">
               Get engineering insights in your inbox
             </h3>
-            <p className="text-sm sm:text-base text-[#9E99E0] max-w-lg leading-relaxed">
-              Join 2,000+ engineers, founders, and leaders building autonomous AI systems, intelligent workflows, and next-gen intelligence.
+            <p className="text-sm sm:text-base text-[#475569] max-w-lg leading-relaxed font-sans">
+              Join 2,000+ engineers, founders, and leaders building autonomous voice systems and telephony intelligence.
             </p>
           </div>
 
           <SubscribeForm />
         </section>
-
       </div>
     </div>
   )
