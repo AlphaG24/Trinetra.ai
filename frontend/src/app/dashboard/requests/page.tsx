@@ -212,7 +212,7 @@ export default function RequestsPage() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h2 className="text-xl font-bold font-display text-white tracking-tight flex items-center gap-2">
-            <Shield className="w-6 h-6 text-violet-500 animate-pulse" /> Marketing Portal & Controls
+            <Shield className="w-6 h-6 text-zinc-400" /> Marketing Portal & Controls
           </h2>
           <p className="text-xs text-zinc-400 leading-relaxed font-sans max-w-xl">
             Submit and track compliance requests for homepage demo configurations, objection prompts, and telephony resource expansion.
@@ -222,7 +222,7 @@ export default function RequestsPage() {
         {userRole === 'developer_tester' && (
           <button
             onClick={() => setIsModalOpen(true)}
-            className="flex items-center gap-2 px-4 py-2.5 bg-violet-600 hover:bg-violet-750 text-white text-xs font-extrabold uppercase tracking-wider rounded-xl transition cursor-pointer shadow-lg shadow-violet-500/10"
+            className="flex items-center gap-2 px-4 py-2.5 bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 text-xs font-bold uppercase tracking-wider rounded-xl transition-all shadow-sm active:scale-[0.98] cursor-pointer"
           >
             <Plus className="w-4 h-4" /> New Compliance Request
           </button>
@@ -245,7 +245,7 @@ export default function RequestsPage() {
 
         {isLoading ? (
           <div className="flex flex-col items-center justify-center py-20 gap-3">
-            <Loader2 className="w-8 h-8 text-violet-500 animate-spin" />
+            <Loader2 className="w-8 h-8 text-zinc-400 animate-spin" />
             <span className="text-xs text-zinc-400">Loading requests...</span>
           </div>
         ) : error ? (
@@ -325,7 +325,7 @@ export default function RequestsPage() {
                 <select
                   value={requestType}
                   onChange={(e) => setRequestType(e.target.value as any)}
-                  className="w-full px-4 py-3 bg-[#130224] border border-white/10 rounded-xl text-xs text-white focus:outline-none focus:ring-1 focus:ring-violet-500 cursor-pointer appearance-none"
+                  className="w-full px-4 py-3 bg-[#130224] border border-white/10 rounded-xl text-xs text-white focus:outline-none focus:ring-1 focus:ring-zinc-400 cursor-pointer appearance-none"
                 >
                   <option value="set_homepage_agent">Homepage Agent Designation</option>
                   <option value="bypass_limits">Override Resource Quota Limits</option>
@@ -347,7 +347,7 @@ export default function RequestsPage() {
                     <select
                       value={selectedAgentId}
                       onChange={(e) => setSelectedAgentId(e.target.value)}
-                      className="w-full px-4 py-3 bg-[#130224] border border-white/10 rounded-xl text-xs text-white focus:outline-none focus:ring-1 focus:ring-violet-500 cursor-pointer"
+                      className="w-full px-4 py-3 bg-[#130224] border border-white/10 rounded-xl text-xs text-white focus:outline-none focus:ring-1 focus:ring-zinc-400 cursor-pointer"
                     >
                       {agents.map((a) => (
                         <option key={a.id} value={a.id}>{a.name}</option>
@@ -366,7 +366,7 @@ export default function RequestsPage() {
                     <select
                       value={limitType}
                       onChange={(e) => setLimitType(e.target.value as any)}
-                      className="w-full px-4 py-3 bg-[#130224] border border-white/10 rounded-xl text-xs text-white focus:outline-none focus:ring-1 focus:ring-violet-500 cursor-pointer"
+                      className="w-full px-4 py-3 bg-[#130224] border border-white/10 rounded-xl text-xs text-white focus:outline-none focus:ring-1 focus:ring-zinc-400 cursor-pointer"
                     >
                       <option value="agents">Agent slots</option>
                       <option value="phone_numbers">Phone number slots</option>
@@ -383,7 +383,7 @@ export default function RequestsPage() {
                       max={50}
                       value={limitValue}
                       onChange={(e) => setLimitValue(Number(e.target.value))}
-                      className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-xs text-white placeholder-zinc-500 focus:outline-none focus:ring-1 focus:ring-violet-500"
+                      className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-xs text-white placeholder-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-400"
                     />
                   </div>
                 </div>
@@ -400,7 +400,7 @@ export default function RequestsPage() {
                     value={justification}
                     onChange={(e) => setJustification(e.target.value)}
                     placeholder="Provide a business case (e.g. require ElevenLabs Rachel model integration for a US-UK real estate demo)."
-                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-xs text-white placeholder-zinc-500 focus:outline-none focus:ring-1 focus:ring-violet-500 resize-none font-sans"
+                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-xs text-white placeholder-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-400 resize-none font-sans"
                   />
                 </div>
               )}
@@ -408,7 +408,7 @@ export default function RequestsPage() {
               <button
                 type="submit"
                 disabled={loading || (requestType === 'set_homepage_agent' && agents.length === 0)}
-                className="w-full mt-2 py-3 bg-violet-600 hover:bg-violet-750 text-white font-extrabold text-xs uppercase tracking-wider rounded-xl transition flex items-center justify-center gap-2 disabled:opacity-50 disabled:pointer-events-none cursor-pointer shadow-lg shadow-violet-500/10"
+                className="w-full mt-2 py-3 bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 font-bold text-xs uppercase tracking-wider rounded-xl transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:pointer-events-none cursor-pointer shadow-sm active:scale-[0.98]"
               >
                 {loading ? (
                   <>

@@ -10,6 +10,7 @@ from fastapi import APIRouter, HTTPException, Query, Response
 from pydantic import BaseModel, Field
 
 from app.services.invoice_vault_service import InvoiceVaultService
+from app.services.billing_lifecycle_service import InvoiceDeliveryService
 
 invoice_router = APIRouter(prefix="/api/invoices", tags=["invoices"])
 
@@ -22,6 +23,12 @@ class CAReviewRequest(BaseModel):
     reviewer_id: Optional[str] = Field(default="admin-system-id", description="Reviewer user ID")
 
 
+class DeliverInvoiceRequest(BaseModel):
+    organization_id: str
+    recipient_email: Optional[str] = None
+    recipient_phone: Optional[str] = None
+
+
 class GenerateInvoiceRequest(BaseModel):
     organization_id: str
     amount_paisa: int = Field(gt=0, description="Amount in paisa inclusive of GST")
@@ -31,6 +38,8 @@ class GenerateInvoiceRequest(BaseModel):
     customer_state: Optional[str] = None
     customer_state_code: Optional[str] = None
     transaction_type: str = "wallet_topup"
+    recipient_email: Optional[str] = None
+    recipient_phone: Optional[str] = None
 
 
 @invoice_router.get("")
@@ -146,11 +155,51 @@ async def generate_invoice(req: GenerateInvoiceRequest):
             customer_state_code=req.customer_state_code,
             transaction_type=req.transaction_type,
         )
+        # Trigger multi-channel delivery (Email + WhatsApp India + Vault per Decision B4)
+        delivery_res = None
+        if req.recipient_email or req.recipient_phone:
+            try:
+                delivery_service = InvoiceDeliveryService()
+                inv_id = invoice.get("id") or req.payment_reference_id
+                delivery_res = delivery_service.deliver_invoice(
+                    invoice_id=inv_id,
+                    organization_id=req.organization_id,
+                    recipient_email=req.recipient_email,
+                    recipient_phone=req.recipient_phone,
+                )
+            except Exception:
+                pass
+
         return {
             "success": True,
             "invoice": invoice,
+            "delivery": delivery_res,
         }
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to generate invoice: {e}")
+
+
+@invoice_router.post("/{invoice_id}/deliver")
+async def deliver_invoice(invoice_id: str, req: DeliverInvoiceRequest):
+    """
+    Triggers multi-channel delivery of statutory invoice via Email + WhatsApp (India) + permanent in-app vault (Decision B4).
+    """
+    delivery_service = InvoiceDeliveryService()
+    try:
+        res = delivery_service.deliver_invoice(
+            invoice_id=invoice_id,
+            organization_id=req.organization_id,
+            recipient_email=req.recipient_email,
+            recipient_phone=req.recipient_phone,
+        )
+        return {
+            "success": True,
+            "message": "Invoice successfully dispatched across configured delivery channels.",
+            "delivery": res,
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to deliver invoice: {e}")

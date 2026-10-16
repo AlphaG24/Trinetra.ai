@@ -201,6 +201,12 @@ export default function TicketDetailPage() {
     return false
   }
 
+  const formatCategory = (cat: string) => {
+    if (cat === 'cfu_forwarding') return 'Call Forwarding (CFU)'
+    if (cat === 'number_porting') return 'Number Porting (Premium)'
+    return cat.replace(/_/g, ' ')
+  }
+
   const isResolved = ticket.status.toLowerCase() === 'resolved' || ticket.status.toLowerCase() === 'closed'
 
   return (
@@ -241,7 +247,7 @@ export default function TicketDetailPage() {
               <div className="flex flex-wrap items-center gap-2">
                 <span className="text-xs font-mono text-[var(--muted)] font-bold">{ticket.ticket_number || 'TRI-SUP'}</span>
                 <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-[var(--primary-bg)] text-[var(--heading)] border border-[var(--border)] font-montserrat">
-                  {ticket.category.replace('_', ' ')}
+                  {formatCategory(ticket.category)}
                 </span>
                 <span className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full font-montserrat ${getStatusBadgeClass(ticket.status)}`}>
                   {getStatusLabel(ticket.status)}

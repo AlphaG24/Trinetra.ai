@@ -29,7 +29,7 @@ export function EmptyState({
       {actionLabel && actionHref && (
         <Link 
           href={actionHref}
-          className="px-4 py-2 rounded-xl bg-gradient-to-r from-violet-600 to-blue-500 text-white font-medium hover:shadow-[0_0_20px_rgba(124,58,237,0.3)] transition-all"
+          className="px-5 py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 text-xs font-bold uppercase tracking-wider shadow-sm transition-all active:scale-[0.98] cursor-pointer inline-flex items-center justify-center"
         >
           {actionLabel}
         </Link>
@@ -38,7 +38,7 @@ export function EmptyState({
       {actionLabel && actionOnClick && (
         <button 
           onClick={actionOnClick}
-          className="px-4 py-2 rounded-xl bg-gradient-to-r from-violet-600 to-blue-500 text-white font-medium hover:shadow-[0_0_20px_rgba(124,58,237,0.3)] transition-all"
+          className="px-5 py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 text-xs font-bold uppercase tracking-wider shadow-sm transition-all active:scale-[0.98] cursor-pointer inline-flex items-center justify-center"
         >
           {actionLabel}
         </button>

@@ -1,0 +1,156 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "project_name": "Trinetra AI (Vaakriti)",
+  "baseline_version": "1.0.0",
+  "locked_date": "2026-10-07",
+  "source_of_truth": "docs/MASTER_PLAN.md (v1.2, Section 18 Overrides)",
+  "governing_principles": [
+    "Existing functionality has priority over new functionality",
+    "Minimal change principle: smallest safe change over largest clean refactor",
+    "Zero remote DDL or writes by AI: direct database operating mode",
+    "Frozen compliance and security files locked by deterministic SHA-256",
+    "Zero in-call disconnection: active calls never cut mid-call on quota exhaustion",
+    "Zero force-push or hard-reset on git branches"
+  ],
+  "applications": [
+    {
+      "name": "Frontend Web Application",
+      "framework": "Next.js 16 (App Router) + React 19",
+      "path": "frontend",
+      "port": 3000,
+      "domains": ["trinetraedu-ai.com", "app.trinetraedu-ai.com", "admin.trinetraedu-ai.com"]
+    },
+    {
+      "name": "FastAPI Voice Backend",
+      "framework": "FastAPI + Python 3.11/3.12",
+      "path": "backend",
+      "port": 8000,
+      "domains": ["api.trinetraedu-ai.com"]
+    },
+    {
+      "name": "LiveKit Voice Agent Worker",
+      "framework": "LiveKit Agents Python SDK",
+      "path": "backend/agent.py",
+      "protocol": "WebRTC / WebSocket"
+    }
+  ],
+  "canonical_roles": [
+    {
+      "role": "customer",
+      "description": "Standard business and coaching institute accounts with standard quotas and spend limits"
+    },
+    {
+      "role": "developer_tester",
+      "description": "Internal QA/test accounts exempt from business limits but excluded from revenue/compliance metrics and forbidden from KYC view"
+    },
+    {
+      "role": "admin",
+      "description": "Platform operators with 30-min idle timeouts and step-up auth for privileged actions"
+    }
+  ],
+  "frozen_compliance_files": [
+    {
+      "path": "backend/app/services/disclosure_service.py",
+      "sha256": "e9580c12b7c6bece21a499089c9c020c0a7ad1c400787a24c6bfec5dad30bb37",
+      "controls": ["PHASE1-DISC-01", "PHASE1-DISC-02", "PHASE1-PART-A", "PHASE1-PRIV-01"]
+    },
+    {
+      "path": "backend/app/services/outbound_safety_guardrails.py",
+      "sha256": "86edbf54522d61570650c6ada0ac39870c616361b1e472e347f102dbb5fb5937",
+      "controls": ["PHASE3-OUT-01", "PHASE3-OUT-02", "PHASE3-OUT-03", "PHASE3-OUT-04", "PHASE3-OUT-05"]
+    },
+    {
+      "path": "backend/app/services/ai/prompt_guard.py",
+      "sha256": "ba4ccf1205ecef224e66c5317154cbe468e3f5f3c0967010b6295982010485a7",
+      "controls": ["STEP0-AI-ID"]
+    },
+    {
+      "path": "frontend/src/lib/safety/promptGuard.ts",
+      "sha256": "02f0dea341f94608867d67ca06b8417f9952f30e1e0ed4fc86c6d4576c480c74",
+      "controls": ["STEP0-AI-ID"]
+    }
+  ],
+  "database_tables": [
+    "profiles",
+    "organizations",
+    "wallets",
+    "wallet_transactions",
+    "invoices",
+    "invoice_line_items",
+    "invoice_ca_reviews",
+    "phone_numbers",
+    "phone_number_pool",
+    "number_bids",
+    "number_lifecycle_missed_calls",
+    "number_lifecycle_digests",
+    "voice_calls",
+    "agents",
+    "customer_contacts",
+    "appointments",
+    "callbacks",
+    "campaigns",
+    "campaign_contacts",
+    "dnd_registry",
+    "call_disclosure_opt_out_acknowledgments",
+    "kyc_documents",
+    "kyc_access_audit_logs",
+    "admin_audit_trail",
+    "byon_carrier_credentials",
+    "byon_phone_numbers",
+    "support_tickets",
+    "system_config",
+    "processed_webhook_events",
+    "available_agents",
+    "prompt_templates",
+    "product_bundles",
+    "subscribers",
+    "banned_words",
+    "moderation_logs",
+    "partners",
+    "partner_referrals"
+  ],
+  "protected_components": {
+    "level_1_critical": [
+      "backend/app/services/disclosure_service.py",
+      "backend/app/services/outbound_safety_guardrails.py",
+      "backend/app/services/ai/prompt_guard.py",
+      "frontend/src/lib/safety/promptGuard.ts",
+      "backend/app/services/role_policy_service.py",
+      "backend/app/services/admin_auth_service.py",
+      "backend/app/services/wallet_service.py",
+      "frontend/src/middleware.ts",
+      "backend/database.py",
+      "supabase/migrations/*.sql"
+    ],
+    "level_2_high_risk": [
+      "backend/agent.py",
+      "backend/app/services/voice_reliability_service.py",
+      "backend/app/services/number_lifecycle_service.py",
+      "backend/app/services/razorpay_webhook_service.py",
+      "backend/app/services/kyc_vault_service.py",
+      "backend/app/services/invoice_vault_service.py",
+      "backend/app/services/telephony/exotel_adapter.py",
+      "backend/app/services/telephony/twilio.py"
+    ]
+  },
+  "external_services": [
+    { "name": "Supabase Pro", "purpose": "Postgres, Auth SSR, Storage, Realtime", "region": "ap-south-1 Mumbai" },
+    { "name": "LiveKit Cloud / Server", "purpose": "WebRTC SFU Media Streaming", "ports": [7880, 443] },
+    { "name": "Exotel", "purpose": "Indian Domestic Virtual Numbers & SIP Trunking" },
+    { "name": "Twilio", "purpose": "Global PSTN Virtual Numbers & Voice Calls" },
+    { "name": "Sarvam AI", "purpose": "Indic Speech-to-Text & Text-to-Speech (Bulbul models)" },
+    { "name": "ElevenLabs", "purpose": "Expressive English Voice Synthesis & Cloning" },
+    { "name": "Groq", "purpose": "Ultra-Low Latency LLaMA 3.3 70B LLM Inference" },
+    { "name": "Google Gemini", "purpose": "Gemini 2.0 Flash LLM Inference (Free tier)" },
+    { "name": "Razorpay", "purpose": "Indian Payment Gateway (UPI, Cards, Netbanking)" },
+    { "name": "Sentry", "purpose": "Exception & Error Tracking (PII-Scrubbed)" },
+    { "name": "BetterStack", "purpose": "Uptime Monitors & Centralized Log Aggregation" },
+    { "name": "Healthchecks.io", "purpose": "Cron Job Liveness Heartbeats" }
+  ],
+  "testing": {
+    "test_suite_path": "backend/tests",
+    "total_test_files": 38,
+    "regression_checklist_count": 32,
+    "frozen_files_ci_script": "scripts/verify_frozen_files.py"
+  }
+}

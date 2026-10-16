@@ -79,6 +79,12 @@ export default function AdminSupportPage() {
   // System Admins (for assignment)
   const [adminsList, setAdminsList] = useState<AdminProfile[]>([])
 
+  const formatCategory = (cat: string) => {
+    if (cat === 'cfu_forwarding') return 'Call Forwarding (CFU)'
+    if (cat === 'number_porting') return 'Number Porting (Premium)'
+    return cat.replace(/_/g, ' ')
+  }
+
   const fetchTickets = async () => {
     setIsLoading(true)
     try {
@@ -203,18 +209,18 @@ export default function AdminSupportPage() {
     <div className="space-y-6 max-w-6xl animate-in fade-in duration-300 py-6">
       
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-6 border-b border-white/5">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-6 border-b border-[var(--border)]">
         <div>
-          <h1 className="text-2xl font-extrabold tracking-tight text-white flex items-center gap-2 font-display">
+          <h1 className="text-2xl font-extrabold tracking-tight text-[var(--heading)] flex items-center gap-2 font-display">
             <LifeBuoy className="w-6 h-6 text-violet-500" /> Support Desk Console
           </h1>
-          <p className="text-xs text-zinc-400 mt-1">
+          <p className="text-xs text-[var(--body)] mt-1">
             Platform Helpdesk Control Center. Review customer tickets, escalate errors, and respond to organizations.
           </p>
         </div>
         <Link
           href="/admin"
-          className="inline-flex items-center gap-2 text-xs font-semibold text-zinc-400 hover:text-white transition-colors bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-2 hover:bg-zinc-800"
+          className="inline-flex items-center gap-2 text-xs font-semibold text-[var(--muted)] hover:text-[var(--heading)] transition-colors bg-[var(--card-bg)] border border-[var(--border)] rounded-xl px-4 py-2 hover:bg-[var(--hover-bg)] shadow-xs"
         >
           <ArrowLeft className="w-3.5 h-3.5" /> Back to Admin
         </Link>
@@ -225,16 +231,16 @@ export default function AdminSupportPage() {
         
         {/* Left Column: Tickets list and Filters */}
         <div className="lg:col-span-1 space-y-4">
-          <div className="bg-[#0f111a]/60 border border-white/5 rounded-2xl p-4 space-y-3">
+          <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-4 space-y-3 shadow-xs">
             {/* Search */}
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-500" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--muted)]" />
               <input
                 type="text"
                 placeholder="Search ticket # or subject..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-3 py-2 bg-black border border-white/5 rounded-xl text-xs text-white placeholder-zinc-600 focus:outline-none focus:border-violet-500 shadow-inner"
+                className="w-full pl-9 pr-3 py-2 bg-[var(--hover-bg)] border border-[var(--border)] rounded-xl text-xs text-[var(--heading)] placeholder-[var(--muted)] focus:outline-none focus:border-violet-500 transition-colors shadow-xs"
               />
             </div>
 
@@ -243,7 +249,7 @@ export default function AdminSupportPage() {
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="bg-black border border-white/5 rounded-xl px-2 py-2 text-[10px] text-white focus:outline-none focus:border-violet-500 cursor-pointer"
+                className="bg-[var(--hover-bg)] border border-[var(--border)] rounded-xl px-2 py-2 text-[10px] text-[var(--heading)] focus:outline-none focus:border-violet-500 cursor-pointer"
               >
                 <option value="all">All Statuses</option>
                 <option value="open">Open</option>
@@ -256,9 +262,11 @@ export default function AdminSupportPage() {
               <select
                 value={categoryFilter}
                 onChange={(e) => setCategoryFilter(e.target.value)}
-                className="bg-black border border-white/5 rounded-xl px-2 py-2 text-[10px] text-white focus:outline-none focus:border-violet-500 cursor-pointer"
+                className="bg-[var(--hover-bg)] border border-[var(--border)] rounded-xl px-2 py-2 text-[10px] text-[var(--heading)] focus:outline-none focus:border-violet-500 cursor-pointer"
               >
                 <option value="all">All Categories</option>
+                <option value="cfu_forwarding">Call Forwarding (CFU)</option>
+                <option value="number_porting">Number Porting (Premium)</option>
                 <option value="general">General</option>
                 <option value="billing">Billing</option>
                 <option value="agent_issue">Agent Issue</option>
@@ -277,8 +285,8 @@ export default function AdminSupportPage() {
                 <Loader2 className="w-6 h-6 text-violet-500 animate-spin" />
               </div>
             ) : filteredTickets.length === 0 ? (
-              <div className="bg-[#0f111a]/60 border border-white/5 rounded-2xl p-8 text-center text-zinc-500 text-xs">
-                <FolderOpen className="w-8 h-8 mx-auto mb-2 text-zinc-700" />
+              <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-8 text-center text-[var(--muted)] text-xs shadow-xs">
+                <FolderOpen className="w-8 h-8 mx-auto mb-2 text-[var(--muted)]" />
                 No support tickets found.
               </div>
             ) : (
@@ -286,29 +294,29 @@ export default function AdminSupportPage() {
                 <div
                   key={t.id}
                   onClick={() => setSelectedTicket(t)}
-                  className={`p-4 border rounded-2xl cursor-pointer transition-all ${
+                  className={`p-4 border rounded-2xl cursor-pointer transition-all shadow-xs ${
                     selectedTicket?.id === t.id
                       ? 'bg-violet-600/10 border-violet-500/50'
-                      : 'bg-[#0f111a]/60 border-white/5 hover:border-white/10'
+                      : 'bg-[var(--card-bg)] border-[var(--border)] hover:border-violet-500/30'
                   }`}
                 >
                   <div className="flex justify-between items-start gap-2">
-                    <span className="text-[9px] font-mono text-zinc-500">{t.ticket_number}</span>
+                    <span className="text-[9px] font-mono text-[var(--muted)]">{t.ticket_number}</span>
                     <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-md border ${
                       t.status === 'open' 
-                        ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' 
+                        ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20' 
                         : t.status === 'in_progress'
-                        ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'
-                        : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                        ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20'
+                        : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
                     }`}>
                       {t.status.replace('_', ' ')}
                     </span>
                   </div>
-                  <h4 className="text-xs font-bold text-white mt-1.5 truncate">{t.subject}</h4>
-                  <div className="flex justify-between items-center text-[10px] text-zinc-500 pt-2 border-t border-white/5 mt-2">
-                    <span className="capitalize">{t.category.replace('_', ' ')}</span>
+                  <h4 className="text-xs font-bold text-[var(--heading)] mt-1.5 truncate">{t.subject}</h4>
+                  <div className="flex justify-between items-center text-[10px] text-[var(--muted)] pt-2 border-t border-[var(--border)] mt-2">
+                    <span className="capitalize">{formatCategory(t.category)}</span>
                     <span className={`text-[9px] uppercase font-bold ${
-                      t.priority === 'urgent' ? 'text-rose-400' : t.priority === 'high' ? 'text-orange-400' : 'text-zinc-500'
+                      t.priority === 'urgent' ? 'text-rose-500' : t.priority === 'high' ? 'text-orange-500' : 'text-[var(--muted)]'
                     }`}>
                       {t.priority || 'medium'}
                     </span>
@@ -322,19 +330,19 @@ export default function AdminSupportPage() {
         {/* Right Column: Ticket Conversation Detail and Actions */}
         <div className="lg:col-span-2">
           {selectedTicket ? (
-            <div className="bg-[#0f111a]/60 border border-white/5 rounded-3xl p-6 space-y-6">
+            <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-3xl p-6 space-y-6 shadow-xs">
               
               {/* Detail Header / Actions Panel */}
-              <div className="pb-4 border-b border-white/5 space-y-4">
+              <div className="pb-4 border-b border-[var(--border)] space-y-4">
                 <div className="flex justify-between items-start">
                   <div>
                     <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-mono text-zinc-500">{selectedTicket.ticket_number}</span>
-                      <span className="text-[9px] font-black uppercase text-violet-400 bg-violet-500/10 px-2 py-0.5 rounded border border-violet-500/20 capitalize">
-                        {selectedTicket.category.replace('_', ' ')}
+                      <span className="text-[10px] font-mono text-[var(--muted)]">{selectedTicket.ticket_number}</span>
+                      <span className="text-[9px] font-black uppercase text-violet-600 dark:text-violet-400 bg-violet-500/10 px-2 py-0.5 rounded border border-violet-500/20 capitalize">
+                        {formatCategory(selectedTicket.category)}
                       </span>
                     </div>
-                    <h2 className="text-base font-bold text-white mt-1">{selectedTicket.subject}</h2>
+                    <h2 className="text-base font-bold text-[var(--heading)] mt-1">{selectedTicket.subject}</h2>
                   </div>
 
                   <div className="flex items-center gap-2">
@@ -342,7 +350,7 @@ export default function AdminSupportPage() {
                     <select
                       value={selectedTicket.status}
                       onChange={(e) => handleUpdateField({ status: e.target.value })}
-                      className="bg-black border border-white/5 rounded-xl px-2 py-1.5 text-[10px] text-white focus:outline-none focus:border-violet-500 cursor-pointer"
+                      className="bg-[var(--hover-bg)] border border-[var(--border)] rounded-xl px-2 py-1.5 text-[10px] text-[var(--heading)] focus:outline-none focus:border-violet-500 cursor-pointer"
                     >
                       <option value="open">Open</option>
                       <option value="in_progress">In Progress</option>
@@ -354,13 +362,13 @@ export default function AdminSupportPage() {
                 </div>
 
                 {/* Assignment & Urgency controls */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-white/5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-[var(--border)]">
                   <div className="flex items-center gap-2 text-xs">
-                    <span className="text-zinc-500">Assigned To:</span>
+                    <span className="text-[var(--muted)]">Assigned To:</span>
                     <select
                       value={selectedTicket.assigned_to || ''}
                       onChange={(e) => handleUpdateField({ assigned_to: e.target.value || null })}
-                      className="bg-black border border-white/5 rounded-xl px-3 py-1 text-xs text-white focus:outline-none focus:border-violet-500 cursor-pointer flex-1"
+                      className="bg-[var(--hover-bg)] border border-[var(--border)] rounded-xl px-3 py-1 text-xs text-[var(--heading)] focus:outline-none focus:border-violet-500 cursor-pointer flex-1"
                     >
                       <option value="">Unassigned</option>
                       {adminsList.map(admin => (
@@ -370,11 +378,11 @@ export default function AdminSupportPage() {
                   </div>
 
                   <div className="flex items-center gap-2 text-xs">
-                    <span className="text-zinc-500">Priority:</span>
+                    <span className="text-[var(--muted)]">Priority:</span>
                     <select
                       value={selectedTicket.priority || 'medium'}
                       onChange={(e) => handleUpdateField({ priority: e.target.value })}
-                      className="bg-black border border-white/5 rounded-xl px-3 py-1 text-xs text-white focus:outline-none focus:border-violet-500 cursor-pointer flex-1"
+                      className="bg-[var(--hover-bg)] border border-[var(--border)] rounded-xl px-3 py-1 text-xs text-[var(--heading)] focus:outline-none focus:border-violet-500 cursor-pointer flex-1"
                     >
                       <option value="low">Low</option>
                       <option value="medium">Medium</option>
@@ -386,11 +394,11 @@ export default function AdminSupportPage() {
               </div>
 
               {/* Subtabs for Client Chat and Internal Notes */}
-              <div className="flex gap-4 border-b border-white/5 pb-2 text-xs font-bold uppercase tracking-wider">
+              <div className="flex gap-4 border-b border-[var(--border)] pb-2 text-xs font-bold uppercase tracking-wider">
                 <button
                   onClick={() => setDetailTab('chat')}
                   className={`pb-2 border-b-2 cursor-pointer transition-all ${
-                    detailTab === 'chat' ? 'border-violet-500 text-white' : 'border-transparent text-zinc-500 hover:text-zinc-300'
+                    detailTab === 'chat' ? 'border-violet-500 text-[var(--heading)]' : 'border-transparent text-[var(--muted)] hover:text-[var(--body)]'
                   }`}
                 >
                   <span className="flex items-center gap-1">
@@ -400,7 +408,7 @@ export default function AdminSupportPage() {
                 <button
                   onClick={() => setDetailTab('internal')}
                   className={`pb-2 border-b-2 cursor-pointer transition-all ${
-                    detailTab === 'internal' ? 'border-violet-500 text-white' : 'border-transparent text-zinc-500 hover:text-zinc-300'
+                    detailTab === 'internal' ? 'border-violet-500 text-[var(--heading)]' : 'border-transparent text-[var(--muted)] hover:text-[var(--body)]'
                   }`}
                 >
                   <span className="flex items-center gap-1">
@@ -423,19 +431,19 @@ export default function AdminSupportPage() {
                           }`}
                         >
                           <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-[10px] font-bold shrink-0 ${
-                            isClient ? 'bg-white/5 text-zinc-300' : 'bg-violet-600/20 text-violet-400 border border-violet-500/20'
+                            isClient ? 'bg-[var(--hover-bg)] text-[var(--body)] border border-[var(--border)]' : 'bg-violet-600/20 text-violet-600 dark:text-violet-400 border border-violet-500/20'
                           }`}>
                             {isClient ? 'CLI' : 'YOU'}
                           </div>
                           <div className="space-y-1">
                             <div className={`p-3 rounded-2xl text-xs leading-relaxed border ${
                               isClient 
-                                ? 'bg-zinc-900 border-white/5 text-white'
-                                : 'bg-violet-500/5 border-violet-500/10 text-zinc-300'
+                                ? 'bg-[var(--card-bg)] border-[var(--border)] text-[var(--heading)] shadow-xs'
+                                : 'bg-violet-500/5 border-violet-500/10 text-[var(--body)]'
                             }`}>
                               {msg.message}
                             </div>
-                            <span className="text-[8px] text-zinc-600 block px-1">
+                            <span className="text-[8px] text-[var(--muted)] block px-1">
                               {msg.sender_name} • {new Date(msg.timestamp).toLocaleString([], { hour: '2-digit', minute: '2-digit' })}
                             </span>
                           </div>
@@ -450,12 +458,12 @@ export default function AdminSupportPage() {
                       value={replyText}
                       onChange={(e) => setReplyText(e.target.value)}
                       placeholder="Type response to send to the client..."
-                      className="flex-1 bg-black/60 border border-white/5 rounded-xl px-4 py-3 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-violet-500 shadow-inner"
+                      className="flex-1 bg-[var(--hover-bg)] border border-[var(--border)] rounded-xl px-4 py-3 text-xs text-[var(--heading)] placeholder-[var(--muted)] focus:outline-none focus:border-violet-500 transition-colors shadow-xs"
                     />
                     <button
                       type="submit"
                       disabled={isSendingReply || !replyText.trim()}
-                      className="px-4 py-3 rounded-xl bg-violet-600 hover:bg-violet-500 text-white font-bold text-xs uppercase tracking-wider transition-all disabled:opacity-40 flex items-center justify-center shrink-0 cursor-pointer"
+                      className="px-4 py-3 rounded-xl bg-violet-600 hover:bg-violet-500 text-white font-bold text-xs uppercase tracking-wider transition-all disabled:opacity-40 flex items-center justify-center shrink-0 cursor-pointer shadow-md shadow-violet-600/15"
                     >
                       {isSendingReply ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                     </button>
@@ -466,7 +474,7 @@ export default function AdminSupportPage() {
               {/* INTERNAL NOTES TAB */}
               {detailTab === 'internal' && (
                 <div className="space-y-4">
-                  <div className="bg-amber-950/10 border border-amber-500/10 rounded-2xl p-4 flex gap-2.5 text-xs text-amber-500/95 leading-relaxed">
+                  <div className="bg-amber-950/10 border border-amber-500/10 rounded-2xl p-4 flex gap-2.5 text-xs text-amber-600 dark:text-amber-500/95 leading-relaxed">
                     <ShieldAlert className="w-5 h-5 shrink-0 mt-0.5" />
                     <p>Internal notes are only visible to platform support staff and administrators. Clients can never see these messages.</p>
                   </div>
@@ -474,17 +482,17 @@ export default function AdminSupportPage() {
                   {/* Notes List */}
                   <div className="space-y-3 max-h-[220px] overflow-y-auto custom-scrollbar pr-2 my-2">
                     {(!selectedTicket.internal_notes || selectedTicket.internal_notes.length === 0) ? (
-                      <div className="p-6 text-center text-zinc-500 text-xs">
+                      <div className="p-6 text-center text-[var(--muted)] text-xs">
                         No internal notes added yet.
                       </div>
                     ) : (
                       selectedTicket.internal_notes.map((note, i) => (
-                        <div key={i} className="p-3 bg-[#16131c] border border-white/5 rounded-xl space-y-1">
-                          <div className="flex justify-between items-center text-[10px] text-zinc-500">
-                            <span className="font-bold text-violet-400">{note.author}</span>
+                        <div key={i} className="p-3 bg-[var(--hover-bg)] border border-[var(--border)] rounded-xl space-y-1">
+                          <div className="flex justify-between items-center text-[10px] text-[var(--muted)]">
+                            <span className="font-bold text-violet-600 dark:text-violet-400">{note.author}</span>
                             <span>{new Date(note.timestamp).toLocaleString()}</span>
                           </div>
-                          <p className="text-xs text-zinc-300 leading-relaxed font-light">{note.note}</p>
+                          <p className="text-xs text-[var(--body)] leading-relaxed font-light">{note.note}</p>
                         </div>
                       ))
                     )}
@@ -496,12 +504,12 @@ export default function AdminSupportPage() {
                       value={internalNoteText}
                       onChange={(e) => setInternalNoteText(e.target.value)}
                       placeholder="Add private staff annotation..."
-                      className="flex-1 bg-black/60 border border-white/5 rounded-xl px-4 py-3 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-violet-500 shadow-inner"
+                      className="flex-1 bg-[var(--hover-bg)] border border-[var(--border)] rounded-xl px-4 py-3 text-xs text-[var(--heading)] placeholder-[var(--muted)] focus:outline-none focus:border-violet-500 transition-colors shadow-xs"
                     />
                     <button
                       type="submit"
                       disabled={isSavingNote || !internalNoteText.trim()}
-                      className="px-5 py-3 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs uppercase tracking-wider transition-all disabled:opacity-40 flex items-center justify-center shrink-0 cursor-pointer"
+                      className="px-5 py-3 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs uppercase tracking-wider transition-all disabled:opacity-40 flex items-center justify-center shrink-0 cursor-pointer shadow-md"
                     >
                       {isSavingNote ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Log Note'}
                     </button>
@@ -511,8 +519,8 @@ export default function AdminSupportPage() {
 
             </div>
           ) : (
-            <div className="bg-[#0f111a]/40 border border-dashed border-white/5 rounded-3xl p-16 text-center text-zinc-500 text-xs flex flex-col items-center justify-center min-h-[480px]">
-              <AlertCircle className="w-10 h-10 text-zinc-700 mb-2 animate-bounce" />
+            <div className="bg-[var(--card-bg)] border border-dashed border-[var(--border)] rounded-3xl p-16 text-center text-[var(--muted)] text-xs flex flex-col items-center justify-center min-h-[480px] shadow-xs">
+              <AlertCircle className="w-10 h-10 text-[var(--muted)] mb-2 animate-bounce" />
               Select a support ticket from the list to view conversations and take actions.
             </div>
           )}

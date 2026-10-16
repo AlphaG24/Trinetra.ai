@@ -108,25 +108,25 @@ export default function AdminConsentRecordsPage() {
   return (
     <div className="space-y-6 max-w-6xl animate-in fade-in duration-300 py-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-6 border-b border-white/5">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-6 border-b border-[var(--border)]">
         <div>
-          <h1 className="text-3xl font-extrabold tracking-tight text-white flex items-center gap-2.5 font-display">
-            <ShieldCheck className="w-8 h-8 text-emerald-400" /> Consent Audit Center
+          <h1 className="text-3xl font-extrabold tracking-tight text-[var(--heading)] flex items-center gap-2.5 font-display">
+            <ShieldCheck className="w-8 h-8 text-emerald-500" /> Consent Audit Center
           </h1>
-          <p className="text-zinc-400 text-sm mt-1">
+          <p className="text-[var(--body)] text-sm mt-1">
             Official immutable consent ledger conforming to the Digital Personal Data Protection (DPDP) Act 2023.
           </p>
         </div>
         <div className="flex items-center gap-3">
           <button
             onClick={handleExportCSV}
-            className="px-4 py-2 bg-zinc-900 border border-zinc-800 hover:bg-zinc-800 text-zinc-300 hover:text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
+            className="px-4 py-2 bg-[var(--card-bg)] border border-[var(--border)] hover:bg-[var(--hover-bg)] text-[var(--heading)] rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
           >
             <Download className="w-4 h-4" /> Export Ledger
           </button>
           <Link
             href="/admin"
-            className="inline-flex items-center gap-2 text-xs font-semibold text-zinc-400 hover:text-white transition-colors bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-2 hover:bg-zinc-800"
+            className="inline-flex items-center gap-2 text-xs font-semibold text-[var(--muted)] hover:text-[var(--heading)] transition-colors bg-[var(--card-bg)] border border-[var(--border)] rounded-xl px-4 py-2 hover:bg-[var(--hover-bg)] shadow-xs"
           >
             <ArrowLeft className="w-3.5 h-3.5" /> Back to Dashboard
           </Link>
@@ -134,8 +134,8 @@ export default function AdminConsentRecordsPage() {
       </div>
 
       {/* Info Warning */}
-      <div className="bg-emerald-950/10 border border-emerald-500/10 rounded-2xl p-4 flex gap-2.5 text-xs text-emerald-400/90 leading-relaxed">
-        <Lock className="w-5 h-5 shrink-0 mt-0.5" />
+      <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-2xl p-4 flex gap-2.5 text-xs text-emerald-700 dark:text-emerald-400 leading-relaxed">
+        <Lock className="w-5 h-5 shrink-0 mt-0.5 text-emerald-600 dark:text-emerald-400" />
         <p>
           These records are append-only. Under DPDP regulations, this immutable logging ledger is kept permanently to demonstrate explicit user permission for processing personal identifier parameters.
         </p>
@@ -144,13 +144,13 @@ export default function AdminConsentRecordsPage() {
       {/* Filter Controls */}
       <div className="flex flex-col sm:flex-row gap-3 items-center justify-between">
         <div className="relative w-full sm:w-80">
-          <Search className="w-4 h-4 absolute left-3 top-3 text-zinc-500" />
+          <Search className="w-4 h-4 absolute left-3 top-3 text-[var(--muted)]" />
           <input
             type="text"
             placeholder="Search by user, email, or IP..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-zinc-900 border border-zinc-800 rounded-xl pl-9 pr-4 py-2 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-violet-500 transition-colors"
+            className="w-full bg-[var(--card-bg)] border border-[var(--border)] rounded-xl pl-9 pr-4 py-2 text-xs text-[var(--heading)] placeholder-[var(--muted)] focus:outline-none focus:border-violet-500 transition-colors shadow-xs"
           />
         </div>
 
@@ -158,7 +158,7 @@ export default function AdminConsentRecordsPage() {
           <select
             value={filterVersion}
             onChange={(e) => setFilterVersion(e.target.value)}
-            className="bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-zinc-300 focus:outline-none focus:border-violet-500"
+            className="bg-[var(--card-bg)] border border-[var(--border)] rounded-xl px-3 py-2 text-xs text-[var(--heading)] focus:outline-none focus:border-violet-500 shadow-xs cursor-pointer"
           >
             <option value="all">All Versions</option>
             {versions.filter(v => v !== 'all').map(v => (
@@ -174,15 +174,15 @@ export default function AdminConsentRecordsPage() {
           <Loader2 className="w-8 h-8 text-violet-500 animate-spin" />
         </div>
       ) : filteredRecords.length === 0 ? (
-        <div className="bg-zinc-950/40 border border-zinc-800/80 rounded-2xl p-16 text-center text-zinc-500 text-xs">
+        <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-16 text-center text-[var(--muted)] text-xs shadow-xs">
           No consent audit records matching search criteria.
         </div>
       ) : (
-        <div className="bg-zinc-950/60 border border-zinc-800/80 rounded-2xl overflow-hidden shadow-xl">
+        <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl overflow-hidden shadow-xs">
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="border-b border-zinc-800/80 bg-zinc-900/40 text-[10px] font-extrabold uppercase tracking-wider text-zinc-400">
+                <tr className="border-b border-[var(--border)] bg-[var(--hover-bg)] text-[10px] font-extrabold uppercase tracking-wider text-[var(--muted)]">
                   <th className="py-3.5 px-5">User</th>
                   <th className="py-3.5 px-5">Signature Token</th>
                   <th className="py-3.5 px-5">Consent Details</th>
@@ -190,27 +190,27 @@ export default function AdminConsentRecordsPage() {
                   <th className="py-3.5 px-5">Timestamp</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-zinc-800/50 text-xs text-zinc-300">
+              <tbody className="divide-y divide-[var(--border)] text-xs text-[var(--body)]">
                 {filteredRecords.map((record) => (
-                  <tr key={record.id} className="hover:bg-white/[0.01] transition-colors">
+                  <tr key={record.id} className="hover:bg-[var(--hover-bg)] transition-colors">
                     <td className="py-4 px-5">
-                      <div className="font-bold text-white">{record.user_name}</div>
-                      <div className="text-[11px] text-zinc-500 font-mono mt-0.5">{record.user_email}</div>
+                      <div className="font-bold text-[var(--heading)]">{record.user_name}</div>
+                      <div className="text-[11px] text-[var(--muted)] font-mono mt-0.5">{record.user_email}</div>
                     </td>
                     
                     <td className="py-4 px-5">
-                      <div className="text-[10px] font-mono text-zinc-500 bg-black/40 border border-white/5 px-2 py-1 rounded max-w-[120px] truncate">
+                      <div className="text-[10px] font-mono text-[var(--muted)] bg-[var(--hover-bg)] border border-[var(--border)] px-2 py-1 rounded max-w-[120px] truncate">
                         {record.consent_token}
                       </div>
                     </td>
 
                     <td className="py-4 px-5 space-y-1.5 max-w-sm">
-                      <div className="text-[11px] text-zinc-400 line-clamp-1 italic">
+                      <div className="text-[11px] text-[var(--body)] line-clamp-1 italic">
                         &ldquo;{record.purpose_text}&rdquo;
                       </div>
                       <div className="flex flex-wrap gap-1">
                         {record.data_categories?.map(cat => (
-                          <span key={cat} className="px-1.5 py-0.5 rounded-[4px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[9px] font-bold">
+                          <span key={cat} className="px-1.5 py-0.5 rounded-[4px] bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 text-[9px] font-bold">
                             {cat.replace('_', ' ')}
                           </span>
                         ))}
@@ -219,15 +219,15 @@ export default function AdminConsentRecordsPage() {
 
                     <td className="py-4 px-5">
                       <div className="flex items-center gap-1.5">
-                        <Globe className="w-3.5 h-3.5 text-zinc-500" />
-                        <span className="font-mono text-zinc-400">{record.ip_address}</span>
+                        <Globe className="w-3.5 h-3.5 text-[var(--muted)]" />
+                        <span className="font-mono text-[var(--body)]">{record.ip_address}</span>
                       </div>
-                      <div className="text-[9px] text-zinc-600 line-clamp-1 max-w-[150px] mt-0.5" title={record.user_agent}>
+                      <div className="text-[9px] text-[var(--muted)] line-clamp-1 max-w-[150px] mt-0.5" title={record.user_agent}>
                         {record.user_agent}
                       </div>
                     </td>
 
-                    <td className="py-4 px-5 text-zinc-500">
+                    <td className="py-4 px-5 text-[var(--muted)]">
                       {new Date(record.created_at || record.id).toLocaleString('en-IN', {
                         day: 'numeric',
                         month: 'short',

@@ -24,9 +24,29 @@ export async function GET() {
       return NextResponse.json({ error: 'Profile not found' }, { status: 404 })
     }
 
+    // Resolve tenant organization billing model (P5: subscription | credit_based | outcome_based)
+    let effectivePlanTier = profile.plan_tier || 'free'
+    if (profile.organization_id) {
+      const { data: org } = await supabase
+        .from('organizations')
+        .select('metadata')
+        .eq('id', profile.organization_id)
+        .maybeSingle()
+
+      if (org?.metadata?.billing_model) {
+        effectivePlanTier = org.metadata.billing_model
+        if (profile.plan_tier !== effectivePlanTier) {
+          await supabase
+            .from('profiles')
+            .update({ plan_tier: effectivePlanTier })
+            .eq('id', user.id)
+        }
+      }
+    }
+
     // 2.5 Self-healing: check if trial has expired and auto-pause active agents
     const trialEndsAt = profile.trial_ends_at ? new Date(profile.trial_ends_at) : null
-    const isTrialExpired = profile.plan_tier === 'trial' && trialEndsAt && trialEndsAt < new Date()
+    const isTrialExpired = effectivePlanTier === 'trial' && trialEndsAt && trialEndsAt < new Date()
 
     const { createClient: createSupabaseClient } = await import('@supabase/supabase-js')
     const supabaseAdmin = createSupabaseClient(
@@ -100,12 +120,18 @@ export async function GET() {
     return NextResponse.json({
       configs: configMap,
       user_limits: {
-        plan_tier: profile.plan_tier || 'free',
+        plan_tier: effectivePlanTier,
         trial_ends_at: profile.trial_ends_at || null,
         paid_minutes_limit: profile.paid_minutes_limit || 0,
         paid_minutes_used: profile.paid_minutes_used || 0,
         demo_minutes_limit: profile.demo_minutes_limit || 0,
         demo_minutes_used: profile.demo_minutes_used || 0,
+        mandate_status: profile.mandate_status || null,
+        mandate_id: profile.mandate_id || null,
+        mandate_renewal_date: profile.mandate_renewal_date || null,
+        mandate_target_plan: profile.mandate_target_plan || null,
+        mandate_target_price_paisa: profile.mandate_target_price_paisa || null,
+        mandate_personalities: profile.mandate_personalities || null,
       },
       bundles: bundles || []
     })

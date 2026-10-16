@@ -71,6 +71,20 @@ async def trigger_outbound_call(req: OutboundCallRequest):
         if not from_phone:
             from_phone = os.getenv("TWILIO_PHONE_NUMBER") or "+12282950908"
 
+        # Task 3.9 & Decision N8: CLI integrity check (Never spoof)
+        from app.services.outbound_safety_guardrails import validate_outbound_cli
+        is_cli_valid, cli_reason, _ = validate_outbound_cli(
+            caller_id=from_phone,
+            organization_id=req.organization_id,
+            supabase_client=supabase_admin
+        )
+        if not is_cli_valid:
+            logger.warning(f"[CLI Spoof Blocked] Org {req.organization_id} attempt to use CLI {from_phone} was rejected.")
+            raise HTTPException(
+                status_code=403,
+                detail=cli_reason
+            )
+
         call_res = await provider.make_outbound_call(
             req.to_phone, 
             from_phone, 
@@ -81,6 +95,8 @@ async def trigger_outbound_call(req: OutboundCallRequest):
             }
         )
         return {"success": True, "data": call_res}
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Failed to place outbound callback: {e}")
         raise HTTPException(status_code=500, detail=str(e))

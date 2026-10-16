@@ -6,7 +6,6 @@ import { createClient } from '@/utils/supabase/client'
 import { WelcomeHeader } from '@/src/components/dashboard/WelcomeHeader'
 import { QuickActions } from '@/src/components/dashboard/QuickActions'
 import { KPICards } from '@/src/components/dashboard/KPICards'
-import { ToolHealthCards } from '@/src/components/dashboard/ToolHealthCards'
 import { ActivityFeed } from '@/src/components/dashboard/ActivityFeed'
 import { TrialWarnings } from '@/src/components/dashboard/TrialWarnings'
 import useSWR from 'swr'
@@ -262,37 +261,19 @@ export default function DashboardPage() {
         />
       </div>
 
-      {/* Comparison Scorecard Widget */}
-      <div suppressHydrationWarning>
-        <AgentComparisonWidget
-          agents={overviewData?.tools || []}
-          loading={overviewLoading}
-        />
-      </div>
-
-      {/* 5. Main Content Section (Deployed Tools & Activity Feed) */}
+      {/* 5. Main Content Section (Fleet Performance Scorecard & Recent Activity) */}
       <div suppressHydrationWarning className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Deployed Tools (Left 2 Columns) */}
-        <div suppressHydrationWarning className="lg:col-span-2 space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-base font-bold font-display text-[var(--heading)] uppercase tracking-wider">
-              Deployed Tools
-            </h3>
-          </div>
-          <ToolHealthCards
-            tools={overviewData?.tools || []}
+        {/* Agent Performance Scorecard (Left 2 Columns) */}
+        <div suppressHydrationWarning className="lg:col-span-2">
+          <AgentComparisonWidget
+            agents={overviewData?.tools || []}
             loading={overviewLoading}
-            error={overviewError?.message || (overviewData?.error ? overviewData.error : null)}
-            onRetry={() => mutateOverview()}
           />
         </div>
 
-        {/* Recent Activity (Right 1 Column) */}
-        <div suppressHydrationWarning className="space-y-4">
-          <h3 className="text-base font-bold font-display text-[var(--heading)] uppercase tracking-wider">
-            Recent Activity
-          </h3>
-          <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-5">
+        {/* Recent Activity Stream (Right 1 Column) */}
+        <div suppressHydrationWarning className="flex flex-col">
+          <div className="bg-white dark:bg-zinc-900 border border-zinc-200/90 dark:border-zinc-800 rounded-2xl p-6 shadow-xs hover:border-violet-500/20 transition-colors flex-1 flex flex-col">
             <ActivityFeed
               activities={overviewData?.activity || []}
               loading={overviewLoading}

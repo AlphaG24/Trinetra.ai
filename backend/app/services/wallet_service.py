@@ -38,6 +38,7 @@ DEFAULT_RELIABILITY_SCORE: int = 85      # Starting score for standard verified 
 MAX_EMERGENCY_MINUTES: int = 50          # 50 free minutes
 EMERGENCY_MINUTES_COOLDOWN_DAYS: int = 30
 DEFAULT_OVERAGE_RATE_PER_MIN_PAISA: int = 1100  # ₹11.00 per minute
+CREDIT_ROLLOVER_DAYS: int = 180                 # 180 days per refund policy revision (B5)
 
 
 class WalletService:
@@ -46,13 +47,28 @@ class WalletService:
     def __init__(self, supabase_client=None):
         self.supabase = supabase_client or supabase_admin
 
+    def _get_system_config(self, key: str, default: Any) -> Any:
+        """Dynamically fetch platform config from system_config table with fallback."""
+        try:
+            res = self.supabase.table("system_config").select("config_value").eq("config_key", key).execute()
+            if res.data and len(res.data) > 0 and res.data[0].get("config_value") is not None:
+                val = res.data[0]["config_value"]
+                if isinstance(default, int):
+                    return int(val)
+                elif isinstance(default, float):
+                    return float(val)
+                return val
+        except Exception:
+            pass
+        return default
+
     # -------------------------------------------------------------------------
     # 1. Wallet Fetch & Provisioning
     # -------------------------------------------------------------------------
     def get_or_create_wallet(self, organization_id: str) -> Dict[str, Any]:
         """
         Fetches an organization's wallet or provisions a new one with default
-        ₹2,500 spend limit and starting Reliability Score of 85.
+        spend limit (P8: ₹2,500 default or admin-configured) and starting Reliability Score of 85.
         """
         if not organization_id:
             raise ValueError("organization_id is required")
@@ -61,12 +77,14 @@ class WalletService:
         if res.data and len(res.data) > 0:
             return res.data[0]
 
+        default_spend_limit = self._get_system_config("default_spend_limit_paisa", DEFAULT_SPEND_LIMIT_PAISA)
+
         # Provision new wallet
         new_wallet = {
             "organization_id": organization_id,
             "balance_paisa": 0,
             "currency": "INR",
-            "spend_limit_paisa": DEFAULT_SPEND_LIMIT_PAISA,
+            "spend_limit_paisa": default_spend_limit,
             "current_spend_paisa": 0,
             "reliability_score": DEFAULT_RELIABILITY_SCORE,
             "emergency_minutes_available": 0,
@@ -109,6 +127,9 @@ class WalletService:
             "updated_at": now_iso,
         }).eq("organization_id", organization_id).execute()
 
+        # Calculate 180-day rollover expiry (Decision B5)
+        expires_at_iso = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(time.time() + CREDIT_ROLLOVER_DAYS * 86400))
+
         # Insert double-entry ledger row
         tx_entry = {
             "organization_id": organization_id,
@@ -118,6 +139,7 @@ class WalletService:
             "balance_after_paisa": new_balance,
             "description": description or f"Wallet credited by ₹{amount_paisa / 100:.2f}",
             "created_at": now_iso,
+            "expires_at": expires_at_iso,
         }
         self.supabase.table("wallet_transactions").insert(tx_entry).execute()
 
@@ -170,6 +192,36 @@ class WalletService:
         wallet["current_spend_paisa"] = new_spend
         return True, "DEBIT_PROCESSED", wallet
 
+    def check_expired_credits(self, organization_id: str) -> Dict[str, Any]:
+        """
+        Audits credit rollover ledger for credits exceeding the 180-day validity window (Decision B5).
+        Returns count and total paisa of expired credits.
+        """
+        now_iso = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+        try:
+            res = (
+                self.supabase.table("wallet_transactions")
+                .select("*")
+                .eq("organization_id", organization_id)
+                .gt("amount_paisa", 0)
+                .lte("expires_at", now_iso)
+                .execute()
+            )
+            expired_items = res.data or []
+        except Exception as e:
+            logger.warning(f"Error checking expired credits for {organization_id}: {e}")
+            expired_items = []
+
+        total_expired_paisa = sum(item.get("amount_paisa", 0) for item in expired_items)
+        return {
+            "organization_id": organization_id,
+            "expired_credits_count": len(expired_items),
+            "total_expired_paisa": total_expired_paisa,
+            "total_expired_inr": total_expired_paisa / 100.0,
+            "rollover_period_days": CREDIT_ROLLOVER_DAYS,
+            "audited_at": now_iso,
+        }
+
     # -------------------------------------------------------------------------
     # 3. Pre-Call Spend Limit & Zero In-Call Disconnection (Sec 18.9)
     # -------------------------------------------------------------------------
@@ -193,7 +245,8 @@ class WalletService:
         wallet = self.get_or_create_wallet(organization_id)
 
         balance_paisa = wallet.get("balance_paisa", 0)
-        spend_limit = wallet.get("spend_limit_paisa", DEFAULT_SPEND_LIMIT_PAISA)
+        default_limit = self._get_system_config("default_spend_limit_paisa", DEFAULT_SPEND_LIMIT_PAISA)
+        spend_limit = wallet.get("spend_limit_paisa") or default_limit
         current_spend = wallet.get("current_spend_paisa", 0)
         emergency_minutes = wallet.get("emergency_minutes_available", 0)
         reliability_score = wallet.get("reliability_score", DEFAULT_RELIABILITY_SCORE)
@@ -237,11 +290,13 @@ class WalletService:
                 return True, "EMERGENCY_MINUTES_ACTIVE", details
 
             # Balance is 0 and no emergency minutes active
-            eligible_for_emergency = (reliability_score > 80)
+            min_score = self._get_system_config("emergency_minutes_min_reliability_score", 80)
+            eligible_for_emergency = (reliability_score > min_score)
             details["status"] = "INSUFFICIENT_FUNDS"
             details["eligible_for_emergency_minutes"] = eligible_for_emergency
             if eligible_for_emergency:
-                details["message"] = "Wallet balance exhausted. Your Reliability Score qualifies you for 50 free emergency minutes. Claim them now in your dashboard."
+                emergency_quota = self._get_system_config("emergency_minutes_quota", MAX_EMERGENCY_MINUTES)
+                details["message"] = f"Wallet balance exhausted. Your Reliability Score qualifies you for {emergency_quota} free emergency minutes. Claim them now in your dashboard."
             else:
                 details["message"] = "Wallet balance exhausted. Please top up your prepaid wallet to make calls."
             return False, "INSUFFICIENT_FUNDS", details
@@ -255,21 +310,25 @@ class WalletService:
     # -------------------------------------------------------------------------
     def claim_emergency_minutes(self, organization_id: str) -> Tuple[bool, str, Dict[str, Any]]:
         """
-        Grants up to 50 emergency minutes to eligible organizations when quota hits 100%,
-        strictly requiring Reliability Score > 80 and enforcing a 30-day cooldown.
+        Grants free overdraft buffer minutes to eligible organizations when quota hits 100%,
+        strictly requiring Reliability Score > 80 (admin-configurable) and enforcing a 30-day cooldown.
         """
         wallet = self.get_or_create_wallet(organization_id)
         reliability_score = wallet.get("reliability_score", DEFAULT_RELIABILITY_SCORE)
 
-        # 1. Eligibility Check: Reliability Score must be > 80
-        if reliability_score <= 80:
+        min_score = self._get_system_config("emergency_minutes_min_reliability_score", 80)
+        cooldown_days = self._get_system_config("emergency_minutes_cooldown_days", EMERGENCY_MINUTES_COOLDOWN_DAYS)
+        max_minutes = self._get_system_config("emergency_minutes_quota", MAX_EMERGENCY_MINUTES)
+
+        # 1. Eligibility Check: Reliability Score must be > min_score
+        if reliability_score <= min_score:
             return False, "INELIGIBLE_SCORE", {
-                "error": f"Reliability Score must exceed 80 to unlock free emergency minutes (current score: {reliability_score}).",
+                "error": f"Reliability Score must exceed {min_score} to unlock free emergency minutes (current score: {reliability_score}).",
                 "reliability_score": reliability_score,
-                "minimum_required": 81,
+                "minimum_required": min_score + 1,
             }
 
-        # 2. Cooldown check: max once per 30 days
+        # 2. Cooldown check: max once per cooldown_days
         last_claimed = wallet.get("emergency_minutes_claimed_at")
         now = time.time()
         if last_claimed:
@@ -277,17 +336,17 @@ class WalletService:
                 # Parse ISO timestamp
                 last_time = time.mktime(time.strptime(last_claimed[:19], "%Y-%m-%dT%H:%M:%S"))
                 days_since = (now - last_time) / 86400.0
-                if days_since < EMERGENCY_MINUTES_COOLDOWN_DAYS:
+                if days_since < cooldown_days:
                     return False, "COOLDOWN_ACTIVE", {
-                        "error": f"Emergency minutes can only be claimed once every 30 days. Please wait {int(EMERGENCY_MINUTES_COOLDOWN_DAYS - days_since)} more days.",
-                        "days_remaining": int(EMERGENCY_MINUTES_COOLDOWN_DAYS - days_since),
+                        "error": f"Emergency minutes can only be claimed once every {int(cooldown_days)} days. Please wait {int(cooldown_days - days_since)} more days.",
+                        "days_remaining": int(cooldown_days - days_since),
                     }
             except Exception:
                 pass
 
         now_iso = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
         self.supabase.table("wallets").update({
-            "emergency_minutes_available": MAX_EMERGENCY_MINUTES,
+            "emergency_minutes_available": max_minutes,
             "emergency_minutes_claimed_at": now_iso,
             "updated_at": now_iso,
         }).eq("organization_id", organization_id).execute()
@@ -297,12 +356,12 @@ class WalletService:
             organization_id=organization_id,
             action="wallet.emergency_minutes_credited",
             details={
-                "minutes_credited": MAX_EMERGENCY_MINUTES,
+                "minutes_credited": max_minutes,
                 "reliability_score": reliability_score,
             },
         )
 
-        wallet["emergency_minutes_available"] = MAX_EMERGENCY_MINUTES
+        wallet["emergency_minutes_available"] = max_minutes
         wallet["emergency_minutes_claimed_at"] = now_iso
         return True, "EMERGENCY_MINUTES_GRANTED", wallet
 

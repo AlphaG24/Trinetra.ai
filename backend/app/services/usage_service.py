@@ -73,7 +73,7 @@ class UsageService:
             elif plan_tier == 'starter':
                 tier_limit = 500
             elif plan_tier == 'trial':
-                tier_limit = 100
+                tier_limit = await self._get_config("trial_minutes", 50)
             elif plan_tier == 'enterprise':
                 tier_limit = 10000
             else:
@@ -191,7 +191,7 @@ class UsageService:
         base_agents = 1
         base_numbers = 0
         if plan_tier == 'trial':
-            base_agents = 3
+            base_agents = 2
             base_numbers = 1
         elif plan_tier == 'starter':
             base_agents = 5
@@ -204,17 +204,21 @@ class UsageService:
         max_agents = await self._get_config(f"max_agents_{plan_tier}", base_agents) + additional_agents
         max_numbers = await self._get_config(f"max_phone_numbers_{plan_tier}", base_numbers) + additional_phone_numbers
         
-        # Fallback if specific config is not set
+        # Fallback if specific config is not set (P10: Pooled across all customer numbers; no per-number cap)
         if max_numbers == additional_phone_numbers:
-            max_numbers = await self._get_config("max_phone_numbers_per_org", 10) + additional_phone_numbers
+            pooled_cap = await self._get_config("max_pooled_numbers_per_org", None)
+            if pooled_cap is None:
+                pooled_cap = await self._get_config("max_phone_numbers_per_org", 10)
+            max_numbers = int(pooled_cap) + additional_phone_numbers
             
         monthly_minutes = await self._get_config(f"{plan_tier}_minutes", 0)
-        if plan_tier == 'trial':
-            monthly_minutes = 100
-        elif plan_tier == 'starter':
-            monthly_minutes = 500
-        elif plan_tier == 'professional':
-            monthly_minutes = 2000
+        if monthly_minutes == 0:
+            if plan_tier == 'trial':
+                monthly_minutes = await self._get_config("trial_minutes", 50)
+            elif plan_tier == 'starter':
+                monthly_minutes = 500
+            elif plan_tier == 'professional':
+                monthly_minutes = 2000
         
         # Count current usage
         agent_count = await self._count_agents(organization_id)

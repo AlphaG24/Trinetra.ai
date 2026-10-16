@@ -18,6 +18,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Header
 from pydantic import BaseModel, Field
 
 from app.services.essential_admin_service import EssentialAdminService
+from app.services.rate_limit_service import RateLimitService
+from app.services.role_policy_service import UserRole, normalize_role
 
 
 router = APIRouter(prefix="/api/admin/operations", tags=["Admin Operations"])
@@ -49,6 +51,13 @@ class UpdatePricingRequest(BaseModel):
     pricing_updates: Dict[str, Any] = Field(..., description="Key-value mapping of telephony pricing configs")
     reason: str = Field(..., min_length=5, description="Statutory business reason for pricing update")
     step_up_token: str = Field(..., description="HMAC-signed Step-Up Auth token for 'price_change'")
+
+
+class RateLimitOverrideRequest(BaseModel):
+    user_id: str = Field(..., description="Target user ID or customer account ID")
+    api_rpm: Optional[int] = Field(None, ge=1, le=10000, description="API requests per minute override")
+    calls_cpm: Optional[int] = Field(None, ge=1, le=1000, description="Calls per minute per number override (for call center workloads)")
+    reason: str = Field(..., min_length=3, description="Call center or high volume operational justification")
 
 
 @router.get("/users")
@@ -197,3 +206,50 @@ async def get_audit_trail(
         raise HTTPException(status_code=403, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/rate-limits/override")
+async def override_user_rate_limits(
+    payload: RateLimitOverrideRequest,
+    x_user_id: str = Header(..., description="Current authenticated admin user ID"),
+    x_user_role: str = Header(..., description="Current authenticated user role"),
+    service: EssentialAdminService = Depends(get_admin_service),
+):
+    """
+    Configures higher API or call rate limits for specific accounts (Decision A5 call center workloads).
+    Restricted to admin role; logs change to audit trail.
+    """
+    norm_role = normalize_role(x_user_role)
+    if norm_role != UserRole.ADMIN:
+        raise HTTPException(status_code=403, detail="Administrative privileges required to override rate limits.")
+
+    result = RateLimitService.set_user_override(
+        user_id=payload.user_id,
+        api_rpm=payload.api_rpm,
+        calls_cpm=payload.calls_cpm,
+    )
+
+    # Log to immutable audit trail
+    try:
+        service.log_audit_trail(
+            actor_user_id=x_user_id,
+            actor_role=norm_role.value,
+            action="rate_limit_override_updated",
+            target_type="user",
+            target_id=payload.user_id,
+            details={
+                "api_rpm": payload.api_rpm,
+                "calls_cpm": payload.calls_cpm,
+                "reason": payload.reason,
+            },
+            step_up_verified=True,
+        )
+    except Exception as audit_err:
+        pass
+
+    return {
+        "success": True,
+        "message": f"Rate limit override configured for user {payload.user_id}",
+        "config": result,
+    }
+

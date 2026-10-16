@@ -34,7 +34,34 @@ export const STEP_UP_REAUTH_ACTIONS = new Set([
   'number_release_override',
 ]);
 
-export const ADMIN_IDLE_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
+export const SUPERADMIN_EMAILS = new Set([
+  'raghav00424@gmail.com',
+  'raghav@trinetra.ai',
+]);
+
+export function isSuperAdminEmail(email?: string | null): boolean {
+  if (!email) return false;
+  const clean = email.trim().toLowerCase();
+  if (SUPERADMIN_EMAILS.has(clean)) return true;
+  const envAdmins = (process.env.NEXT_PUBLIC_ADMIN_EMAILS || process.env.SUPERADMIN_EMAILS || '')
+    .split(',')
+    .map(e => e.trim().toLowerCase())
+    .filter(Boolean);
+  return envAdmins.includes(clean);
+}
+
+export function isSuperAdminUser(userOrProfile?: any): boolean {
+  if (!userOrProfile) return false;
+  const email = (userOrProfile.email || '').toLowerCase().trim();
+  if (isSuperAdminEmail(email)) return true;
+  const role = (
+    userOrProfile.role ||
+    userOrProfile.user_metadata?.role ||
+    userOrProfile.app_metadata?.role ||
+    ''
+  ).toLowerCase().trim();
+  return role === 'admin' || role === 'super_admin';
+}
 
 export function normalizeRole(roleRaw?: string | null): UserRole {
   if (!roleRaw) return 'customer';

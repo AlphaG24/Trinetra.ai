@@ -534,3 +534,128 @@ async def generate_pre_send_campaign_report(
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "legal_notice": "[CONFIRM WITH A LAWYER] Ensure National Customer Preference Register (NCPR) scrubbing before initiating outbound telemarketing."
     }
+
+
+def validate_outbound_cli(
+    caller_id: str,
+    organization_id: str,
+    supabase_client: Any = None,
+) -> Tuple[bool, str, Dict[str, Any]]:
+    """
+    Validates outbound CLI (Caller Line Identification / Caller ID) integrity.
+    Master Plan Task 3.9 & Decision N8:
+    - Never spoof: Display assigned virtual number only.
+    - If a caller attempts to use an unauthorized or spoofed CLI:
+      1. Blocks outbound call dispatch.
+      2. Logs immutable security event to audit_logs with action 'telephony.cli_spoof_attempt_blocked'.
+    """
+    clean_caller = re.sub(r'[\s\-\(\)]', '', caller_id or "").strip()
+    if not clean_caller:
+        return False, "Outbound CLI (caller ID) cannot be empty. Display assigned virtual number only.", {
+            "caller_id": caller_id,
+            "organization_id": organization_id,
+            "spoof_blocked": True,
+            "reason": "empty_cli"
+        }
+
+    # Format variations (+ prefix, bare digits, 91 prefix)
+    candidates = [clean_caller]
+    if clean_caller.startswith("+"):
+        candidates.append(clean_caller[1:])
+    else:
+        candidates.append(f"+{clean_caller}")
+    if len(clean_caller) == 10 and clean_caller.isdigit():
+        candidates.append(f"+91{clean_caller}")
+        candidates.append(f"91{clean_caller}")
+
+    # Check verified platform default trunks from environment
+    verified_platform_trunks = set()
+    import os
+    tw_trunk = os.getenv("TWILIO_PHONE_NUMBER")
+    if tw_trunk:
+        clean_tw = re.sub(r'[\s\-\(\)]', '', tw_trunk)
+        verified_platform_trunks.update([clean_tw, clean_tw.lstrip("+"), f"+{clean_tw.lstrip('+')}"])
+    exo_trunk = os.getenv("EXOTEL_CALLER_ID")
+    if exo_trunk:
+        clean_exo = re.sub(r'[\s\-\(\)]', '', exo_trunk)
+        verified_platform_trunks.update([clean_exo, clean_exo.lstrip("+"), f"+{clean_exo.lstrip('+')}"])
+
+    # If caller matches verified platform trunk, allow
+    if any(c in verified_platform_trunks for c in candidates):
+        return True, "CLI verified against verified platform trunk.", {
+            "caller_id": clean_caller,
+            "organization_id": organization_id,
+            "spoof_blocked": False,
+            "source": "platform_trunk"
+        }
+
+    is_verified = False
+    if supabase_client:
+        try:
+            # 1. Check if caller belongs to phone_numbers owned by this organization
+            res = (
+                supabase_client.table("phone_numbers")
+                .select("id, phone_number, organization_id, status")
+                .eq("organization_id", organization_id)
+                .in_("phone_number", candidates)
+                .limit(1)
+                .execute()
+            )
+            if res.data and len(res.data) > 0:
+                is_verified = True
+            else:
+                # 2. Check if assigned to an agent belonging to this organization
+                agent_res = (
+                    supabase_client.table("agents")
+                    .select("id, phone_number")
+                    .eq("organization_id", organization_id)
+                    .in_("phone_number", candidates)
+                    .limit(1)
+                    .execute()
+                )
+                if agent_res.data and len(agent_res.data) > 0:
+                    is_verified = True
+        except Exception as e:
+            logger.error(f"[CLI Integrity Check] DB lookup error for org {organization_id}: {e}")
+
+    if is_verified:
+        return True, "CLI verified: caller ID is an assigned virtual number for this organization.", {
+            "caller_id": clean_caller,
+            "organization_id": organization_id,
+            "spoof_blocked": False,
+            "source": "organization_assigned"
+        }
+
+    # SPOOF DETECTED: Caller ID does not belong to this organization!
+    # Record immutable audit log
+    audit_entry = {
+        "action": "telephony.cli_spoof_attempt_blocked",
+        "organization_id": organization_id,
+        "details": {
+            "attempted_caller_id": clean_caller,
+            "reason": "Attempt to spoof outbound caller ID blocked. Caller ID not owned by organization.",
+            "rule": "Master Plan Task 3.9 / Section N8 (Never spoof)"
+        },
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    if supabase_client:
+        try:
+            supabase_client.table("audit_logs").insert(audit_entry).execute()
+        except Exception as e:
+            try:
+                supabase_client.table("revenue_audit_logs").insert(audit_entry).execute()
+            except Exception as e2:
+                logger.error(f"[CLI Integrity] Failed to write audit log: {e2}")
+
+    reason_msg = (
+        f"CLI spoofing prohibited: Caller ID '{clean_caller}' is not an assigned virtual number "
+        f"for organization '{organization_id}'. Displays must use assigned virtual numbers only."
+    )
+    logger.warning(f"[CLI Spoof Attempt Blocked] Org: {organization_id}, Attempted CLI: {clean_caller}")
+    return False, reason_msg, {
+        "caller_id": clean_caller,
+        "organization_id": organization_id,
+        "spoof_blocked": True,
+        "reason": "unauthorized_cli"
+    }
+

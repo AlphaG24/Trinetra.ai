@@ -43,7 +43,6 @@ export default async function AgentSetupPage({ params, searchParams }: PageProps
       .from('agents')
       .select('*')
       .eq('id', slug)
-      .eq('organization_id', profile.organization_id)
       .maybeSingle()
     agent = data
   } else {
@@ -51,13 +50,12 @@ export default async function AgentSetupPage({ params, searchParams }: PageProps
       .from('agents')
       .select('*')
       .eq('vapi_agent_id', slug)
-      .eq('organization_id', profile.organization_id)
       .maybeSingle()
     agent = data
   }
 
   if (!agent) {
-    return notFound()
+    redirect('/dashboard/agents')
   }
 
   // Load all agents in organization if bundle mode

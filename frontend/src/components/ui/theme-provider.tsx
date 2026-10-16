@@ -93,11 +93,17 @@ export function useTheme() {
   return context
 }
 
-export function DashboardThemeWrapper({ children }: { children: React.ReactNode }) {
+export function DashboardThemeWrapper({ 
+  children,
+  className = ''
+}: { 
+  children: React.ReactNode
+  className?: string
+}) {
   return (
     <div 
       suppressHydrationWarning
-      className="dashboard-theme-root min-h-screen w-full bg-[var(--background)] text-[var(--body)]"
+      className={`dashboard-theme-root min-h-screen w-full bg-[var(--background)] text-[var(--body)] ${className}`.trim()}
     >
       {children}
     </div>

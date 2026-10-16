@@ -170,8 +170,8 @@ export function KYCTab() {
   return (
     <div className="space-y-6 text-left">
       {/* Top Banner */}
-      <div className="bg-gradient-to-r from-violet-600/10 to-indigo-600/5 border border-violet-500/10 rounded-2xl p-5 flex items-start gap-4">
-        <div className="w-10 h-10 rounded-xl bg-violet-500/10 border border-violet-500/20 flex items-center justify-center text-violet-400 shrink-0">
+      <div className="bg-zinc-100/80 dark:bg-zinc-900/40 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5 flex items-start gap-4">
+        <div className="w-10 h-10 rounded-xl bg-zinc-200/60 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 flex items-center justify-center text-zinc-900 dark:text-white shrink-0">
           <ShieldCheck className="w-5 h-5" />
         </div>
         <div className="flex-1">
@@ -192,7 +192,7 @@ export function KYCTab() {
         <div className="flex items-center justify-between flex-wrap gap-2">
           <div>
             <h5 className="text-xs font-bold uppercase tracking-wider text-zinc-900 dark:text-white flex items-center gap-2">
-              <ShieldCheck className="w-4 h-4 text-violet-500" />
+              <ShieldCheck className="w-4 h-4 text-zinc-900 dark:text-white" />
               Mandatory Telecom KYC Verification Checklist
             </h5>
             <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
@@ -222,7 +222,7 @@ export function KYCTab() {
             <div className="flex items-start justify-between gap-2">
               <div>
                 <div className="flex items-center gap-2">
-                  <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-violet-500/10 text-violet-500">
+                  <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-zinc-200 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200">
                     Mandatory 1
                   </span>
                   <span className="font-semibold text-xs text-zinc-900 dark:text-white">
@@ -248,7 +248,7 @@ export function KYCTab() {
             <div className="flex items-start justify-between gap-2">
               <div>
                 <div className="flex items-center gap-2">
-                  <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-violet-500/10 text-violet-500">
+                  <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-zinc-200 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200">
                     Mandatory 2
                   </span>
                   <span className="font-semibold text-xs text-zinc-900 dark:text-white">
@@ -270,7 +270,7 @@ export function KYCTab() {
         {/* Upload Form */}
         <div className="bg-white dark:bg-[#0D0120] border border-zinc-200 dark:border-white/5 rounded-2xl p-6 shadow-sm space-y-4">
           <h5 className="font-bold text-xs uppercase tracking-wider text-zinc-900 dark:text-white flex items-center gap-2">
-            <UploadCloud className="w-4 h-4 text-violet-500" />
+            <UploadCloud className="w-4 h-4 text-zinc-900 dark:text-white" />
             Submit Identity / Entity Document
           </h5>
 
@@ -282,17 +282,26 @@ export function KYCTab() {
               <select
                 value={docType}
                 onChange={e => setDocType(e.target.value)}
-                className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-white/10 text-zinc-900 dark:text-white text-xs font-semibold rounded-xl p-3 focus:outline-none focus:ring-1 focus:ring-violet-500"
+                className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-white/10 text-zinc-900 dark:text-white text-xs font-semibold rounded-xl p-3 focus:outline-none focus:ring-1 focus:ring-zinc-900 dark:focus:ring-white"
               >
-                <option value="company_pan">Company / Business PAN Card (Mandatory Entity Proof)</option>
-                <option value="gstin_certificate">GSTIN Registration Certificate (Mandatory Entity Proof)</option>
-                <option value="authorized_signatory_id">Authorized Signatory ID - Aadhaar / Passport (Mandatory Signatory Proof)</option>
-                <option value="incorporation_cert">Certificate of Incorporation (Alternative Entity Proof)</option>
-                <option value="utility_bill">Business Electricity / Telephone Utility Bill (Supporting Address)</option>
+                <optgroup label="India (Domestic)">
+                  <option value="company_pan">Company / Business PAN Card (Mandatory Entity Proof)</option>
+                  <option value="gstin_certificate">GSTIN Registration Certificate (Mandatory Entity Proof)</option>
+                  <option value="authorized_signatory_id">Authorized Signatory ID - Masked Aadhaar / Voter ID (Mandatory Signatory Proof)</option>
+                  <option value="incorporation_cert">Certificate of Incorporation (Alternative Entity Proof)</option>
+                  <option value="utility_bill">Business Electricity / Telephone Utility Bill (Supporting Address)</option>
+                </optgroup>
+                <optgroup label="Global / International">
+                  <option value="passport">Passport (Global Signatory Proof)</option>
+                  <option value="national_id">National ID Card / Driver License (Global Signatory Proof)</option>
+                  <option value="company_registration">Company Registration Certificate (Global Entity Proof)</option>
+                  <option value="business_ein">Business Tax ID / EIN / VAT Certificate (Global Entity Proof)</option>
+                  <option value="trade_license">Commercial Registry / Trade License (Global Entity Proof)</option>
+                </optgroup>
               </select>
-              <p className="text-[10px] text-violet-600 dark:text-violet-400 mt-1 font-medium flex items-center gap-1">
+              <p className="text-[10px] text-zinc-600 dark:text-zinc-400 mt-1 font-medium flex items-center gap-1">
                 <Info className="w-3 h-3" />
-                {docType === 'authorized_signatory_id'
+                {['authorized_signatory_id', 'passport', 'national_id'].includes(docType)
                   ? 'Satisfies Mandatory Requirement 2 (Authorized Signatory ID)'
                   : docType === 'utility_bill'
                   ? 'Supplemental address verification document'
@@ -308,12 +317,20 @@ export function KYCTab() {
                 type="text"
                 value={rawId}
                 onChange={e => setRawId(e.target.value)}
-                placeholder={docType === 'authorized_signatory_id' ? 'Aadhaar (12 digits) or Passport' : 'PAN (e.g. ABCDE1234F) or GSTIN'}
-                className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-white/10 text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-650 text-xs font-semibold font-mono rounded-xl p-3 focus:outline-none focus:ring-1 focus:ring-violet-500"
+                placeholder={
+                  ['authorized_signatory_id', 'masked_aadhaar'].includes(docType) ? 'Masked Aadhaar (12 digits) or Voter ID' :
+                  docType === 'passport' ? 'Passport Number (e.g. A1234567)' :
+                  docType === 'national_id' ? 'National ID / Driver License Number' :
+                  docType === 'company_pan' ? 'PAN (e.g. ABCDE1234F)' :
+                  docType === 'gstin_certificate' ? 'GSTIN (e.g. 27AABCU9603R1ZM)' :
+                  docType === 'business_ein' ? 'EIN / VAT / Tax ID Number' :
+                  'Document / Registration Number'
+                }
+                className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-white/10 text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-650 text-xs font-semibold font-mono rounded-xl p-3 focus:outline-none focus:ring-1 focus:ring-zinc-900 dark:focus:ring-white"
               />
               <p className="text-[10px] text-zinc-400 dark:text-zinc-500 mt-1 flex items-center gap-1 font-mono">
                 <Lock className="w-3 h-3 text-emerald-500" />
-                UIDAI Safe: Only masked identifier (e.g. •••• •••• 1234) is permanently vaulted.
+                Statutory Privacy Safe: Raw Aadhaar numbers are never stored; only masked identifiers are permanently vaulted.
               </p>
             </div>
 
@@ -321,7 +338,7 @@ export function KYCTab() {
               <label className="block text-[10px] font-bold font-montserrat text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mb-2">
                 Upload File (PDF, PNG, JPG - Max 5MB)
               </label>
-              <div className="border border-dashed border-zinc-300 dark:border-white/10 hover:border-violet-500/50 rounded-xl p-4 text-center cursor-pointer transition-colors relative">
+              <div className="border border-dashed border-zinc-300 dark:border-white/10 hover:border-zinc-400 dark:hover:border-zinc-500 rounded-xl p-4 text-center cursor-pointer transition-colors relative">
                 <input
                   type="file"
                   accept=".pdf,image/png,image/jpeg"
@@ -329,7 +346,7 @@ export function KYCTab() {
                   className="absolute inset-0 opacity-0 cursor-pointer"
                 />
                 <div className="flex flex-col items-center gap-1.5">
-                  <FileText className="w-6 h-6 text-violet-400" />
+                  <FileText className="w-6 h-6 text-zinc-900 dark:text-white" />
                   <span className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
                     {fileName || 'Click or drag file here'}
                   </span>
@@ -345,7 +362,7 @@ export function KYCTab() {
                   type="checkbox"
                   checked={consentGiven}
                   onChange={e => setConsentGiven(e.target.checked)}
-                  className="mt-0.5 rounded border-zinc-300 dark:border-white/20 text-violet-600 focus:ring-violet-500"
+                  className="mt-0.5 rounded border-zinc-300 dark:border-white/20 text-violet-600 focus:ring-zinc-900 dark:focus:ring-white"
                 />
                 <span className="text-[11px] text-zinc-600 dark:text-zinc-400 leading-snug">
                   I affirmatively declare that this identity document is authentic and grant consent to Trinetra AI and its authorized carriers for statutory telecom KYC verification pursuant to the Digital Personal Data Protection Act.
@@ -356,7 +373,7 @@ export function KYCTab() {
             <button
               type="submit"
               disabled={uploading || !consentGiven || !fileBase64}
-              className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-violet-600 hover:bg-violet-700 text-white font-bold text-xs uppercase tracking-wider transition-all cursor-pointer disabled:opacity-50 shadow-md shadow-violet-600/10"
+              className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 font-bold text-xs uppercase tracking-wider transition-all cursor-pointer disabled:opacity-50 shadow-sm active:scale-[0.99]"
             >
               {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />}
               <span>{uploading ? 'Vaulting Encrypted Document...' : 'Submit for Compliance Review'}</span>
@@ -367,13 +384,13 @@ export function KYCTab() {
         {/* Uploaded Documents History */}
         <div className="bg-white dark:bg-[#0D0120] border border-zinc-200 dark:border-white/5 rounded-2xl p-6 shadow-sm space-y-4">
           <h5 className="font-bold text-xs uppercase tracking-wider text-zinc-900 dark:text-white flex items-center gap-2">
-            <FileText className="w-4 h-4 text-violet-500" />
+            <FileText className="w-4 h-4 text-zinc-900 dark:text-white" />
             Vaulted KYC Documents
           </h5>
 
           {loading ? (
             <div className="flex flex-col items-center justify-center py-16 gap-2">
-              <Loader2 className="w-6 h-6 text-violet-500 animate-spin" />
+              <Loader2 className="w-6 h-6 text-zinc-900 dark:text-white animate-spin" />
               <p className="text-xs text-zinc-400 font-mono">Loading vaulted documents...</p>
             </div>
           ) : docs.length === 0 ? (
@@ -400,7 +417,7 @@ export function KYCTab() {
                     </div>
                     {doc.id_number_masked && (
                       <p className="text-[11px] font-mono text-zinc-500 dark:text-zinc-400">
-                        Masked ID: <span className="text-violet-400 font-semibold">{doc.id_number_masked}</span>
+                        Masked ID: <span className="text-zinc-900 dark:text-white font-semibold">{doc.id_number_masked}</span>
                       </p>
                     )}
                     <p className="text-[10px] text-zinc-400">

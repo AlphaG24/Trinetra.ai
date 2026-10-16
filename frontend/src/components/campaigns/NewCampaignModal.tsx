@@ -411,7 +411,7 @@ export function NewCampaignModal({ isOpen, onClose, onSuccess }: NewCampaignModa
           <button
             type="submit"
             disabled={submitting || !agentId || !file || !consentAttestation || (purpose !== 'promotional' && !purposeAttestation)}
-            className="px-6 py-2.5 rounded-xl bg-violet-600 text-white hover:bg-violet-700 text-xs font-bold uppercase tracking-wider transition-all disabled:opacity-50 flex items-center gap-2 cursor-pointer"
+            className="px-6 py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 text-xs font-bold uppercase tracking-wider transition-all disabled:opacity-50 flex items-center gap-2 cursor-pointer shadow-sm active:scale-[0.98]"
           >
             {submitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
             Create Campaign

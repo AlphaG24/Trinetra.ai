@@ -1,7 +1,8 @@
 'use client'
 
+import React, { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { Sparkles, ArrowRight } from 'lucide-react'
+import { ArrowRight, ShieldCheck } from 'lucide-react'
 
 interface WelcomeHeaderProps {
   fullName?: string | null
@@ -9,13 +10,19 @@ interface WelcomeHeaderProps {
   loading?: boolean
 }
 
-export function WelcomeHeader({ fullName, isOnboardingComplete = true, loading = false }: WelcomeHeaderProps) {
-  const getGreeting = () => {
+export function WelcomeHeader({
+  fullName,
+  isOnboardingComplete = true,
+  loading = false,
+}: WelcomeHeaderProps) {
+  const [greeting, setGreeting] = useState('Welcome back')
+
+  useEffect(() => {
     const hours = new Date().getHours()
-    if (hours < 12) return 'Good morning'
-    if (hours < 18) return 'Good afternoon'
-    return 'Good evening'
-  }
+    if (hours < 12) setGreeting('Good morning')
+    else if (hours < 18) setGreeting('Good afternoon')
+    else setGreeting('Good evening')
+  }, [])
 
   if (loading) {
     return (
@@ -30,26 +37,32 @@ export function WelcomeHeader({ fullName, isOnboardingComplete = true, loading =
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div>
-          <h1 suppressHydrationWarning className="text-2xl md:text-3xl font-black font-heading tracking-tight text-zinc-950 dark:text-white">
-            {getGreeting()}, {name} 👋
-          </h1>
-          <p className="text-sm text-zinc-550 dark:text-zinc-400 mt-1">
-            Here's what's happening across your Trinetra tools.
-          </p>
-        </div>
+      <div className="pb-1">
+        <h1
+          suppressHydrationWarning
+          className="text-2xl md:text-3xl font-black font-heading tracking-tight text-zinc-950 dark:text-white"
+        >
+          {greeting}, {name} 👋
+        </h1>
+        <p className="text-xs md:text-sm text-zinc-500 dark:text-zinc-400 mt-1 font-medium">
+          Here&apos;s what&apos;s happening across your VAAKRITI tools.
+        </p>
       </div>
 
       {!isOnboardingComplete && (
-        <div className="flex items-center justify-between p-4 rounded-xl bg-violet-500/10 border border-violet-500/20 text-violet-700 dark:text-violet-400 text-sm animate-pulse">
-          <div className="flex items-center gap-2">
-            <Sparkles className="w-4 h-4 shrink-0" />
-            <span className="font-semibold">Complete your profile to get the most out of Trinetra</span>
+        <div className="flex items-center justify-between p-4 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-200 text-sm shadow-xs">
+          <div className="flex items-center gap-2.5">
+            <div className="w-7 h-7 rounded-lg bg-teal-500/10 border border-teal-500/20 flex items-center justify-center text-teal-600 dark:text-teal-400">
+              <ShieldCheck className="w-4 h-4" />
+            </div>
+            <div>
+              <span className="font-semibold text-xs md:text-sm block">Complete your profile setup</span>
+              <span className="text-[11px] text-zinc-500 dark:text-zinc-400">Unlock statutory invoicing, custom domains, and automated phone routing.</span>
+            </div>
           </div>
-          <Link 
-            href="/dashboard/onboarding" 
-            className="flex items-center gap-1 text-xs font-bold uppercase tracking-wider hover:underline underline-offset-4"
+          <Link
+            href="/dashboard/onboarding"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 text-xs font-semibold tracking-wide transition shadow-xs cursor-pointer shrink-0"
           >
             <span>Complete Setup</span>
             <ArrowRight className="w-3.5 h-3.5" />

@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import { AuditLogViewer, type AuditLog } from '@/components/admin/AuditLogViewer'
+import { AuditLogViewer, type AuditLog } from '@/src/components/admin/AuditLogViewer'
 import { ScrollText } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -13,6 +13,7 @@ export default function AuditLogsPage() {
 
   const [actionFilter, setActionFilter] = useState('all')
   const [searchQuery, setSearchQuery] = useState('')
+  const [ipFilter, setIpFilter] = useState('')
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
   const [loading, setLoading] = useState(true)
@@ -25,6 +26,7 @@ export default function AuditLogsPage() {
       params.set('limit', '50')
       if (actionFilter && actionFilter !== 'all') params.set('action', actionFilter)
       if (searchQuery.trim()) params.set('search', searchQuery.trim())
+      if (ipFilter.trim()) params.set('ip', ipFilter.trim())
       if (fromDate) params.set('from', fromDate)
       if (toDate) params.set('to', toDate)
 
@@ -40,7 +42,7 @@ export default function AuditLogsPage() {
     } finally {
       setLoading(false)
     }
-  }, [page, actionFilter, searchQuery, fromDate, toDate])
+  }, [page, actionFilter, searchQuery, ipFilter, fromDate, toDate])
 
   useEffect(() => {
     fetchAuditLogs()
@@ -72,6 +74,11 @@ export default function AuditLogsPage() {
         searchQuery={searchQuery}
         setSearchQuery={(q: string) => {
           setSearchQuery(q)
+          setPage(1)
+        }}
+        ipFilter={ipFilter}
+        setIpFilter={(ip: string) => {
+          setIpFilter(ip)
           setPage(1)
         }}
         fromDate={fromDate}

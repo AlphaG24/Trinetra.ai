@@ -20,6 +20,11 @@ export function TrialWarnings({
   paidMinutesUsed = 0,
   paidMinutesLimit = 100
 }: TrialWarningsProps) {
+  // Credit-based and outcome-based plans are metered via prepaid wallet with pay-as-you-go, not fixed minutes limits
+  if (planTier === 'credit_based' || planTier === 'outcome_based') {
+    return null
+  }
+
   const now = new Date()
 
   const isFree = planTier === 'free' || planTier === 'free_demo'

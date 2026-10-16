@@ -101,8 +101,18 @@ function AuthForm() {
         toast.success('Welcome back!')
         
         const redirectParam = searchParams ? searchParams.get('redirect') : null
-        
+        const userEmail = (data.user.email || '').toLowerCase().trim()
+        const isSuperAdminByEmail = userEmail === 'raghav00424@gmail.com' || userEmail === 'raghav@trinetra.ai' || (process.env.NEXT_PUBLIC_ADMIN_EMAILS || '').includes(userEmail)
+        const metaRole = (data.user.app_metadata?.role || data.user.user_metadata?.role || '').toLowerCase().trim()
+        const isMetaAdmin = metaRole === 'admin' || metaRole === 'super_admin'
+
+        // 1. If valid relative path specified (e.g. /dashboard/campaigns) and NOT home or login
         if (redirectParam && redirectParam.startsWith('/') && redirectParam !== '/' && !redirectParam.startsWith('/login')) {
+          // If user is superadmin/admin and redirectParam is just the generic root dashboard, route to /admin
+          if ((isSuperAdminByEmail || isMetaAdmin) && (redirectParam === '/dashboard' || redirectParam === '/dashboard/')) {
+            window.location.href = '/admin'
+            return
+          }
           window.location.href = redirectParam
           return
         }
@@ -123,8 +133,30 @@ function AuthForm() {
           }
         }
 
-        router.push('/dashboard')
-        router.refresh()
+        // 3. Default direct destination based on user role (superadmin takes immediate priority)
+        if (isSuperAdminByEmail || isMetaAdmin) {
+          window.location.href = '/admin'
+          return
+        }
+
+        try {
+          const profilePromise = supabase
+            .from('profiles')
+            .select('role')
+            .eq('id', data.user.id)
+            .single()
+          const timeoutPromise = new Promise<{ data: any }>((resolve) => 
+            setTimeout(() => resolve({ data: null }), 1500)
+          )
+          const { data: profile } = await Promise.race([profilePromise, timeoutPromise])
+          
+          const role = (profile?.role || metaRole || 'client').toLowerCase()
+          const isAdmin = isSuperAdminByEmail || role === 'admin' || role === 'super_admin'
+
+          window.location.href = isAdmin ? '/admin' : '/dashboard'
+        } catch {
+          window.location.href = isSuperAdminByEmail ? '/admin' : '/dashboard'
+        }
       }
     } catch (err) {
       console.error('Sign-in error:', err)

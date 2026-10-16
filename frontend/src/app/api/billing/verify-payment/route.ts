@@ -6,6 +6,8 @@ import { sendEmailTemplate } from '@/lib/email'
 import { generateInvoicePdf } from '@/lib/pdf'
 import fs from 'fs'
 import path from 'path'
+import { validateCoupon, recordCouponRedemption } from '@/lib/coupons'
+import { calculateGSTBreakdown, validateGSTIN } from '@/lib/gst'
 
 interface CartItem {
   type: 'subscription' | 'phone_number' | 'bundle' | 'number_pool' | 'number_renewal'
@@ -30,16 +32,37 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
     
-    const body = await request.json()
-    console.log('[Verify Payment] 1F LOG: Payment verification start for user:', user.id, 'with email:', user.email)
-    console.log('[Verify Payment] 1F LOG: Request payload details:', JSON.stringify(body))
+    let body: any = {}
+    try {
+      const text = await request.text()
+      if (text) {
+        body = JSON.parse(text)
+      }
+    } catch (parseErr) {
+      console.warn('[Verify Payment] Could not parse request JSON body:', parseErr)
+      return NextResponse.json({ error: 'Invalid or empty request payload' }, { status: 400 })
+    }
 
-    const { razorpay_payment_id, razorpay_order_id, razorpay_signature, items, use_same_profile } = body as {
+    const { 
+      razorpay_payment_id, 
+      razorpay_order_id, 
+      razorpay_signature, 
+      items, 
+      use_same_profile,
+      coupon_code,
+      customer_gstin,
+      customer_legal_name,
+      save_gst_to_profile
+    } = body as {
       razorpay_payment_id: string
       razorpay_order_id: string
       razorpay_signature: string
       items: CartItem[]
       use_same_profile?: boolean
+      coupon_code?: string
+      customer_gstin?: string
+      customer_legal_name?: string
+      save_gst_to_profile?: boolean
     }
 
     if (!items || items.length === 0) {
@@ -54,7 +77,7 @@ export async function POST(request: Request) {
     const config: Record<string, string> = {}
     configs?.forEach(c => { config[c.config_key] = c.config_value })
     
-    const keySecret = config.razorpay_test_key_secret || config.razorpay_key_secret
+    const keySecret = config.razorpay_test_key_secret || config.razorpay_key_secret || process.env.RAZORPAY_KEY_SECRET
     
     if (!keySecret) {
       return NextResponse.json({ error: 'Payment gateway not configured' }, { status: 500 })
@@ -106,7 +129,7 @@ export async function POST(request: Request) {
     const planConfig: Record<string, { tier: string, minutes: number, days: number }> = {
       trial: {
         tier: 'trial',
-        minutes: parseInt(config.trial_minutes || '100', 10),
+        minutes: parseInt(config.trial_minutes || '50', 10),
         days: parseInt(config.trial_days || '7', 10)
       },
       starter: {
@@ -155,7 +178,16 @@ export async function POST(request: Request) {
     // Process all items in cart
     for (const item of items) {
       if (item.type === 'subscription') {
-        const selectedPlan = planConfig[item.key]
+        let tierKey = item.key.toLowerCase()
+        if (tierKey.includes('professional') || tierKey.includes('pro')) {
+          tierKey = 'professional'
+        } else if (tierKey.includes('starter')) {
+          tierKey = 'starter'
+        } else if (tierKey.includes('trial')) {
+          tierKey = 'trial'
+        }
+
+        const selectedPlan = planConfig[tierKey] || planConfig[item.key]
         if (selectedPlan) {
           planTierToSet = selectedPlan.tier
           demoMinutesLimitToSet = selectedPlan.tier === 'trial' ? selectedPlan.minutes : 10
@@ -164,19 +196,150 @@ export async function POST(request: Request) {
           trialEndsAtToSet = selectedPlan.tier === 'trial' ? new Date(Date.now() + selectedPlan.days * 86400000).toISOString() : null
         }
 
-        const basePrice = subscriptionPrices[item.key] || 0
+        const basePrice = subscriptionPrices[tierKey] || subscriptionPrices[item.key] || 0
         const totalRawPrice = basePrice * item.quantity
         const itemDiscount = Math.round(totalRawPrice * (agentDiscountPercent / 100))
         const finalPrice = totalRawPrice - itemDiscount
         totalPaidPaisa += finalPrice
 
-        invoiceLines.push({
-          item: `${item.key.toUpperCase()} Subscription Plan Upgrade`,
-          quantity: item.quantity,
-          rate: basePrice,
-          discount: itemDiscount,
-          amount: finalPrice
-        })
+        if (tierKey === 'trial') {
+          const trialMeta = (body as any).trial_metadata || {}
+          const targetCount = trialMeta.agentCount || 2
+          const persList = Array.isArray(trialMeta.selectedPersonalities) && trialMeta.selectedPersonalities.length > 0
+            ? trialMeta.selectedPersonalities.map((p: string) => p.replace('_', ' ')).join(', ')
+            : 'Sales Executive, Customer Support'
+          const targetPrice = trialMeta.targetPriceRupees || (targetCount === 1 ? 4999 : targetCount === 4 ? 19999 : 9999)
+          const renewalDateStr = trialMeta.renewalDate
+            ? new Date(trialMeta.renewalDate).toLocaleDateString('en-IN', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })
+            : new Date(Date.now() + 7 * 86400000).toLocaleDateString('en-IN', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })
+
+          invoiceLines.push({
+            item: `7-Day All-Access Trial (${targetCount} Agent${targetCount > 1 ? 's' : ''} - ${persList})`,
+            description: `Initial charge: ₹99.00 (0 CGST / 0 SGST). Upcoming autopay deduction: ₹${targetPrice.toLocaleString('en-IN')} + 18% GST (Total: ₹${Math.round(targetPrice * 1.18).toLocaleString('en-IN')}) scheduled on ${renewalDateStr}. Cancel anytime before then in billing settings.`,
+            quantity: 1,
+            rate: basePrice,
+            discount: 0,
+            amount: finalPrice,
+            is_trial: true,
+            invoice_type: 'trial'
+          })
+
+          // Instant auto-provisioning of selected trial personality agents
+          const selectedPersonalities: string[] = Array.isArray(trialMeta.selectedPersonalities) && trialMeta.selectedPersonalities.length > 0
+            ? trialMeta.selectedPersonalities
+            : ['sales_agent', 'support_agent'].slice(0, targetCount)
+
+          const trialDays = selectedPlan?.days || 7
+          const trialExpiresAt = new Date(Date.now() + trialDays * 86400000).toISOString()
+          const companyName = profile.company_name || profile.full_name || 'My Company'
+
+          for (const roleId of selectedPersonalities) {
+            const dbAgentType = roleId.toLowerCase()
+            const agentTypeKey = dbAgentType.endsWith('_agent') ? dbAgentType : `${dbAgentType}_agent`
+
+            let voiceId = 'shubh'
+            let cleanName = roleId.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())
+
+            if (dbAgentType.includes('support')) {
+              voiceId = 'anushka'
+              cleanName = 'Customer Support Agent'
+            } else if (dbAgentType.includes('sales')) {
+              voiceId = 'shubh'
+              cleanName = 'Sales Executive Agent'
+            } else if (dbAgentType.includes('appointment')) {
+              voiceId = 'anushka'
+              cleanName = 'Appointment Booking Agent'
+            } else if (dbAgentType.includes('lead')) {
+              voiceId = 'shubh'
+              cleanName = 'Lead Qualifier Agent'
+            } else if (dbAgentType.includes('multi')) {
+              voiceId = 'shubh'
+              cleanName = 'Multi-Personality Agent'
+            } else if (dbAgentType.includes('anika') || dbAgentType.includes('vikram')) {
+              voiceId = 'shubh'
+              cleanName = 'Vikram - AI Voice Assistant'
+            }
+
+            const agentName = `[Trial] ${cleanName}`
+
+            let systemPrompt = ''
+            try {
+              const promptFileName = (dbAgentType === 'anika-voice' || dbAgentType.includes('vikram'))
+                ? 'vikram_sharma.txt'
+                : `${agentTypeKey}.txt`
+              const possiblePaths = [
+                path.resolve(process.cwd(), '../backend/prompts', promptFileName),
+                path.resolve(process.cwd(), 'backend/prompts', promptFileName),
+                path.resolve('/app/backend/prompts', promptFileName),
+              ]
+              for (const filePath of possiblePaths) {
+                if (fs.existsSync(filePath)) {
+                  systemPrompt = fs.readFileSync(filePath, 'utf-8')
+                  break
+                }
+              }
+            } catch (e) {}
+
+            if (!systemPrompt) {
+              systemPrompt = `You are a helpful, courteous ${cleanName} for ${companyName}. Speak clearly and assist customers professionally.`
+            }
+
+            try {
+              const businessDescription = profile.business_description || 'General business'
+              const contextBlock = `=== BUSINESS CONTEXT ===\nBusiness Description: ${businessDescription}\nCompany Name: ${companyName}\nIndustry: ${profile.business_type || 'General'}\n========================\n\n`
+              systemPrompt = contextBlock + systemPrompt
+            } catch (e) {}
+
+            const greetingMessage = (dbAgentType.includes('support') || dbAgentType.includes('appointment'))
+              ? `Hello, main ${cleanName} bol rahi hoon ${companyName} se. Kaise help kar sakti hoon?`
+              : `Hello, main ${cleanName} bol raha hoon ${companyName} se. Kaise help kar sakta hoon?`
+
+            const agentPayload = {
+              user_id: user.id,
+              organization_id: profile.organization_id || null,
+              name: agentName,
+              agent_type: 'voice',
+              voice_provider: 'sarvam',
+              voice_id: voiceId,
+              status: 'active',
+              system_prompt: systemPrompt,
+              greeting_message: greetingMessage,
+              fallback_message: 'Mujhe yeh samajh nahi aaya, kripya dubara bataiye.',
+              validity_days: trialDays,
+              subscription_expires_at: trialExpiresAt,
+              expiry_alerts_sent: [],
+              config: {
+                plan_tier: 'trial',
+                target_plan: trialMeta.targetPlanSlug || 'starter',
+                personality_role: roleId,
+                slug: roleId,
+                minutes_limit: 50
+              }
+            }
+
+            const { data: newAgents, error: insertAgentErr } = await adminClient
+              .from('agents')
+              .insert(agentPayload)
+              .select()
+
+            if (insertAgentErr) {
+              console.error('[Verify Payment] Trial Personality Agent Creation Error:', insertAgentErr)
+            } else if (newAgents && newAgents.length > 0) {
+              if (!firstAgentId) {
+                firstAgentId = newAgents[0].id
+              }
+              console.log('[Verify Payment] Instantly created trial personality agent:', agentName)
+            }
+          }
+        } else {
+          invoiceLines.push({
+            item: `${item.key.toUpperCase()} Subscription Plan Upgrade`,
+            quantity: item.quantity,
+            rate: basePrice,
+            discount: itemDiscount,
+            amount: finalPrice
+          })
+        }
       } else if (item.type === 'phone_number') {
         additionalNumbersToAdd += item.quantity
 
@@ -578,8 +741,75 @@ export async function POST(request: Request) {
       }
     }
 
-    const taxPaisa = Math.round(totalPaidPaisa * 0.18) // 18% GST total (9% CGST + 9% SGST)
-    const finalTotalPaisa = totalPaidPaisa + taxPaisa
+    // 3a. Onboarding & Setup Fee processing (if enabled in admin configs and not pure trial)
+    const isPureTrial = items.length === 1 && items.some((item: any) => item.type === 'subscription' && (item.key === 'trial' || item.key.endsWith('_trial')))
+    const onboardingFeeEnabled = config.onboarding_fee_enabled === 'true'
+    const onboardingFeePaisa = (onboardingFeeEnabled && !isPureTrial)
+      ? parseInt(config.onboarding_fee_paisa || '0', 10)
+      : 0
+
+    if (onboardingFeePaisa > 0) {
+      totalPaidPaisa += onboardingFeePaisa
+      invoiceLines.push({
+        item: 'One-Time Onboarding & Setup Fee',
+        quantity: 1,
+        rate: onboardingFeePaisa,
+        discount: 0,
+        amount: onboardingFeePaisa
+      })
+    }
+
+    // 3b. Coupon validation and discount line
+    let couponDiscountPaisa = 0
+    let validCouponCode = ''
+    if (coupon_code && typeof coupon_code === 'string' && coupon_code.trim()) {
+      const cRes = await validateCoupon(adminClient, coupon_code.trim(), totalPaidPaisa / 100, user.id)
+      if (cRes.isValid) {
+        couponDiscountPaisa = cRes.discountAmountPaisa
+        validCouponCode = cRes.coupon!.code
+        invoiceLines.push({
+          item: `Coupon Discount (${validCouponCode})`,
+          quantity: 1,
+          rate: -couponDiscountPaisa,
+          discount: 0,
+          amount: -couponDiscountPaisa
+        })
+      }
+    }
+
+    const taxablePaisa = Math.max(0, totalPaidPaisa - couponDiscountPaisa)
+
+    // 3c. GST Calculation (Intra-state CGST+SGST vs Inter-state IGST)
+    let cleanGSTIN = customer_gstin && typeof customer_gstin === 'string' && customer_gstin.trim()
+      ? customer_gstin.trim().toUpperCase()
+      : (profile.gst_number || profile.gstin || null)
+
+    let customerStateCode = '07'
+    let stateName = profile.state || 'Delhi'
+    if (cleanGSTIN) {
+      const gstinVal = validateGSTIN(cleanGSTIN)
+      if (gstinVal.isValid) {
+        customerStateCode = gstinVal.stateCode!
+        stateName = gstinVal.state!
+      }
+    }
+
+    const gstCalc = isPureTrial
+      ? {
+          isInterState: false,
+          cgstRate: 0,
+          cgstAmount: 0,
+          sgstRate: 0,
+          sgstAmount: 0,
+          igstRate: 0,
+          igstAmount: 0,
+          totalTaxAmount: 0,
+          grandTotal: taxablePaisa
+        }
+      : calculateGSTBreakdown(taxablePaisa, cleanGSTIN ? customerStateCode : null)
+
+    const taxPaisa = gstCalc.totalTaxAmount
+    const finalTotalPaisa = isPureTrial ? taxablePaisa : (taxablePaisa + taxPaisa)
 
     // 4. Update profiles table with fallback checks
     const updates: Record<string, any> = {
@@ -591,6 +821,24 @@ export async function POST(request: Request) {
       trial_started_at: trialStartedAtToSet,
       trial_ends_at: trialEndsAtToSet,
       updated_at: new Date().toISOString()
+    }
+
+    if (isPureTrial) {
+      const trialMeta = (body as any).trial_metadata || {}
+      updates.mandate_status = 'scheduled'
+      updates.mandate_id = razorpay_payment_id || razorpay_order_id
+      updates.mandate_target_plan = trialMeta.targetPlanSlug || 'starter'
+      updates.mandate_renewal_date = trialMeta.renewalDate || new Date(Date.now() + 7 * 86400000).toISOString()
+      updates.mandate_target_price_paisa = (trialMeta.targetPriceRupees || 4999) * 100
+      updates.mandate_personalities = trialMeta.selectedPersonalities || ['sales', 'support']
+    } else if (planTierToSet !== 'free' && planTierToSet !== 'free_demo') {
+      updates.mandate_status = 'active'
+    }
+
+    if (save_gst_to_profile && cleanGSTIN) {
+      updates.gst_number = cleanGSTIN
+      if (customer_legal_name) updates.company_name = customer_legal_name
+      updates.state = stateName
     }
 
     // Support fallback increments if columns exist, otherwise safe defaults
@@ -609,7 +857,43 @@ export async function POST(request: Request) {
       console.error('[Verify Payment] Profiles Update Error:', profileUpdateErr)
       return NextResponse.json({ error: 'Failed to update plan limits' }, { status: 500 })
     }
-    console.log('[Verify Payment] 1F LOG: User profile limits updated successfully in DB:', JSON.stringify(updates))
+    // Extend validity on active agents by 30 days upon paid plan upgrade or recurring renewal
+    if (planTierToSet !== 'trial' && planTierToSet !== 'free' && planTierToSet !== 'free_demo') {
+      try {
+        const renewalExpiresAt = new Date(Date.now() + 30 * 86400000).toISOString()
+        let agentQuery = adminClient
+          .from('agents')
+          .update({
+            subscription_expires_at: renewalExpiresAt,
+            status: 'active',
+            updated_at: new Date().toISOString()
+          })
+          .neq('status', 'deleted')
+
+        if (profile.organization_id) {
+          agentQuery = agentQuery.eq('organization_id', profile.organization_id)
+        } else {
+          agentQuery = agentQuery.eq('user_id', user.id)
+        }
+        await agentQuery
+        console.log('[Verify Payment] Successfully extended subscription_expires_at for active agents to:', renewalExpiresAt)
+      } catch (agentRenewErr) {
+        console.warn('[Verify Payment] Could not extend agents subscription_expires_at:', agentRenewErr)
+      }
+    }
+
+    // Record coupon redemption if applicable
+    if (validCouponCode) {
+      await recordCouponRedemption(
+        adminClient,
+        validCouponCode,
+        user.id,
+        razorpay_order_id,
+        razorpay_payment_id,
+        couponDiscountPaisa,
+        totalPaidPaisa
+      )
+    }
 
     // 5. Create and save a single invoice with dynamic line items (VAK/ series per Task 11)
     const { count: totalInvoices } = await adminClient
@@ -625,15 +909,42 @@ export async function POST(request: Request) {
         invoice_number: vakInvoiceNumber,
         period_start: new Date().toISOString(),
         period_end: new Date(Date.now() + 30 * 86400000).toISOString(),
-        subscription_amount: totalPaidPaisa,
+        subscription_amount: taxablePaisa,
         tax_amount: taxPaisa,
         total_amount: finalTotalPaisa,
         line_items: invoiceLines,
         status: 'paid',
-        payment_method: 'razorpay',
+        payment_method: 'Razorpay Gateway',
         payment_id: razorpay_payment_id,
+        payment_reference_id: razorpay_payment_id,
         paid_at: new Date().toISOString(),
-        due_date: new Date(Date.now() + 30 * 86400000).toISOString()
+        due_date: new Date(Date.now() + 30 * 86400000).toISOString(),
+        customer_legal_name: customer_legal_name || profile.company_name || profile.full_name || user.email,
+        customer_gstin: cleanGSTIN || 'N/A',
+        customer_state: stateName,
+        customer_state_code: customerStateCode,
+        customer_billing_address: {
+          name: customer_legal_name || profile.full_name || '',
+          company: customer_legal_name || profile.company_name || '',
+          email: user.email,
+          address: profile.address || '',
+          city: profile.city || '',
+          state: stateName,
+          pincode: profile.pincode || '',
+          country: profile.country || 'India'
+        },
+        place_of_supply: stateName,
+        subtotal_paisa: taxablePaisa,
+        cgst_rate_pct: gstCalc.cgstRate,
+        cgst_amount_paisa: gstCalc.cgstAmount,
+        sgst_rate_pct: gstCalc.sgstRate,
+        sgst_amount_paisa: gstCalc.sgstAmount,
+        igst_rate_pct: gstCalc.igstRate,
+        igst_amount_paisa: gstCalc.igstAmount,
+        total_tax_paisa: taxPaisa,
+        grand_total_paisa: finalTotalPaisa,
+        supplier_name: 'Vaakriti Technologies Private Limited',
+        supplier_gstin: '07AAAAA0000A1Z5'
       })
       .select()
       .single()
@@ -654,17 +965,19 @@ export async function POST(request: Request) {
       const pdfBuffer = generateInvoicePdf({
         invoiceNumber: invoiceRecord.invoice_number,
         date: new Date(invoiceRecord.created_at).toLocaleDateString('en-IN'),
-        customerName: profile.full_name || user.email!,
+        customerName: invoiceRecord.customer_legal_name || profile.full_name || user.email!,
         customerEmail: user.email!,
-        customerAddress: `${profile.city || ''}, ${profile.state || ''}, ${profile.country || 'IN'}`.replace(/^,\s*/, '').replace(/,\s*,$/, ''),
-        customerGstin: profile.gst_number || 'N/A',
-        subtotal: (totalPaidPaisa / 100).toFixed(2),
+        customerAddress: `${invoiceRecord.customer_billing_address?.city || profile.city || ''}, ${invoiceRecord.customer_billing_address?.state || profile.state || ''}, ${profile.country || 'IN'}`.replace(/^,\s*/, '').replace(/,\s*,$/, ''),
+        customerGstin: invoiceRecord.customer_gstin || 'N/A',
+        subtotal: (taxablePaisa / 100).toFixed(2),
         tax: (taxPaisa / 100).toFixed(2),
         total: (finalTotalPaisa / 100).toFixed(2),
         paymentMethod: 'Razorpay',
         transactionId: razorpay_payment_id,
-        placeOfSupply: profile.state || 'IN',
+        placeOfSupply: invoiceRecord.place_of_supply || 'IN',
         amountInWords: 'Rupees ' + (finalTotalPaisa / 100).toLocaleString('en-IN') + ' Only',
+        supplierName: invoiceRecord.supplier_name || 'Vaakriti Technologies Private Limited',
+        supplierGstin: invoiceRecord.supplier_gstin || '07AAAAA0000A1Z5',
         items: invoiceLines.map((line: any) => ({
           quantity: line.quantity,
           description: line.item,
@@ -738,11 +1051,11 @@ export async function POST(request: Request) {
     try {
       await sendEmailTemplate({
         to: user.email!,
-        subject: `Invoice ${invoiceRecord.invoice_number} from TRINETRAEDU-AI`,
+        subject: `Tax Invoice ${invoiceRecord.invoice_number}`,
         templateName: 'invoice',
         variables: {
           invoice_number: invoiceRecord.invoice_number,
-          company_name: 'TRINETRAEDU-AI',
+          company_name: invoiceRecord.supplier_name || 'Vaakriti Technologies Private Limited',
           company_address: 'India , Uttar Pradesh\\nKanpur Nagar , 208022',
           company_phone: '+91 9580619562',
           company_email: 'support@trinetraedu-ai.com',
@@ -797,7 +1110,20 @@ export async function POST(request: Request) {
     }
 
     const redirectUrl = firstAgentId ? `/dashboard/agents/${firstAgentId}/setup?bundle=true` : undefined
-    return NextResponse.json({ success: true, invoice_id: invoiceRecord.id, redirect_url: redirectUrl })
+    const cleanCustomerAddress = typeof invoiceRecord.customer_address === 'string' && invoiceRecord.customer_address.trim().length > 0
+      ? invoiceRecord.customer_address
+      : [profile.address || profile.street, profile.city, profile.state, profile.pincode, profile.country || 'India'].filter(Boolean).join(', ') || 'India'
+
+    return NextResponse.json({
+      success: true,
+      invoice_id: invoiceRecord.id,
+      invoice_number: invoiceRecord.invoice_number,
+      invoice: {
+        ...invoiceRecord,
+        customer_address: cleanCustomerAddress
+      },
+      redirect_url: redirectUrl
+    })
   } catch (error: any) {
     console.error('[Verify Payment] Catch Error:', error)
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })

@@ -245,7 +245,7 @@ export function PaymentProgressModal({
           {status === "success" && (
             <button
               onClick={onClose}
-              className="w-full py-2.5 rounded-xl bg-violet-600 hover:bg-violet-700 text-white font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-violet-600/30 transition-all cursor-pointer"
+              className="w-full py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer active:scale-[0.98]"
             >
               <span>View in My Numbers</span>
               <ArrowRight size={14} />
@@ -262,7 +262,7 @@ export function PaymentProgressModal({
               </button>
               <a
                 href="/dashboard/support"
-                className="flex-1 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-700 text-white font-bold text-xs uppercase tracking-wider text-center transition-colors cursor-pointer"
+                className="flex-1 py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 font-bold text-xs uppercase tracking-wider text-center transition-colors cursor-pointer shadow-sm active:scale-[0.98]"
               >
                 Contact Support
               </a>

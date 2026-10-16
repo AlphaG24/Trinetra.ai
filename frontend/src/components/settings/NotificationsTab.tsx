@@ -160,7 +160,7 @@ export function NotificationsTab() {
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center py-20 gap-3">
-        <Loader2 className="w-8 h-8 animate-spin text-violet-500" />
+        <Loader2 className="w-8 h-8 animate-spin text-zinc-900 dark:text-white" />
         <p className="text-xs text-zinc-400">Loading notification preferences...</p>
       </div>
     )
@@ -173,11 +173,11 @@ export function NotificationsTab() {
         {/* Event Toggles & Channel Multi-Select (Left 2 columns) */}
         <div className="lg:col-span-2 space-y-6">
           <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-6 space-y-6 shadow-sm relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-64 h-64 bg-violet-500/5 blur-[120px] pointer-events-none rounded-full" />
+            <div className="absolute top-0 right-0 w-64 h-64 bg-zinc-500/5 blur-[120px] pointer-events-none rounded-full" />
             
             <div className="flex items-center justify-between pb-4 border-b border-[var(--border)]">
               <div className="flex items-center gap-3">
-                <Bell className="w-5 h-5 text-violet-400" />
+                <Bell className="w-5 h-5 text-zinc-900 dark:text-white" />
                 <div>
                   <h3 className="font-bold font-montserrat text-sm text-[var(--heading)] uppercase tracking-wider">Granular Preferences</h3>
                   <p className="text-[10px] text-[var(--muted)] mt-0.5">Route critical alerts directly to your preferred communication channels.</p>
@@ -205,7 +205,7 @@ export function NotificationsTab() {
                         onClick={() => handleToggleChannel(item.id, 'email')}
                         className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-[10px] font-semibold tracking-wide uppercase transition ${
                           eventPrefs.email 
-                            ? 'bg-violet-500/10 border-violet-500/30 text-violet-400' 
+                            ? 'bg-zinc-200 dark:bg-zinc-800 border-zinc-300 dark:border-zinc-700 text-zinc-800 dark:text-zinc-200' 
                             : 'bg-[var(--background)]/40 border-[var(--border)] text-[var(--muted)] hover:text-[var(--body)]'
                         }`}
                       >
@@ -219,7 +219,7 @@ export function NotificationsTab() {
                         onClick={() => handleToggleChannel(item.id, 'telegram')}
                         className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-[10px] font-semibold tracking-wide uppercase transition ${
                           eventPrefs.telegram 
-                            ? 'bg-violet-500/10 border-violet-500/30 text-violet-400' 
+                            ? 'bg-zinc-200 dark:bg-zinc-800 border-zinc-300 dark:border-zinc-700 text-zinc-800 dark:text-zinc-200' 
                             : 'bg-[var(--background)]/40 border-[var(--border)] text-[var(--muted)] hover:text-[var(--body)]'
                         }`}
                       >
@@ -233,7 +233,7 @@ export function NotificationsTab() {
                         onClick={() => handleToggleChannel(item.id, 'dashboard')}
                         className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-[10px] font-semibold tracking-wide uppercase transition ${
                           eventPrefs.dashboard 
-                            ? 'bg-violet-500/10 border-violet-500/30 text-violet-400' 
+                            ? 'bg-zinc-200 dark:bg-zinc-800 border-zinc-300 dark:border-zinc-700 text-zinc-800 dark:text-zinc-200' 
                             : 'bg-[var(--background)]/40 border-[var(--border)] text-[var(--muted)] hover:text-[var(--body)]'
                         }`}
                       >
@@ -249,7 +249,7 @@ export function NotificationsTab() {
             <button
               onClick={saveSettings}
               disabled={saving}
-              className="w-full flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-violet-600 hover:bg-violet-700 disabled:bg-violet-600/50 text-white font-bold text-xs uppercase tracking-wider transition-all cursor-pointer shadow-md shadow-violet-500/10"
+              className="w-full flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-zinc-900 hover:bg-zinc-800 disabled:bg-zinc-800/50 text-white dark:bg-white dark:hover:bg-zinc-100 dark:disabled:bg-white/50 dark:text-zinc-950 font-bold text-xs uppercase tracking-wider transition-all cursor-pointer shadow-sm active:scale-[0.99]"
             >
               {saving ? (
                 <>
@@ -271,7 +271,7 @@ export function NotificationsTab() {
           <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-6 space-y-4 shadow-sm relative overflow-hidden">
             <div className="flex items-center justify-between pb-3 border-b border-[var(--border)]">
               <div className="flex items-center gap-2">
-                <Clock className="w-4 h-4 text-violet-400" />
+                <Clock className="w-4 h-4 text-zinc-900 dark:text-white" />
                 <h3 className="font-bold font-montserrat text-xs text-[var(--heading)] uppercase tracking-wider">Quiet Hours</h3>
               </div>
               <button
@@ -279,7 +279,7 @@ export function NotificationsTab() {
                 onClick={() => handleUpdateQuietHours('enabled', !prefs.quiet_hours.enabled)}
                 className={`relative inline-flex items-center h-5 w-9 rounded-full transition-all shrink-0 cursor-pointer ${
                   prefs.quiet_hours.enabled
-                    ? 'bg-violet-600 border border-violet-500/30'
+                    ? 'bg-zinc-900 dark:bg-white border border-zinc-900 dark:border-white'
                     : 'bg-[var(--background)] border border-[var(--border)]'
                 }`}
               >
@@ -303,7 +303,7 @@ export function NotificationsTab() {
                     type="time"
                     value={prefs.quiet_hours.start}
                     onChange={(e) => handleUpdateQuietHours('start', e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg bg-[var(--background)] border border-[var(--border)] text-xs text-zinc-900 dark:text-white [color-scheme:light] dark:[color-scheme:dark] focus:outline-none focus:border-violet-500 transition-colors"
+                    className="w-full px-3 py-2 rounded-lg bg-[var(--background)] border border-[var(--border)] text-xs text-zinc-900 dark:text-white [color-scheme:light] dark:[color-scheme:dark] focus:outline-none focus:border-zinc-900 dark:focus:border-white transition-colors"
                   />
                 </div>
                 <div>
@@ -312,7 +312,7 @@ export function NotificationsTab() {
                     type="time"
                     value={prefs.quiet_hours.end}
                     onChange={(e) => handleUpdateQuietHours('end', e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg bg-[var(--background)] border border-[var(--border)] text-xs text-zinc-900 dark:text-white [color-scheme:light] dark:[color-scheme:dark] focus:outline-none focus:border-violet-500 transition-colors"
+                    className="w-full px-3 py-2 rounded-lg bg-[var(--background)] border border-[var(--border)] text-xs text-zinc-900 dark:text-white [color-scheme:light] dark:[color-scheme:dark] focus:outline-none focus:border-zinc-900 dark:focus:border-white transition-colors"
                   />
                 </div>
               </div>
@@ -323,7 +323,7 @@ export function NotificationsTab() {
           <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-6 space-y-4 shadow-sm relative overflow-hidden">
             <div className="flex items-center justify-between pb-3 border-b border-[var(--border)]">
               <div className="flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-violet-400" />
+                <Sparkles className="w-4 h-4 text-zinc-900 dark:text-white" />
                 <h3 className="font-bold font-montserrat text-xs text-[var(--heading)] uppercase tracking-wider">Digest Mode</h3>
               </div>
               <button
@@ -331,7 +331,7 @@ export function NotificationsTab() {
                 onClick={() => handleUpdateDigest('enabled', !prefs.digest_mode.enabled)}
                 className={`relative inline-flex items-center h-5 w-9 rounded-full transition-all shrink-0 cursor-pointer ${
                   prefs.digest_mode.enabled
-                    ? 'bg-violet-600 border border-violet-500/30'
+                    ? 'bg-zinc-900 dark:bg-white border border-zinc-900 dark:border-white'
                     : 'bg-[var(--background)] border border-[var(--border)]'
                 }`}
               >
@@ -354,7 +354,7 @@ export function NotificationsTab() {
                   type="time"
                   value={prefs.digest_mode.time}
                   onChange={(e) => handleUpdateDigest('time', e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg bg-[var(--background)] border border-[var(--border)] text-xs text-zinc-900 dark:text-white [color-scheme:light] dark:[color-scheme:dark] focus:outline-none focus:border-violet-500 transition-colors"
+                  className="w-full px-3 py-2 rounded-lg bg-[var(--background)] border border-[var(--border)] text-xs text-zinc-900 dark:text-white [color-scheme:light] dark:[color-scheme:dark] focus:outline-none focus:border-zinc-900 dark:focus:border-white transition-colors"
                 />
               </div>
             )}
