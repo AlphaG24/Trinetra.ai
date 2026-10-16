@@ -118,7 +118,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const loadUser = useCallback(async () => {
     try {
-      const { data: { user: currentUser }, error } = await supabase.auth.getUser()
+      const res = await supabase.auth.getUser().catch((err: any) => ({
+        data: { user: null },
+        error: err,
+      }))
+      const currentUser = res?.data?.user
+      const error = res?.error
+
       if (error || !currentUser) {
         setUser(null)
         setProfile(null)
@@ -132,8 +138,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       setUser(currentUser)
       await fetchProfile(currentUser.id)
-    } catch (err) {
-      console.warn('[AuthProvider] Load user error:', err)
+    } catch (err: any) {
+      if (err?.name !== 'AuthRetryableFetchError') {
+        console.warn('[AuthProvider] Load user error:', err)
+      }
     } finally {
       setIsLoading(false)
     }
@@ -144,8 +152,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const init = async () => {
       try {
-        const { data: { user: currentUser }, error } = await supabase.auth.getUser()
+        const res = await supabase.auth.getUser().catch((err: any) => ({
+          data: { user: null },
+          error: err,
+        }))
         if (!isMounted) return
+
+        const currentUser = res?.data?.user
+        const error = res?.error
 
         if (error || !currentUser) {
           setUser(null)
@@ -160,8 +174,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         setUser(currentUser)
         await fetchProfile(currentUser.id)
-      } catch (err) {
-        console.warn('[AuthProvider] Init user error:', err)
+      } catch (err: any) {
+        if (err?.name !== 'AuthRetryableFetchError') {
+          console.warn('[AuthProvider] Init user error:', err)
+        }
       } finally {
         if (isMounted) setIsLoading(false)
       }

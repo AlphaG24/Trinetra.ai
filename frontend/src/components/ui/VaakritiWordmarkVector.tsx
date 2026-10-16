@@ -1,0 +1,32 @@
+import React from "react";
+
+interface VaakritiWordmarkVectorProps extends React.SVGProps<SVGSVGElement> {
+  className?: string;
+}
+
+/**
+ * VaakritiWordmarkVector - Precision vector wordmark of the official VAAKRITI logo.
+ * Uses canonical compound path with evenodd rule ensuring R has a clean counter cutout
+ * and zero geometric overlap or distortion.
+ */
+export function VaakritiWordmarkVector({ className, ...props }: VaakritiWordmarkVectorProps) {
+  return (
+    <svg
+      viewBox="0 0 1280 164"
+      fill="currentColor"
+      xmlns="http://www.w3.org/2000/svg"
+      role="img"
+      aria-label="VAAKRITI"
+      shapeRendering="geometricPrecision"
+      className={className}
+      {...props}
+    >
+      <title>VAAKRITI</title>
+      <path
+        fillRule="evenodd"
+        clipRule="evenodd"
+        d="M 0 4 L 83 160 L 98 160 L 186 4 L 153 4 L 90.5 116 L 33 4 Z M 311 0 L 321 0 L 399 159 L 368 159 L 316 59 L 255 159 L 225 159 Z M 527 0 L 537 0 L 619 159 L 585 159 L 532 59 L 471 159 L 437 159 Z M 656 4 L 686 4 L 686 71 L 756 4 L 795 4 L 724 76 L 795 159 L 756 159 L 702 99 L 686 113 L 686 159 L 656 159 Z M 832 4 L 920 4 C 945 4 958 17 958 45 C 958 72 944 87 920 89 L 967 159 L 928 159 L 888 100 L 863 100 L 863 159 L 832 159 Z M 863 27 L 910 27 C 922 27 928 34 928 47 C 928 60 922 75 910 75 L 863 75 Z M 1005 4 L 1035 4 L 1035 159 L 1005 159 Z M 1072 4 L 1208 4 L 1208 27 L 1156 27 L 1156 159 L 1125 159 L 1125 27 L 1072 27 Z M 1248 4 L 1279 4 L 1279 159 L 1248 159 Z"
+      />
+    </svg>
+  );
+}

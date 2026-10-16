@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/server'
 import { MarketplaceListingClient } from '@/src/components/marketplace/MarketplaceListingClient'
+import { DemoAgentsManager } from '@/components/dashboard/DemoAgentsManager'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -8,6 +9,7 @@ export default async function DemoPage() {
   let services: any[] = []
   let errorOccurred = false
   let errorMessage = ''
+  let isDeveloperTester = false
 
   try {
     const supabase = await createClient()
@@ -24,6 +26,17 @@ export default async function DemoPage() {
     } else {
       services = data || []
     }
+    const { data: { user } } = await supabase.auth.getUser()
+    if (user) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .maybeSingle()
+      if (profile && ['developer_tester', 'admin', 'super_admin'].includes(profile.role)) {
+        isDeveloperTester = true
+      }
+    }
   } catch (err: any) {
     errorOccurred = true
     errorMessage = err.message || 'Something went wrong'
@@ -31,6 +44,11 @@ export default async function DemoPage() {
 
   return (
     <div className="space-y-6">
+      {/* Developer Tester Demo Management Console */}
+      {isDeveloperTester && (
+        <DemoAgentsManager />
+      )}
+
       <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shadow-sm">
         <div>
           <h1 className="text-2xl font-bold font-display text-[var(--heading)]">Demo Tools</h1>

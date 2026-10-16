@@ -5,7 +5,25 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ChevronDown, GraduationCap, Globe } from "lucide-react";
+import {
+  ChevronDown,
+  GraduationCap,
+  Globe,
+  Building2,
+  Handshake,
+  PhoneCall,
+  Mic,
+  Bot,
+  CreditCard,
+  Code2,
+  Cpu,
+  FileText,
+  BookOpen,
+  ShieldCheck,
+  ArrowUpRight,
+  Sparkles,
+} from "lucide-react";
+import { AnimatePresence, motion } from "framer-motion";
 import { toast } from "sonner";
 
 import {
@@ -15,6 +33,189 @@ import {
 } from "@/lib/site-content";
 import { useAuth } from "@/src/components/providers/AuthProvider";
 import { VaakritiWordmark } from "@/components/ui/VaakritiWordmark";
+
+export type MegamenuTab = "products" | "developers" | "resources" | "company";
+
+export interface MegamenuPageItem {
+  name: string;
+  description: string;
+  href: string;
+  icon: any;
+}
+
+export interface MegamenuCardItem {
+  image: string;
+  tag: string;
+  title: string;
+  subtitle: string;
+  href: string;
+}
+
+export const MEGAMENU_TABS: Record<
+  MegamenuTab,
+  {
+    label: string;
+    pages: MegamenuPageItem[];
+    cards: MegamenuCardItem[];
+  }
+> = {
+  products: {
+    label: "Products",
+    pages: [
+      {
+        name: "Voice Studio Demo",
+        description: "Experience conversational voice AI live in your browser",
+        href: "/demo",
+        icon: Mic,
+      },
+      {
+        name: "Agent Directory",
+        description: "Browse pre-configured autonomous inbound & outbound agents",
+        href: "/marketplace",
+        icon: Bot,
+      },
+      {
+        name: "Pricing & Plans",
+        description: "Transparent usage tiers, enterprise SIP trunks & SLA packages",
+        href: "/pricing",
+        icon: CreditCard,
+      },
+    ],
+    cards: [
+      {
+        image: "/images/vaakriti_voice_ai.jpg",
+        tag: "Autonomous Voice",
+        title: "Real-time Multilingual Indian Telephony",
+        subtitle: "Experience live voice studio",
+        href: "/demo",
+      },
+      {
+        image: "/images/vaakriti_arch.jpg",
+        tag: "Enterprise Scale",
+        title: "Scalable Sovereign Voice Infrastructure",
+        subtitle: "Explore enterprise plans",
+        href: "/pricing",
+      },
+    ],
+  },
+  developers: {
+    label: "Developers",
+    pages: [
+      {
+        name: "Documentation",
+        description: "Developer guides, quickstarts, and platform architecture",
+        href: "/docs",
+        icon: Code2,
+      },
+      {
+        name: "WebRTC Audio SDK",
+        description: "Ultra-low latency streaming for web & mobile apps",
+        href: "/docs",
+        icon: Cpu,
+      },
+      {
+        name: "API & Webhooks",
+        description: "Real-time telephony webhooks and event streaming",
+        href: "/docs",
+        icon: FileText,
+      },
+    ],
+    cards: [
+      {
+        image: "/images/vaakriti_arch.jpg",
+        tag: "Developer SDK",
+        title: "Integrate Voice AI in under 10 lines of code",
+        subtitle: "View documentation",
+        href: "/docs",
+      },
+      {
+        image: "/images/vaakriti_voice_ai.jpg",
+        tag: "Low Latency",
+        title: "< 450ms Bidirectional Audio Streaming",
+        subtitle: "Test in demo studio",
+        href: "/demo",
+      },
+    ],
+  },
+  resources: {
+    label: "Resources",
+    pages: [
+      {
+        name: "Research & Blog",
+        description: "Articles on Indic voice AI, latency, and telephony",
+        href: "/blog",
+        icon: BookOpen,
+      },
+      {
+        name: "Privacy & Security",
+        description: "Strict tenant isolation, data governance, and RLS",
+        href: "/privacy",
+        icon: ShieldCheck,
+      },
+      {
+        name: "Terms of Service",
+        description: "Enterprise SLA, platform policies, and guidelines",
+        href: "/terms",
+        icon: FileText,
+      },
+    ],
+    cards: [
+      {
+        image: "/images/vaakriti_arch.jpg",
+        tag: "Research & Insights",
+        title: "Scaling Indian Voice AI Across Regional Dialects",
+        subtitle: "Read our technical research",
+        href: "/blog",
+      },
+      {
+        image: "/images/vaakriti_voice_ai.jpg",
+        tag: "Whitepaper",
+        title: "Autonomous Agents vs Traditional Telecom IVR",
+        subtitle: "Explore research findings",
+        href: "/blog",
+      },
+    ],
+  },
+  company: {
+    label: "Company",
+    pages: [
+      {
+        name: "About Vaakriti",
+        description: "Our mission, vision, and team building India's voice AI",
+        href: "/about",
+        icon: Building2,
+      },
+      {
+        name: "Partners & Affiliates",
+        description: "Agency partner program, reseller revenue, and co-selling",
+        href: "/partners",
+        icon: Handshake,
+      },
+      {
+        name: "Contact Us",
+        description: "Talk to our enterprise voice solutions architecture team",
+        href: "/contact",
+        icon: PhoneCall,
+      },
+    ],
+    cards: [
+      {
+        image: "/images/vaakriti_arch.jpg",
+        tag: "Announcing Vaakriti",
+        title: "Sovereign Multilingual Voice AI for India",
+        subtitle: "Learn about our journey",
+        href: "/about",
+      },
+      {
+        image: "/images/vaakriti_voice_ai.jpg",
+        tag: "Brand Identity",
+        title: "A New Identity for Conversational Intelligence",
+        subtitle: "Get in touch with us",
+        href: "/contact",
+      },
+    ],
+  },
+};
 
 type ProductStatus = "live" | "beta" | "coming_soon";
 
@@ -87,7 +288,41 @@ export function Navbar() {
     action_text: "Experience Live",
     action_url: "",
   });
+  const [activeTab, setActiveTab] = useState<MegamenuTab | null>(null);
+  const megamenuTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleMouseEnterTab = (tab: MegamenuTab) => {
+    if (megamenuTimerRef.current) {
+      clearTimeout(megamenuTimerRef.current);
+      megamenuTimerRef.current = null;
+    }
+    setActiveTab(tab);
+  };
+
+  const handleMouseEnterPopover = () => {
+    if (megamenuTimerRef.current) {
+      clearTimeout(megamenuTimerRef.current);
+      megamenuTimerRef.current = null;
+    }
+  };
+
+  const handleMouseLeave = () => {
+    if (megamenuTimerRef.current) {
+      clearTimeout(megamenuTimerRef.current);
+    }
+    megamenuTimerRef.current = setTimeout(() => {
+      setActiveTab(null);
+    }, 180);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (megamenuTimerRef.current) {
+        clearTimeout(megamenuTimerRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     fetch("/api/public/announcement")
@@ -176,40 +411,38 @@ export function Navbar() {
     return (
       <>
         <header
+          onMouseLeave={handleMouseLeave}
           className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
-            scrolled
-              ? "bg-white/85 backdrop-blur-md shadow-xs border-b border-slate-100/70"
+            scrolled || activeTab
+              ? "backdrop-blur-md shadow-xs border-b bg-white/95 border-[#E2E8F0]"
               : "bg-transparent border-0 border-none shadow-none"
           }`}
         >
-          {/* ── 1. TOP ANNOUNCEMENT TAB (WHITE EMERGING & MIXING WITH GREEN, DISAPPEARS ON SCROLL) ── */}
+          {/* ── 1. TOP ANNOUNCEMENT TAB ── */}
           <div
+            suppressHydrationWarning
             className={`w-full transition-all duration-300 ${
               scrolled
                 ? "max-h-0 opacity-0 overflow-hidden py-0 border-0 pointer-events-none"
-                : "max-h-16 opacity-100 py-1.5 px-3 border-0 shadow-none"
+                : "max-h-16 opacity-100 py-1.5 px-3 border-b shadow-none bg-[#F1F5F9]/90 border-[#E2E8F0]"
             }`}
-            style={
-              !scrolled
-                ? {
-                    background:
-                      "linear-gradient(180deg, #FFFFFF 0%, rgba(255, 255, 255, 0.95) 30%, rgba(236, 253, 245, 0.70) 70%, rgba(167, 243, 208, 0.35) 100%)",
-                  }
-                : undefined
-            }
           >
-            <div className="max-w-[1536px] mx-auto flex items-center justify-center gap-1.5 sm:gap-2.5 text-[11px] sm:text-[12px] font-sans text-slate-800">
-              <span className="text-emerald-700 text-[10px] hidden sm:inline select-none">✦ ✦ ✦</span>
-              <span className="px-2 py-0.5 rounded-full text-[9.5px] sm:text-[10px] font-bold uppercase tracking-wider bg-emerald-700/15 text-emerald-900 border border-emerald-700/20">
+            <div className="max-w-[1536px] mx-auto flex items-center justify-center gap-1.5 sm:gap-2.5 text-[11px] sm:text-[12px] font-sans">
+              <span className="text-[10px] hidden sm:inline select-none text-[#2563EB]">✦ ✦ ✦</span>
+              <span
+                className="px-2 py-0.5 rounded-full text-[9.5px] sm:text-[10px] font-bold uppercase tracking-wider border font-sans bg-[#2563EB]/10 text-[#2563EB] border-[#2563EB]/25"
+              >
                 {announcement.tag || "Platform"}
               </span>
-              <span className="text-slate-800 font-medium truncate max-w-[280px] sm:max-w-none">
+              <span
+                className="font-medium truncate max-w-[280px] sm:max-w-none font-sans text-[#334155]"
+              >
                 {announcement.text || "How Autonomous Voice Agents handle complex Indian calls"}
               </span>
               {announcement.action_url ? (
                 <Link
                   href={announcement.action_url}
-                  className="font-semibold text-emerald-900 hover:text-black underline underline-offset-4 decoration-emerald-800/40 hover:decoration-black transition-colors cursor-pointer ml-1"
+                  className="font-semibold underline underline-offset-4 transition-colors cursor-pointer ml-1 font-sans text-[#2563EB] hover:text-[#1D4ED8]"
                 >
                   {announcement.action_text || "Experience Live →"}
                 </Link>
@@ -217,12 +450,12 @@ export function Navbar() {
                 <button
                   type="button"
                   onClick={handleAnnouncementClick}
-                  className="font-semibold text-emerald-900 hover:text-black underline underline-offset-4 decoration-emerald-800/40 hover:decoration-black transition-colors cursor-pointer ml-1"
+                  className="font-semibold underline underline-offset-4 transition-colors cursor-pointer ml-1 font-sans text-[#2563EB] hover:text-[#1D4ED8]"
                 >
                   {announcement.action_text || "Experience Live →"}
                 </button>
               )}
-              <span className="text-emerald-700 text-[10px] hidden sm:inline select-none">✦ ✦ ✦</span>
+              <span className="text-[10px] hidden sm:inline select-none text-[#2563EB]">✦ ✦ ✦</span>
             </div>
           </div>
 
@@ -231,49 +464,44 @@ export function Navbar() {
             {/* Brand Logo on Left */}
             <div className="flex items-center gap-3">
               <Link href="/" className="group select-none flex items-center py-2" aria-label="Vaakriti Home">
-                <VaakritiWordmark className="h-[15px] sm:h-[16.5px] md:h-[18px] w-auto text-[#0B0F17] group-hover:text-emerald-700 transition-colors duration-200" />
+                <div className="text-[#0F172A] hover:text-[#2563EB] transition-colors">
+                  <VaakritiWordmark className="h-[15px] sm:h-[16.5px] md:h-[18px] w-auto transition-colors duration-200" />
+                </div>
               </Link>
             </div>
 
-            {/* Clean Navigation Links in Center: Products, Developers, Resources, Company */}
-            <nav className="hidden md:flex items-center gap-8 lg:gap-10">
-              <Link
-                href="/#products"
-                className="text-[13.5px] font-medium text-slate-800 hover:text-emerald-700 transition-colors"
-              >
-                Products
-              </Link>
-              <Link
-                href="/#developers"
-                className="text-[13.5px] font-medium text-slate-800 hover:text-emerald-700 transition-colors"
-              >
-                Developers
-              </Link>
-              <Link
-                href="/#resources"
-                className="text-[13.5px] font-medium text-slate-800 hover:text-emerald-700 transition-colors"
-              >
-                Resources
-              </Link>
-              <Link
-                href="/#company"
-                className="text-[13.5px] font-medium text-slate-800 hover:text-emerald-700 transition-colors"
-              >
-                Company
-              </Link>
+            {/* Navigation Tabs (Hovering opens Sarvam-style Megamenu with real pages) */}
+            <nav className="hidden md:flex items-center gap-7 lg:gap-9">
+              {(["products", "developers", "resources", "company"] as const).map((tabKey) => {
+                const tab = MEGAMENU_TABS[tabKey];
+                const isActive = activeTab === tabKey;
+                return (
+                  <button
+                    key={tabKey}
+                    type="button"
+                    onMouseEnter={() => handleMouseEnterTab(tabKey)}
+                    onClick={() => setActiveTab(activeTab === tabKey ? null : tabKey)}
+                    className={`text-[13.5px] font-medium transition-colors font-sans py-2.5 flex items-center gap-1 cursor-pointer select-none ${
+                      isActive ? "text-[#2563EB] font-semibold" : "text-[#1E293B] hover:text-[#2563EB]"
+                    }`}
+                  >
+                    <span>{tab.label}</span>
+                  </button>
+                );
+              })}
             </nav>
 
             {/* Right Action Buttons: Go to Dashboard, Contact Us */}
             <div className="hidden sm:flex items-center gap-3">
               <Link
                 href={user ? (role === 'admin' || role === 'super_admin' ? '/admin' : '/dashboard') : '/login'}
-                className="inline-flex items-center justify-center px-5 py-2 text-[13px] font-semibold bg-[#111827] text-white hover:bg-black rounded-full shadow-xs transition-all duration-200 cursor-pointer"
+                className="inline-flex items-center justify-center px-5 py-2 text-[13px] font-semibold rounded-full shadow-xs transition-all duration-200 cursor-pointer font-sans bg-[#0F172A] text-white hover:bg-[#1E293B]"
               >
                 Go to Dashboard
               </Link>
               <Link
                 href="/contact"
-                className="inline-flex items-center justify-center px-4.5 py-2 text-[13px] font-medium text-[#111827] bg-white/90 hover:bg-white border border-slate-200/90 hover:border-slate-300 rounded-full shadow-2xs transition-all duration-200 cursor-pointer"
+                className="inline-flex items-center justify-center px-4.5 py-2 text-[13px] font-semibold rounded-full shadow-2xs transition-all duration-200 cursor-pointer font-sans bg-[#2563EB] text-white hover:bg-[#1D4ED8]"
               >
                 Contact Us
               </Link>
@@ -282,7 +510,7 @@ export function Navbar() {
             {/* Mobile hamburger */}
             <button
               onClick={toggleMenu}
-              className="sm:hidden p-2 text-slate-800 hover:text-emerald-700"
+              className="sm:hidden p-2 text-[#0F172A] hover:text-[#2563EB]"
               aria-label="Toggle Navigation Menu"
             >
               <span className="block w-5 h-0.5 bg-current mb-1" />
@@ -290,50 +518,148 @@ export function Navbar() {
               <span className="block w-5 h-0.5 bg-current" />
             </button>
           </div>
+
+          {/* ── 3. SARVAM-STYLE HOVER MEGAMENU POPOVER MODAL ── */}
+          <AnimatePresence>
+            {activeTab && (
+              <motion.div
+                initial={{ opacity: 0, y: -6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -6 }}
+                transition={{ duration: 0.16, ease: "easeOut" }}
+                onMouseEnter={handleMouseEnterPopover}
+                onMouseLeave={handleMouseLeave}
+                className="w-full bg-white/98 backdrop-blur-2xl border-t border-b border-[#E2E8F0] shadow-[0_24px_60px_rgba(15,23,42,0.08)] py-8 z-40 select-none"
+              >
+                <div className="max-w-[1340px] mx-auto px-6 sm:px-10 lg:px-14 grid grid-cols-12 gap-8 items-stretch">
+                  
+                  {/* Left Column: Real Website Pages with Crisp Icons (Sarvam-inspired) */}
+                  <div className="col-span-12 lg:col-span-5 flex flex-col justify-center space-y-2 border-r-0 lg:border-r border-[#E2E8F0] pr-0 lg:pr-8">
+                    {MEGAMENU_TABS[activeTab].pages.map((item) => {
+                      const Icon = item.icon;
+                      return (
+                        <Link
+                          key={item.name}
+                          href={item.href}
+                          onClick={() => setActiveTab(null)}
+                          className="group flex items-start gap-3.5 p-3 rounded-2xl hover:bg-[#F8FAFC] transition-all duration-200"
+                        >
+                          <div className="w-9 h-9 rounded-xl bg-[#F1F5F9] group-hover:bg-[#2563EB]/10 border border-[#E2E8F0] group-hover:border-[#2563EB]/25 flex items-center justify-center text-[#475569] group-hover:text-[#2563EB] transition-colors shrink-0 mt-0.5">
+                            <Icon className="w-4 h-4" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="text-[14px] font-semibold text-[#0F172A] group-hover:text-[#2563EB] transition-colors flex items-center gap-1 font-sans">
+                              {item.name}
+                              <ArrowUpRight className="w-3.5 h-3.5 opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-all text-[#2563EB]" />
+                            </div>
+                            <p className="text-[12px] text-[#64748B] font-sans leading-relaxed mt-0.5">
+                              {item.description}
+                            </p>
+                          </div>
+                        </Link>
+                      );
+                    })}
+                  </div>
+
+                  {/* Right Column: Visual Announcement Cards (Fills blank space with generated imagery) */}
+                  <div className="col-span-12 lg:col-span-7 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {MEGAMENU_TABS[activeTab].cards.map((card) => (
+                      <Link
+                        key={card.title}
+                        href={card.href}
+                        onClick={() => setActiveTab(null)}
+                        className="group block relative rounded-2xl overflow-hidden border border-[#E2E8F0] bg-white hover:border-[#2563EB]/40 hover:shadow-lg transition-all duration-300"
+                      >
+                        <div className="relative w-full h-[140px] sm:h-[155px] overflow-hidden bg-slate-100">
+                          <Image
+                            src={card.image}
+                            alt={card.title}
+                            fill
+                            className="object-cover group-hover:scale-105 transition-transform duration-500"
+                            sizes="(max-width: 768px) 100vw, 360px"
+                          />
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-black/20 to-transparent" />
+                          <div className="absolute top-3 left-3">
+                            <span className="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-white/90 backdrop-blur-md text-[#0F172A] shadow-xs">
+                              {card.tag}
+                            </span>
+                          </div>
+                          <div className="absolute bottom-3 left-3 right-3 text-white">
+                            <h4 className="text-[13.5px] font-bold font-sans drop-shadow-sm leading-snug">
+                              {card.title}
+                            </h4>
+                          </div>
+                        </div>
+                        
+                        <div className="p-3.5 flex items-center justify-between text-[12px] font-medium text-[#334155] group-hover:text-[#2563EB] transition-colors bg-[#FAFAFA]">
+                          <span className="truncate">{card.subtitle}</span>
+                          <ArrowUpRight className="w-3.5 h-3.5 shrink-0 ml-1 text-[#64748B] group-hover:text-[#2563EB] transition-colors" />
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </header>
 
-        {/* Mobile menu drawer for landing */}
+        {/* Mobile menu drawer with actual pages */}
         {menuOpen && (
-          <div className="fixed inset-0 z-50 bg-[#FAF7F2] flex flex-col p-6 sm:hidden">
-            <div className="flex items-center justify-between pb-4 border-b border-[#E8DFC8]">
-              <VaakritiWordmark className="h-[17px] w-auto text-[#171513]" />
+          <div className="fixed inset-0 z-50 bg-[#F4F7FC] flex flex-col p-6 sm:hidden overflow-y-auto">
+            <div className="flex items-center justify-between pb-4 border-b border-[#E2E8F0]">
+              <VaakritiWordmark className="h-[17px] w-auto text-[#080D18]" />
               <button
                 onClick={() => setMenuOpen(false)}
-                className="p-2 text-[#42372E]"
+                className="p-2 text-[#080D18]"
                 aria-label="Close menu"
               >
                 ✕
               </button>
             </div>
-            <nav className="flex flex-col gap-4 py-6 text-lg font-medium text-[#332A23]">
-              <Link href="/#platform" onClick={() => setMenuOpen(false)}>
-                Platform
+            <nav className="flex flex-col gap-3 py-6 text-sm font-medium text-[#080D18]">
+              <div className="text-[11px] font-bold uppercase tracking-wider text-[#64748B] px-2 pt-1">Products</div>
+              <Link href="/demo" onClick={() => setMenuOpen(false)} className="px-3 py-2 rounded-xl hover:bg-white text-base">
+                Voice Studio Demo
               </Link>
-              <Link href="/#solutions" onClick={() => setMenuOpen(false)}>
-                Solutions
+              <Link href="/marketplace" onClick={() => setMenuOpen(false)} className="px-3 py-2 rounded-xl hover:bg-white text-base">
+                Agent Directory
               </Link>
-              <Link href="/#industries" onClick={() => setMenuOpen(false)}>
-                Industries
+              <Link href="/pricing" onClick={() => setMenuOpen(false)} className="px-3 py-2 rounded-xl hover:bg-white text-base">
+                Pricing & Plans
               </Link>
-              <Link href="/#resources" onClick={() => setMenuOpen(false)}>
-                Resources
+
+              <div className="text-[11px] font-bold uppercase tracking-wider text-[#64748B] px-2 pt-3">Developers & Resources</div>
+              <Link href="/docs" onClick={() => setMenuOpen(false)} className="px-3 py-2 rounded-xl hover:bg-white text-base">
+                Documentation
               </Link>
-              <Link href="/pricing" onClick={() => setMenuOpen(false)}>
-                Pricing
+              <Link href="/blog" onClick={() => setMenuOpen(false)} className="px-3 py-2 rounded-xl hover:bg-white text-base">
+                Blog & Research
+              </Link>
+
+              <div className="text-[11px] font-bold uppercase tracking-wider text-[#64748B] px-2 pt-3">Company</div>
+              <Link href="/about" onClick={() => setMenuOpen(false)} className="px-3 py-2 rounded-xl hover:bg-white text-base">
+                About Vaakriti
+              </Link>
+              <Link href="/partners" onClick={() => setMenuOpen(false)} className="px-3 py-2 rounded-xl hover:bg-white text-base">
+                Partners
+              </Link>
+              <Link href="/contact" onClick={() => setMenuOpen(false)} className="px-3 py-2 rounded-xl hover:bg-white text-base">
+                Contact Us
               </Link>
             </nav>
             <div className="mt-auto pt-6 flex flex-col gap-3">
               <Link
                 href="/contact"
                 onClick={() => setMenuOpen(false)}
-                className="w-full block text-center py-2.5 rounded-full border border-[#DFCDBB] bg-white text-[#171513] text-sm font-semibold hover:border-[#171513] transition-colors shadow-sm"
+                className="w-full block text-center py-2.5 rounded-full border border-[#CBD5E1] bg-white text-[#080D18] text-sm font-semibold hover:border-[#315CFF] hover:text-[#315CFF] transition-colors shadow-xs"
               >
                 Contact Us
               </Link>
               <Link
                 href={user ? (role === 'admin' || role === 'super_admin' ? '/admin' : '/dashboard') : '/login'}
                 onClick={() => setMenuOpen(false)}
-                className="w-full block text-center py-2.5 rounded-full bg-[#171513] text-[#FAF7F2] text-sm font-semibold hover:bg-[#332A23] transition-colors shadow-sm"
+                className="w-full block text-center py-2.5 rounded-full bg-[#080D18] text-[#F4F7FC] text-sm font-semibold hover:bg-[#18243A] transition-colors shadow-xs"
               >
                 {user ? "Dashboard" : "Login"}
               </Link>
@@ -363,7 +689,7 @@ export function Navbar() {
               onMouseLeave={closeProductsMenu}
             >
               <Link
-                href="/#products"
+                href="/marketplace"
                 className="navbar__link inline-flex items-center gap-[8px]"
                 aria-expanded={productsMenuOpen}
                 aria-haspopup="menu"

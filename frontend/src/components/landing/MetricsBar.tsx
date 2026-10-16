@@ -1,48 +1,63 @@
+import { Fragment } from "react";
 import { createClient } from "@supabase/supabase-js";
 
 function formatLink(url: string | null) {
-  if (!url || url.trim() === "") return "/login";
+  if (!url || url.trim() === "") return "/dashboard";
   if (url.startsWith("http://") || url.startsWith("https://")) {
     return url;
   }
   return `https://${url}`;
 }
 
+const FALLBACK_SERVICES = [
+  { name: "Trinetra Shiksha", subdomain_url: "https://shiksha.trinetraedu-ai.com" },
+  { name: "Vikram Voice Assistant", subdomain_url: "/dashboard" },
+  { name: "Autonomous Support Desk", subdomain_url: "/dashboard" },
+  { name: "Outbound Sales Closer", subdomain_url: "/dashboard" },
+  { name: "Lead Qualification Engine", subdomain_url: "/dashboard" },
+  { name: "Multi-Dialect Conversationalist", subdomain_url: "/dashboard" },
+  { name: "Appointment Booker", subdomain_url: "/dashboard" },
+];
+
 export async function MetricsBar() {
   // Fetch tools dynamically from database bypassing RLS using service role key
   let services: any[] = [];
   try {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-    
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
-    const { data } = await supabase
-      .from("platform_services")
-      .select("name, subdomain_url")
-      .eq("is_active", true)
-      .order("name", { ascending: true });
-    
-    if (data) {
-      services = data;
+    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+
+    if (supabaseUrl && supabaseServiceKey) {
+      const supabase = createClient(supabaseUrl, supabaseServiceKey);
+      const { data } = await supabase
+        .from("platform_services")
+        .select("name, subdomain_url")
+        .eq("is_active", true)
+        .order("name", { ascending: true });
+
+      if (data && data.length > 0) {
+        services = data;
+      }
     }
   } catch (err) {
     console.error("Failed to fetch platform services in MetricsBar:", err);
   }
 
-  // Hardcode Trinetra Shiksha since it is a separate platform
-  const listItems = [
-    { name: "Trinetra Shiksha", subdomain_url: "https://shiksha.trinetraedu-ai.com" },
-    ...services.map((s) => ({
-      name: s.name,
-      subdomain_url: s.subdomain_url,
-    })),
-  ];
+  const activeItems =
+    services.length > 0
+      ? [
+          { name: "Trinetra Shiksha", subdomain_url: "https://shiksha.trinetraedu-ai.com" },
+          ...services.map((s) => ({
+            name: s.name,
+            subdomain_url: s.subdomain_url,
+          })),
+        ]
+      : FALLBACK_SERVICES;
 
   // Repeat list items to comfortably fill width on large monitors
-  const repeatedItems = Array(4).fill(listItems).flat();
+  const repeatedItems = Array(4).fill(activeItems).flat();
 
   return (
-    <section className="w-full pt-4 sm:pt-6 md:pt-8 pb-12 sm:pb-16 bg-transparent overflow-hidden flex flex-col items-center relative group select-none z-10">
+    <section className="w-full pt-4 sm:pt-6 md:pt-8 pb-10 sm:pb-14 bg-transparent overflow-hidden flex flex-col items-center relative group select-none z-10">
       <style>{`
         @keyframes marqueeContinuous {
           0% {
@@ -68,7 +83,7 @@ export async function MetricsBar() {
         <div
           className="flex w-max shrink-0 items-center group-hover:[animation-play-state:paused]"
           style={{
-            animation: "marqueeContinuous 130s linear infinite",
+            animation: "marqueeContinuous 100s linear infinite",
             willChange: "transform",
           }}
         >
@@ -79,15 +94,21 @@ export async function MetricsBar() {
               const href = formatLink(item.subdomain_url);
 
               return (
-                <a
-                  key={`track-1-${idx}`}
-                  href={href}
-                  target={hasExternalLink ? "_blank" : undefined}
-                  rel={hasExternalLink ? "noopener noreferrer" : undefined}
-                  className="shrink-0 whitespace-nowrap mx-8 sm:mx-12 font-[family-name:var(--font-playfair),Georgia,serif] font-bold text-[15px] sm:text-[16px] md:text-[17px] tracking-[0.12em] uppercase text-[#111827] hover:text-emerald-700 transition-colors duration-200 cursor-pointer"
-                >
-                  {item.name}
-                </a>
+                <Fragment key={`track-1-${idx}`}>
+                  <a
+                    href={href}
+                    target={hasExternalLink ? "_blank" : undefined}
+                    rel={hasExternalLink ? "noopener noreferrer" : undefined}
+                    className="shrink-0 whitespace-nowrap mx-6 sm:mx-10 font-[family-name:var(--font-cal-sans)] font-semibold text-[15px] sm:text-[17px] md:text-[18px] tracking-[0.08em] uppercase transition-colors duration-200 cursor-pointer text-[#334155] hover:text-[#2563EB]"
+                  >
+                    {item.name}
+                  </a>
+                  <span
+                    className="text-[10px] mx-2 shrink-0 select-none text-[#2563EB]/60"
+                  >
+                    ◆
+                  </span>
+                </Fragment>
               );
             })}
           </div>
@@ -99,15 +120,21 @@ export async function MetricsBar() {
               const href = formatLink(item.subdomain_url);
 
               return (
-                <a
-                  key={`track-2-${idx}`}
-                  href={href}
-                  target={hasExternalLink ? "_blank" : undefined}
-                  rel={hasExternalLink ? "noopener noreferrer" : undefined}
-                  className="shrink-0 whitespace-nowrap mx-8 sm:mx-12 font-[family-name:var(--font-playfair),Georgia,serif] font-bold text-[15px] sm:text-[16px] md:text-[17px] tracking-[0.12em] uppercase text-[#111827] hover:text-emerald-700 transition-colors duration-200 cursor-pointer"
-                >
-                  {item.name}
-                </a>
+                <Fragment key={`track-2-${idx}`}>
+                  <a
+                    href={href}
+                    target={hasExternalLink ? "_blank" : undefined}
+                    rel={hasExternalLink ? "noopener noreferrer" : undefined}
+                    className="shrink-0 whitespace-nowrap mx-6 sm:mx-10 font-[family-name:var(--font-cal-sans)] font-semibold text-[15px] sm:text-[17px] md:text-[18px] tracking-[0.08em] uppercase transition-colors duration-200 cursor-pointer text-[#334155] hover:text-[#2563EB]"
+                  >
+                    {item.name}
+                  </a>
+                  <span
+                    className="text-[10px] mx-2 shrink-0 select-none text-[#2563EB]/60"
+                  >
+                    ◆
+                  </span>
+                </Fragment>
               );
             })}
           </div>

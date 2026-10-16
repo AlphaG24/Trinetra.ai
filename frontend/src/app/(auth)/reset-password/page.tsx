@@ -2,10 +2,13 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { motion } from 'framer-motion'
-import { Mail, ArrowRight, Bot, PhoneCall, MessageSquare, Lock, Eye, EyeOff } from 'lucide-react'
+import { Mail, ArrowRight, ArrowLeft, Lock, Eye, EyeOff } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { createClient } from '@/lib/client'
+import { VaakritiSymbolVector } from '@/components/ui/VaakritiSymbolVector'
+import { VaakritiWordmarkVector } from '@/components/ui/VaakritiWordmarkVector'
 
 export default function ResetPasswordPage() {
   const router = useRouter()
@@ -24,7 +27,9 @@ export default function ResetPasswordPage() {
 
   useEffect(() => {
     setIsMounted(true)
-    
+  }, [])
+
+  useEffect(() => {
     const checkSession = async () => {
       try {
         const { data: { user } } = await supabase.auth.getUser()
@@ -37,17 +42,12 @@ export default function ResetPasswordPage() {
     }
     checkSession()
   }, [])
-  
-  if (!isMounted || checkingSession) {
-    return <div className="flex h-screen w-full bg-[#05050a] items-center justify-center text-zinc-500 font-mono text-sm">Initializing...</div>
-  }
 
   const handleReset = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
 
     try {
-      // Redirect to our PKCE auth callback first, which will then redirect to this page authenticated
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: `${window.location.origin}/auth/callback?next=/reset-password`,
       })
@@ -93,7 +93,6 @@ export default function ResetPasswordPage() {
 
       toast.success('Password updated successfully!')
       
-      // Delay and redirect to dashboard with a hard reload to ensure session sync
       setTimeout(() => {
         window.location.href = '/dashboard'
       }, 1500)
@@ -104,166 +103,176 @@ export default function ResetPasswordPage() {
     }
   }
 
-  const floatAnimation: any = {
-    animate: {
-      y: [0, -20, 0],
-      rotate: [0, 5, -5, 0],
-      transition: {
-        duration: 6,
-        repeat: Infinity,
-        ease: "easeInOut"
-      }
-    }
+  if (!isMounted || checkingSession) {
+    return <div className="flex h-screen w-full bg-slate-50" />
   }
 
   return (
-    <div className="flex h-screen w-full bg-[#05050a] overflow-hidden font-sans text-white selection:bg-amber-500/30">
-      
-      {/* Left Half - Abstract Visualization */}
-      <div className="hidden lg:flex w-1/2 relative flex-col justify-center items-center p-12 overflow-hidden border-r border-white/5">
-        <div className="absolute w-[600px] h-[600px] rounded-full bg-gradient-to-tr from-amber-600/20 via-yellow-500/10 to-purple-600/20 blur-[100px] pointer-events-none" />
+    <div className="flex min-h-screen w-full bg-[#F8FAFC] text-slate-900 overflow-x-hidden font-sans selection:bg-slate-200 selection:text-slate-900 relative items-center justify-center p-3 sm:p-5 lg:p-7">
 
-        <div className="absolute inset-0 perspective-[1000px] pointer-events-none overflow-hidden flex items-center justify-center opacity-30">
-          <motion.div 
-            animate={{
-              rotateX: [60, 60],
-              rotateZ: [0, 360],
-            }}
-            transition={{ duration: 100, repeat: Infinity, ease: "linear" }}
-            className="w-[200vw] h-[200vw] absolute bg-[linear-gradient(to_right,rgba(255,255,255,0.05)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.05)_1px,transparent_1px)] bg-[size:4rem_4rem]"
-            style={{ transformStyle: 'preserve-3d' }}
-          />
-        </div>
-
-        {/* Floating Icons */}
-        <motion.div variants={floatAnimation} animate="animate" className="absolute top-16 left-16 xl:top-24 xl:left-24 p-4 rounded-2xl bg-white/5 backdrop-blur-md border border-white/10 shadow-[0_0_30px_rgba(245,158,11,0.2)]">
-          <PhoneCall className="w-8 h-8 text-amber-400" />
-        </motion.div>
-        
-        <motion.div variants={floatAnimation} animate="animate" style={{ animationDelay: '2s' }} className="absolute top-16 right-16 xl:top-24 xl:right-24 p-4 rounded-2xl bg-white/5 backdrop-blur-md border border-white/10 shadow-[0_0_30px_rgba(139,92,246,0.2)]">
-          <MessageSquare className="w-8 h-8 text-purple-400" />
-        </motion.div>
-
-        <motion.div variants={floatAnimation} animate="animate" style={{ animationDelay: '4s' }} className="absolute top-48 left-24 xl:top-64 xl:left-32 p-4 rounded-2xl bg-white/5 backdrop-blur-md border border-white/10 shadow-[0_0_30px_rgba(16,185,129,0.2)]">
-          <Bot className="w-8 h-8 text-emerald-400" />
-        </motion.div>
-
-        <div className="relative z-10 w-full max-w-lg flex flex-col items-center text-center">
-          <motion.div 
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 1, ease: "easeOut" }}
-            className="mb-8 relative"
-          >
-            <div className="absolute inset-0 bg-amber-500/20 blur-3xl rounded-full scale-150"></div>
-            <img src="/trident.png" alt="Trinetra Logo" className="w-32 h-32 xl:w-48 xl:h-48 object-contain drop-shadow-[0_0_40px_rgba(245,158,11,0.8)] relative z-10" />
-          </motion.div>
-
-          <motion.h1 
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 0.2 }}
-            className="text-6xl xl:text-7xl font-black tracking-tighter leading-none mb-6"
-          >
-            Trinetra <br/>
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-yellow-500 to-amber-600">
-              Intelligence
-            </span>
-          </motion.h1>
-          
-          <motion.p 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.8, delay: 0.4 }}
-            className="text-xl text-gray-400 font-light leading-relaxed max-w-md"
-          >
-            Recover your access and return to the command center.
-          </motion.p>
-        </div>
-
-        <div className="absolute bottom-8 text-xs text-gray-600 tracking-widest uppercase font-semibold">
-          © {new Date().getFullYear()} Trinetra AI. All Systems Operational.
-        </div>
+      {/* ── AMBIENT SUBTLE BACKGROUND GRID & SOFT GRADIENT ── */}
+      <div className="fixed inset-0 pointer-events-none z-0">
+        <div 
+          className="absolute inset-0 opacity-40"
+          style={{
+            backgroundImage: "radial-gradient(#CBD5E1 1px, transparent 1px)",
+            backgroundSize: "28px 28px",
+          }}
+        />
+        <div 
+          className="absolute inset-0"
+          style={{
+            background: "linear-gradient(180deg, rgba(59, 130, 246, 0.08) 0%, rgba(37, 99, 235, 0.03) 25%, transparent 60%)",
+          }}
+        />
       </div>
 
-      {/* Right Half - Form */}
-      <div className="w-full lg:w-1/2 flex flex-col justify-center items-center p-6 sm:p-12 relative z-10">
-        
-        {/* Mobile View Elements */}
-        <div className="flex lg:hidden flex-col items-center mb-10 w-full">
-          <div className="relative mb-6">
-            <div className="absolute inset-0 bg-amber-500/20 blur-2xl rounded-full scale-150"></div>
-            <img src="/trident.png" alt="Trinetra Logo" className="w-28 h-28 object-contain relative z-10 drop-shadow-[0_0_30px_rgba(245,158,11,0.8)]" />
-          </div>
-          <h1 className="text-4xl font-black tracking-tighter">Trinetra</h1>
-        </div>
-
-        <motion.div 
-          initial={{ opacity: 0, x: 40 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.6, type: "spring", bounce: 0.3 }}
-          className="w-full max-w-[420px]"
+      {/* ── BACK TO LOGIN BUTTON ── */}
+      <div className="absolute top-5 left-5 sm:top-7 sm:left-7 z-50">
+        <Link
+          href="/login"
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs font-semibold text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-50 border border-slate-200 backdrop-blur-xl transition-all duration-200 shadow-sm hover:shadow group"
         >
-          {user ? (
-            /* --- UPDATE PASSWORD FORM (Authenticated State) --- */
-            <>
-              <div className="mb-10 text-center lg:text-left">
-                <h2 className="text-3xl font-bold tracking-tight mb-2">New Password</h2>
-                <p className="text-gray-400 text-sm">Set a secure new password for your account (minimum 12 characters).</p>
-              </div>
+          <ArrowLeft className="w-3.5 h-3.5 transition-transform duration-200 group-hover:-translate-x-1 text-slate-700" />
+          <span>Back to Sign In</span>
+        </Link>
+      </div>
+
+      {/* ── MASTER DUAL-PANEL CONTAINER ── */}
+      <main className="relative z-10 w-full max-w-[1240px] min-h-[620px] lg:min-h-[700px] grid grid-cols-1 lg:grid-cols-12 rounded-[2.2rem] lg:rounded-[2.8rem] border-2 border-slate-200/90 bg-white/95 backdrop-blur-2xl shadow-[0_20px_70px_-15px_rgba(15,23,42,0.07),0_1px_3px_rgba(15,23,42,0.03)] overflow-hidden">
+
+        {/* ─────────────────────────────────────────────────────────────
+            LEFT PANEL: CLEAN BRAND SHOWCASE (ONLY LOGO, NO ORBS, NO TAGS)
+           ───────────────────────────────────────────────────────────── */}
+        <div className="hidden lg:flex lg:col-span-6 xl:col-span-6 p-4 xl:p-6">
+          <div className="relative w-full h-full rounded-[2rem] xl:rounded-[2.4rem] border border-slate-200/80 bg-gradient-to-b from-slate-50/70 via-white to-slate-50/50 overflow-hidden flex flex-col justify-between items-center p-8 xl:p-12 text-center shadow-sm">
+
+            <div 
+              className="absolute inset-0 opacity-15 pointer-events-none"
+              style={{
+                backgroundImage: "linear-gradient(rgba(148, 163, 184, 0.25) 1px, transparent 1px), linear-gradient(90deg, rgba(148, 163, 184, 0.25) 1px, transparent 1px)",
+                backgroundSize: "36px 36px",
+              }}
+            />
+
+            {/* Top spacer for clean vertical balance */}
+            <div className="w-full h-4" />
+
+            {/* Center: Sharp Logo Lockup (Emblem + Wordmark + Tagline) */}
+            <div className="relative z-10 flex flex-col items-center justify-center my-auto py-8">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.92 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.6, ease: "easeOut" }}
+                className="mb-7 flex items-center justify-center"
+              >
+                <VaakritiSymbolVector className="w-28 xl:w-36 h-auto text-slate-900 select-none" />
+              </motion.div>
 
               <motion.div
-                className="bg-white/[0.02] backdrop-blur-3xl p-8 rounded-[2rem] border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.4)] relative"
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: 0.1 }}
+                className="mb-4 flex items-center justify-center w-full max-w-[280px] xl:max-w-[340px]"
               >
-                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-3/4 h-px bg-gradient-to-r from-transparent via-amber-500/50 to-transparent"></div>
+                <VaakritiWordmarkVector className="w-full h-auto text-slate-900 select-none" />
+              </motion.div>
 
-                <form onSubmit={handleUpdatePassword} className="space-y-6">
-                  <div className="space-y-2 group">
-                    <label className="text-[11px] font-bold text-gray-500 uppercase tracking-widest pl-1 transition-colors group-focus-within:text-amber-500">
+              <motion.p
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.6, delay: 0.2 }}
+                className="text-[11px] font-mono tracking-[0.38em] text-slate-500 uppercase font-semibold select-none"
+              >
+                THE CREATION OF VOICE
+              </motion.p>
+            </div>
+
+            <div className="relative z-10 text-[10px] text-slate-400 tracking-widest uppercase font-semibold">
+              © {new Date().getFullYear()} VAAKRITI AI. ALL RIGHTS RESERVED.
+            </div>
+          </div>
+        </div>
+
+        {/* ─────────────────────────────────────────────────────────────
+            RIGHT PANEL: RECOVERY FORM (NO BLUE TEXT)
+           ───────────────────────────────────────────────────────────── */}
+        <div className="lg:col-span-6 xl:col-span-6 flex flex-col justify-center items-center p-6 sm:p-10 xl:p-14 relative z-10 border-t lg:border-t-0 lg:border-l-2 border-slate-200/90 bg-white">
+
+          {/* Mobile Only: Header */}
+          <div className="flex lg:hidden flex-col items-center mb-8 text-center">
+            <VaakritiSymbolVector className="w-16 h-auto text-slate-900 mb-3 select-none drop-shadow-sm" />
+            <VaakritiWordmarkVector className="w-48 h-auto text-slate-900 mb-2 select-none" />
+            <p className="text-[10px] font-mono tracking-[0.3em] text-slate-500 uppercase font-semibold">
+              THE CREATION OF VOICE
+            </p>
+          </div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, ease: "easeOut" }}
+            className="w-full max-w-[400px]"
+          >
+            {user ? (
+              /* UPDATE PASSWORD */
+              <>
+                <div className="mb-7 text-center lg:text-left">
+                  <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900 mb-1.5">
+                    Set New Password
+                  </h1>
+                  <p className="text-slate-500 text-xs sm:text-sm">
+                    Configure a strong new password (minimum 12 characters).
+                  </p>
+                </div>
+
+                <form onSubmit={handleUpdatePassword} className="space-y-4">
+                  <div className="space-y-1.5 group">
+                    <label className="text-[11px] font-bold text-slate-700 uppercase tracking-widest pl-1">
                       New Password
                     </label>
                     <div className="relative">
-                      <Lock className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-500 transition-colors group-focus-within:text-amber-500" />
+                      <Lock className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 group-focus-within:text-slate-900 transition-colors pointer-events-none" />
                       <input
                         type={showPassword ? 'text' : 'password'}
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
                         required
                         minLength={12}
-                        className="w-full bg-black/40 border border-white/5 rounded-2xl py-4 pl-12 pr-12 text-white placeholder-gray-600 focus:outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500 focus:bg-amber-500/5 transition-all shadow-inner"
+                        className="w-full bg-slate-50/80 hover:bg-slate-50 focus:bg-white border border-slate-200 hover:border-slate-300 focus:border-slate-800 rounded-2xl py-3 pl-11 pr-11 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-4 focus:ring-slate-900/10 transition-all text-sm shadow-sm"
                         placeholder="••••••••••••"
                       />
                       <button
                         type="button"
                         onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-amber-500 transition-colors"
+                        className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer p-1"
                       >
-                        {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                       </button>
                     </div>
                   </div>
 
-                  <div className="space-y-2 group">
-                    <label className="text-[11px] font-bold text-gray-500 uppercase tracking-widest pl-1 transition-colors group-focus-within:text-amber-500">
+                  <div className="space-y-1.5 group">
+                    <label className="text-[11px] font-bold text-slate-700 uppercase tracking-widest pl-1">
                       Confirm New Password
                     </label>
                     <div className="relative">
-                      <Lock className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-500 transition-colors group-focus-within:text-amber-500" />
+                      <Lock className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 group-focus-within:text-slate-900 transition-colors pointer-events-none" />
                       <input
                         type={showConfirmPassword ? 'text' : 'password'}
                         value={confirmPassword}
                         onChange={(e) => setConfirmPassword(e.target.value)}
                         required
                         minLength={12}
-                        className="w-full bg-black/40 border border-white/5 rounded-2xl py-4 pl-12 pr-12 text-white placeholder-gray-600 focus:outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500 focus:bg-amber-500/5 transition-all shadow-inner"
+                        className="w-full bg-slate-50/80 hover:bg-slate-50 focus:bg-white border border-slate-200 hover:border-slate-300 focus:border-slate-800 rounded-2xl py-3 pl-11 pr-11 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-4 focus:ring-slate-900/10 transition-all text-sm shadow-sm"
                         placeholder="••••••••••••"
                       />
                       <button
                         type="button"
                         onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                        className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-amber-500 transition-colors"
+                        className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer p-1"
                       >
-                        {showConfirmPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                        {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                       </button>
                     </div>
                   </div>
@@ -271,50 +280,48 @@ export default function ResetPasswordPage() {
                   <button
                     type="submit"
                     disabled={isLoading}
-                    className="w-full mt-8 relative flex items-center justify-center gap-2 rounded-2xl bg-amber-500 py-4 font-bold text-black transition-all hover:bg-amber-400 hover:shadow-[0_0_40px_rgba(245,158,11,0.4)] active:scale-95 disabled:opacity-50 disabled:active:scale-100 disabled:cursor-not-allowed group overflow-hidden"
+                    className="w-full mt-4 relative flex items-center justify-center gap-2 rounded-2xl bg-slate-900 hover:bg-black py-3.5 font-bold text-white text-sm transition-all shadow-[0_4px_16px_rgba(15,23,42,0.18)] hover:shadow-[0_6px_22px_rgba(15,23,42,0.25)] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed group overflow-hidden cursor-pointer"
                   >
                     {isLoading ? (
                       <>
-                        <div className="w-5 h-5 border-2 border-black/30 border-t-black rounded-full animate-spin" />
-                        <span>Updating...</span>
+                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        <span>Updating Password...</span>
                       </>
                     ) : (
                       <>
                         <span>Update Password</span>
-                        <ArrowRight className="w-5 h-5 transition-transform group-hover:translate-x-1" />
+                        <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
                       </>
                     )}
-                    <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/40 to-transparent group-hover:animate-[shimmer_1.5s_infinite]" />
+                    <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/10 to-transparent group-hover:animate-[shimmer_1.5s_infinite]" />
                   </button>
                 </form>
-              </motion.div>
-            </>
-          ) : (
-            /* --- REQUEST RESET LINK FORM (Unauthenticated State) --- */
-            <>
-              <div className="mb-10 text-center lg:text-left">
-                <h2 className="text-3xl font-bold tracking-tight mb-2">Reset Password</h2>
-                <p className="text-gray-400 text-sm">Enter your email and we'll send you a recovery link.</p>
-              </div>
+              </>
+            ) : (
+              /* REQUEST RESET LINK */
+              <>
+                <div className="mb-7 text-center lg:text-left">
+                  <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900 mb-1.5">
+                    Reset Password
+                  </h1>
+                  <p className="text-slate-500 text-xs sm:text-sm">
+                    Enter your work email and we'll send you a recovery link.
+                  </p>
+                </div>
 
-              <motion.div
-                className="bg-white/[0.02] backdrop-blur-3xl p-8 rounded-[2rem] border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.4)] relative"
-              >
-                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-3/4 h-px bg-gradient-to-r from-transparent via-amber-500/50 to-transparent"></div>
-
-                <form onSubmit={handleReset} className="space-y-6">
-                  <div className="space-y-2 group">
-                    <label className="text-[11px] font-bold text-gray-500 uppercase tracking-widest pl-1 transition-colors group-focus-within:text-amber-500">
-                      Email Address
+                <form onSubmit={handleReset} className="space-y-4">
+                  <div className="space-y-1.5 group">
+                    <label className="text-[11px] font-bold text-slate-700 uppercase tracking-widest pl-1">
+                      Work Email
                     </label>
                     <div className="relative">
-                      <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-500 transition-colors group-focus-within:text-amber-500" />
+                      <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 group-focus-within:text-slate-900 transition-colors pointer-events-none" />
                       <input
                         type="email"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
                         required
-                        className="w-full bg-black/40 border border-white/5 rounded-2xl py-4 pl-12 pr-4 text-white placeholder-gray-600 focus:outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500 focus:bg-amber-500/5 transition-all shadow-inner"
+                        className="w-full bg-slate-50/80 hover:bg-slate-50 focus:bg-white border border-slate-200 hover:border-slate-300 focus:border-slate-800 rounded-2xl py-3 pl-11 pr-4 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-4 focus:ring-slate-900/10 transition-all text-sm shadow-sm"
                         placeholder="agent@trinetra.ai"
                       />
                     </div>
@@ -323,35 +330,46 @@ export default function ResetPasswordPage() {
                   <button
                     type="submit"
                     disabled={isLoading}
-                    className="w-full mt-8 relative flex items-center justify-center gap-2 rounded-2xl bg-amber-500 py-4 font-bold text-black transition-all hover:bg-amber-400 hover:shadow-[0_0_40px_rgba(245,158,11,0.4)] active:scale-95 disabled:opacity-50 disabled:active:scale-100 disabled:cursor-not-allowed group overflow-hidden"
+                    className="w-full mt-4 relative flex items-center justify-center gap-2 rounded-2xl bg-slate-900 hover:bg-black py-3.5 font-bold text-white text-sm transition-all shadow-[0_4px_16px_rgba(15,23,42,0.18)] hover:shadow-[0_6px_22px_rgba(15,23,42,0.25)] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed group overflow-hidden cursor-pointer"
                   >
                     {isLoading ? (
                       <>
-                        <div className="w-5 h-5 border-2 border-black/30 border-t-black rounded-full animate-spin" />
-                        <span>Sending...</span>
+                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        <span>Sending Recovery Link...</span>
                       </>
                     ) : (
                       <>
-                        <span>Send Reset Link</span>
-                        <ArrowRight className="w-5 h-5 transition-transform group-hover:translate-x-1" />
+                        <span>Send Recovery Link</span>
+                        <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
                       </>
                     )}
-                    <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/40 to-transparent group-hover:animate-[shimmer_1.5s_infinite]" />
+                    <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/10 to-transparent group-hover:animate-[shimmer_1.5s_infinite]" />
                   </button>
                 </form>
-              </motion.div>
 
-              <p className="mt-8 text-center text-[13px] text-gray-500">
-                Remember your password?{' '}
-                <a href="/login" className="text-amber-500 hover:text-amber-400 font-bold transition-colors">
-                  Sign In →
-                </a>
-              </p>
-            </>
-          )}
-        </motion.div>
-      </div>
+                <div className="mt-7 text-center">
+                  <p className="text-[12px] text-slate-500">
+                    Remember your password?{' '}
+                    <Link
+                      href="/login"
+                      className="text-slate-900 font-bold hover:underline cursor-pointer"
+                    >
+                      Sign In instead →
+                    </Link>
+                  </p>
+                </div>
+              </>
+            )}
+          </motion.div>
+        </div>
+      </main>
+
+      <style dangerouslySetInnerHTML={{
+        __html: `
+        @keyframes shimmer {
+          100% { transform: translateX(100%); }
+        }
+      `}} />
     </div>
   )
 }
-

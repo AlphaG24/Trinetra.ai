@@ -4,7 +4,8 @@ import React, { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import { Mic, MicOff, Volume2, MessageSquare, ChevronDown, Sparkles } from "lucide-react";
 import { toast } from "sonner";
-import { useVoiceAgent, TranscriptMessage } from "../../../hooks/useVoiceAgent";
+import { createClient } from "@/utils/supabase/client";
+import { useVoiceAgent, TranscriptMessage } from "@/hooks/useVoiceAgent";
 
 export interface DemoAgentItem {
   id: string;
@@ -22,6 +23,7 @@ export interface DemoAgentItem {
   is_managed_by_dev: boolean;
   campaign_purpose?: string;
   industry_domain?: string;
+  personalities?: Record<string, boolean>;
 }
 
 // Initial calibrated fallback personas
@@ -36,8 +38,8 @@ const INITIAL_AGENTS: DemoAgentItem[] = [
     gender: "female",
     description: "Speaks with cultural warmth and clear conversational cadence.",
     greeting_message: "Namaste! Main Vaakriti se Arika bol rahi hoon, aapki AI assistant. Service quality ke liye yeh call record ki ja sakti hai. Aaj main aapki kya madad kar sakti hoon?",
-    accent_color: "#2E5A44", // Forest Sage
-    badge_color: "bg-[#2E5A44]/10 text-[#2E5A44] border-[#2E5A44]/20",
+    accent_color: "#315CFF", // Electric Cobalt
+    badge_color: "bg-[#315CFF]/10 text-[#315CFF] border-[#315CFF]/20",
     suggested_prompts: [
       "What solutions does Vaakriti offer?",
       "Tell me about your Indian language support.",
@@ -55,8 +57,8 @@ const INITIAL_AGENTS: DemoAgentItem[] = [
     gender: "male",
     description: "Focused on business solutions, onboarding, and enterprise pilots.",
     greeting_message: "Hello! Main Vaakriti se Vikram bol raha hoon, an AI assistant. Yeh call quality review ke liye record ki ja sakti hai. Kya aap hamare enterprise solutions ke baare mein jaan-na chahte hain?",
-    accent_color: "#C65B32", // Heritage Terracotta
-    badge_color: "bg-[#C65B32]/10 text-[#C65B32] border-[#C65B32]/20",
+    accent_color: "#45C5FF", // Signal Cyan
+    badge_color: "bg-[#45C5FF]/10 text-[#45C5FF] border-[#45C5FF]/20",
     suggested_prompts: [
       "I want to explore an enterprise pilot.",
       "How does pricing work for high volume?",
@@ -74,8 +76,8 @@ const INITIAL_AGENTS: DemoAgentItem[] = [
     gender: "female",
     description: "Specializes in scheduling, inquiries, and customer assistance.",
     greeting_message: "Namaste, main Vaakriti scheduling team se Anika bol rahi hoon, ek AI assistant. Service quality ke liye call record ho sakti hai. Aapko appointment reschedule ya book karni hai?",
-    accent_color: "#2B4C7E", // Royal Slate Blue
-    badge_color: "bg-[#2B4C7E]/10 text-[#2B4C7E] border-[#2B4C7E]/20",
+    accent_color: "#315CFF", // Electric Cobalt
+    badge_color: "bg-[#315CFF]/10 text-[#315CFF] border-[#315CFF]/20",
     suggested_prompts: [
       "Can you schedule a consultation for Friday?",
       "Do you support SMS confirmations?",
@@ -93,8 +95,8 @@ const INITIAL_AGENTS: DemoAgentItem[] = [
     gender: "male",
     description: "Guidance on adaptive learning, exam preparation, and education.",
     greeting_message: "Greetings! I am Dr. Aarav from Trinetra Shiksha, an AI academic guide. This session may be recorded for quality. How can I assist with your educational goals today?",
-    accent_color: "#D97706", // Golden Saffron
-    badge_color: "bg-[#D97706]/10 text-[#D97706] border-[#D97706]/20",
+    accent_color: "#45C5FF", // Signal Cyan
+    badge_color: "bg-[#45C5FF]/10 text-[#45C5FF] border-[#45C5FF]/20",
     suggested_prompts: [
       "How does Trinetra Shiksha personalize questions?",
       "Explain cognitive profile mapping.",
@@ -139,20 +141,29 @@ export function LiveDemoSection() {
       })
       .catch((err) => console.warn("[LiveDemoSection] Notice loading public agents:", err));
 
-    fetch("/api/developer/demo-agents")
-      .then((res) => {
-        if (res.ok) return res.json();
-        return null;
-      })
-      .then((data) => {
-        if (data?.my_agents && Array.isArray(data.my_agents)) {
-          setMyDeveloperAgents(data.my_agents);
+    // Fetch developer-configured agents only if authenticated to avoid 401 on public landing page
+    try {
+      const supabase = createClient();
+      supabase.auth.getUser().then((res: { data: { user: unknown } }) => {
+        const user = res?.data?.user;
+        if (user) {
+          fetch("/api/developer/demo-agents")
+            .then((res) => {
+              if (res.ok) return res.json();
+              return null;
+            })
+            .then((data) => {
+              if (data?.my_agents && Array.isArray(data.my_agents)) {
+                setMyDeveloperAgents(data.my_agents);
+              }
+              if (data?.all_agents && Array.isArray(data.all_agents)) {
+                setAllPlatformAgents(data.all_agents);
+              }
+            })
+            .catch(() => {});
         }
-        if (data?.all_agents && Array.isArray(data.all_agents)) {
-          setAllPlatformAgents(data.all_agents);
-        }
-      })
-      .catch(() => {});
+      }).catch(() => {});
+    } catch {}
   }, []);
 
   // Format timer MM:SS
@@ -267,7 +278,16 @@ export function LiveDemoSection() {
       setAgents((prev) => [customDemoAgent, ...prev]);
     }
     setSelectedAgent(customDemoAgent);
-    toast.success(`Selected agent "${customDemoAgent.name}"`);
+    toast.success(`Selected real agent "${customDemoAgent.name}"`);
+  };
+
+  // Switch personality on the fly for the selected agent
+  const handleSelectPersonality = (newPersonality: string) => {
+    setSelectedAgent((prev) => ({
+      ...prev,
+      personality: newPersonality,
+    }));
+    toast.info(`Switched personality to "${newPersonality}"`);
   };
 
   const handleSendPrompt = (promptText: string) => {
@@ -281,80 +301,119 @@ export function LiveDemoSection() {
   };
 
   return (
-    <section id="demo" className="relative w-full pt-4 pb-20 sm:pb-28 bg-white overflow-hidden select-none">
-      
-      {/* ── 1. VIBRANT PLASMA BLUE RADIANT AURA EMERGING BEHIND THE MODAL ── */}
-      <div
-        className="pointer-events-none absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[1150px] sm:w-[1380px] h-[650px] sm:h-[800px] opacity-85 blur-[105px] z-0"
-        style={{
-          background:
-            "radial-gradient(ellipse 75% 60% at 50% 50%, rgba(37, 99, 235, 0.38) 0%, rgba(6, 182, 212, 0.32) 35%, rgba(99, 102, 241, 0.22) 65%, transparent 100%)",
-        }}
-      />
-      <div
-        className="pointer-events-none absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] sm:w-[900px] h-[450px] sm:h-[550px] opacity-75 blur-[80px] z-0"
-        style={{
-          background:
-            "radial-gradient(circle, rgba(14, 165, 233, 0.35) 0%, rgba(59, 130, 246, 0.25) 50%, transparent 80%)",
-        }}
-      />
+    <section
+      id="live-demo"
+      className="relative w-full py-16 sm:py-24 select-none transition-colors duration-300"
+      style={{
+        backgroundColor: "var(--theme-bg-demo, #080D18)",
+      }}
+    >
 
       <div className="relative z-10 max-w-6xl mx-auto px-6 sm:px-10 lg:px-12">
         
-        {/* Section Header */}
-        <div className="text-center max-w-3xl mx-auto mb-8 sm:mb-10">
-          <h2 
-            className="text-3xl sm:text-4xl md:text-5xl font-medium tracking-tight text-[#0B0F17] mb-2.5"
-            style={{ fontFamily: 'var(--font-playfair), "Playfair Display", Georgia, serif' }}
+        {/* Section Header with 2-Way Typography (Cal Sans + Inter) */}
+        <div className="text-center max-w-3xl mx-auto mb-10 sm:mb-12">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-[11px] font-mono font-bold tracking-wider uppercase mb-3 border bg-[#18243A] border-[#1E2D4A] text-[#45C5FF]">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#45C5FF] animate-pulse" />
+            <span>Enterprise Voice Studio • Sub-480ms WebRTC</span>
+          </div>
+          <h2
+            className="text-3xl sm:text-4xl md:text-5xl font-bold tracking-tight mb-3 font-[family-name:var(--font-cal-sans)] transition-colors duration-300 text-white"
           >
-            The AI Voice Platform
+            Talk to Our AI Agents — Live
           </h2>
-          <p className="text-slate-600 text-sm sm:text-base font-normal font-[family-name:var(--font-playfair),Georgia,serif] tracking-wide">
-            Real-time conversational agents for customer support, lead qualification, and enterprise operations.
+          <p
+            className="text-sm sm:text-base font-normal font-sans tracking-normal transition-colors duration-300 text-slate-300 max-w-2xl mx-auto"
+          >
+            Full-duplex conversational intelligence powered by LiveKit WebRTC. Select a persona and tap the button to experience natural conversational latency with real audio.
           </p>
         </div>
 
-        {/* ── SIMPLE & SLEEK VOICE STUDIO MODAL ── */}
-        <div className="rounded-2xl sm:rounded-3xl bg-white/95 backdrop-blur-xl border border-slate-200/80 shadow-[0_20px_50px_rgba(37,99,235,0.08),0_1px_3px_rgba(0,0,0,0.04)] overflow-hidden flex flex-col transition-all">
+        {/* ── SIMPLE & SLEEK VOICE STUDIO MODAL CONTAINER WITH RADIANT BACKLIGHT ── */}
+        <div className="relative">
+
+          {/* 1. Left Lateral Accent Glow */}
+          <div
+            className="pointer-events-none absolute top-1/2 -translate-y-1/2 -left-14 sm:-left-28 w-[280px] sm:w-[420px] h-[45%] -z-10 rounded-full opacity-60 blur-[65px] transition-colors duration-300"
+            style={{
+              background:
+                "radial-gradient(ellipse at 15% 50%, rgba(49, 92, 255, 0.25) 0%, transparent 80%)",
+            }}
+          />
+
+          {/* 2. Right Lateral Accent Glow */}
+          <div
+            className="pointer-events-none absolute top-1/2 -translate-y-1/2 -right-14 sm:-right-28 w-[280px] sm:w-[420px] h-[45%] -z-10 rounded-full opacity-60 blur-[65px] transition-colors duration-300"
+            style={{
+              background:
+                "radial-gradient(ellipse at 85% 50%, rgba(69, 197, 255, 0.22) 0%, transparent 80%)",
+            }}
+          />
+
+          {/* ── VOICE STUDIO MODAL CARD ── */}
+          <div
+            className="rounded-2xl sm:rounded-3xl border shadow-[0_24px_60px_rgba(0,0,0,0.5)] overflow-hidden flex flex-col transition-all duration-300"
+            style={{
+              backgroundColor: "var(--theme-demo-surface, #0E1626)",
+              borderColor: "var(--theme-demo-border, #1E2D4A)",
+            }}
+          >
           
           {/* Sleek Top Bar: Persona Identity & Unified Segmented Tabs */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-6 py-3.5 border-b border-slate-100 bg-slate-50/50">
+          <div
+            className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-6 py-3.5 border-b transition-colors duration-300"
+            style={{
+              backgroundColor: "var(--theme-demo-surface-alt, #18243A)",
+              borderColor: "var(--theme-demo-border, #1E2D4A)",
+            }}
+          >
             {/* Active Persona Identity */}
             <div className="flex items-center gap-3">
               <div 
                 className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white shadow-xs transition-colors"
-                style={{ backgroundColor: selectedAgent.accent_color || '#2563EB' }}
+                style={{ backgroundColor: selectedAgent.accent_color || '#315CFF' }}
               >
                 {selectedAgent.name.charAt(0)}
               </div>
               <div>
-                <h3 className="font-[family-name:var(--font-playfair),Georgia,serif] text-sm sm:text-base font-bold text-[#0B0F17] tracking-tight">
+                <h3
+                  className="font-[family-name:var(--font-cal-sans)] text-sm sm:text-base font-bold tracking-tight text-white"
+                >
                   {selectedAgent.name}
                 </h3>
-                <p className="text-[11px] text-slate-500 font-[family-name:var(--font-playfair),Georgia,serif]">
-                  {selectedAgent.archetype} • <span className="text-slate-800 font-medium">{selectedAgent.language}</span>
+                <p
+                  className="text-[11px] font-sans text-slate-400"
+                >
+                  {selectedAgent.archetype} • <span className="font-medium text-white">{selectedAgent.language}</span>
                 </p>
               </div>
             </div>
 
             {/* Persona Switcher Tabs + Developer Tester Unrestricted Agent Dropdown */}
             <div className="flex items-center gap-2 flex-wrap">
-              <div className="bg-slate-200/70 p-1 rounded-full flex items-center gap-1 overflow-x-auto no-scrollbar">
+              {/* Persona Switcher Tabs */}
+              <div
+                className="p-1 rounded-full flex items-center gap-1 overflow-x-auto no-scrollbar border"
+                style={{
+                  backgroundColor: "#080D18",
+                  borderColor: "#1E2D4A",
+                }}
+              >
                 {agents.map((a) => {
                   const isSelected = a.id === selectedAgent.id;
                   return (
                     <button
                       key={a.id}
                       onClick={() => handleSwitchAgent(a)}
-                      className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-[family-name:var(--font-playfair),Georgia,serif] transition-all shrink-0 cursor-pointer ${
+                      className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-sans transition-all shrink-0 cursor-pointer ${
                         isSelected
-                          ? "bg-white text-slate-900 shadow-2xs font-bold"
-                          : "text-slate-600 hover:text-slate-900"
+                          ? "shadow-2xs font-bold bg-[#315CFF] text-white"
+                          : "text-slate-400 hover:text-white"
                       }`}
                     >
                       <span
                         className="w-2 h-2 rounded-full"
-                        style={{ backgroundColor: a.accent_color || '#2563EB' }}
+                        style={{ backgroundColor: isSelected ? "#45C5FF" : (a.accent_color || '#315CFF') }}
                       />
                       <span>{a.name}</span>
                     </button>
@@ -362,13 +421,13 @@ export function LiveDemoSection() {
                 })}
               </div>
 
-              {/* Developer Real Agent Selector (Managed by Developer ID & Platform) */}
+              {/* Developer Real Agent Selector */}
               {(myDeveloperAgents.length > 0 || allPlatformAgents.length > 0) && (
                 <div className="relative inline-flex items-center">
                   <select
                     onChange={(e) => handleSelectRealAgent(e.target.value)}
                     value={selectedAgent.id}
-                    className="appearance-none pl-3 pr-8 py-1.5 text-xs font-semibold rounded-full bg-emerald-50 border border-emerald-300 text-emerald-900 hover:bg-emerald-100 transition cursor-pointer focus:outline-none shadow-xs"
+                    className="appearance-none pl-3 pr-8 py-1.5 text-xs font-semibold rounded-full bg-[#18243A] border border-[#1E2D4A] text-[#F4F7FC] hover:border-[#315CFF]/60 transition cursor-pointer focus:outline-none shadow-xs"
                     title="Select any agent managed by your developer ID or platform"
                   >
                     <option value="" disabled>Select Real Agent...</option>
@@ -391,7 +450,7 @@ export function LiveDemoSection() {
                       </optgroup>
                     )}
                   </select>
-                  <ChevronDown className="w-3.5 h-3.5 text-emerald-800 absolute right-2.5 pointer-events-none" />
+                  <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 pointer-events-none" />
                 </div>
               )}
             </div>
@@ -401,20 +460,30 @@ export function LiveDemoSection() {
           <div className="grid grid-cols-1 lg:grid-cols-12 min-h-[380px] sm:min-h-[420px] overflow-hidden">
             
             {/* Left: Sleek Acoustic Chamber with Modern Illuminated Voice Studio Button (7 cols) */}
-            <div className="lg:col-span-7 p-6 sm:p-8 flex flex-col justify-between items-center text-center bg-white border-b lg:border-b-0 lg:border-r border-slate-100 relative">
+            <div
+              className="lg:col-span-7 p-6 sm:p-8 flex flex-col justify-between items-center text-center border-b lg:border-b-0 lg:border-r relative transition-colors duration-300"
+              style={{
+                backgroundColor: "var(--theme-demo-surface, #0E1626)",
+                borderColor: "var(--theme-demo-border, #1E2D4A)",
+              }}
+            >
               
               {/* Header Status & Timer */}
               <div className="w-full flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <span className={`w-2 h-2 rounded-full ${
-                    isCallConnected ? "bg-emerald-500 animate-ping" : isConnecting ? "bg-amber-500 animate-pulse" : "bg-slate-400"
+                    isCallConnected ? "bg-[#45C5FF] animate-ping" : isConnecting ? "bg-amber-400 animate-pulse" : "bg-slate-500"
                   }`} />
-                  <span className="font-[family-name:var(--font-playfair),Georgia,serif] text-xs font-medium text-slate-500">
+                  <span
+                    className="text-xs font-medium font-sans text-slate-300"
+                  >
                     {isCallConnected ? "Live WebRTC Audio Active" : isConnecting ? "Connecting via LiveKit..." : "Voice Studio"}
                   </span>
                 </div>
 
-                <div className="font-mono text-xs font-semibold px-2.5 py-1 rounded-full bg-slate-100 text-slate-700">
+                <div
+                  className="font-mono text-xs font-semibold px-2.5 py-1 rounded-full border bg-[#18243A] border-[#1E2D4A] text-[#F4F7FC]"
+                >
                   {formatTimer(secondsConnected)}
                 </div>
               </div>
@@ -434,15 +503,15 @@ export function LiveDemoSection() {
                   <motion.div
                     animate={
                       isCallConnected
-                        ? { scale: [1, 1.25, 1], opacity: [0.25, 0.65, 0.25] }
-                        : { scale: [1, 1.08, 1], opacity: [0.12, 0.25, 0.12] }
+                        ? { scale: [1, 1.25, 1], opacity: [0.35, 0.75, 0.35] }
+                        : { scale: [1, 1.08, 1], opacity: [0.15, 0.3, 0.15] }
                     }
                     transition={{ duration: 2.4, repeat: Infinity, ease: "easeInOut" }}
                     className="absolute inset-0 rounded-full blur-xl pointer-events-none"
                     style={{
                       background: isCallConnected
-                        ? "radial-gradient(circle, rgba(16, 185, 129, 0.40) 0%, rgba(6, 182, 212, 0.35) 50%, transparent 80%)"
-                        : "radial-gradient(circle, rgba(37, 99, 235, 0.35) 0%, rgba(6, 182, 212, 0.25) 50%, transparent 80%)",
+                        ? "radial-gradient(circle, #315CFF 0%, transparent 80%)"
+                        : "radial-gradient(circle, rgba(49, 92, 255, 0.35) 0%, transparent 80%)",
                     }}
                   />
 
@@ -457,20 +526,18 @@ export function LiveDemoSection() {
                       rotate: { duration: 16, repeat: Infinity, ease: "linear" },
                       scale: { duration: 2, repeat: Infinity, ease: "easeInOut" },
                     }}
-                    className={`absolute inset-1.5 rounded-full border border-dashed transition-colors duration-300 pointer-events-none ${
-                      isCallConnected
-                        ? "border-emerald-400/60"
-                        : "border-cyan-400/40 group-hover:border-cyan-500/60"
-                    }`}
+                    className="absolute inset-1.5 rounded-full border border-dashed transition-colors duration-300 pointer-events-none"
+                    style={{
+                      borderColor: isCallConnected ? "#45C5FF" : "#1E2D4A",
+                    }}
                   />
 
                   {/* Main illuminated core button */}
                   <div 
-                    className={`relative w-28 h-28 sm:w-32 sm:h-32 rounded-full flex flex-col items-center justify-center transition-all duration-300 shadow-xl ${
-                      isCallConnected
-                        ? "bg-gradient-to-b from-slate-900 via-slate-950 to-slate-900 border-2 border-emerald-400/80 shadow-emerald-500/20"
-                        : "bg-gradient-to-b from-slate-900 via-[#0B132B] to-[#0A0E1A] border-2 border-cyan-400/50 shadow-cyan-500/20 group-hover:border-cyan-300 group-hover:shadow-cyan-500/30"
-                    }`}
+                    className="relative w-28 h-28 sm:w-32 sm:h-32 rounded-full flex flex-col items-center justify-center transition-all duration-300 shadow-xl border-2 bg-[#18243A] hover:bg-[#1E2D4A]"
+                    style={{
+                      borderColor: isCallConnected ? "#45C5FF" : "#315CFF",
+                    }}
                   >
                     {/* Live Dancing Equalizer Soundwave Bars */}
                     <div className="flex items-center gap-1.5 h-10">
@@ -488,11 +555,10 @@ export function LiveDemoSection() {
                             ease: "easeInOut",
                             delay: i * 0.09,
                           }}
-                          className={`w-1 sm:w-1.5 rounded-full h-7 transition-colors duration-300 ${
-                            isCallConnected
-                              ? i % 2 === 0 ? "bg-emerald-400" : "bg-cyan-300"
-                              : "bg-cyan-400 group-hover:bg-cyan-300"
-                          }`}
+                          className="w-1 sm:w-1.5 rounded-full h-7 transition-colors duration-300"
+                          style={{
+                            backgroundColor: isCallConnected ? "#45C5FF" : "#315CFF",
+                          }}
                         />
                       ))}
                     </div>
@@ -500,7 +566,9 @@ export function LiveDemoSection() {
                 </motion.button>
 
                 {/* Subtext Instruction below button */}
-                <p className="mt-3 text-xs sm:text-sm font-[family-name:var(--font-playfair),Georgia,serif] text-slate-600 font-medium">
+                <p
+                  className="mt-3 text-xs sm:text-sm font-sans font-medium text-slate-300"
+                >
                   {isCallConnected 
                     ? "Live WebRTC call in progress — Tap button to end" 
                     : isConnecting 
@@ -514,11 +582,12 @@ export function LiveDemoSection() {
                 {isCallConnected && (
                   <button
                     onClick={toggleMute}
-                    className={`px-4 py-1.5 rounded-full border text-xs font-[family-name:var(--font-playfair),Georgia,serif] flex items-center gap-1.5 transition-all cursor-pointer ${
-                      isMuted 
-                        ? "bg-rose-50 border-rose-200 text-rose-600" 
-                        : "bg-slate-50 border-slate-200 hover:border-slate-300 text-slate-700"
-                    }`}
+                    className="px-4 py-1.5 rounded-full border text-xs font-sans flex items-center gap-1.5 transition-all cursor-pointer"
+                    style={{
+                      backgroundColor: isMuted ? "rgba(225,29,72,0.15)" : "#18243A",
+                      borderColor: isMuted ? "#E11D48" : "#1E2D4A",
+                      color: isMuted ? "#E11D48" : "#FFFFFF",
+                    }}
                   >
                     {isMuted ? <MicOff className="w-3.5 h-3.5" /> : <Mic className="w-3.5 h-3.5" />}
                     <span>{isMuted ? "Unmute Mic" : "Mute Mic"}</span>
@@ -528,20 +597,30 @@ export function LiveDemoSection() {
             </div>
 
             {/* Right: Sleek Live Dialogue & Quick Prompts (5 cols) */}
-            <div className="lg:col-span-5 p-6 flex flex-col justify-between bg-slate-50/30 text-left">
+            <div
+              className="lg:col-span-5 p-6 flex flex-col justify-between text-left transition-colors duration-300 border-t lg:border-t-0"
+              style={{
+                backgroundColor: "var(--theme-demo-surface, #0E1626)",
+                borderColor: "var(--theme-demo-border, #1E2D4A)",
+              }}
+            >
               
               {/* Header */}
-              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div
+                className="flex items-center justify-between pb-3 border-b border-[#1E2D4A]"
+              >
                 <div className="flex items-center gap-2">
-                  <MessageSquare className="w-4 h-4 text-cyan-600" />
-                  <span className="text-xs font-[family-name:var(--font-playfair),Georgia,serif] font-bold text-slate-800">
+                  <MessageSquare className="w-4 h-4 text-[#315CFF]" />
+                  <span
+                    className="text-xs font-bold font-sans text-white"
+                  >
                     Live Conversation Feed
                   </span>
                 </div>
                 {transcripts.length > 0 && (
                   <button
                     onClick={() => clearTranscripts()}
-                    className="text-[11px] font-[family-name:var(--font-playfair),Georgia,serif] text-slate-400 hover:text-slate-700 transition-colors cursor-pointer"
+                    className="text-[11px] font-sans hover:text-[#45C5FF] text-slate-400 transition-colors cursor-pointer"
                   >
                     Clear
                   </button>
@@ -554,15 +633,15 @@ export function LiveDemoSection() {
                 className="flex-1 my-3 overflow-y-auto space-y-3 pr-2 min-h-[220px] max-h-[260px] sm:max-h-[300px]"
               >
                 {transcripts.length === 0 ? (
-                  <div className="h-full flex flex-col items-center justify-center text-center p-4 text-slate-400 text-xs font-[family-name:var(--font-playfair),Georgia,serif]">
+                  <div className="h-full flex flex-col items-center justify-center text-center p-4 text-slate-400 text-xs font-sans">
                     {isCallConnected ? (
-                      <div className="flex flex-col items-center gap-2 text-emerald-600">
+                      <div className="flex flex-col items-center gap-2 text-[#45C5FF]">
                         <Volume2 className="w-6 h-6 animate-pulse" />
-                        <span className="font-medium">Live audio channel connected.</span>
-                        <span className="text-[11px] text-slate-500">Speak into your mic to begin speaking with {selectedAgent.name}.</span>
+                        <span className="font-medium text-white">Live audio channel connected.</span>
+                        <span className="text-[11px] text-slate-400">Speak into your mic to begin speaking with {selectedAgent.name}.</span>
                       </div>
                     ) : isConnecting ? (
-                      <div className="flex flex-col items-center gap-2 text-amber-600">
+                      <div className="flex flex-col items-center gap-2 text-amber-400">
                         <Sparkles className="w-6 h-6 animate-spin" />
                         <span>Initializing WebRTC audio pipe...</span>
                       </div>
@@ -589,17 +668,17 @@ export function LiveDemoSection() {
                         animate={{ opacity: 1, y: 0 }}
                         className={`flex flex-col gap-1 ${isUser ? "items-end" : "items-start"}`}
                       >
-                        <div className="flex items-center gap-1.5 text-[10px] font-[family-name:var(--font-playfair),Georgia,serif] text-slate-500">
-                          <span className="font-semibold text-slate-800">
+                        <div className="flex items-center gap-1.5 text-[10px] font-mono text-slate-400">
+                          <span className="font-semibold text-slate-200">
                             {isUser ? "You" : t.speaker}
                           </span>
                           {formattedTime && <span>{formattedTime}</span>}
                         </div>
                         <div 
-                          className={`p-3.5 rounded-2xl text-xs leading-relaxed max-w-[90%] shadow-2xs font-[family-name:var(--font-playfair),Georgia,serif] ${
+                          className={`p-3.5 rounded-2xl text-xs leading-relaxed max-w-[90%] shadow-2xs font-sans ${
                             isUser
-                              ? "rounded-tr-xs bg-slate-900 text-white"
-                              : "rounded-tl-xs bg-white border border-slate-200/80 text-slate-800"
+                              ? "rounded-tr-xs bg-[#315CFF] text-white"
+                              : "rounded-tl-xs bg-[#18243A] border border-[#1E2D4A] text-[#F4F7FC]"
                           }`}
                         >
                           {t.text}
@@ -611,8 +690,8 @@ export function LiveDemoSection() {
               </div>
 
               {/* Quick Prompts to Speak */}
-              <div className="pt-3 border-t border-slate-100 space-y-2">
-                <span className="text-[10px] font-[family-name:var(--font-playfair),Georgia,serif] font-bold uppercase tracking-wider text-slate-500 block">
+              <div className="pt-3 border-t border-[#1E2D4A] space-y-2">
+                <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400 block">
                   Suggested topics to ask:
                 </span>
                 <div className="flex flex-wrap gap-1.5">
@@ -620,7 +699,7 @@ export function LiveDemoSection() {
                     <button
                       key={idx}
                       onClick={() => handleSendPrompt(prompt)}
-                      className="text-left text-[11px] font-[family-name:var(--font-playfair),Georgia,serif] px-3 py-1.5 rounded-full bg-white hover:bg-cyan-50 border border-slate-200/80 hover:border-cyan-300 text-slate-700 hover:text-cyan-950 transition-all cursor-pointer shadow-2xs"
+                      className="text-left text-[11px] font-sans px-3 py-1.5 rounded-full bg-[#18243A] hover:bg-[#315CFF]/15 border border-[#1E2D4A] hover:border-[#315CFF] text-slate-200 hover:text-[#45C5FF] transition-all cursor-pointer shadow-2xs"
                     >
                       &quot;{prompt}&quot;
                     </button>
@@ -631,6 +710,7 @@ export function LiveDemoSection() {
             </div>
           </div>
 
+        </div>
         </div>
 
       </div>

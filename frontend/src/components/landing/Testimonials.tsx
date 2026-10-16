@@ -1,111 +1,140 @@
 "use client";
 
 import React, { useState } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
+import { Star, Quote, ChevronLeft, ChevronRight, MessageSquareQuote } from "lucide-react";
 
-const FEEDBACK_LIST = [
+const TESTIMONIALS = [
   {
     id: 1,
     quote:
-      "Professional, creative, and incredibly detail-oriented. The AI voice agents not only look and sound amazing, but also handle our daily call volume with flawless reliability and sub-second latency.",
-    author: "JAMES PARKER",
-    role: "FOUNDER, LAUNCHPAD",
-    initials: "JP",
-    avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
+      "Arika handled over 8,500 patient appointments across our Mumbai and Pune clinics in Hinglish without a single breakdown. The voice quality, medical politeness, and zero hold times transformed our patient experience.",
+    author: "Dr. Ananya Sen",
+    role: "Chief of Operations",
+    company: "CarePulse Health & Multispecialty Clinics",
+    location: "Mumbai",
+    metric: "8,500+ calls answered with zero hold time",
   },
   {
     id: 2,
     quote:
-      "Arika handled over 4,500 patient appointments across Mumbai clinics in Hinglish without a single breakdown. The voice quality and compliance controls are unmatched in the Indian market.",
-    author: "DR. ANANYA SEN",
-    role: "CHIEF OF OPERATIONS, CAREPULSE HEALTH",
-    initials: "AS",
-    avatar: "https://images.unsplash.com/photo-1580489944761-15a19d654956?w=150&auto=format&fit=crop&q=80",
+      "Our property advisors used to take 4 to 6 hours to call back portal leads. With Vaakriti, our outbound agent engages buyers within 15 seconds, qualifies their budget, and schedules weekend site visits directly on Google Calendar.",
+    author: "Rajesh Verma",
+    role: "Director of Sales & Growth",
+    company: "Nexus Real Estate Group",
+    location: "Gurugram / NCR",
+    metric: "3.4x jump in qualified site visits",
   },
   {
     id: 3,
     quote:
-      "Trinetra's self-healing voice pipeline eliminated our manual lead follow-up backlog within 48 hours. Our conversion speed jumped by 3.4x with automated WhatsApp summaries.",
-    author: "RAJESH VERMA",
-    role: "DIRECTOR OF GROWTH, NEXUS ENTERPRISES",
-    initials: "RV",
-    avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80",
+      "Telecom compliance was our biggest fear. Vaakriti's automatic TRAI DND scrubbing and strict 9am-9pm pacing gave our legal team 100% confidence. Our EMI reminder collections speed increased by 42%.",
+    author: "Vikramaditya Singhania",
+    role: "Head of Digital Collections",
+    company: "FinFirst Lending Capital",
+    location: "Bengaluru",
+    metric: "42% faster loan installment recovery",
   },
 ];
 
 export function Testimonials() {
-  const [activeIndex, setActiveIndex] = useState(0);
+  const [activeIdx, setActiveIdx] = useState(0);
+
+  const prev = () => setActiveIdx((i) => (i === 0 ? TESTIMONIALS.length - 1 : i - 1));
+  const next = () => setActiveIdx((i) => (i === TESTIMONIALS.length - 1 ? 0 : i + 1));
+
+  const curr = TESTIMONIALS[activeIdx];
 
   return (
-    <section className="w-full bg-white py-20 px-6 sm:px-10 lg:px-16">
-      <div className="mx-auto max-w-[1536px]">
+    <section id="testimonials" className="w-full bg-white py-20 sm:py-28 px-4 sm:px-6 lg:px-8 relative z-10">
+      <div className="mx-auto max-w-[1400px]">
         
-        {/* Section Top Bar (Matching Reference Image "■ WHAT CLIENTS SAY" / "REAL FEEDBACK →") */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-8 mb-10 border-b border-slate-200/90 gap-4">
-          <div className="flex items-center gap-2.5">
-            <span className="w-2.5 h-2.5 rounded-[1px] bg-[#84CC16]" />
-            <h2 className="text-[13px] font-mono tracking-[0.2em] uppercase font-bold text-[#0B0F17]">
-              WHAT CLIENTS SAY
-            </h2>
+        {/* Section Header */}
+        <div className="flex flex-col items-center text-center mb-14 sm:mb-18">
+          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-slate-200 bg-slate-50 text-[11px] font-mono font-bold tracking-widest text-slate-700 uppercase mb-4">
+            <MessageSquareQuote className="w-3.5 h-3.5 text-emerald-600" />
+            <span>ENTERPRISE CLIENT VALIDATION</span>
           </div>
-          <span className="text-[11px] font-mono tracking-[0.2em] uppercase text-slate-500 font-semibold">
-            REAL FEEDBACK →
-          </span>
+          <h2 className="text-3xl sm:text-4xl md:text-5xl font-extrabold tracking-tight text-slate-900 max-w-3xl">
+            Trusted by operational leaders across India.
+          </h2>
+          <p className="mt-4 text-sm sm:text-base text-slate-600 max-w-2xl">
+            See how clinics, real estate developers, and financial institutions deploy Vaakriti to solve high-volume customer communications.
+          </p>
         </div>
 
-        {/* Luminous White Testimonial Card */}
-        <div className="max-w-4xl mx-auto">
-          <motion.div
-            key={activeIndex}
-            initial={{ opacity: 0, y: 15 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4 }}
-            className="rounded-3xl bg-white border border-slate-200/90 p-8 sm:p-12 shadow-[0_8px_30px_rgba(0,0,0,0.04)] hover:border-lime-400/80 transition-all duration-300 relative"
-          >
-            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6 sm:gap-8 justify-between">
-              
-              {/* Quote Body with Electric Lime Quote Mark */}
-              <div className="flex-1">
-                <div className="flex items-start gap-4">
-                  <span className="text-4xl text-[#84CC16] font-serif leading-none select-none shrink-0 font-bold">
-                    “
-                  </span>
-                  <p className="text-[15px] sm:text-[17px] text-slate-700 font-sans leading-relaxed">
-                    {FEEDBACK_LIST[activeIndex].quote}
-                  </p>
+        {/* Testimonial Showcase Carousel */}
+        <div className="max-w-4xl mx-auto relative">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={curr.id}
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -15 }}
+              transition={{ duration: 0.35, ease: "easeOut" }}
+              className="rounded-[2.2rem] sm:rounded-[2.8rem] border border-slate-200/90 bg-slate-50/70 p-8 sm:p-12 lg:p-16 shadow-[0_12px_40px_-10px_rgba(0,0,0,0.04)] relative"
+            >
+              {/* Stars & Metric Pill */}
+              <div className="flex flex-wrap items-center justify-between gap-4 mb-8">
+                <div className="flex items-center gap-1 text-amber-400">
+                  {[...Array(5)].map((_, i) => (
+                    <Star key={i} className="w-4 h-4 fill-amber-400" />
+                  ))}
                 </div>
+                <span className="text-[11px] font-mono font-bold px-3 py-1 rounded-full bg-emerald-100/70 text-emerald-800 border border-emerald-200 uppercase">
+                  {curr.metric}
+                </span>
               </div>
 
-              {/* Author Meta on Right (Matching Reference Image) */}
-              <div className="flex items-center gap-4 shrink-0 sm:pl-8 sm:border-l border-slate-200/80">
-                <div className="relative w-12 h-12 rounded-full border border-lime-400/50 bg-[#0C0E14] text-[#84CC16] font-mono font-bold text-sm flex items-center justify-center shadow-[0_0_12px_rgba(132,204,22,0.25)] shrink-0">
-                  {FEEDBACK_LIST[activeIndex].initials}
-                </div>
+              {/* Quote Text */}
+              <blockquote className="text-lg sm:text-xl md:text-2xl font-medium text-slate-800 leading-relaxed mb-10 italic">
+                &ldquo;{curr.quote}&rdquo;
+              </blockquote>
+
+              {/* Author Info & Nav Buttons */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 pt-6 border-t border-slate-200/80">
                 <div>
-                  <h4 className="text-xs sm:text-sm font-bold text-[#0B0F17] uppercase tracking-wider font-mono">
-                    {FEEDBACK_LIST[activeIndex].author}
-                  </h4>
-                  <p className="text-[10px] sm:text-[11px] text-slate-500 font-mono tracking-wider uppercase mt-0.5">
-                    {FEEDBACK_LIST[activeIndex].role}
-                  </p>
+                  <div className="text-base sm:text-lg font-bold text-slate-900">
+                    {curr.author}
+                  </div>
+                  <div className="text-xs sm:text-sm text-slate-600 font-medium">
+                    {curr.role} &bull; <span className="text-slate-800 font-semibold">{curr.company}</span>
+                  </div>
+                  <div className="text-[11px] font-mono text-slate-400 mt-0.5">
+                    {curr.location}
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={prev}
+                    aria-label="Previous testimonial"
+                    className="w-10 h-10 rounded-full border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 flex items-center justify-center transition-all cursor-pointer shadow-2xs"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={next}
+                    aria-label="Next testimonial"
+                    className="w-10 h-10 rounded-full border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 flex items-center justify-center transition-all cursor-pointer shadow-2xs"
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
                 </div>
               </div>
+            </motion.div>
+          </AnimatePresence>
 
-            </div>
-          </motion.div>
-
-          {/* Minimalist Carousel Dots (Active Dot in Electric Lime #84CC16) */}
+          {/* Dots Indicator */}
           <div className="flex items-center justify-center gap-2 mt-8">
-            {FEEDBACK_LIST.map((_, idx) => (
+            {TESTIMONIALS.map((_, i) => (
               <button
-                key={idx}
-                onClick={() => setActiveIndex(idx)}
-                className={`transition-all duration-300 rounded-full cursor-pointer ${
-                  idx === activeIndex
-                    ? "w-6 h-2 bg-[#84CC16] shadow-[0_0_10px_#84CC16]"
-                    : "w-2 h-2 bg-slate-300 hover:bg-slate-400"
+                key={i}
+                onClick={() => setActiveIdx(i)}
+                aria-label={`Go to slide ${i + 1}`}
+                className={`h-2 rounded-full transition-all duration-300 cursor-pointer ${
+                  activeIdx === i ? "w-8 bg-slate-900" : "w-2 bg-slate-300 hover:bg-slate-400"
                 }`}
-                aria-label={`Go to slide ${idx + 1}`}
               />
             ))}
           </div>

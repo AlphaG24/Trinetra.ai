@@ -101,7 +101,7 @@ export function PlasmaEnergyRing({
     const inactive = streaksRef.current.find((s) => !s.active);
     if (!inactive) return;
 
-    const streakColors = ["#059669", "#06B6D4", "#2563EB", "#8B5CF6", "#EC4899", "#F59E0B", "#FFFFFF"];
+    const streakColors = ["#1a5c86ff", "#06B6D4", "#2563EB", "#613db5ff", "#3a3cb0ff", "#F59E0B", "#FFFFFF"];
     inactive.angle = Math.random() * Math.PI * 2;
     inactive.currentDist = baseRadius * (0.92 + Math.random() * 0.12);
     inactive.maxDist = inactive.currentDist + baseRadius * (0.24 + Math.random() * 0.20);
@@ -406,11 +406,11 @@ export function PlasmaEnergyRing({
       gl.ARRAY_BUFFER,
       new Float32Array([
         -1.0, -1.0,
-         1.0, -1.0,
-        -1.0,  1.0,
-        -1.0,  1.0,
-         1.0, -1.0,
-         1.0,  1.0,
+        1.0, -1.0,
+        -1.0, 1.0,
+        -1.0, 1.0,
+        1.0, -1.0,
+        1.0, 1.0,
       ]),
       gl.STATIC_DRAW
     );
@@ -614,9 +614,8 @@ export function PlasmaEnergyRing({
       onPointerMove={handlePointerMove}
       onPointerLeave={handlePointerLeave}
       onPointerDown={handleClick}
-      className={`relative flex items-center justify-center cursor-pointer select-none transition-transform duration-300 ${
-        isHovered ? "scale-[1.03]" : "scale-100"
-      } ${className}`}
+      className={`relative flex items-center justify-center cursor-pointer select-none transition-transform duration-300 ${isHovered ? "scale-[1.03]" : "scale-100"
+        } ${className}`}
       style={{
         width: size,
         height: size,

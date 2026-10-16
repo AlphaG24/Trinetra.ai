@@ -126,7 +126,7 @@ export default async function MarketplaceDetailPage({ params }: MarketplaceDetai
     if (tool) {
       // 2. Fetch authenticated user profile safely with timeout
       try {
-        const authPromise = supabase.auth.getUser()
+        const authPromise = supabase.auth.getUser().catch(() => ({ data: { user: null } }))
         const authTimeout = new Promise<any>((resolve) =>
           setTimeout(() => resolve({ data: { user: null } }), 1500)
         )
@@ -139,6 +139,8 @@ export default async function MarketplaceDetailPage({ params }: MarketplaceDetai
             .select('*')
             .eq('id', user.id)
             .maybeSingle()
+            .then(res => res)
+            .catch(() => ({ data: null }))
           const profileTimeout = new Promise<any>((resolve) =>
             setTimeout(() => resolve({ data: null }), 1500)
           )
@@ -149,6 +151,8 @@ export default async function MarketplaceDetailPage({ params }: MarketplaceDetai
             .from('agents')
             .select('*')
             .eq('user_id', user.id)
+            .then(res => res)
+            .catch(() => ({ data: [] }))
           const agentsTimeout = new Promise<any>((resolve) =>
             setTimeout(() => resolve({ data: [] }), 1500)
           )
@@ -159,7 +163,11 @@ export default async function MarketplaceDetailPage({ params }: MarketplaceDetai
 
       // 3. Fetch system config keys safely with timeout
       try {
-        const configPromise = supabase.from('system_config').select('config_key, config_value')
+        const configPromise = supabase
+          .from('system_config')
+          .select('config_key, config_value')
+          .then(res => res)
+          .catch(() => ({ data: null }))
         const configTimeout = new Promise<any>((resolve) =>
           setTimeout(() => resolve({ data: null }), 1500)
         )

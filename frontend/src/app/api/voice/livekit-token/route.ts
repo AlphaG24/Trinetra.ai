@@ -116,21 +116,47 @@ async function generateLiveKitToken({
     })().catch(() => {});
   }
 
-  // Trigger backend agent worker to join room immediately
-  const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || process.env.NEXT_PUBLIC_FASTAPI_URL || 'http://127.0.0.1:8000';
-  try {
-    fetch(`${backendUrl.replace(/\/$/, '')}/api/voice/dispatch-agent`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        room_name,
-        participant_name: participant_name || 'User',
-        agent_id: agent_id || null,
-      }),
-    }).catch((dispatchErr: any) => {
-      console.warn('[livekit-token] Backend agent dispatch notification notice:', dispatchErr?.message);
+  // Trigger backend agent worker to join room immediately (local with Render cloud fallback)
+  (async () => {
+    const payload = JSON.stringify({
+      room_name,
+      participant_name: participant_name || 'User',
+      agent_id: agent_id || null,
     });
-  } catch {}
+
+    let dispatched = false;
+    // 1. Try local FastAPI backend if active
+    try {
+      const localController = new AbortController();
+      const localTimeout = setTimeout(() => localController.abort(), 1200);
+      const localRes = await fetch('http://127.0.0.1:8000/api/voice/livekit-token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: payload,
+        signal: localController.signal,
+      });
+      clearTimeout(localTimeout);
+      if (localRes.ok) {
+        dispatched = true;
+      }
+    } catch {}
+
+    // 2. If local backend did not dispatch, dispatch via Render cloud backend
+    if (!dispatched) {
+      try {
+        const renderRes = await fetch('https://trinetra-ai-1-6f2n.onrender.com/api/voice/livekit-token', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: payload,
+        });
+        if (renderRes.ok) {
+          console.log('[livekit-token] Dispatched agent via Render cloud backend');
+        }
+      } catch (rErr: any) {
+        console.warn('[livekit-token] Remote agent dispatch notice:', rErr?.message);
+      }
+    }
+  })().catch(() => {});
 
   return NextResponse.json({
     status: 'success',

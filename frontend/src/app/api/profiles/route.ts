@@ -31,7 +31,7 @@ export async function GET() {
     
     let user: any = null
     try {
-      const authPromise = supabase.auth.getUser()
+      const authPromise = supabase.auth.getUser().catch(() => ({ data: { user: null } }))
       const timeoutPromise = new Promise<any>((_, reject) =>
         setTimeout(() => reject(new Error('Auth timeout')), 2500)
       )

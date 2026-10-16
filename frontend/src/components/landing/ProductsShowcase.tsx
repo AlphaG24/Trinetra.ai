@@ -1,251 +1,235 @@
 "use client";
 
-import React from "react";
-import { motion } from "framer-motion";
-import { PhoneCall, Workflow, GraduationCap, ArrowUpRight, Sparkles } from "lucide-react";
+import React, { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { 
+  PhoneCall, 
+  PhoneOutgoing, 
+  Cpu, 
+  CheckCircle2, 
+  ArrowRight, 
+  Sparkles,
+  Zap,
+  Clock,
+  ShieldCheck,
+  Calendar,
+  Layers
+} from "lucide-react";
 import Link from "next/link";
 
+interface CapabilityTab {
+  id: string;
+  badge: string;
+  title: string;
+  outcome: string;
+  metrics: { label: string; value: string }[];
+  visual: {
+    statusBadge: string;
+    headline: string;
+    subline: string;
+    actionDone: string;
+    latency: string;
+  };
+}
+
+const TABS: CapabilityTab[] = [
+  {
+    id: "inbound",
+    badge: "INBOUND CONCIERGE",
+    title: "24/7 Front-Desk Resolution",
+    outcome: "Zero wait times. Answers questions, qualifies callers, and books calendar slots instantly.",
+    metrics: [
+      { label: "Hold Time", value: "0 sec" },
+      { label: "Resolution", value: "94.2%" },
+      { label: "Concurrency", value: "Unlimited" },
+    ],
+    visual: {
+      statusBadge: "LIVE CALL // APPOINTMENT CONFIRMED",
+      headline: "Apollo Clinic: Dr. Sharma consultation booked",
+      subline: "Patient requested tomorrow 5:30 PM slot in Hinglish. Slot locked in Google Calendar.",
+      actionDone: "WhatsApp confirmation & SMS link dispatched instantly",
+      latency: "410ms turn-taking",
+    },
+  },
+  {
+    id: "outbound",
+    badge: "OUTBOUND SCALE",
+    title: "10,000+ Concurrent Outreach",
+    outcome: "Autonomous lead follow-ups, payment reminders, and renewals with strict TRAI pacing.",
+    metrics: [
+      { label: "Dial Pacing", value: "Instant" },
+      { label: "DND Scrub", value: "100% Pre-Call" },
+      { label: "Pickup Rate", value: "3.8x higher" },
+    ],
+    visual: {
+      statusBadge: "ACTIVE CAMPAIGN // HOT LEAD QUALIFIED",
+      headline: "DLF Luxury: 3BHK visit scheduled for Saturday",
+      subline: "Prospect budget verified (₹2.4 Cr). Call auto-transferred to senior relationship manager.",
+      actionDone: "Lead status synced to Salesforce & CRM tag updated",
+      latency: "440ms turn-taking",
+    },
+  },
+  {
+    id: "intelligence",
+    badge: "LIVE INTELLIGENCE",
+    title: "CRM Sync & Sentiment Audit",
+    outcome: "Every conversation transcribed, summarized, and scored for QA without human note-taking.",
+    metrics: [
+      { label: "CRM Sync", value: "Real-time" },
+      { label: "QA Scoring", value: "Automated" },
+      { label: "PII Masked", value: "100%" },
+    ],
+    visual: {
+      statusBadge: "AUDIT COMPLETE // SENTIMENT: POSITIVE",
+      headline: "Autonomous Call Summary & QA Rating: 98/100",
+      subline: "Key intents extracted: Price inquiry, immediate delivery needed, location: Whitefield, Bangalore.",
+      actionDone: "Structured JSON pushed to webhook endpoint & Zoho CRM",
+      latency: "Edge transcription",
+    },
+  },
+];
+
 export function ProductsShowcase() {
+  const [activeTab, setActiveTab] = useState<string>("inbound");
+  const current = TABS.find((t) => t.id === activeTab) || TABS[0];
+
   return (
-    <section id="platform" className="w-full bg-white py-20 px-6 sm:px-10 lg:px-16">
-      <div className="mx-auto max-w-[1536px]">
+    <section id="products" className="w-full bg-white py-16 sm:py-24 px-4 sm:px-6 lg:px-8 relative z-10 border-t border-slate-100">
+      <div className="mx-auto max-w-[1360px]">
         
-        {/* Section Top Bar (Matching Reference Image "■ SELECTED WORK" / "EXPLORE MORE PROJECTS →") */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-8 mb-10 border-b border-slate-200/90 gap-4">
-          <div className="flex items-center gap-2.5">
-            <span className="w-2.5 h-2.5 rounded-[1px] bg-[#84CC16]" />
-            <h2 className="text-[13px] font-mono tracking-[0.2em] uppercase font-bold text-[#0B0F17]">
-              SELECTED WORK &amp; PLATFORMS
+        {/* Section Header: Minimal & Punchy */}
+        <div className="flex flex-col md:flex-row md:items-end justify-between mb-10 pb-6 border-b border-slate-200/80 gap-6">
+          <div>
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-slate-200 bg-slate-50 text-[11px] font-mono font-bold tracking-widest text-slate-700 uppercase mb-3">
+              <Zap className="w-3.5 h-3.5 text-emerald-600" />
+              <span>CAPABILITIES</span>
+            </div>
+            <h2 className="text-2xl sm:text-3xl md:text-4xl font-extrabold tracking-tight text-slate-900">
+              Autonomous Voice for Every Workflow
             </h2>
           </div>
-          <Link
-            href="/#solutions"
-            className="group flex items-center gap-1.5 text-[11px] font-mono tracking-[0.2em] uppercase text-slate-600 hover:text-[#84CC16] font-semibold transition-colors"
-          >
-            <span>EXPLORE MORE PROJECTS</span>
-            <span className="text-[#84CC16] group-hover:translate-x-1 transition-transform">→</span>
-          </Link>
+          <p className="text-sm text-slate-600 max-w-md font-normal leading-relaxed">
+            Replace manual call centers and rigid IVR menus with intelligent conversational agents tailored for Indian enterprise scale.
+          </p>
         </div>
 
-        {/* 3-Card Showcase Grid (With Signature Center Dark Card from Reference Image) */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-16">
-          
-          {/* CARD 01: Luminous White Card (FINTRACK DASHBOARD style) */}
-          <motion.div
-            initial={{ opacity: 0, y: 25 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.5 }}
-            className="group relative flex flex-col justify-between rounded-3xl bg-white border border-slate-200/90 p-8 shadow-[0_4px_20px_rgba(0,0,0,0.03)] hover:border-lime-400 hover:shadow-[0_12px_36px_rgba(132,204,22,0.12)] transition-all duration-300"
-          >
-            {/* Mockup Preview Area */}
-            <div className="relative w-full h-[220px] rounded-2xl bg-slate-50 border border-slate-200/80 p-5 flex flex-col justify-between overflow-hidden mb-6 group-hover:border-lime-400/40 transition-colors">
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-500">
-                  INBOUND AI RECEPTIONIST
-                </span>
-                <span className="flex items-center gap-1.5 text-[10px] font-mono text-[#84CC16] font-semibold">
-                  <span className="w-1.5 h-1.5 rounded-full bg-[#84CC16] animate-pulse" /> LIVE
-                </span>
-              </div>
-
-              {/* Realistic Call Interface */}
-              <div className="rounded-xl bg-white p-4 border border-slate-200 shadow-2xs">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-bold text-[#0B0F17]">Dr. Sharma Clinic</span>
-                  <span className="text-[10px] font-mono text-[#84CC16]">01:42</span>
-                </div>
-                <p className="text-[11px] text-slate-600 line-clamp-2 italic">
-                  &ldquo;Aapka appointment kal sham 5 baje confirm kar diya gaya hai.&rdquo;
-                </p>
-              </div>
-
-              {/* Waveform footer */}
-              <div className="flex items-center gap-1">
-                {[14, 22, 10, 26, 18, 12, 30, 16, 20].map((h, i) => (
-                  <div
-                    key={i}
-                    className="w-1 rounded-full bg-[#84CC16]/70"
-                    style={{ height: `${h}px` }}
-                  />
-                ))}
-              </div>
-            </div>
-
-            {/* Info Footer */}
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <div className="flex items-center gap-2">
-                  <span className="font-mono text-xs font-bold text-[#84CC16]">01</span>
-                  <h3 className="text-sm font-bold text-[#0B0F17] tracking-tight uppercase font-mono">
-                    VOICE RECEPTION OS
-                  </h3>
-                </div>
-                <span className="text-slate-400 group-hover:text-[#84CC16] group-hover:translate-x-1 transition-all text-sm">
-                  →
-                </span>
-              </div>
-              <p className="text-xs text-slate-500 font-sans">
-                Autonomous inbound telephony and appointment booking platform.
-              </p>
-            </div>
-          </motion.div>
-
-          {/* CARD 02: HIGH-CONTRAST DEEP BLACK CARD (Matches center LAUNCHPAD WEBSITE card with Glowing Lime Orb) */}
-          <motion.div
-            initial={{ opacity: 0, y: 25 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.5, delay: 0.1 }}
-            className="group relative flex flex-col justify-between rounded-3xl bg-[#0C0E14] border border-slate-800 p-8 shadow-[0_20px_50px_rgba(0,0,0,0.35)] hover:border-lime-400/80 hover:shadow-[0_0_45px_rgba(132,204,22,0.25)] transition-all duration-300"
-          >
-            {/* Mockup Preview Area with Glowing Electric Lime Sphere */}
-            <div className="relative w-full h-[220px] rounded-2xl bg-[#07090E] border border-slate-800 p-6 flex flex-col justify-between overflow-hidden mb-6">
-              
-              {/* Top headline text on dark card */}
-              <div className="relative z-10">
-                <p className="text-sm font-mono text-slate-400">
-                  Where voice becomes
-                </p>
-                <p className="text-lg font-black text-white tracking-tight">
-                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#84CC16] to-[#A3E635]">
-                    reality.
-                  </span>
-                </p>
-              </div>
-
-              {/* Glowing Electric Lime Sphere (Exact reference image element) */}
-              <div className="absolute -right-6 -bottom-6 w-36 h-36 rounded-full bg-gradient-to-tr from-[#65A30D] via-[#84CC16] to-[#A3E635] shadow-[0_0_60px_rgba(132,204,22,0.65)] flex items-center justify-center">
-                <div className="w-24 h-24 rounded-full bg-[#0C0E14]/30 backdrop-blur-xs border border-white/20" />
-              </div>
-
-              {/* Micro badge */}
-              <div className="relative z-10 flex items-center gap-1.5 text-[10px] font-mono text-slate-400">
-                <span className="w-1.5 h-1.5 rounded-full bg-[#84CC16]" />
-                <span>Trinetra Engine v2.4</span>
-              </div>
-            </div>
-
-            {/* Info Footer on Dark Card */}
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <div className="flex items-center gap-2">
-                  <span className="font-mono text-xs font-bold text-[#84CC16]">02</span>
-                  <h3 className="text-sm font-bold text-white tracking-tight uppercase font-mono">
-                    AUTONOMOUS VOICE AGENTS
-                  </h3>
-                </div>
-                <span className="text-[#84CC16] group-hover:translate-x-1 transition-transform text-sm">
-                  →
-                </span>
-              </div>
-              <p className="text-xs text-slate-400 font-sans">
-                Self-healing outbound &amp; inbound AI sales and support pipelines.
-              </p>
-            </div>
-          </motion.div>
-
-          {/* CARD 03: Luminous White Card (ELEVATE APP style) */}
-          <motion.div
-            initial={{ opacity: 0, y: 25 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.5, delay: 0.2 }}
-            className="group relative flex flex-col justify-between rounded-3xl bg-white border border-slate-200/90 p-8 shadow-[0_4px_20px_rgba(0,0,0,0.03)] hover:border-lime-400 hover:shadow-[0_12px_36px_rgba(132,204,22,0.12)] transition-all duration-300"
-          >
-            {/* Mockup Preview Area */}
-            <div className="relative w-full h-[220px] rounded-2xl bg-slate-50 border border-slate-200/80 p-5 flex flex-col justify-between overflow-hidden mb-6 group-hover:border-lime-400/40 transition-colors">
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-500">
-                  TRINETRA SHIKSHA
-                </span>
-                <span className="text-[10px] font-mono text-slate-400">
-                  EDUCATION OS
-                </span>
-              </div>
-
-              {/* Education App UI Snapshot */}
-              <div className="rounded-xl bg-white p-4 border border-slate-200 shadow-2xs">
-                <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-xs font-bold text-[#0B0F17]">CBSE Class X Math</span>
-                  <span className="text-[10px] font-mono font-bold text-[#84CC16]">98% Mastery</span>
-                </div>
-                <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
-                  <div className="bg-[#84CC16] h-full rounded-full w-[82%]" />
-                </div>
-              </div>
-
-              {/* Tag pills */}
-              <div className="flex items-center gap-1.5">
-                <span className="text-[9px] font-mono px-2 py-0.5 rounded-full bg-slate-200/60 text-slate-600">
-                  Voice Tutor
-                </span>
-                <span className="text-[9px] font-mono px-2 py-0.5 rounded-full bg-[#84CC16]/10 text-[#65A30D]">
-                  Adaptive
-                </span>
-              </div>
-            </div>
-
-            {/* Info Footer */}
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <div className="flex items-center gap-2">
-                  <span className="font-mono text-xs font-bold text-[#84CC16]">03</span>
-                  <h3 className="text-sm font-bold text-[#0B0F17] tracking-tight uppercase font-mono">
-                    AI PEDAGOGY PLATFORM
-                  </h3>
-                </div>
-                <span className="text-slate-400 group-hover:text-[#84CC16] group-hover:translate-x-1 transition-all text-sm">
-                  →
-                </span>
-              </div>
-              <p className="text-xs text-slate-500 font-sans">
-                Personalized bilingual voice tutoring aligned with national curricula.
-              </p>
-            </div>
-          </motion.div>
-
+        {/* Tab Controls: Minimalist Segmented Bar */}
+        <div className="flex items-center gap-2 mb-8 overflow-x-auto no-scrollbar pb-2">
+          {TABS.map((tab) => {
+            const isActive = tab.id === activeTab;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`px-5 py-3 rounded-full text-xs sm:text-sm font-semibold tracking-wide transition-all whitespace-nowrap cursor-pointer flex items-center gap-2 ${
+                  isActive
+                    ? "bg-slate-900 text-white shadow-md shadow-slate-900/10"
+                    : "bg-slate-100/80 text-slate-600 hover:bg-slate-200/70 hover:text-slate-900"
+                }`}
+              >
+                <span className={`w-2 h-2 rounded-full ${isActive ? "bg-emerald-400" : "bg-slate-400"}`} />
+                {tab.badge}
+              </button>
+            );
+          })}
         </div>
 
-        {/* 4-COLUMN STATS / IMPACT ROW (Matching Reference Image "28+ PROJECTS DELIVERED / 14+ HAPPY CLIENTS / 99% SUCCESS RATE / 5+ YEARS OF EXPERIENCE") */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 pt-10 border-t border-slate-200/90 text-center">
-          
-          <div className="flex flex-col items-center">
-            <span className="text-3xl sm:text-4xl lg:text-5xl font-black text-[#0B0F17] tracking-tight font-mono">
-              28<span className="text-[#84CC16]">+</span>
-            </span>
-            <span className="mt-2 text-[11px] font-mono uppercase tracking-[0.18em] text-slate-500 font-semibold">
-              VOICE WORKFLOWS
-            </span>
-          </div>
+        {/* Interactive Capability Card: Clean, Compact, High-Impact */}
+        <div className="rounded-3xl border border-slate-200/90 bg-gradient-to-b from-slate-50/50 via-white to-slate-50/30 p-6 sm:p-10 shadow-sm overflow-hidden">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={current.id}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.2 }}
+              className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center"
+            >
+              {/* Left Column: Direct Impact & Metrics */}
+              <div className="lg:col-span-5 flex flex-col justify-center">
+                <span className="text-[11px] font-mono font-bold tracking-widest text-emerald-700 uppercase mb-2">
+                  {current.badge}
+                </span>
+                <h3 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight mb-3">
+                  {current.title}
+                </h3>
+                <p className="text-slate-600 text-sm sm:text-base leading-relaxed mb-8">
+                  {current.outcome}
+                </p>
 
-          <div className="flex flex-col items-center">
-            <span className="text-3xl sm:text-4xl lg:text-5xl font-black text-[#0B0F17] tracking-tight font-mono">
-              99.8<span className="text-[#84CC16]">%</span>
-            </span>
-            <span className="mt-2 text-[11px] font-mono uppercase tracking-[0.18em] text-slate-500 font-semibold">
-              UPTIME SLA
-            </span>
-          </div>
+                {/* 3 Hard Numbers */}
+                <div className="grid grid-cols-3 gap-3 pt-4 border-t border-slate-200/80">
+                  {current.metrics.map((m, idx) => (
+                    <div key={idx} className="flex flex-col">
+                      <span className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
+                        {m.value}
+                      </span>
+                      <span className="text-[11px] font-mono text-slate-500 uppercase tracking-wider mt-0.5">
+                        {m.label}
+                      </span>
+                    </div>
+                  ))}
+                </div>
 
-          <div className="flex flex-col items-center">
-            <span className="text-3xl sm:text-4xl lg:text-5xl font-black text-[#0B0F17] tracking-tight font-mono">
-              &lt;700<span className="text-[#84CC16]">ms</span>
-            </span>
-            <span className="mt-2 text-[11px] font-mono uppercase tracking-[0.18em] text-slate-500 font-semibold">
-              VOICE LATENCY
-            </span>
-          </div>
+                <div className="mt-8 flex items-center gap-4">
+                  <a
+                    href="#live-demo"
+                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-slate-900 text-white text-xs sm:text-sm font-semibold hover:bg-black transition-all"
+                  >
+                    <span>Test This In Studio</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </a>
+                </div>
+              </div>
 
-          <div className="flex flex-col items-center">
-            <span className="text-3xl sm:text-4xl lg:text-5xl font-black text-[#0B0F17] tracking-tight font-mono">
-              60<span className="text-[#84CC16]">+</span>
-            </span>
-            <span className="mt-2 text-[11px] font-mono uppercase tracking-[0.18em] text-slate-500 font-semibold">
-              LANGUAGES &amp; DIALECTS
-            </span>
-          </div>
+              {/* Right Column: Live Outcome Visualization Card */}
+              <div className="lg:col-span-7">
+                <div className="rounded-2xl border border-slate-200 bg-white p-6 sm:p-8 shadow-sm relative overflow-hidden">
+                  
+                  {/* Status Header */}
+                  <div className="flex items-center justify-between pb-4 border-b border-slate-100 gap-2 mb-5">
+                    <div className="flex items-center gap-2">
+                      <span className="relative flex h-2.5 w-2.5">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                        <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500" />
+                      </span>
+                      <span className="text-[11px] font-mono font-bold tracking-wider text-slate-700">
+                        {current.visual.statusBadge}
+                      </span>
+                    </div>
+                    <span className="text-[11px] font-mono text-emerald-700 bg-emerald-50 border border-emerald-200/60 px-2.5 py-0.5 rounded-full font-semibold">
+                      {current.visual.latency}
+                    </span>
+                  </div>
 
+                  {/* Core Result Preview */}
+                  <div className="space-y-4">
+                    <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/70">
+                      <h4 className="text-sm sm:text-base font-bold text-slate-900 mb-1">
+                        {current.visual.headline}
+                      </h4>
+                      <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
+                        {current.visual.subline}
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-3 p-3.5 rounded-xl bg-emerald-50/60 border border-emerald-200/50 text-emerald-900 text-xs sm:text-sm font-medium">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                      <span>{current.visual.actionDone}</span>
+                    </div>
+                  </div>
+
+                  {/* Subtle Telemetry Strip */}
+                  <div className="mt-5 pt-4 border-t border-slate-100 flex items-center justify-between text-[11px] font-mono text-slate-500">
+                    <span>STATUS: RESOLVED</span>
+                    <span>SECURITY: DPDP COMPLIANT</span>
+                  </div>
+
+                </div>
+              </div>
+
+            </motion.div>
+          </AnimatePresence>
         </div>
 
       </div>

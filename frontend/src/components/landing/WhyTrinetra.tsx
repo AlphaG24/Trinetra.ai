@@ -1,113 +1,164 @@
-"use client";
+import React from "react";
+import Image from "next/image";
+import { Mic, Zap, Languages, CheckCircle2, Sparkles } from "lucide-react";
 
-import { motion } from "framer-motion";
-import { Globe, Zap, GraduationCap, Shield, PhoneCall, Database, ArrowRight } from "lucide-react";
+interface FeaturePillar {
+  number: string;
+  badge: string;
+  title: string;
+  description: string;
+  icon: React.ComponentType<{ className?: string }>;
+}
 
-const features = [
+const FEATURE_PILLARS: FeaturePillar[] = [
   {
-    num: "01",
-    id: "lang",
-    icon: <Globe size={22} className="text-[#0B0F17]" />,
-    title: "MULTILINGUAL VOICE",
-    desc: "Autonomous voice pipelines fluently conversing across Hinglish, Hindi, Tamil, Telugu, and 60+ global languages with sub-second latency.",
+    number: "01",
+    badge: "Turn-Taking",
+    title: "Natural, Fluid Conversations",
+    description:
+      "Callers can speak casually, pause to think, or change their mind mid-sentence. The AI listens, pauses instantly when interrupted, and pivots the conversation naturally.",
+    icon: Mic,
   },
   {
-    num: "02",
-    id: "heal",
-    icon: <Zap size={22} className="text-[#0B0F17]" />,
-    title: "SELF-HEALING AGENTS",
-    desc: "Continuous autonomous monitoring that detects tool errors, recovers gracefully mid-call, and self-optimizes with every conversational turn.",
+    number: "02",
+    badge: "5,000+ Lines",
+    title: "Zero Hold Times, Instant Scale",
+    description:
+      "Instant pickup with 0s queue time. Whether 5 calls a day or a peak rush of 5,000 inquiries in the same minute, every caller gets immediate, attentive support 24/7.",
+    icon: Zap,
   },
   {
-    num: "03",
-    id: "voice",
-    icon: <PhoneCall size={22} className="text-[#0B0F17]" />,
-    title: "AUTONOMOUS RECEPTION",
-    desc: "24/7 inbound receptionists that qualify leads, schedule appointments, handle escalations, and send instant WhatsApp/SMS briefings.",
+    number: "03",
+    badge: "Global Dialects",
+    title: "Fluent Across Languages",
+    description:
+      "Native fluency across global languages and regional dialects. Your AI effortlessly detects accents and switches languages mid-conversation so every caller feels understood.",
+    icon: Languages,
   },
   {
-    num: "04",
-    id: "shiksha",
-    icon: <GraduationCap size={22} className="text-[#0B0F17]" />,
-    title: "EDUCATION & SHIKSHA",
-    desc: "Specialized pedagogical voice engines for schools, institutes, and entrance exam candidates with curriculum alignment.",
-  },
-  {
-    num: "05",
-    id: "data",
-    icon: <Database size={22} className="text-[#0B0F17]" />,
-    title: "STRUCTURED EXTRACTION",
-    desc: "Real-time extraction of caller intent, appointments, CRM records, and structured JSON directly from natural voice conversations.",
-  },
-  {
-    num: "06",
-    id: "sec",
-    icon: <Shield size={22} className="text-[#0B0F17]" />,
-    title: "ENTERPRISE SECURITY",
-    desc: "DPDP Act 2023 compliant, automated PII scrubbing, 180-day retention splits, strict multi-tenant isolation, and in-country data residency.",
+    number: "04",
+    badge: "Action-Driven",
+    title: "Calls That Actually Complete Work",
+    description:
+      "Far beyond scripted FAQ bots. The agent autonomously books calendar meetings, qualifies sales intent, and syncs records to your CRM in real time.",
+    icon: CheckCircle2,
   },
 ];
 
 export function WhyTrinetra() {
   return (
-    <section id="solutions" className="w-full bg-white py-20 px-6 sm:px-10 lg:px-16">
-      <div className="mx-auto max-w-[1536px]">
-        
-        {/* Section Top Bar (Matching Reference Image "■ WHAT I DO" / "SOLVING PROBLEMS WITH DESIGN") */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-8 mb-10 border-b border-slate-200/90 gap-4">
-          <div className="flex items-center gap-2.5">
-            <span className="w-2.5 h-2.5 rounded-[1px] bg-[#84CC16]" />
-            <h2 className="text-[13px] font-mono tracking-[0.2em] uppercase font-bold text-[#0B0F17]">
-              WHAT WE DO
-            </h2>
-          </div>
-          <span className="text-[11px] font-mono tracking-[0.2em] uppercase text-slate-500 font-semibold">
-            SOLVING PROBLEMS WITH VOICE &amp; AI
-          </span>
-        </div>
-
-        {/* Grid of Luminous White Cards (Matching 01, 02, 03, 04 Card Style in Reference Image) */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {features.map((feature, idx) => (
-            <motion.div
-              key={feature.id}
-              initial={{ opacity: 0, y: 25 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.5, delay: 0.08 * idx }}
-              className="group relative flex flex-col justify-between rounded-2xl bg-white border border-slate-200/90 p-8 shadow-[0_4px_20px_rgba(0,0,0,0.03)] hover:border-lime-400 hover:shadow-[0_12px_36px_rgba(132,204,22,0.12)] transition-all duration-300"
-            >
-              <div>
-                {/* Header: Icon on Left, Lime Numeric Badge on Right */}
-                <div className="flex items-center justify-between mb-6">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-50 border border-slate-200 group-hover:border-[#84CC16] group-hover:bg-[#84CC16]/10 transition-colors">
-                    {feature.icon}
-                  </div>
-                  <span className="font-mono text-sm font-bold text-[#84CC16]">
-                    {feature.num}
-                  </span>
-                </div>
-
-                {/* Card Title & Desc */}
-                <h3 className="text-base font-bold text-[#0B0F17] tracking-tight mb-2.5 uppercase font-mono">
-                  {feature.title}
-                </h3>
-                <p className="text-[13px] text-slate-600 leading-relaxed font-sans">
-                  {feature.desc}
-                </p>
+    <section
+      id="why-trinetra"
+      className="w-full py-16 sm:py-20 lg:py-24 px-4 sm:px-6 lg:px-10 relative z-10 select-none overflow-hidden transition-colors duration-300"
+      style={{
+        backgroundColor: "var(--theme-bg-why, #FAFAFA)",
+        borderTop: "1px solid var(--theme-border, #E5E5E5)",
+        borderBottom: "1px solid var(--theme-border, #E5E5E5)",
+      }}
+    >
+      <div className="mx-auto max-w-[1400px]">
+        {/* ── 2-COLUMN GRAND SHOWCASE: EDITORIAL GRID + ILLUSTRATED CHARACTER ── */}
+        <div className="flex flex-col lg:flex-row items-center justify-between gap-12 lg:gap-16">
+          
+          {/* ── LEFT COLUMN: EDITORIAL CONTENT & 4 FEATURE CARDS ── */}
+          <div className="w-full lg:w-[58%] xl:w-[60%] flex flex-col justify-center">
+            <div>
+              {/* Eyebrow Label */}
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-[11px] font-mono font-bold tracking-wider uppercase mb-3 border bg-white border-[#E2E8F0] text-[#315CFF]">
+                <Sparkles className="w-3.5 h-3.5 text-[#315CFF]" />
+                <span>VOICE AGENT CAPABILITIES</span>
               </div>
 
-              {/* Bottom Right Corner Arrow */}
-              <div className="mt-8 flex justify-end">
-                <span className="text-slate-400 group-hover:text-[#84CC16] group-hover:translate-x-1 transition-all duration-200 text-sm">
-                  →
+              {/* Editorial Display Heading with Cal Sans */}
+              <h2
+                className="text-3xl sm:text-4xl lg:text-[46px] xl:text-[52px] font-bold tracking-tight leading-[1.12] mb-4 font-[family-name:var(--font-cal-sans)] transition-colors duration-300"
+                style={{ color: "var(--theme-text-primary, #080D18)" }}
+              >
+                AI voice agents that understand{" "}
+                <span style={{ color: "var(--theme-accent, #315CFF)" }}>
+                  real people.
                 </span>
-              </div>
-            </motion.div>
-          ))}
-        </div>
+              </h2>
 
+              {/* Descriptive Value Subtitle */}
+              <p
+                className="text-base sm:text-lg font-normal leading-relaxed max-w-2xl mb-8 sm:mb-10 font-sans transition-colors duration-300"
+                style={{ color: "var(--theme-text-secondary, #4A5568)" }}
+              >
+                From natural multilingual code-switching to instant intent resolution, your agent answers conversationally, adapts on the fly, and gets things done — just like a human, but available 24/7.
+              </p>
+            </div>
+
+            {/* ── 4 STRUCTURED FEATURE CARDS GRID ── */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
+              {FEATURE_PILLARS.map((feature) => {
+                const Icon = feature.icon;
+                return (
+                  <div
+                    key={feature.number}
+                    className="p-5 sm:p-6 rounded-2xl bg-white border border-[#E2E8F0] shadow-[0_2px_10px_rgba(8,13,24,0.02)] hover:border-[#315CFF]/40 hover:shadow-[0_8px_24px_rgba(49,92,255,0.06)] transition-all duration-200 flex flex-col justify-between"
+                  >
+                    <div>
+                      {/* Top Bar with Number & Icon */}
+                      <div className="flex items-center justify-between mb-3.5">
+                        <span className="font-mono text-xs font-bold text-[#315CFF] tracking-wider">
+                          /{feature.number}
+                        </span>
+                        <div className="w-8 h-8 rounded-lg bg-[#315CFF]/8 border border-[#315CFF]/15 flex items-center justify-center text-[#315CFF]">
+                          <Icon className="w-4 h-4" />
+                        </div>
+                      </div>
+
+                      {/* Feature Title */}
+                      <h3
+                        className="text-base font-bold tracking-tight leading-snug mb-2 font-sans"
+                        style={{ color: "var(--theme-text-primary, #080D18)" }}
+                      >
+                        {feature.title}
+                      </h3>
+
+                      {/* Feature Description */}
+                      <p
+                        className="text-xs sm:text-[13px] leading-relaxed font-normal font-sans"
+                        style={{ color: "var(--theme-text-secondary, #4A5568)" }}
+                      >
+                        {feature.description}
+                      </p>
+                    </div>
+
+                    <div className="pt-3 mt-3 border-t border-[#F1F5F9]">
+                      <span className="text-[10px] font-mono font-semibold tracking-wider uppercase text-[#718096]">
+                        {feature.badge}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+          </div>
+
+          {/* ── RIGHT COLUMN: ILLUSTRATED CHARACTER AS SUPPORTING VISUAL ── */}
+          <div className="w-full lg:w-[42%] xl:w-[40%] shrink-0 flex items-center justify-center">
+            <div className="relative w-full max-w-[420px] sm:max-w-[460px] lg:max-w-[500px] aspect-[4/5] flex items-center justify-center">
+              {/* Subtle Atmospheric Radiance behind character */}
+              <div className="absolute inset-4 rounded-full bg-radial from-[#315CFF]/12 via-[#45C5FF]/6 to-transparent blur-2xl pointer-events-none" />
+
+              <Image
+                src="/images/vaakriti_voice_muse_transparent.png"
+                alt="Vaakriti Voice Muse - Royal Blue Fine Line Ink Engraving Artwork"
+                fill
+                sizes="(max-width: 1024px) 100vw, 42vw"
+                className="object-contain object-center drop-shadow-[0_16px_36px_rgba(49,92,255,0.12)] transition-transform duration-500 hover:scale-[1.015]"
+                priority
+              />
+            </div>
+          </div>
+
+        </div>
       </div>
     </section>
   );
 }
+
+export default WhyTrinetra;

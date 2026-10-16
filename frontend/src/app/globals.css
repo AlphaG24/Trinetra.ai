@@ -57,6 +57,52 @@
   --border-medium: rgba(0, 0, 0, 0.12);
   --font-heading-fallback: var(--font-playfair), "Playfair Display", Georgia, serif;
   --font-body-fallback: var(--font-merriweather), Merriweather, Georgia, serif;
+
+  /* Dynamic Brand Theme Variables (Production AI Infrastructure) */
+  --brand-primary: #315CFF;
+  --brand-primary-rgb: 49, 92, 255;
+  --brand-secondary: #45C5FF;
+  --brand-secondary-rgb: 69, 197, 255;
+  --hero-glow-1: 49, 92, 255;
+  --hero-glow-2: 69, 197, 255;
+  --hero-glow-3: 30, 64, 175;
+  --modal-glow-rgb: 49, 92, 255;
+
+  /* ═══════════════════════════════════════════════════════════════
+     VAAKRITI VISUAL IDENTITY (LIGHT THEME - BLUE / WHITE / BLACK):
+     Porcelain White: #F8FAFC | Pure White: #FFFFFF | Electric Cobalt: #2563EB
+     Vibrant Sky/Cyan: #0284C7 | Obsidian Slate: #0F172A | Muted Slate: #334155
+     ═══════════════════════════════════════════════════════════════ */
+  --theme-bg: #FAFAFA;
+  --theme-bg-hero: #FAFAFA;
+  --theme-bg-demo: #0F172A;
+  --theme-bg-why: #FAFAFA;
+  --theme-bg-banner: #0F172A;
+  --theme-bg-eco: #FAFAFA;
+  --theme-bg-map: #FAFAFA;
+  --theme-surface: #FAFAFA;
+  --theme-surface-alt: #F4F4F5;
+  --theme-border: #E5E5E5;
+  --theme-border-dark: #D4D4D8;
+  --theme-text-primary: #0F172A;
+  --theme-text-secondary: #334155;
+  --theme-text-muted: #64748B;
+  --theme-demo-text-primary: #FAFAFA;
+  --theme-demo-text-secondary: #94A3B8;
+  --theme-demo-surface: #0F172A;
+  --theme-demo-surface-alt: #1E293B;
+  --theme-demo-border: #334155;
+  --theme-structure-bg: #FAFAFA;
+  --theme-structure-text: #0F172A;
+  --theme-accent: #2563EB;
+  --theme-accent-hover: #1D4ED8;
+  --theme-accent-subtle: rgba(37, 99, 235, 0.08);
+  --theme-accent-contrast: #FFFFFF;
+  --theme-accent-secondary: #0284C7;
+  --theme-map-dot: #2563EB;
+  --theme-route-west: #2563EB;
+  --theme-route-east: #0284C7;
+  --theme-route-south: #1D4ED8;
 }
 
 /* Light theme (Active in reference image) */
@@ -88,8 +134,8 @@ html.light,
 :root[data-theme='light'] body,
 html[data-theme='light'] body,
 html.light body {
-  background-color: #F8F9FC !important;
-  color: #4A5268 !important;
+  background-color: #FAFAFA !important;
+  color: #334155 !important;
   background-image: none !important;
 }
 
@@ -191,8 +237,8 @@ h6 {
 .homepage-theme-root,
 [data-homepage="true"] {
   font-family: var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
-  background-color: #ffffff !important;
-  color: #0B0F17 !important;
+  background-color: var(--theme-bg, #F4F7FC) !important;
+  color: var(--theme-text-primary, #080D18) !important;
 }
 
 .homepage-theme-root h1,
@@ -661,4 +707,10 @@ html.light .navbar__link:hover {
   background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.22), transparent);
   animation: lightSweep 3.5s ease-in-out infinite;
   pointer-events: none;
+}
+
+@keyframes dash {
+  to {
+    stroke-dashoffset: -100;
+  }
 }

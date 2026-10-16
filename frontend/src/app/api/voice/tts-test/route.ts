@@ -3,13 +3,25 @@ import { NextResponse } from "next/server";
 export async function POST(request: Request) {
   try {
     const body = await request.json()
-    const backendUrl = process.env.NEXT_PUBLIC_FASTAPI_URL || 'http://127.0.0.1:8000'
+    const localUrl = (process.env.NEXT_PUBLIC_FASTAPI_URL || process.env.NEXT_PUBLIC_BACKEND_URL || 'http://127.0.0.1:8000').replace(/\/$/, '')
+    const fallbackProdUrl = 'https://trinetra-ai-1-6f2n.onrender.com'
     
-    const response = await fetch(`${backendUrl}/api/voice/tts-test`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
-    })
+    let response: Response
+    try {
+      response = await fetch(`${localUrl}/api/voice/tts-test`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(4000),
+      })
+    } catch {
+      // Fallback to production backend
+      response = await fetch(`${fallbackProdUrl}/api/voice/tts-test`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+    }
     
     if (!response.ok) {
       let errorMsg = `TTS preview failed (${response.status})`

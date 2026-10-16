@@ -2,6 +2,9 @@
 node_modules/
 .next/
 *.log
+scratch/
+video_frames/
+*.mp4
 
 # Backend Virtual Environments
 backend/.venv/

@@ -131,16 +131,15 @@ export async function GET() {
     // Fetch ALL agents from database for developer_tester without tenant limitations
     const { data: allDatabaseAgents, error: agentsError } = await (supabaseAdmin as any)
       .from('agents')
-      .select('id, name, personality, greeting_message, voice_id, language, gender, status, organization_id, created_at, system_prompt, user_id')
+      .select('id, name, personality, greeting_message, voice_id, language, gender, status, organization_id, created_at, system_prompt, user_id, personalities, campaign_purpose, industry_domain, agent_type, voice_provider')
       .order('name', { ascending: true });
 
     if (agentsError) {
       console.warn('[DeveloperDemoAgents] Notice loading all agents:', agentsError.message);
     }
 
-    const myAgents = (allDatabaseAgents || []).filter(
-      (ag: any) => ag.user_id === profile.id || (profile.organization_id && ag.organization_id === profile.organization_id)
-    );
+    // developer_tester gets ALL agents unrestricted — no tenant filtering
+    const myAgents = allDatabaseAgents || [];
 
     return NextResponse.json({ 
       success: true, 
@@ -195,17 +194,11 @@ export async function POST(req: Request) {
       }
 
       if (existingAgent) {
-        // Update existing agent record
+        // Mark as demo agent without overwriting custom prompt, voice, or dashboard settings
         await (supabaseAdmin as any)
           .from('agents')
           .update({
-            name: item.name,
-            personality: item.personality || 'Warm & Professional',
-            greeting_message: item.greeting_message,
-            voice_id: item.voice_id || 'shreya',
-            language: item.language || 'Hinglish',
-            gender: item.gender || 'female',
-            status: 'live',
+            status: 'active',
             is_demo: true,
             updated_at: new Date().toISOString(),
           })
@@ -225,9 +218,11 @@ export async function POST(req: Request) {
             gender: item.gender || 'female',
             user_id: profile.id,
             organization_id: profile.organization_id || null,
-            status: 'live',
+            status: 'active',
             is_demo: true,
-            system_prompt: `You are ${item.name}, an AI assistant for Vaakriti. Personality: ${item.personality || 'Warm & Professional'}.`,
+            system_prompt: item.system_prompt || `You are ${item.name}, an AI assistant for Trinetra AI. Personality: ${item.personality || 'Warm & Professional'}.`,
+            campaign_purpose: item.campaign_purpose || 'General AI Operations',
+            industry_domain: item.industry_domain || 'Enterprise AI',
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           });

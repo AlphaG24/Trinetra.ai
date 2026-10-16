@@ -341,9 +341,13 @@ export function useVoiceAgent() {
               console.warn('[useVoiceAgent] Mic mixer connect notice:', micMixErr)
             }
           }
-        } catch (micErr) {
+        } catch (micErr: any) {
           console.error('[LiveKit] Failed to publish microphone:', micErr)
-          toast.error('Could not access microphone')
+          if (micErr?.name === 'NotAllowedError' || String(micErr).includes('Permission denied')) {
+            toast.error('Microphone permission blocked. Please click the lock icon in your browser address bar and allow Microphone access.', { duration: 5000 })
+          } else {
+            toast.error('Could not access microphone: ' + (micErr?.message || 'Device unavailable'))
+          }
         }
       })
 

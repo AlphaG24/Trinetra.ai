@@ -2099,29 +2099,29 @@ class VikramAgent(Agent):
             add_to_chat_ctx=True
         )
 
-        # A4: Opening playout watchdog scales with expected duration (est * 1.5 + 3s, min 15s)
-        watchdog_timeout = calculate_opening_watchdog_timeout(greeting)
-        try:
-            # Enforce watchdog timeout so allow_interruptions=False can never freeze the session
-            await asyncio.wait_for(speech_handle, timeout=watchdog_timeout)
-            if hasattr(self, 'timing_tracker') and self.timing_tracker:
-                self.timing_tracker.mark("audio_playout")
-        except asyncio.TimeoutError:
-            logger.warning(
-                f"[VikramAgent] Opening greeting playout exceeded {watchdog_timeout:.1f}s safety timeout; "
-                "releasing session to listener"
-            )
-        except Exception as play_err:
-            logger.warning(f"[VikramAgent] Error or cancellation during greeting playout: {play_err}")
+        # Allow greeting to playout asynchronously so turn detector and VAD are immediately active
+        async def _monitor_greeting_playout():
+            try:
+                watchdog_timeout = calculate_opening_watchdog_timeout(greeting)
+                await asyncio.wait_for(speech_handle, timeout=watchdog_timeout)
+                if hasattr(self, 'timing_tracker') and self.timing_tracker:
+                    self.timing_tracker.mark("audio_playout")
+            except asyncio.TimeoutError:
+                logger.info(f"[VikramAgent] Opening greeting playout completed or transferred to listener")
+            except Exception as play_err:
+                logger.debug(f"[VikramAgent] Greeting playout note: {play_err}")
+        asyncio.create_task(_monitor_greeting_playout())
 
-        # Add to chat context as an assistant message so the LLM never repeats the opening
+        # Defensive ensure greeting in history (already done by add_to_chat_ctx=True)
         try:
             if hasattr(self, 'session') and hasattr(self.session, 'history') and self.session.history:
-                has_msg = any(getattr(m, 'content', '') == greeting for m in self.session.history.messages)
-                if not has_msg:
+                raw_msgs = getattr(self.session.history, 'messages', None)
+                msg_list = raw_msgs() if callable(raw_msgs) else (raw_msgs or [])
+                has_msg = any(getattr(m, 'content', '') == greeting for m in msg_list)
+                if not has_msg and hasattr(self.session.history, 'add_message'):
                     self.session.history.add_message(role="assistant", content=greeting)
         except Exception as ctx_err:
-            logger.warning(f"Error adding opening greeting to session history: {ctx_err}")
+            logger.debug(f"Opening greeting session history notice: {ctx_err}")
 
 
     def _clean_chunk(self, chunk):

@@ -2,9 +2,10 @@
 
 import React, { useState, useEffect } from 'react';
 import { 
-  Bot, Save, RotateCcw, Loader2, Sparkles, CheckCircle2, 
-  Plus, Trash2, MessageSquare, Mic, UserCheck, ShieldCheck, ChevronDown
+  Bot, Save, RotateCcw, Loader2, Plus, Trash2, 
+  UserCheck, ExternalLink, Sparkles, CheckCircle2, ChevronDown
 } from 'lucide-react';
+import Link from 'next/link';
 import { toast } from 'sonner';
 
 export interface DemoAgentItem {
@@ -23,34 +24,12 @@ export interface DemoAgentItem {
   is_managed_by_dev: boolean;
   campaign_purpose?: string;
   industry_domain?: string;
+  system_prompt?: string;
 }
-
-const VOICE_OPTIONS = [
-  { id: 'shreya', label: 'Sarvam AI - Shreya (Female - Hinglish / Hindi)', gender: 'female' },
-  { id: 'shubh', label: 'Sarvam AI - Shubh (Male - Hindi / English)', gender: 'male' },
-  { id: 'anushka', label: 'Sarvam AI - Anushka (Female - Hinglish Dialect)', gender: 'female' },
-  { id: 'priya', label: 'Sarvam AI - Priya (Female - Expressive Hindi)', gender: 'female' },
-  { id: 'amartya', label: 'Sarvam AI - Amartya (Male - Hindi)', gender: 'male' },
-  { id: 'arvind', label: 'Sarvam AI - Arvind (Male - Professional Hindi)', gender: 'male' },
-  { id: 'ratan', label: 'Sarvam AI - Ratan (Male - Authoritative Hindi)', gender: 'male' },
-  { id: 'deepgram-vikram', label: 'Deepgram Hindi - Vikram (Male - Dynamic Sales)', gender: 'male' },
-];
-
-const PERSONALITY_OPTIONS = [
-  'Warm & Consultative',
-  'Persuasive & Energetic',
-  'Empathetic & Supportive',
-  'Refined & Professional',
-  'Assertive & Deal-Focused',
-  'Intellectual & Guiding',
-  'Friendly & Conversational',
-];
 
 export function DemoAgentsManager() {
   const [agents, setAgents] = useState<DemoAgentItem[]>([]);
   const [allAgents, setAllAgents] = useState<any[]>([]);
-  const [myAgents, setMyAgents] = useState<any[]>([]);
-  const [developerId, setDeveloperId] = useState<string>('');
   const [selectedAgentIndex, setSelectedAgentIndex] = useState(0);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -68,16 +47,9 @@ export function DemoAgentsManager() {
         if (data?.all_agents && Array.isArray(data.all_agents)) {
           setAllAgents(data.all_agents);
         }
-        if (data?.my_agents && Array.isArray(data.my_agents)) {
-          setMyAgents(data.my_agents);
-        }
-        if (data?.developer_id) {
-          setDeveloperId(data.developer_id);
-        }
       })
       .catch(async (err) => {
         console.warn('Developer demo endpoint notice, loading public fallback:', err.message);
-        // Fallback: load public agents so UI is always functional
         try {
           const pubRes = await fetch('/api/public/demo-agents');
           const pubData = await pubRes.json();
@@ -92,36 +64,11 @@ export function DemoAgentsManager() {
   }, []);
 
   const currentAgent = agents[selectedAgentIndex];
+  const boundDbAgent = allAgents.find((a) => a.id === currentAgent?.id);
 
-  // Select a real database agent and bind into the active slot
+  // Bind a real database agent into the active slot
   const handleSelectRealAgent = (agentId: string) => {
     if (!agentId) return;
-
-    if (agentId === '__CREATE_NEW__') {
-      const newAgentName = prompt('Enter name for the new developer agent:', 'My AI Agent');
-      if (!newAgentName) return;
-
-      const newId = `dev-agent-${Date.now()}`;
-      setAgents((prev) => {
-        const copy = [...prev];
-        copy[selectedAgentIndex] = {
-          ...copy[selectedAgentIndex],
-          id: newId,
-          name: newAgentName,
-          personality: 'Warm & Consultative',
-          archetype: 'Custom Developer Persona',
-          voice_id: 'shreya',
-          language: 'Hinglish & English',
-          gender: 'female',
-          description: `Custom real agent managed by developer ID ${developerId || 'active'}.`,
-          greeting_message: `Namaste! Main Trinetra AI se ${newAgentName} bol rahi hoon, aapki AI assistant. Service quality ke liye yeh call record ki ja sakti hai. Aaj main aapki kya madad kar sakti hoon?`,
-          is_managed_by_dev: true,
-        };
-        return copy;
-      });
-      toast.success(`Created agent draft "${newAgentName}". Click "Save Configuration" to register in database!`);
-      return;
-    }
 
     const foundAgent = allAgents.find((a) => a.id === agentId);
     if (!foundAgent) return;
@@ -135,19 +82,23 @@ export function DemoAgentsManager() {
       copy[selectedAgentIndex] = {
         ...copy[selectedAgentIndex],
         id: foundAgent.id,
-        name: foundAgent.name?.replace(/^\[.*?\]\s*/, '')?.replace(/\s*-\s*Demo$/i, '') || copy[selectedAgentIndex].name,
+        name: foundAgent.name?.replace(/^\[.*?\]\s*/, '')?.replace(/\s*-\s*Demo$/i, '') || foundAgent.name,
         personality: foundAgent.personality || copy[selectedAgentIndex].personality || 'Warm & Consultative',
+        archetype: foundAgent.campaign_purpose || foundAgent.agent_type || 'Custom Agent',
         voice_id: foundAgent.voice_id || defaultVoice,
         language: foundAgent.language || 'Hinglish & English',
         gender: resolvedGender,
-        description: foundAgent.description || copy[selectedAgentIndex].description,
-        greeting_message: foundAgent.greeting_message || `Namaste! Main Trinetra AI se ${foundAgent.name} bol ${resolvedGender === 'female' ? 'rahi' : 'raha'} hoon, ek AI assistant. Service quality ke liye yeh call record ki ja sakti hai. Aaj main aapki kya madad kar ${resolvedGender === 'female' ? 'sakti' : 'sakta'} hoon?`,
+        description: foundAgent.description || copy[selectedAgentIndex].description || `Agent managed by your workspace.`,
+        greeting_message: foundAgent.greeting_message || copy[selectedAgentIndex].greeting_message || `Namaste! Main Trinetra AI se bol raha hoon. Kaise madad kar sakta hoon?`,
+        system_prompt: foundAgent.system_prompt || '',
+        campaign_purpose: foundAgent.campaign_purpose || '',
+        industry_domain: foundAgent.industry_domain || '',
         is_managed_by_dev: true,
       };
       return copy;
     });
 
-    toast.success(`Connected real agent "${foundAgent.name}" (ID: ${foundAgent.id}) to this slot!`);
+    toast.success(`Slot #${selectedAgentIndex + 1} configured with "${foundAgent.name}"!`);
   };
 
   const handleAddNewAgentSlot = () => {
@@ -156,21 +107,20 @@ export function DemoAgentsManager() {
     const newAgent: DemoAgentItem = {
       id: defaultAgent.id || `demo-${Date.now()}`,
       name: defaultAgent.name || `Agent ${newSlotNumber}`,
-      personality: 'Warm & Consultative',
-      archetype: 'Inbound Specialist',
-      campaign_purpose: 'Customer Service & Inbound Triage',
-      industry_domain: 'Hospitality / Concierge Booking',
+      personality: defaultAgent.personality || 'Warm & Consultative',
+      archetype: defaultAgent.agent_type || 'Workspace Agent',
+      campaign_purpose: defaultAgent.campaign_purpose || 'General Assistance',
+      industry_domain: defaultAgent.industry_domain || 'General',
       voice_id: defaultAgent.voice_id || 'shreya',
-      language: 'Hinglish & English',
-      gender: 'female',
-      description: 'Custom AI agent calibrated for natural voice conversations.',
-      greeting_message: 'Namaste! Main Trinetra AI se bol rahi hoon, aapki AI assistant. Service quality ke liye yeh call record ki ja sakti hai. Aaj main aapki kya madad kar sakti hoon?',
+      language: defaultAgent.language || 'Hinglish & English',
+      gender: defaultAgent.gender || 'female',
+      description: defaultAgent.description || 'Configured via your workspace agents.',
+      greeting_message: defaultAgent.greeting_message || 'Namaste! Main Trinetra AI se bol rahi hoon. Kaise madad kar sakti hoon?',
       accent_color: '#0D9488',
       badge_color: 'bg-teal-500/10 text-teal-400 border-teal-500/20',
       suggested_prompts: [
-        'Room unavailable on desired dates / alternate options',
-        'Early check-in or late check-out fee waiver requested',
-        'Cancellation penalty / refund dispute resolution',
+        'What solutions do you offer for my business?',
+        'Can you demonstrate your live call capabilities?',
       ],
       is_managed_by_dev: true,
     };
@@ -189,56 +139,6 @@ export function DemoAgentsManager() {
     toast.info('Removed agent slot.');
   };
 
-  const handleUpdateField = (field: keyof DemoAgentItem, value: any) => {
-    setAgents((prev) => {
-      const copy = [...prev];
-      copy[selectedAgentIndex] = {
-        ...copy[selectedAgentIndex],
-        [field]: value,
-      };
-      return copy;
-    });
-  };
-
-  const handleUpdatePrompt = (promptIndex: number, value: string) => {
-    setAgents((prev) => {
-      const copy = [...prev];
-      const prompts = [...(copy[selectedAgentIndex].suggested_prompts || [])];
-      prompts[promptIndex] = value;
-      copy[selectedAgentIndex] = {
-        ...copy[selectedAgentIndex],
-        suggested_prompts: prompts,
-      };
-      return copy;
-    });
-  };
-
-  const handleAddPrompt = () => {
-    setAgents((prev) => {
-      const copy = [...prev];
-      const prompts = [...(copy[selectedAgentIndex].suggested_prompts || [])];
-      prompts.push('New call scenario / objection prompt...');
-      copy[selectedAgentIndex] = {
-        ...copy[selectedAgentIndex],
-        suggested_prompts: prompts,
-      };
-      return copy;
-    });
-  };
-
-  const handleRemovePrompt = (promptIndex: number) => {
-    setAgents((prev) => {
-      const copy = [...prev];
-      const prompts = [...(copy[selectedAgentIndex].suggested_prompts || [])];
-      prompts.splice(promptIndex, 1);
-      copy[selectedAgentIndex] = {
-        ...copy[selectedAgentIndex],
-        suggested_prompts: prompts,
-      };
-      return copy;
-    });
-  };
-
   const handleSave = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     setSaving(true);
@@ -255,7 +155,7 @@ export function DemoAgentsManager() {
         setAgents(data.agents);
       }
 
-      toast.success('Live demo agents saved and synchronized with database! Real agent is active.');
+      toast.success('Live voice demo studio updated with your selected agents!');
     } catch (err: any) {
       toast.error(err.message || 'Error saving demo agents');
     } finally {
@@ -264,14 +164,14 @@ export function DemoAgentsManager() {
   };
 
   const handleReset = async () => {
-    if (!confirm('Reset all demo agents to official Trinetra defaults?')) return;
+    if (!confirm('Reset all demo agents to official defaults?')) return;
     setLoading(true);
     try {
       const res = await fetch('/api/public/demo-agents');
       const data = await res.json();
       if (data?.agents) {
         setAgents(data.agents);
-        toast.info('Loaded defaults. Click "Save Configuration" to publish.');
+        toast.info('Loaded defaults. Click "Save Configuration" to apply.');
       }
     } catch {
       toast.error('Failed to reset defaults');
@@ -284,7 +184,7 @@ export function DemoAgentsManager() {
     return (
       <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-8 flex flex-col items-center justify-center gap-3">
         <Loader2 className="w-8 h-8 text-emerald-500 animate-spin" />
-        <span className="text-xs text-zinc-400">Loading demo agents configuration...</span>
+        <span className="text-xs text-zinc-400">Loading your agents...</span>
       </div>
     );
   }
@@ -304,14 +204,14 @@ export function DemoAgentsManager() {
           <div>
             <div className="flex items-center gap-2">
               <h3 className="text-sm font-bold uppercase tracking-wider text-white">
-                Live Voice Demo Studio Agents
+                Live Voice Demo Studio Configuration
               </h3>
               <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
                 Developer Tester
               </span>
             </div>
             <p className="text-xs text-zinc-400 mt-0.5">
-              Select real database agents managed by your developer ID, tune their personalities, and deploy them to the live studio.
+              Choose which of your agents to showcase in each demo slot. All prompts, voices, and personality settings are controlled directly from each agent&apos;s dashboard.
             </p>
           </div>
         </div>
@@ -367,7 +267,7 @@ export function DemoAgentsManager() {
             type="button"
             onClick={handleAddNewAgentSlot}
             className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-medium text-emerald-400 hover:text-emerald-300 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 transition cursor-pointer"
-            title="Add another agent slot to the live studio"
+            title="Add another agent slot to the studio"
           >
             <Plus className="w-3.5 h-3.5" />
             <span>Add Slot</span>
@@ -387,265 +287,95 @@ export function DemoAgentsManager() {
         )}
       </div>
 
-      {/* Editor Body */}
-      <form onSubmit={handleSave} className="p-6 space-y-6">
+      {/* Clean Configuration Form */}
+      <div className="p-6 space-y-6">
         
-        {/* ── 1. PROMINENT REAL AGENT SELECTOR (MANAGED BY DEVELOPER ID) ── */}
-        <div className="p-5 rounded-2xl bg-zinc-950/80 border-2 border-emerald-500/50 shadow-xl space-y-3">
+        {/* Dropdown: Pick from Available Agents */}
+        <div className="p-5 rounded-2xl bg-zinc-950/80 border-2 border-emerald-500/50 shadow-xl space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-            <label className="text-xs font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-2">
-              <UserCheck className="w-4 h-4 text-emerald-400" />
-              <span>Select Real Agent Managed by My Developer ID</span>
-            </label>
-            <span className="text-[11px] font-mono text-zinc-400 bg-zinc-900 px-2.5 py-1 rounded-lg border border-zinc-800">
-              Active Agent ID: <strong className="text-emerald-300">{currentAgent.id}</strong>
+            <div>
+              <label className="text-xs font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-2">
+                <UserCheck className="w-4 h-4 text-emerald-400" />
+                <span>Select Agent for Slot #{selectedAgentIndex + 1} ({currentAgent.name})</span>
+              </label>
+              <p className="text-[11px] text-zinc-400 mt-0.5">
+                Choose any agent from your workspace. When selected, this demo slot connects directly to that agent.
+              </p>
+            </div>
+            <span className="text-[11px] font-mono text-zinc-400 bg-zinc-900 px-2.5 py-1 rounded-lg border border-zinc-800 self-start sm:self-auto">
+              ID: <strong className="text-emerald-300">{currentAgent.id}</strong>
             </span>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-center">
-            <div className="sm:col-span-8 relative">
-              <select
-                value={allAgents.some((a) => a.id === currentAgent.id) ? currentAgent.id : ''}
-                onChange={(e) => handleSelectRealAgent(e.target.value)}
-                className="w-full px-4 py-3 bg-zinc-900 border border-emerald-500/60 rounded-xl text-xs text-white font-medium focus:outline-none focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400 cursor-pointer appearance-none"
-              >
-                <option value="" disabled>-- Pick Real Database Agent for &quot;{currentAgent.name}&quot; --</option>
-                
-                {/* My Developer Agents (Highest Priority) */}
-                {myAgents.length > 0 && (
-                  <optgroup label="🌟 My Developer Agents (Managed by My ID)">
-                    {myAgents.map((ag) => (
-                      <option key={ag.id} value={ag.id}>
-                        {ag.name} ({ag.language || 'Hinglish'}) — [{ag.status ? ag.status.toUpperCase() : 'ACTIVE'}] — ID: {ag.id}
-                      </option>
-                    ))}
-                  </optgroup>
-                )}
-
-                {/* All Platform Agents */}
-                <optgroup label="🏢 All Platform / System Agents">
-                  {allAgents.map((ag) => (
-                    <option key={ag.id} value={ag.id}>
-                      {ag.name} ({ag.language || 'Hinglish'}) — [{ag.status ? ag.status.toUpperCase() : 'ACTIVE'}] — ID: {ag.id}
-                    </option>
-                  ))}
-                </optgroup>
-
-                {/* Create New Agent Option */}
-                <optgroup label="✨ Create New Real Agent">
-                  <option value="__CREATE_NEW__">+ Create New Agent Registered to My Developer ID</option>
-                </optgroup>
-              </select>
-              <ChevronDown className="w-4 h-4 text-zinc-400 absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-            </div>
-
-            <div className="sm:col-span-4 text-[11px] text-zinc-400 leading-tight">
-              Selecting an agent binds this slot to the real agent record. When calls connect, the live voice pipeline runs this specific agent.
-            </div>
-          </div>
-        </div>
-
-        {/* ── 2. AGENT PROFILE ROW ── */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-          {/* Agent Name */}
-          <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-1.5">
-              Agent Name
-            </label>
-            <input
-              type="text"
-              value={currentAgent.name}
-              onChange={(e) => handleUpdateField('name', e.target.value)}
-              className="w-full px-3.5 py-2.5 bg-zinc-950/60 border border-zinc-800 rounded-xl text-xs text-white placeholder-zinc-600 focus:outline-none focus:border-emerald-500 font-medium"
-              placeholder="e.g. Vikram"
-              required
-            />
-          </div>
-
-          {/* Calling Campaign / Purpose */}
-          <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-1.5">
-              Calling Campaign / Purpose
-            </label>
-            <input
-              type="text"
-              value={currentAgent.campaign_purpose || currentAgent.archetype || ''}
-              onChange={(e) => {
-                handleUpdateField('campaign_purpose', e.target.value);
-                handleUpdateField('archetype', e.target.value);
-              }}
-              className="w-full px-3.5 py-2.5 bg-zinc-950/60 border border-zinc-800 rounded-xl text-xs text-white placeholder-zinc-600 focus:outline-none focus:border-emerald-500 font-medium"
-              placeholder="e.g. Customer Service / Inbound Booking"
-              required
-            />
-          </div>
-
-          {/* Industry / Domain */}
-          <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-1.5">
-              Industry / Domain
-            </label>
-            <input
-              type="text"
-              value={currentAgent.industry_domain || 'Hospitality / Concierge Booking'}
-              onChange={(e) => handleUpdateField('industry_domain', e.target.value)}
-              className="w-full px-3.5 py-2.5 bg-zinc-950/60 border border-zinc-800 rounded-xl text-xs text-white placeholder-zinc-600 focus:outline-none focus:border-emerald-500 font-medium"
-              placeholder="e.g. Hospitality / Concierge Booking"
-              required
-            />
-          </div>
-        </div>
-
-        {/* ── 3. VOICE, TONE & GENDER ROW ── */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-          {/* Voice Model / Provider */}
-          <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-1.5">
-              Voice Model / Provider
-            </label>
-            <div className="relative">
-              <select
-                value={currentAgent.voice_id || 'shreya'}
-                onChange={(e) => {
-                  const opt = VOICE_OPTIONS.find((v) => v.id === e.target.value);
-                  handleUpdateField('voice_id', e.target.value);
-                  if (opt) handleUpdateField('gender', opt.gender);
-                }}
-                className="w-full px-3.5 py-2.5 bg-zinc-950/60 border border-zinc-800 rounded-xl text-xs text-white focus:outline-none focus:border-emerald-500 appearance-none font-medium cursor-pointer"
-              >
-                {VOICE_OPTIONS.map((v) => (
-                  <option key={v.id} value={v.id}>
-                    {v.label}
-                  </option>
-                ))}
-              </select>
-              <ChevronDown className="w-4 h-4 text-zinc-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-            </div>
-          </div>
-
-          {/* Tone / Personality */}
-          <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-1.5">
-              Tone / Personality
-            </label>
-            <div className="relative">
-              <select
-                value={currentAgent.personality || 'Warm & Consultative'}
-                onChange={(e) => handleUpdateField('personality', e.target.value)}
-                className="w-full px-3.5 py-2.5 bg-zinc-950/60 border border-zinc-800 rounded-xl text-xs text-white focus:outline-none focus:border-emerald-500 appearance-none font-medium cursor-pointer"
-              >
-                {PERSONALITY_OPTIONS.map((p) => (
-                  <option key={p} value={p}>
-                    {p}
-                  </option>
-                ))}
-              </select>
-              <ChevronDown className="w-4 h-4 text-zinc-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-            </div>
-          </div>
-
-          {/* AI Gender */}
-          <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-1.5">
-              AI Gender
-            </label>
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={() => handleUpdateField('gender', 'male')}
-                className={`flex-1 py-2.5 px-3 rounded-xl text-xs font-bold transition cursor-pointer border ${
-                  currentAgent.gender === 'male'
-                    ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
-                    : 'bg-zinc-950/40 text-zinc-400 border-zinc-800 hover:text-white'
-                }`}
-              >
-                Male
-              </button>
-              <button
-                type="button"
-                onClick={() => handleUpdateField('gender', 'female')}
-                className={`flex-1 py-2.5 px-3 rounded-xl text-xs font-bold transition cursor-pointer border ${
-                  currentAgent.gender === 'female'
-                    ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
-                    : 'bg-zinc-950/40 text-zinc-400 border-zinc-800 hover:text-white'
-                }`}
-              >
-                Female
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* ── 4. OPENING GREETING (WITH SEC-011 COMPLIANCE BADGE) ── */}
-        <div>
-          <div className="flex items-center justify-between mb-1.5">
-            <label className="text-xs font-semibold uppercase tracking-wider text-zinc-400">
-              Opening Greeting (Or Excel/CSV Auto-Fill for Outbound Calls)
-            </label>
-            <span className="text-[10px] text-emerald-400 font-mono flex items-center gap-1 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
-              <ShieldCheck className="w-3 h-3 text-emerald-400" />
-              SEC-011 Mandate: AI Identity + Call Recording Notice
-            </span>
-          </div>
-          <textarea
-            value={currentAgent.greeting_message}
-            onChange={(e) => handleUpdateField('greeting_message', e.target.value)}
-            rows={3}
-            className="w-full px-3.5 py-2.5 bg-zinc-950/60 border border-zinc-800 rounded-xl text-xs text-white placeholder-zinc-600 focus:outline-none focus:border-emerald-500 font-sans leading-relaxed"
-            placeholder="Namaste! Main Trinetra AI se Vikram bol raha hoon, an AI assistant. Service quality ke liye yeh call record ki ja sakti hai..."
-            required
-          />
-        </div>
-
-        {/* ── 5. CANONICAL OBJECTION / CALL SCENARIO PROMPTS ── */}
-        <div>
-          <div className="flex items-center justify-between mb-2">
-            <label className="text-xs font-semibold uppercase tracking-wider text-zinc-400">
-              Suggested Objection Handling / Call Scenario Prompts
-            </label>
-            <button
-              type="button"
-              onClick={handleAddPrompt}
-              className="flex items-center gap-1 text-[11px] font-semibold text-emerald-400 hover:text-emerald-300 cursor-pointer"
+          <div className="relative">
+            <select
+              value={allAgents.some((a) => a.id === currentAgent.id) ? currentAgent.id : ''}
+              onChange={(e) => handleSelectRealAgent(e.target.value)}
+              className="w-full px-4 py-3 bg-zinc-900 border border-emerald-500/60 rounded-xl text-xs text-white font-medium focus:outline-none focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400 cursor-pointer appearance-none"
             >
-              <Plus className="w-3.5 h-3.5" />
-              Add Scenario
-            </button>
-          </div>
-          <div className="space-y-2">
-            {(currentAgent.suggested_prompts || []).map((prompt, pIdx) => (
-              <div key={pIdx} className="flex items-center gap-2">
-                <input
-                  type="text"
-                  value={prompt}
-                  onChange={(e) => handleUpdatePrompt(pIdx, e.target.value)}
-                  className="flex-1 px-3.5 py-2 bg-zinc-950/60 border border-zinc-800 rounded-xl text-xs text-white placeholder-zinc-600 focus:outline-none focus:border-emerald-500 font-medium"
-                />
-                <button
-                  type="button"
-                  onClick={() => handleRemovePrompt(pIdx)}
-                  className="p-2 text-zinc-500 hover:text-rose-400 transition cursor-pointer"
-                  title="Remove scenario"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              </div>
-            ))}
+              <option value="" disabled>-- Select an Agent from your Workspace --</option>
+              {allAgents.map((ag) => (
+                <option key={ag.id} value={ag.id}>
+                  {ag.name?.replace(/^\[.*?\]\s*/, '')} — [Voice: {ag.voice_id || 'shreya'}, Status: {(ag.status || 'ACTIVE').toUpperCase()}]
+                </option>
+              ))}
+            </select>
+            <ChevronDown className="w-4 h-4 text-zinc-400 absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
           </div>
         </div>
 
-        {/* Action Button */}
+        {/* Bound Agent Info Card & Direct Dashboard Access */}
+        <div className="p-5 rounded-2xl bg-zinc-900/40 border border-zinc-800 space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 font-bold text-sm">
+                {currentAgent.name?.slice(0, 2).toUpperCase() || 'AI'}
+              </div>
+              <div>
+                <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                  <span>{currentAgent.name}</span>
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                    Active in Live Studio
+                  </span>
+                </h4>
+                <p className="text-xs text-zinc-400 mt-0.5">
+                  Voice: <strong className="text-zinc-200">{boundDbAgent?.voice_id || currentAgent.voice_id || 'shreya'}</strong> ({boundDbAgent?.voice_provider || 'Sarvam AI'}) • Language: <strong className="text-zinc-200">{boundDbAgent?.language || currentAgent.language || 'Hinglish'}</strong>
+                </p>
+              </div>
+            </div>
+
+            {/* Direct Link to Agent's Dashboard */}
+            <Link
+              href={`/dashboard/agents/${currentAgent.id}`}
+              target="_blank"
+              className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-emerald-300 hover:text-white bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 rounded-xl transition cursor-pointer self-start sm:self-auto"
+            >
+              <span>Manage in Agent Dashboard</span>
+              <ExternalLink className="w-3.5 h-3.5" />
+            </Link>
+          </div>
+
+          <div className="pt-3 border-t border-zinc-800/80 flex items-center gap-2 text-xs text-zinc-400">
+            <Sparkles className="w-4 h-4 text-emerald-400 shrink-0" />
+            <span>
+              All prompt instructions, conversation behavior, objection handling, appointment calendar, and voice tuning are loaded in real time directly from this agent&apos;s dashboard.
+            </span>
+          </div>
+        </div>
+
+        {/* Save Bar */}
         <div className="pt-2 flex justify-end">
           <button
-            type="submit"
+            type="button"
+            onClick={() => handleSave()}
             disabled={saving}
             className="flex items-center gap-2 px-6 py-2.5 text-xs font-bold uppercase tracking-wider bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl shadow-lg shadow-emerald-500/20 transition cursor-pointer disabled:opacity-50"
           >
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-            Save All Configurations
+            Save &amp; Update Live Studio
           </button>
         </div>
-      </form>
+      </div>
     </div>
   );
 }

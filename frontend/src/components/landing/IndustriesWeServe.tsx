@@ -1,98 +1,172 @@
 "use client";
 
-import { motion } from "framer-motion";
+import React, { useState } from "react";
+import { 
+  Building2, 
+  Stethoscope, 
+  Landmark, 
+  GraduationCap, 
+  ShoppingBag, 
+  ArrowRight,
+  Sparkles,
+  TrendingUp
+} from "lucide-react";
 
-const industries = [
+interface IndustryMetric {
+  id: string;
+  name: string;
+  icon: React.ElementType;
+  metric: string;
+  metricLabel: string;
+  result: string;
+  tags: string[];
+}
+
+const INDUSTRIES: IndustryMetric[] = [
   {
-    num: "01",
-    icon: "🏥",
-    title: "Healthcare & Clinics",
-    desc: "Inbound triage, appointment booking, prescription refills, and pre-op reminders in regional dialects."
+    id: "healthcare",
+    name: "Healthcare & Clinics",
+    icon: Stethoscope,
+    metric: "94%",
+    metricLabel: "Show-Up Rate",
+    result: "Automated 24/7 doctor appointment scheduling, triage, and post-op follow-ups in Hinglish.",
+    tags: ["OPD Booking", "Doctor Roster Sync", "WhatsApp Reminder"],
   },
   {
-    num: "02",
-    icon: "🏠",
-    title: "Real Estate & Housing",
-    desc: "Lead qualification, site visit scheduling, price guidance, and instant WhatsApp brochures."
+    id: "realestate",
+    name: "Real Estate Developers",
+    icon: Building2,
+    metric: "3.8x",
+    metricLabel: "Visit Velocity",
+    result: "Speed-to-lead under 15 seconds. Pre-qualifies budget and books site tours directly for agents.",
+    tags: ["Lead Qualification", "Site Visits", "Calendar Sync"],
   },
   {
-    num: "03",
-    icon: "🏫",
-    title: "Institutes & Coaching",
-    desc: "Admissions counseling, entrance test queries, fee follow-ups, and student doubt resolution."
+    id: "bfsi",
+    name: "BFSI & Lending",
+    icon: Landmark,
+    metric: "62%",
+    metricLabel: "Cost Reduction",
+    result: "EMI reminders, KYC verification, and document collection with strict TRAI 09:00–21:00 compliance.",
+    tags: ["EMI Reminders", "KYC Follow-up", "TRAI Locked"],
   },
   {
-    num: "04",
-    icon: "🍽️",
-    title: "Hospitality & Dining",
-    desc: "Table reservations, party bookings, catering inquiries, and operating hour details."
+    id: "edtech",
+    name: "EdTech & Education",
+    icon: GraduationCap,
+    metric: "4.1x",
+    metricLabel: "Demo Attendance",
+    result: "Warm counselor follow-ups for parent inquiries, counseling slot confirmations, and fee reminders.",
+    tags: ["Counselor Calls", "Demo Bookings", "Parent Updates"],
   },
   {
-    num: "05",
-    icon: "💼",
-    title: "Professional Services",
-    desc: "CA & legal consultations, client intake qualification, document checklists, and callbacks."
+    id: "d2c",
+    name: "D2C & E-Commerce",
+    icon: ShoppingBag,
+    metric: "-48%",
+    metricLabel: "RTO Drop",
+    result: "Instant Cash-on-Delivery address verification and abandoned cart recovery calls across 12 languages.",
+    tags: ["COD Verification", "Address Confirmation", "12 Languages"],
   },
-  {
-    num: "06",
-    icon: "💇",
-    title: "Wellness & Salons",
-    desc: "Slot reservations, service menu queries, cancellation management, and loyalty re-engagement."
-  }
 ];
 
 export function IndustriesWeServe() {
+  const [selectedId, setSelectedId] = useState<string>("healthcare");
+
   return (
-    <section id="industries" className="w-full bg-white py-20 px-6 sm:px-10 lg:px-16 overflow-hidden">
-      <div className="max-w-[1536px] mx-auto">
+    <section id="industries" className="w-full bg-white py-16 sm:py-24 px-4 sm:px-6 lg:px-8 relative z-10 border-t border-slate-100">
+      <div className="mx-auto max-w-[1360px]">
         
-        {/* Section Top Bar */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-8 mb-10 border-b border-slate-200/90 gap-4">
-          <div className="flex items-center gap-2.5">
-            <span className="w-2.5 h-2.5 rounded-[1px] bg-[#84CC16]" />
-            <h2 className="text-[13px] font-mono tracking-[0.2em] uppercase font-bold text-[#0B0F17]">
-              INDUSTRIES WE SERVE
+        {/* Header: Minimal & Clear */}
+        <div className="flex flex-col md:flex-row md:items-end justify-between mb-12 pb-6 border-b border-slate-200/80 gap-6">
+          <div>
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-slate-200 bg-slate-50 text-[11px] font-mono font-bold tracking-widest text-slate-700 uppercase mb-3">
+              <TrendingUp className="w-3.5 h-3.5 text-emerald-600" />
+              <span>MEASURABLE OUTCOMES</span>
+            </div>
+            <h2 className="text-2xl sm:text-3xl md:text-4xl font-extrabold tracking-tight text-slate-900">
+              Proven Results Across Indian Verticals
             </h2>
           </div>
-          <span className="text-[11px] font-mono tracking-[0.2em] uppercase text-slate-500 font-semibold">
-            VERTICAL SPECIALIZATIONS →
-          </span>
+          <p className="text-sm text-slate-600 max-w-md font-normal leading-relaxed">
+            Every vertical deployment includes custom vernacular dialogue models, CRM webhooks, and regulatory safeguards.
+          </p>
         </div>
 
-        {/* 6-Card Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {industries.map((ind, idx) => (
-            <motion.div
-              key={ind.title}
-              initial={{ opacity: 0, y: 25 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.5, delay: idx * 0.08 }}
-              className="group relative flex flex-col justify-between rounded-2xl bg-white border border-slate-200/90 p-8 shadow-[0_4px_20px_rgba(0,0,0,0.03)] hover:border-lime-400 hover:shadow-[0_12px_36px_rgba(132,204,22,0.12)] transition-all duration-300"
-            >
-              <div>
-                <div className="flex items-center justify-between mb-5">
-                  <span className="text-2xl p-2 rounded-xl bg-slate-50 border border-slate-200">{ind.icon}</span>
-                  <span className="font-mono text-xs font-bold text-[#84CC16]">
-                    {ind.num}
-                  </span>
+        {/* 5-Column Clean Results Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-5">
+          {INDUSTRIES.map((ind) => {
+            const Icon = ind.icon;
+            const isSelected = ind.id === selectedId;
+
+            return (
+              <div
+                key={ind.id}
+                onClick={() => setSelectedId(ind.id)}
+                className={`rounded-2xl border p-6 flex flex-col justify-between transition-all cursor-pointer ${
+                  isSelected
+                    ? "border-slate-900 bg-slate-900 text-white shadow-lg shadow-slate-900/10 -translate-y-1"
+                    : "border-slate-200/90 bg-white hover:border-slate-300 hover:bg-slate-50/50 text-slate-900"
+                }`}
+              >
+                <div>
+                  {/* Top Bar: Icon & Name */}
+                  <div className="flex items-center justify-between mb-5">
+                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${
+                      isSelected ? "bg-white/10 text-white" : "bg-slate-100 text-slate-800"
+                    }`}>
+                      <Icon className="w-4 h-4" />
+                    </div>
+                    <span className={`text-[10px] font-mono uppercase tracking-wider font-semibold ${
+                      isSelected ? "text-emerald-400" : "text-emerald-700"
+                    }`}>
+                      VERIFIED
+                    </span>
+                  </div>
+
+                  <h3 className={`text-base font-bold tracking-tight mb-4 ${isSelected ? "text-white" : "text-slate-900"}`}>
+                    {ind.name}
+                  </h3>
+
+                  {/* Big Impact Metric */}
+                  <div className="mb-4">
+                    <span className={`text-3xl sm:text-4xl font-black tracking-tight ${
+                      isSelected ? "text-emerald-400" : "text-slate-900"
+                    }`}>
+                      {ind.metric}
+                    </span>
+                    <p className={`text-[11px] font-mono uppercase tracking-wider mt-0.5 ${
+                      isSelected ? "text-slate-400" : "text-slate-500"
+                    }`}>
+                      {ind.metricLabel}
+                    </p>
+                  </div>
+
+                  <p className={`text-xs leading-relaxed mb-6 ${
+                    isSelected ? "text-slate-300" : "text-slate-600"
+                  }`}>
+                    {ind.result}
+                  </p>
                 </div>
 
-                <h3 className="font-mono text-sm font-bold text-[#0B0F17] uppercase tracking-tight mb-2">
-                  {ind.title}
-                </h3>
-                <p className="font-sans text-xs text-slate-600 leading-relaxed">
-                  {ind.desc}
-                </p>
+                {/* Bottom Tags */}
+                <div className="pt-4 border-t border-slate-100/10 flex flex-wrap gap-1.5">
+                  {ind.tags.map((t, i) => (
+                    <span
+                      key={i}
+                      className={`text-[10px] font-mono px-2 py-0.5 rounded-md ${
+                        isSelected 
+                          ? "bg-white/10 text-slate-300" 
+                          : "bg-slate-100 text-slate-600 border border-slate-200/60"
+                      }`}
+                    >
+                      {t}
+                    </span>
+                  ))}
+                </div>
               </div>
-
-              <div className="mt-6 flex justify-end">
-                <span className="text-slate-400 group-hover:text-[#84CC16] group-hover:translate-x-1 transition-all text-xs">
-                  →
-                </span>
-              </div>
-            </motion.div>
-          ))}
+            );
+          })}
         </div>
 
       </div>

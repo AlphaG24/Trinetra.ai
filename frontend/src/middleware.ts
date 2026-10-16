@@ -82,7 +82,7 @@ export async function middleware(request: NextRequest) {
   let user = null
   let authFailedOrTimedOut = false
   try {
-    const userPromise = supabase.auth.getUser()
+    const userPromise = supabase.auth.getUser().catch(err => ({ data: { user: null }, error: err }))
     const timeoutPromise = new Promise<{ data: { user: null }; error: Error }>((_, reject) =>
       setTimeout(() => reject(new Error('Supabase Auth timeout')), 2000)
     )

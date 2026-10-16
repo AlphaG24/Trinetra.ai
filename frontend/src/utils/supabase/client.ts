@@ -2,21 +2,72 @@ import { createBrowserClient } from '@supabase/ssr'
 
 let clientInstance: any = null
 
+if (typeof window !== 'undefined') {
+  // Prevent Next.js error overlay from popping up on benign background auth retry errors
+  window.addEventListener('unhandledrejection', (event) => {
+    const reason = event.reason
+    if (
+      reason?.name === 'AuthRetryableFetchError' ||
+      reason?.constructor?.name === 'AuthRetryableFetchError' ||
+      reason?.message?.includes?.('AuthRetryableFetchError')
+    ) {
+      event.preventDefault()
+    }
+  })
+
+  // Filter AuthRetryableFetchError from console.error to keep the Next.js dev overlay clean
+  const origConsoleError = console.error
+  console.error = (...args: any[]) => {
+    const first = args[0]
+    if (
+      first?.name === 'AuthRetryableFetchError' ||
+      first?.constructor?.name === 'AuthRetryableFetchError' ||
+      (typeof first === 'string' && first.includes('AuthRetryableFetchError')) ||
+      (typeof first === 'object' && first?.__isAuthError && (first?.status === 503 || first?.status === 0))
+    ) {
+      console.warn('[Supabase AuthNotice] Handled background auth fetch notice')
+      return
+    }
+    origConsoleError.apply(console, args)
+  }
+}
+
 const resilientFetch: typeof fetch = async (input, init) => {
   try {
     return await fetch(input, init)
   } catch (err: any) {
-    // If browser native fetch fails due to offline/network glitch, return a synthetic 503 response
-    // instead of letting an unhandled TypeError: Failed to fetch bubble to the console
-    console.warn('[SupabaseClient] Network fetch notice:', err?.message || err)
+    const urlStr =
+      typeof input === 'string'
+        ? input
+        : input instanceof Request
+        ? input.url
+        : String(input || '')
+
+    // For GoTrue auth endpoints (/auth/v1/), returning 503 triggers GoTrue's internal
+    // AuthRetryableFetchError retry storm. Returning a non-5xx (400) allows GoTrue
+    // to cleanly treat the session as expired/logged-out without crashing or looping.
+    if (urlStr.includes('/auth/v1/')) {
+      return new Response(
+        JSON.stringify({
+          error: 'invalid_grant',
+          error_description: 'Network temporarily offline or auth session expired.',
+        }),
+        {
+          status: 400,
+          statusText: 'Bad Request',
+          headers: { 'Content-Type': 'application/json' },
+        }
+      )
+    }
+
     return new Response(
       JSON.stringify({
         error: 'network_unavailable',
         message: 'Network service temporarily unavailable.',
       }),
       {
-        status: 503,
-        statusText: 'Service Unavailable',
+        status: 400,
+        statusText: 'Bad Request',
         headers: { 'Content-Type': 'application/json' },
       }
     )

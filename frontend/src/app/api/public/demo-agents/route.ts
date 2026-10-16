@@ -137,11 +137,11 @@ export async function GET() {
 
       const devUserIds = (devProfiles || []).map((p) => p.id);
 
-      // 2. Query demo agents or agents owned by developer_tester accounts
+      // 2. Query demo agents or active platform agents
       let query = supabaseAdmin
         .from('agents')
-        .select('id, name, personality, voice_id, language, is_demo, user_id, greeting_message, gender, agent_type, status')
-        .eq('status', 'live');
+        .select('id, name, personality, voice_id, language, is_demo, user_id, greeting_message, gender, agent_type, status, system_prompt, personalities, campaign_purpose, industry_domain')
+        .in('status', ['live', 'active']);
 
       if (devUserIds.length > 0) {
         query = query.or(`is_demo.eq.true,user_id.in.(${devUserIds.join(',')})`);
@@ -149,9 +149,19 @@ export async function GET() {
         query = query.eq('is_demo', true);
       }
 
-      const { data: dbAgents, error: agentsError } = await query.limit(10);
+      let { data: dbAgents, error: agentsError } = await query.limit(10);
 
-      if (agentsError || !dbAgents || dbAgents.length === 0) {
+      // If no specific demo or dev agents found, query top active platform agents
+      if (!dbAgents || dbAgents.length === 0) {
+        const { data: fallbackAgents } = await supabaseAdmin
+          .from('agents')
+          .select('id, name, personality, voice_id, language, is_demo, user_id, greeting_message, gender, agent_type, status, system_prompt, personalities, campaign_purpose, industry_domain')
+          .in('status', ['live', 'active'])
+          .limit(8);
+        dbAgents = fallbackAgents || [];
+      }
+
+      if (agentsError && (!dbAgents || dbAgents.length === 0)) {
         return DEFAULT_DEMO_PERSONAS;
       }
 
@@ -200,6 +210,8 @@ export async function GET() {
             `Help me connect with the enterprise team.`,
           ],
           is_managed_by_dev: true,
+          campaign_purpose: (dbAgent as any).campaign_purpose || preset?.campaign_purpose || undefined,
+          industry_domain: (dbAgent as any).industry_domain || preset?.industry_domain || undefined,
         };
       });
 

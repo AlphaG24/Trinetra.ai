@@ -45,7 +45,7 @@ function FooterIconButton({
   muted?: boolean;
 }) {
   const baseClass =
-    "flex h-9 w-9 items-center justify-center rounded-full bg-slate-900 border border-slate-800 text-slate-400 transition-colors duration-300 hover:border-lime-500 hover:text-[#84CC16]";
+    "flex h-9 w-9 items-center justify-center rounded-full bg-[#18243A] border border-[#1E2D4A] text-slate-300 transition-colors duration-300 hover:border-[#315CFF] hover:text-[#45C5FF]";
 
   if (!href) {
     return (
@@ -108,14 +108,14 @@ export function Footer() {
 
   if (pathname === "/login") {
     return (
-      <footer className="w-full border-t border-slate-800 bg-[#0C0E14] px-5 py-5 text-center">
-        <p className="m-0 font-mono text-[12px] text-slate-500">
+      <footer className="w-full border-t border-[#18243A] bg-[#080D18] px-5 py-5 text-center">
+        <p className="m-0 font-mono text-[12px] text-slate-400">
           &copy; 2026 {companyName} |{" "}
-          <Link href="/privacy" className="text-[#84CC16] hover:underline">
+          <Link href="/privacy" className="text-[#315CFF] hover:text-[#45C5FF] hover:underline">
             Privacy Policy
           </Link>{" "}
           |{" "}
-          <Link href="/terms" className="text-[#84CC16] hover:underline">
+          <Link href="/terms" className="text-[#315CFF] hover:text-[#45C5FF] hover:underline">
             Terms
           </Link>
         </p>
@@ -126,14 +126,14 @@ export function Footer() {
   return (
     <footer className="w-full overflow-hidden flex flex-col">
       
-      {/* ── 1. "LET'S WORK TOGETHER" CTA SECTION (Exact Reference Image Style) ── */}
-      <div className="w-full bg-[#F4F5F7] border-t border-slate-200/90 py-20 px-6 sm:px-10 lg:px-16 relative">
+      {/* ── 1. "LET'S WORK TOGETHER" CTA SECTION (Ice White & Electric Cobalt) ── */}
+      <div className="w-full bg-[#F4F7FC] border-t border-[#E2E8F0] py-20 px-6 sm:px-10 lg:px-16 relative">
         <div className="max-w-[1536px] mx-auto">
           
           {/* Section Sub-header */}
           <div className="flex items-center gap-2 mb-6">
-            <span className="w-2.5 h-2.5 rounded-[1px] bg-[#84CC16]" />
-            <span className="text-[11px] font-mono tracking-[0.2em] uppercase font-bold text-slate-500">
+            <span className="w-2.5 h-2.5 rounded-[2px] bg-[#315CFF]" />
+            <span className="text-[11px] font-mono tracking-[0.2em] uppercase font-bold text-[#4A5568]">
               LET&apos;S WORK TOGETHER
             </span>
           </div>
@@ -142,63 +142,70 @@ export function Footer() {
             
             {/* Left Headline & Action */}
             <div className="lg:col-span-7">
-              <h2 className="text-4xl sm:text-5xl md:text-6xl font-black text-[#0B0F17] tracking-tight leading-[0.98]">
+              <h2 className="text-4xl sm:text-5xl md:text-6xl font-black text-[#080D18] tracking-tight leading-[0.98]">
                 HAVE A PROJECT
                 <br />
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#65A30D] via-[#84CC16] to-[#A3E635] drop-shadow-[0_0_30px_rgba(132,204,22,0.35)]">
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#315CFF] via-[#45C5FF] to-[#315CFF] drop-shadow-[0_0_30px_rgba(49,92,255,0.3)]">
                   IN MIND?
                 </span>
               </h2>
 
-              <p className="mt-6 max-w-md text-xs sm:text-[13px] font-mono text-slate-600 leading-relaxed uppercase">
+              <p className="mt-6 max-w-md text-xs sm:text-[13px] font-mono text-[#4A5568] leading-relaxed uppercase">
                 We are always open to discussing new voice pipelines, enterprise deployments, or regional partner integration.
               </p>
 
-              <div className="mt-8">
+              <div className="mt-8 flex items-center gap-3.5 flex-wrap">
                 <Link
                   href="/contact"
-                  className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-white border border-slate-300 text-[#0B0F17] font-mono font-bold text-xs uppercase tracking-wider hover:border-[#84CC16] hover:text-[#84CC16] hover:shadow-[0_0_20px_rgba(132,204,22,0.25)] transition-all"
+                  className="inline-flex items-center gap-2.5 px-8 py-3.5 rounded-full bg-[#315CFF] text-white font-sans font-bold text-xs sm:text-sm shadow-[0_4px_18px_rgba(49,92,255,0.35)] hover:bg-[#2048E8] hover:shadow-[0_6px_24px_rgba(49,92,255,0.45)] hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer"
                 >
-                  <ArrowUpRight className="w-4 h-4 text-[#84CC16]" />
-                  <span>GET IN TOUCH</span>
+                  <ArrowUpRight className="w-4 h-4" />
+                  <span>START A CONVERSATION</span>
+                </Link>
+
+                <Link
+                  href="/marketplace"
+                  className="inline-flex items-center gap-2 px-6 py-3.5 rounded-full bg-white border border-[#CBD5E1] text-[#080D18] font-sans font-semibold text-xs sm:text-sm hover:border-[#315CFF] hover:text-[#315CFF] transition-all shadow-2xs cursor-pointer"
+                >
+                  <span>Explore Marketplace</span>
                 </Link>
               </div>
             </div>
 
-            {/* Right Contact Cards (Matching Reference Image) */}
+            {/* Right Contact Cards */}
             <div className="lg:col-span-5 flex flex-col gap-3">
               
-              <div className="flex items-center gap-4 p-4 rounded-2xl bg-white border border-slate-200/90 shadow-2xs">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-50 border border-slate-200 text-[#84CC16]">
+              <div className="flex items-center gap-4 p-4 rounded-2xl bg-white border border-[#E2E8F0] shadow-xs hover:border-[#315CFF]/40 transition-colors">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#F4F7FC] border border-[#E2E8F0] text-[#315CFF]">
                   <Mail className="w-4 h-4" />
                 </div>
                 <div>
-                  <div className="text-[9px] font-mono uppercase text-slate-400 tracking-wider">EMAIL</div>
-                  <a href="mailto:contact@trinetraedu-ai.com" className="text-xs font-mono font-bold text-[#0B0F17] hover:text-[#84CC16]">
+                  <div className="text-[9px] font-mono uppercase text-[#718096] tracking-wider">EMAIL</div>
+                  <a href="mailto:contact@trinetraedu-ai.com" className="text-xs font-mono font-bold text-[#080D18] hover:text-[#315CFF]">
                     contact@trinetraedu-ai.com
                   </a>
                 </div>
               </div>
 
-              <div className="flex items-center gap-4 p-4 rounded-2xl bg-white border border-slate-200/90 shadow-2xs">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-50 border border-slate-200 text-[#84CC16]">
+              <div className="flex items-center gap-4 p-4 rounded-2xl bg-white border border-[#E2E8F0] shadow-xs hover:border-[#315CFF]/40 transition-colors">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#F4F7FC] border border-[#E2E8F0] text-[#315CFF]">
                   <Globe className="w-4 h-4" />
                 </div>
                 <div>
-                  <div className="text-[9px] font-mono uppercase text-slate-400 tracking-wider">WEBSITE</div>
-                  <span className="text-xs font-mono font-bold text-[#0B0F17]">
+                  <div className="text-[9px] font-mono uppercase text-[#718096] tracking-wider">WEBSITE</div>
+                  <span className="text-xs font-mono font-bold text-[#080D18]">
                     trinetraedu-ai.com
                   </span>
                 </div>
               </div>
 
-              <div className="flex items-center gap-4 p-4 rounded-2xl bg-white border border-slate-200/90 shadow-2xs">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-50 border border-slate-200 text-[#84CC16]">
+              <div className="flex items-center gap-4 p-4 rounded-2xl bg-white border border-[#E2E8F0] shadow-xs hover:border-[#315CFF]/40 transition-colors">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#F4F7FC] border border-[#E2E8F0] text-[#315CFF]">
                   <MapPin className="w-4 h-4" />
                 </div>
                 <div>
-                  <div className="text-[9px] font-mono uppercase text-slate-400 tracking-wider">LOCATION</div>
-                  <span className="text-xs font-mono font-bold text-[#0B0F17]">
+                  <div className="text-[9px] font-mono uppercase text-[#718096] tracking-wider">LOCATION</div>
+                  <span className="text-xs font-mono font-bold text-[#080D18]">
                     Bharat • Global Scale
                   </span>
                 </div>
@@ -208,19 +215,19 @@ export function Footer() {
 
           </div>
 
-          {/* Wireframe Hemisphere Graphic with Lime Glow */}
+          {/* Wireframe Hemisphere Graphic with Cobalt / Cyan Glow */}
           <div className="relative w-full h-16 mt-12 overflow-hidden flex items-end justify-center pointer-events-none opacity-40">
-            <div className="w-[500px] h-[500px] rounded-full border border-dashed border-[#84CC16]/60 shadow-[0_-15px_40px_rgba(132,204,22,0.3)]" />
+            <div className="w-[500px] h-[500px] rounded-full border border-dashed border-[#315CFF]/50 shadow-[0_-15px_40px_rgba(49,92,255,0.25)]" />
           </div>
 
         </div>
       </div>
 
-      {/* ── 2. SLEEK OBSIDIAN TECHNICAL FOOTER LINKS ── */}
-      <div className="w-full bg-[#0C0E14] border-t border-slate-800 text-slate-300 px-6 sm:px-10 lg:px-16 pt-16 pb-10">
+      {/* ── 2. SLEEK OBSIDIAN TECHNICAL FOOTER LINKS (Ink Black #080D18) ── */}
+      <div className="w-full bg-[#080D18] border-t border-[#18243A] text-slate-300 px-6 sm:px-10 lg:px-16 pt-16 pb-10">
         
-        {/* Subtle Lime Accent Line */}
-        <div className="mx-auto mb-12 h-[1px] w-full max-w-4xl bg-gradient-to-r from-transparent via-[#84CC16]/50 to-transparent" />
+        {/* Subtle Cobalt Accent Line */}
+        <div className="mx-auto mb-12 h-[1px] w-full max-w-4xl bg-gradient-to-r from-transparent via-[#315CFF]/50 to-transparent" />
 
         <div className="mx-auto max-w-[1536px]">
           <div className="grid grid-cols-1 gap-10 md:grid-cols-2 lg:grid-cols-5">
@@ -273,14 +280,14 @@ export function Footer() {
                         <button
                           type="button"
                           onClick={() => toast("Coming Soon! We're working on it.")}
-                          className="font-sans text-xs text-slate-400 hover:text-[#84CC16] transition-colors"
+                          className="font-sans text-xs text-slate-400 hover:text-[#45C5FF] transition-colors"
                         >
                           {link.name}
                         </button>
                       ) : (
                         <Link
                           href={link.href}
-                          className="font-sans text-xs text-slate-400 hover:text-[#84CC16] transition-colors"
+                          className="font-sans text-xs text-slate-400 hover:text-[#45C5FF] transition-colors"
                         >
                           {link.name}
                         </Link>
@@ -300,7 +307,7 @@ export function Footer() {
                   <li key={link.name}>
                     <Link
                       href={link.href}
-                      className="font-sans text-xs text-slate-400 hover:text-[#84CC16] transition-colors"
+                      className="font-sans text-xs text-slate-400 hover:text-[#45C5FF] transition-colors"
                     >
                       {link.name}
                     </Link>
@@ -318,7 +325,7 @@ export function Footer() {
                   <li key={link.name}>
                     <Link
                       href={link.href}
-                      className="font-sans text-xs text-slate-400 hover:text-[#84CC16] transition-colors"
+                      className="font-sans text-xs text-slate-400 hover:text-[#45C5FF] transition-colors"
                     >
                       {link.name}
                     </Link>
@@ -328,13 +335,13 @@ export function Footer() {
             </div>
           </div>
 
-          <div className="mt-12 flex flex-col items-center justify-between gap-4 border-t border-slate-800/80 pt-6 md:flex-row text-[11px] font-mono text-slate-500">
+          <div className="mt-12 flex flex-col items-center justify-between gap-4 border-t border-[#18243A] pt-6 md:flex-row text-[11px] font-mono text-slate-400">
             <p>
               &copy; 2026 {companyName} AI. All rights reserved.
             </p>
             <p className="flex items-center gap-1.5">
-              <span>DESIGNED TO INSPIRE</span>
-              <span className="text-[#84CC16]">///</span>
+              <span>AUTONOMOUS VOICE INFRASTRUCTURE</span>
+              <span className="text-[#45C5FF]">///</span>
             </p>
           </div>
         </div>

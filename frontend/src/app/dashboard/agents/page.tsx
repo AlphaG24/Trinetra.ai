@@ -43,13 +43,26 @@ export default function AgentsDashboardPage() {
         return
       }
 
-      // Fetch user agents
-      const { data: agentsData, error: agentsErr } = await supabase
-        .from('agents')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
+      // Fetch user profile to check role and organization
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('organization_id, role')
+        .eq('id', user.id)
+        .maybeSingle()
 
+      const isPrivileged = ['developer_tester', 'admin', 'super_admin'].includes(profile?.role || '')
+
+      // Fetch agents
+      let query = supabase.from('agents').select('*')
+      if (!isPrivileged) {
+        if (profile?.organization_id) {
+          query = query.or(`user_id.eq.${user.id},organization_id.eq.${profile.organization_id}`)
+        } else {
+          query = query.eq('user_id', user.id)
+        }
+      }
+
+      const { data: agentsData, error: agentsErr } = await query.order('created_at', { ascending: false })
       if (agentsErr) throw agentsErr
 
       const mappedAgents = (agentsData || []).map((agent: any) => {
