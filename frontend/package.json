@@ -40,7 +40,7 @@
     "postprocessing": "^6.39.5",
     "raw-loader": "^4.0.2",
     "react": "19.2.3",
-    "react-dom": "19.2.3",
+    "react-dom": "19.2.8",
     "react-dropzone": "^14.4.0",
     "react-hook-form": "^7.72.1",
     "react-hot-toast": "^2.6.0",
