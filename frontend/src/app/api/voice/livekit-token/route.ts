@@ -144,7 +144,8 @@ async function generateLiveKitToken({
     // 2. If local backend did not dispatch, dispatch via Render cloud backend
     if (!dispatched) {
       try {
-        const renderRes = await fetch('https://trinetra-ai-1-6f2n.onrender.com/api/voice/livekit-token', {
+        const backendBase = (process.env.NEXT_PUBLIC_BACKEND_URL || process.env.BACKEND_URL || 'https://trinetra-ai-3d0a.onrender.com').replace(/\/$/, '');
+        const renderRes = await fetch(`${backendBase}/api/voice/livekit-token`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: payload,

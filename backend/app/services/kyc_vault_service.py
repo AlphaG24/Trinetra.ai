@@ -404,7 +404,7 @@ class KYCVaultService:
                 "title": title,
                 "message": msg,
                 "type": f"kyc_{new_status}",
-                "action_url": "/dashboard/settings/kyc",
+                "action_url": "/dashboard/kyc",
                 "action_text": "View KYC Status" if new_status == "verified" else "Re-upload Document",
                 "is_read": False,
                 "metadata": {

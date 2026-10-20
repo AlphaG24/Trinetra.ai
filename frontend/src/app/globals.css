@@ -1050,44 +1050,6 @@ html.light .navbar__link:hover {
 
 .ambient-action-card::after {
   content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 45%;
-  height: 100%;
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    rgba(0, 0, 0, 0.04) 50%,
-    transparent 100%
-  );
-  animation: ambientSheen 4.2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
-  pointer-events: none;
+  display: none;
 }
-
-.dark .ambient-action-card::after {
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    rgba(255, 255, 255, 0.12) 50%,
-    transparent 100%
-  );
-}
-
-.ambient-action-card:hover::after {
-  opacity: 0;
-}
-
-@keyframes bubbleRise1 {
-  0% { transform: translateY(0); opacity: 0; }
-  40% { opacity: 0.9; }
-  100% { transform: translateY(-7px); opacity: 0; }
-}
-@keyframes bubbleRise2 {
-  0% { transform: translateY(0); opacity: 0; }
-  50% { opacity: 0.9; }
-  100% { transform: translateY(-9px); opacity: 0; }
-}
-.anim-bubble-1 { animation: bubbleRise1 2s ease-out infinite; }
-.anim-bubble-2 { animation: bubbleRise2 2.5s ease-out infinite 0.7s; }
 

@@ -9,6 +9,8 @@ import { cleanAgentName } from '@/src/utils/formatAgentName'
 import { PageHeaderSkeleton, CardGridSkeleton } from '@/src/components/ui/skeleton'
 import { PlanValidityTimer } from '@/src/components/shared/PlanValidityTimer'
 
+import { useAuth } from '@/src/components/providers/AuthProvider'
+
 interface UserAgent {
   id: string
   agent_name: string
@@ -21,6 +23,7 @@ interface UserAgent {
 
 export default function AgentsDashboardPage() {
   const router = useRouter()
+  const { user: authUser, profile: authProfile, isLoading: authLoading } = useAuth()
   const [agents, setAgents] = useState<UserAgent[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -36,46 +39,65 @@ export default function AgentsDashboardPage() {
   const loadData = async () => {
     try {
       setLoading(true)
+      // 1. Try fetching from resilient server endpoint
+      const res = await fetch('/api/dashboard/agents')
+      if (res.ok) {
+        const json = await res.json()
+        if (json.agents) {
+          const mappedAgents = json.agents.map((agent: any) => {
+            const rawName = agent.name || ''
+            return {
+              ...agent,
+              agent_name: cleanAgentName(rawName),
+              raw_name: rawName
+            }
+          })
+          setAgents(mappedAgents)
+          return
+        }
+      }
+
+      // 2. Client fallback
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) {
-        router.push('/login')
+      const effectiveUser = user || authUser
+      if (!effectiveUser) {
+        if (!authLoading) {
+          console.warn('[Agents] No authenticated session found yet')
+        }
         return
       }
 
-      // Fetch user profile to check role and organization
       const { data: profile } = await supabase
         .from('profiles')
         .select('organization_id, role')
-        .eq('id', user.id)
+        .eq('id', effectiveUser.id)
         .maybeSingle()
 
-      const isPrivileged = ['developer_tester', 'admin', 'super_admin'].includes(profile?.role || '')
+      const isPrivileged = ['developer_tester', 'admin', 'super_admin'].includes(profile?.role || authProfile?.role || '')
 
-      // Fetch agents
       let query = supabase.from('agents').select('*')
       if (!isPrivileged) {
-        if (profile?.organization_id) {
-          query = query.or(`user_id.eq.${user.id},organization_id.eq.${profile.organization_id}`)
+        const orgId = profile?.organization_id || authProfile?.organization_id
+        if (orgId) {
+          query = query.or(`user_id.eq.${effectiveUser.id},organization_id.eq.${orgId}`)
         } else {
-          query = query.eq('user_id', user.id)
+          query = query.eq('user_id', effectiveUser.id)
         }
       }
 
       const { data: agentsData, error: agentsErr } = await query.order('created_at', { ascending: false })
-      if (agentsErr) throw agentsErr
-
-      const mappedAgents = (agentsData || []).map((agent: any) => {
-        const rawName = agent.name || ''
-        const displayName = cleanAgentName(rawName)
-        return {
-          ...agent,
-          agent_name: displayName,
-          raw_name: rawName
-        }
-      })
-      setAgents(mappedAgents)
-
+      if (!agentsErr && agentsData) {
+        const mappedAgents = agentsData.map((agent: any) => {
+          const rawName = agent.name || ''
+          return {
+            ...agent,
+            agent_name: cleanAgentName(rawName),
+            raw_name: rawName
+          }
+        })
+        setAgents(mappedAgents)
+      }
     } catch (err: any) {
       console.error("Failed to load agents page data:", err)
     } finally {
@@ -85,7 +107,7 @@ export default function AgentsDashboardPage() {
 
   useEffect(() => {
     loadData()
-  }, [router])
+  }, [authUser?.id])
 
   const handleDeleteAgent = async (e: React.MouseEvent, agentId: string) => {
     e.stopPropagation()

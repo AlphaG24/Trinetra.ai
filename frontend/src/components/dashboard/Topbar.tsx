@@ -198,8 +198,18 @@ export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
     router.refresh()
   }
 
-  const displayName = profile?.full_name || user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'User'
-  const avatarUrl = profile?.avatar_url
+  const displayName = (
+    profile?.full_name ||
+    authProfile?.full_name ||
+    user?.user_metadata?.full_name ||
+    authUser?.user_metadata?.full_name ||
+    user?.user_metadata?.name ||
+    authUser?.user_metadata?.name ||
+    user?.email?.split('@')[0] ||
+    authUser?.email?.split('@')[0] ||
+    'User'
+  ).trim()
+  const avatarUrl = profile?.avatar_url || authProfile?.avatar_url
 
   return (
     <header className="fixed top-0 right-0 left-0 h-16 bg-[var(--card-bg)] border-b border-[var(--border)] z-[999]">

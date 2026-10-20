@@ -1,17 +1,21 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { createClient } from '@/utils/supabase/client'
-import { Send, RefreshCw, CheckCircle2, AlertTriangle, Loader2 } from 'lucide-react'
+import { useAuth } from '@/components/providers/AuthProvider'
+import { Send, RefreshCw, CheckCircle2, AlertTriangle, Loader2, Copy, Check, MessageSquare } from 'lucide-react'
 
 export default function TelegramConnectionCard() {
-  const [loading, setLoading] = useState(true)
+  const { user: authUser, profile: authProfile, refreshProfile: refreshAuthProfile } = useAuth()
+  const [loading, setLoading] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
-  const [user, setUser] = useState<any>(null)
+  const [savingManualId, setSavingManualId] = useState(false)
+  const [manualChatId, setManualChatId] = useState('')
+  const [showManualInput, setShowManualInput] = useState(false)
+  const [copied, setCopied] = useState(false)
   const [profile, setProfile] = useState<any>(null)
   const [error, setError] = useState<string | null>(null)
+  const [successMsg, setSuccessMsg] = useState<string | null>(null)
 
-  const supabase = createClient()
   const botUsername = process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME || 'trinetra_messaging_bot'
 
   const fetchProfile = async (showRefreshIndicator = false) => {
@@ -23,27 +27,23 @@ export default function TelegramConnectionCard() {
     setError(null)
 
     try {
-      // Get current authenticated user
-      const { data: { user: authUser }, error: authError } = await supabase.auth.getUser()
-      if (authError || !authUser) {
-        throw new Error('User not authenticated. Please log in.')
+      const res = await fetch('/api/profiles')
+      if (res.ok) {
+        const data = await res.json()
+        if (data.profile) {
+          setProfile(data.profile)
+          return
+        }
       }
-      setUser(authUser)
-
-      // Get profile details from database
-      const { data: dbProfile, error: profileError } = await supabase
-        .from('profiles')
-        .select('id, telegram_chat_id, onboarding_complete')
-        .eq('id', authUser.id)
-        .single()
-
-      if (profileError) {
-        throw profileError
+      // Fallback to auth context profile
+      if (authProfile) {
+        setProfile(authProfile)
       }
-      setProfile(dbProfile)
     } catch (err: any) {
-      console.error('Error loading Telegram connection details:', err)
-      setError(err.message || 'Failed to fetch connection status.')
+      console.warn('Could not refresh profile from server, using cached profile:', err)
+      if (authProfile) {
+        setProfile(authProfile)
+      }
     } finally {
       setLoading(false)
       setRefreshing(false)
@@ -51,27 +51,76 @@ export default function TelegramConnectionCard() {
   }
 
   useEffect(() => {
-    fetchProfile()
-  }, [])
+    if (authProfile) {
+      setProfile(authProfile)
+    }
+    fetchProfile(false)
+  }, [authProfile?.id])
 
-  if (loading) {
+  const effectiveUserId = profile?.id || authUser?.id || authProfile?.id || ''
+  const isConnected = !!(profile?.telegram_chat_id || authProfile?.telegram_chat_id)
+  const activeChatId = profile?.telegram_chat_id || authProfile?.telegram_chat_id || ''
+  const telegramLink = `https://t.me/${botUsername}?start=${effectiveUserId}`
+
+  const getMaskedChatId = (chatId: string) => {
+    if (!chatId) return ''
+    const str = String(chatId)
+    if (str.length <= 4) return str
+    return '*'.repeat(str.length - 4) + str.slice(-4)
+  }
+
+  const handleCopyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(telegramLink)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      // ignore
+    }
+  }
+
+  const handleSaveManualChatId = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!manualChatId.trim()) return
+
+    setSavingManualId(true)
+    setError(null)
+    setSuccessMsg(null)
+
+    try {
+      const res = await fetch('/api/profiles', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          telegram_chat_id: manualChatId.trim(),
+          onboarding_complete: true,
+        }),
+      })
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}))
+        throw new Error(errData.error || 'Failed to update Telegram Chat ID')
+      }
+
+      setSuccessMsg('Telegram Chat ID linked successfully!')
+      setManualChatId('')
+      setShowManualInput(false)
+      await fetchProfile(true)
+      if (refreshAuthProfile) await refreshAuthProfile()
+    } catch (err: any) {
+      setError(err.message || 'Could not link Chat ID')
+    } finally {
+      setSavingManualId(false)
+    }
+  }
+
+  if (loading && !profile && !authProfile) {
     return (
       <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-6 flex flex-col items-center justify-center min-h-[220px]">
         <Loader2 className="w-8 h-8 animate-spin text-violet-500" />
         <p className="text-xs text-[var(--muted)] mt-3 animate-pulse">Loading connection status...</p>
       </div>
     )
-  }
-
-  const isConnected = !!(profile?.telegram_chat_id)
-  const telegramLink = `https://t.me/${botUsername}?start=${profile?.id || ''}`
-
-  // Mask chat ID for privacy (e.g. 7743675039 -> *****5039)
-  const getMaskedChatId = (chatId: string) => {
-    if (!chatId) return ''
-    const str = String(chatId)
-    if (str.length <= 4) return str
-    return '*'.repeat(str.length - 4) + str.slice(-4)
   }
 
   return (
@@ -116,6 +165,13 @@ export default function TelegramConnectionCard() {
           </div>
         )}
 
+        {successMsg && (
+          <div className="flex gap-2 p-3.5 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-emerald-700 dark:text-emerald-300 text-xs items-start">
+            <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
+            <span>{successMsg}</span>
+          </div>
+        )}
+
         {/* Content Action State */}
         {isConnected ? (
           <div className="space-y-4">
@@ -126,7 +182,7 @@ export default function TelegramConnectionCard() {
                 <p className="text-xs text-[var(--muted)] mt-1 leading-relaxed">
                   Your profile is actively mapped to Telegram Chat ID{' '}
                   <code className="px-1.5 py-0.5 bg-[var(--background)] border border-[var(--border)] rounded text-emerald-600 dark:text-emerald-400 font-mono text-xs">
-                    {getMaskedChatId(profile.telegram_chat_id)}
+                    {getMaskedChatId(activeChatId)}
                   </code>.
                   No further configuration is required.
                 </p>
@@ -147,9 +203,15 @@ export default function TelegramConnectionCard() {
           <div className="space-y-4">
             <div className="flex flex-col sm:flex-row gap-3">
               <a
-                href={telegramLink}
+                href={effectiveUserId ? telegramLink : '#'}
                 target="_blank"
                 rel="noopener noreferrer"
+                onClick={(e) => {
+                  if (!effectiveUserId) {
+                    e.preventDefault()
+                    setError('Loading your account profile, please wait...')
+                  }
+                }}
                 className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-violet-600 to-violet-700 hover:from-violet-500 hover:to-violet-600 text-white font-bold rounded-xl transition-all duration-300 shadow-md text-sm text-center"
               >
                 <Send className="w-4 h-4" />
@@ -167,14 +229,43 @@ export default function TelegramConnectionCard() {
               </button>
             </div>
 
-            {/* UX Note banner */}
-            <div className="p-4 bg-violet-500/5 border border-violet-500/15 rounded-xl">
-              <p className="text-xs text-violet-700 dark:text-violet-300/80 leading-relaxed">
-                ℹ️ <strong>Direct Linking:</strong> Clicking this button will securely open Telegram. Press the
-                &apos;Start&apos; button inside the chat to automatically map your system alerts directly to your
-                phone. No manual ID copying required.
-              </p>
+            <div className="flex items-center justify-between pt-1">
+              <button
+                type="button"
+                onClick={handleCopyLink}
+                className="text-xs text-[var(--muted)] hover:text-violet-500 flex items-center gap-1.5 transition-colors cursor-pointer"
+              >
+                {copied ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+                <span>{copied ? 'Bot link copied!' : 'Copy direct link'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowManualInput(!showManualInput)}
+                className="text-xs text-violet-500 hover:text-violet-600 font-medium cursor-pointer"
+              >
+                {showManualInput ? 'Hide manual ID' : 'Enter Telegram ID manually'}
+              </button>
             </div>
+
+            {showManualInput && (
+              <form onSubmit={handleSaveManualChatId} className="flex gap-2 pt-2">
+                <input
+                  type="text"
+                  placeholder="Enter your Telegram Chat ID (e.g. 7743675039)"
+                  value={manualChatId}
+                  onChange={(e) => setManualChatId(e.target.value)}
+                  className="flex-1 px-3 py-2 text-xs bg-[var(--background)] border border-[var(--border)] rounded-xl text-[var(--heading)] focus:outline-none focus:border-violet-500"
+                />
+                <button
+                  type="submit"
+                  disabled={savingManualId || !manualChatId.trim()}
+                  className="px-4 py-2 text-xs font-semibold bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white rounded-xl transition cursor-pointer"
+                >
+                  {savingManualId ? 'Saving...' : 'Save'}
+                </button>
+              </form>
+            )}
           </div>
         )}
       </div>

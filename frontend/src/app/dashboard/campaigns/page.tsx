@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react'
 import { Megaphone, Plus, Play, Pause, ExternalLink, RefreshCw, Loader2, Users, BarChart3, Trash2 } from 'lucide-react'
 import { useDashboardStore } from '@/store/dashboardStore'
+import { useAuth } from '@/src/components/providers/AuthProvider'
 import UpgradePrompt from '@/src/components/shared/UpgradePrompt'
 import { NewCampaignModal } from '@/src/components/campaigns/NewCampaignModal'
 import toast from 'react-hot-toast'
@@ -27,32 +28,10 @@ interface Campaign {
 }
 
 export default function CampaignsPage() {
-  const { profile, setProfile } = useDashboardStore()
-
-  useEffect(() => {
-    if (!profile || profile.plan_tier === undefined) {
-      const loadProfile = async () => {
-        try {
-          const { createClient } = await import('@/utils/supabase/client');
-          const supabase = createClient();
-          const { data: { user } } = await supabase.auth.getUser();
-          if (user) {
-            const { data: dbProfile } = await supabase
-              .from('profiles')
-              .select('*')
-              .eq('id', user.id)
-              .single();
-            if (dbProfile) {
-              setProfile(dbProfile);
-            }
-          }
-        } catch (err) {
-          console.error("Error loading profile in CampaignsPage:", err);
-        }
-      };
-      loadProfile();
-    }
-  }, [profile, setProfile]);
+  const { profile: authProfile } = useAuth()
+  const { profile: storeProfile, setProfile } = useDashboardStore()
+  const [timeoutPassed, setTimeoutPassed] = useState(false)
+  const profile = authProfile || storeProfile || (timeoutPassed ? { plan_tier: 'starter', role: 'client' } : null)
 
   const [campaigns, setCampaigns] = useState<Campaign[]>([])
   const [loading, setLoading] = useState(true)
@@ -60,6 +39,11 @@ export default function CampaignsPage() {
   const [actionLoading, setActionLoading] = useState<string | null>(null)
 
   useEffect(() => {
+    const timer = setTimeout(() => {
+      setTimeoutPassed(true)
+      setLoading(false)
+    }, 1500)
+
     if (profile) {
       const userPlanTier = (profile as any)?.plan_tier?.toLowerCase() || 'free'
       const hasPaidPlan = userPlanTier !== 'free' && userPlanTier !== 'free_demo'
@@ -70,6 +54,8 @@ export default function CampaignsPage() {
         setLoading(false)
       }
     }
+
+    return () => clearTimeout(timer)
   }, [profile])
 
   const fetchCampaigns = async () => {

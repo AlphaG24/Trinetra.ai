@@ -29,28 +29,53 @@ export function CallsPageClient({ agents }: { agents: any[] }) {
   const [autoPlayAudio, setAutoPlayAudio] = useState(false)
   const perPage = 25
 
-  const supabase = createClient()
-
   useEffect(() => {
     const fetchCalls = async () => {
       setIsLoading(true)
-      let query = supabase
-        .from('voice_calls')
-        .select('id, created_at, duration_seconds, sentiment, outcome, caller_name, caller_phone, recording_url, agent_id', { count: 'estimated' })
-        .order('created_at', { ascending: false })
-        .range((page - 1) * perPage, page * perPage - 1)
+      try {
+        const params = new URLSearchParams({
+          page: String(page),
+          per_page: String(perPage),
+          sentiment: sentimentFilter,
+        })
+        if (search) params.set('search', search)
 
-      if (sentimentFilter !== 'all') {
-        query = query.eq('sentiment', sentimentFilter)
-      }
-      if (search) {
-        query = query.ilike('caller_name', `%${search}%`)
+        const res = await fetch(`/api/dashboard/calls?${params.toString()}`)
+        if (res.ok) {
+          const data = await res.json()
+          setCalls(data.calls || [])
+          setTotal(data.total || 0)
+          setIsLoading(false)
+          return
+        }
+      } catch (apiErr) {
+        console.warn('[/api/dashboard/calls fetch notice]', apiErr)
       }
 
-      const { data, count } = await query
-      setCalls(data || [])
-      setTotal(count || 0)
-      setIsLoading(false)
+      // Client Supabase fallback
+      try {
+        const supabase = createClient()
+        let query = supabase
+          .from('voice_calls')
+          .select('id, created_at, duration_seconds, sentiment, outcome, caller_name, caller_phone, recording_url, agent_id', { count: 'estimated' })
+          .order('created_at', { ascending: false })
+          .range((page - 1) * perPage, page * perPage - 1)
+
+        if (sentimentFilter !== 'all') {
+          query = query.eq('sentiment', sentimentFilter)
+        }
+        if (search) {
+          query = query.ilike('caller_name', `%${search}%`)
+        }
+
+        const { data, count } = await query
+        setCalls(data || [])
+        setTotal(count || 0)
+      } catch (err) {
+        console.error('Failed to load calls fallback:', err)
+      } finally {
+        setIsLoading(false)
+      }
     }
     fetchCalls()
   }, [page, sentimentFilter, search])
@@ -60,11 +85,21 @@ export function CallsPageClient({ agents }: { agents: any[] }) {
     setSelectedCall(call)
     if (!call.transcript) {
       try {
+        const res = await fetch(`/api/dashboard/calls?call_id=${call.id}`)
+        if (res.ok) {
+          const json = await res.json()
+          if (json.call) {
+            setSelectedCall((prev: any) => (prev ? { ...prev, ...json.call } : json.call))
+            return
+          }
+        }
+
+        const supabase = createClient()
         const { data } = await supabase
           .from('voice_calls')
           .select('transcript, call_summary, recording_url')
           .eq('id', call.id)
-          .single()
+          .maybeSingle()
         if (data) {
           setSelectedCall((prev: any) => (prev ? { ...prev, ...data } : prev))
         }

@@ -139,7 +139,7 @@ export async function dispatchKYCReviewNotification({
     const userEmail = profile?.email
     const userPhone = profile?.phone ? normalizePhone(profile.phone) : ''
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://trinetraedu-ai.com'
-    const kycPortalUrl = `${baseUrl}/dashboard/settings/kyc`
+    const kycPortalUrl = `${baseUrl}/dashboard/kyc`
 
     // =========================================================================
     // CHANNEL 1: In-App Dashboard Notification
@@ -160,7 +160,7 @@ export async function dispatchKYCReviewNotification({
         title: notifTitle,
         message: notifMessage,
         type: isApproved ? 'success' : 'warning',
-        action_url: '/dashboard/settings/kyc',
+        action_url: '/dashboard/kyc',
         action_text: isApproved ? 'View Verification Status' : 'Re-upload Document',
         is_read: false,
         metadata: {

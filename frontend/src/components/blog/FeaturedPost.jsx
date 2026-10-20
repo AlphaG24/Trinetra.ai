@@ -38,10 +38,10 @@ export default function FeaturedPost({ post }) {
       >
         {/* Left Column: Widescreen Image */}
         <div className="relative w-full md:w-[48%] h-[260px] md:h-[380px] overflow-hidden bg-black/35">
-          {post.cover_image ? (
+          {(post.cover_image_url || post.cover_image) ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img 
-              src={post.cover_image} 
+              src={post.cover_image_url || post.cover_image} 
               alt={post.title} 
               className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-[1.03]" 
             />

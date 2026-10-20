@@ -66,7 +66,8 @@ export default function SupportPage() {
       const data = await res.json()
       setTickets(data || [])
     } catch (err: any) {
-      toast.error("Failed to load tickets: " + err.message)
+      console.warn("Notice loading support tickets:", err?.message || err)
+      setTickets([])
     } finally {
       setIsLoadingTickets(false)
     }

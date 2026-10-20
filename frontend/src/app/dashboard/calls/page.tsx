@@ -18,12 +18,7 @@ export default async function CallsPage() {
   const { data: agents } = await supabase
     .from('agents')
     .select('id, name, agent_type')
-    .eq('user_id', user.id)
     .eq('agent_type', 'voice')
-
-  if (!agents || agents.length === 0) {
-    redirect('/dashboard')
-  }
 
   const cleanedAgents = (agents || []).map((a: any) => ({
     ...a,

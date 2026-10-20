@@ -4,6 +4,8 @@ import React, { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { ArrowRight, ShieldCheck } from 'lucide-react'
 
+import { useAuth } from '@/src/components/providers/AuthProvider'
+
 interface WelcomeHeaderProps {
   fullName?: string | null
   isOnboardingComplete?: boolean
@@ -15,6 +17,7 @@ export function WelcomeHeader({
   isOnboardingComplete = true,
   loading = false,
 }: WelcomeHeaderProps) {
+  const { user: authUser, profile: authProfile } = useAuth()
   const [greeting, setGreeting] = useState('Welcome back')
 
   useEffect(() => {
@@ -33,7 +36,15 @@ export function WelcomeHeader({
     )
   }
 
-  const name = fullName ? fullName.split(' ')[0] : 'Partner'
+  const effectiveName = (
+    fullName ||
+    authProfile?.full_name ||
+    authUser?.user_metadata?.full_name ||
+    authUser?.user_metadata?.name ||
+    (authUser?.email ? authUser.email.split('@')[0] : '') ||
+    'Partner'
+  ).trim()
+  const name = effectiveName ? effectiveName.split(' ')[0] : 'Partner'
 
   return (
     <div className="space-y-4">

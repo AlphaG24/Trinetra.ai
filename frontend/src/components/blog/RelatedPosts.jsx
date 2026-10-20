@@ -17,9 +17,9 @@ export default function RelatedPosts({ posts, currentPostId }) {
             className="flex items-center gap-3 rounded-xl border border-border-subtle bg-trinetra-bg-tertiary p-3 hover:border-border-medium"
           >
             <div className="h-[60px] w-[60px] overflow-hidden rounded-xl bg-trinetra-bg-primary">
-              {p.cover_image ? (
+              {(p.cover_image_url || p.cover_image) ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={p.cover_image} alt={p.title || "Related"} className="h-full w-full object-cover" loading="lazy" />
+                <img src={p.cover_image_url || p.cover_image} alt={p.title || "Related"} className="h-full w-full object-cover" loading="lazy" />
               ) : (
                 <div className="h-full w-full bg-gradient-to-br from-violet-500/25 via-cyan-500/10 to-gold-500/20" />
               )}

@@ -81,26 +81,34 @@ export const GET = safeApiHandler(async () => {
     console.error('Failed to auto-archive old support tickets:', err)
   }
 
-  let query = supabase.from('support_tickets').select('*').eq('archived', false)
+  const { createClient: createSupabaseClient } = await import('@supabase/supabase-js')
+  const supabaseAdmin = createSupabaseClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+
+  let query = supabaseAdmin.from('support_tickets').select('*').eq('archived', false)
   if (!isAdmin) {
     let orgId = profile.organization_id
     if (!orgId) {
       try {
         orgId = await ensureOrganization(user.id, user.email || '', profile.full_name || '', profile.organization_id)
       } catch (err: any) {
-        return NextResponse.json({ error: err.message }, { status: 500 })
+        console.warn('Could not auto-create organization for support tickets:', err)
       }
     }
-    query = query.eq('organization_id', orgId)
+    const filter = orgId ? `organization_id.eq.${orgId},submitted_by.eq.${user.id}` : `submitted_by.eq.${user.id}`
+    query = query.or(filter)
   }
 
   const { data: tickets, error: ticketsErr } = await query.order('created_at', { ascending: false })
 
   if (ticketsErr) {
+    console.error('[/api/support/tickets GET] Fetch tickets error:', ticketsErr)
     return NextResponse.json({ error: 'Failed to fetch tickets' }, { status: 500 })
   }
 
-  return NextResponse.json(tickets)
+  return NextResponse.json(tickets || [])
 })
 
 export const POST = safeApiHandler(async (req: Request) => {

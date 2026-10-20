@@ -31,9 +31,9 @@ function AnimatedLabFlaskIcon() {
       <path d="M 10 2 V 7 L 4.5 18 C 3.8 19.3 4.8 21 6.3 21 H 17.7 C 19.2 21 20.2 19.3 19.5 18 L 14 7 V 2" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
       {/* Liquid Wave Level */}
       <path d="M 7.5 15.5 Q 12 13.5 16.5 15.5" strokeWidth="1.6" strokeLinecap="round" opacity="0.8" />
-      {/* Animated Rising Bubbles */}
-      <circle cx="10" cy="14" r="1.2" fill="currentColor" stroke="none" className="anim-bubble-1" />
-      <circle cx="14" cy="15" r="1.5" fill="currentColor" stroke="none" className="anim-bubble-2" />
+      {/* Static Rising Bubbles */}
+      <circle cx="10" cy="14" r="1.2" fill="currentColor" stroke="none" opacity="0.7" />
+      <circle cx="14" cy="15" r="1.5" fill="currentColor" stroke="none" opacity="0.7" />
     </svg>
   )
 }
@@ -48,10 +48,10 @@ export function QuickActions({}: QuickActionsProps) {
       <Link
         suppressHydrationWarning
         href="/dashboard/marketplace"
-        className="ambient-action-card group relative flex items-center justify-between p-4 rounded-2xl border border-zinc-200/90 dark:border-white/10 bg-white dark:bg-zinc-900 hover:border-black dark:hover:border-white text-zinc-900 dark:text-white transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md shadow-xs cursor-pointer"
+        className="relative flex items-center justify-between p-4 rounded-2xl border border-zinc-200/90 dark:border-white/10 bg-white dark:bg-zinc-900 hover:border-zinc-400 dark:hover:border-zinc-600 text-zinc-900 dark:text-white transition-colors cursor-pointer shadow-xs"
       >
         <div className="flex items-center gap-3.5 min-w-0">
-          <div className="w-10 h-10 rounded-xl bg-teal-500/10 border border-teal-500/20 text-teal-600 dark:text-teal-400 flex items-center justify-center flex-shrink-0 group-hover:border-teal-500/40 group-hover:bg-teal-500/15 transition-all">
+          <div className="w-10 h-10 rounded-xl bg-teal-500/10 border border-teal-500/20 text-teal-600 dark:text-teal-400 flex items-center justify-center flex-shrink-0 transition-colors">
             <AnimatedStorefrontIcon />
           </div>
           <div className="min-w-0 text-left">
@@ -66,8 +66,8 @@ export function QuickActions({}: QuickActionsProps) {
           </div>
         </div>
 
-        <div className="flex items-center gap-1 text-xs font-semibold text-zinc-400 group-hover:text-zinc-900 dark:group-hover:text-white transition-colors pl-2 flex-shrink-0">
-          <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+        <div className="flex items-center gap-1 text-xs font-semibold text-zinc-400 pl-2 flex-shrink-0">
+          <ArrowRight className="w-4 h-4" />
         </div>
       </Link>
 
@@ -76,10 +76,10 @@ export function QuickActions({}: QuickActionsProps) {
         suppressHydrationWarning
         type="button"
         onClick={() => router.push('/dashboard/demo')}
-        className="ambient-action-card group relative flex items-center justify-between p-4 rounded-2xl border border-zinc-200/90 dark:border-white/10 bg-white dark:bg-zinc-900 hover:border-black dark:hover:border-white text-zinc-900 dark:text-white transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md shadow-xs cursor-pointer w-full"
+        className="relative flex items-center justify-between p-4 rounded-2xl border border-zinc-200/90 dark:border-white/10 bg-white dark:bg-zinc-900 hover:border-zinc-400 dark:hover:border-zinc-600 text-zinc-900 dark:text-white transition-colors cursor-pointer w-full shadow-xs"
       >
         <div className="flex items-center gap-3.5 min-w-0">
-          <div className="w-10 h-10 rounded-xl bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-white/10 text-zinc-900 dark:text-zinc-100 flex items-center justify-center flex-shrink-0 group-hover:border-zinc-400 group-hover:bg-zinc-200 dark:group-hover:bg-zinc-700 transition-all">
+          <div className="w-10 h-10 rounded-xl bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-white/10 text-zinc-900 dark:text-zinc-100 flex items-center justify-center flex-shrink-0 transition-colors">
             <AnimatedLabFlaskIcon />
           </div>
           <div className="min-w-0 text-left">
@@ -94,8 +94,8 @@ export function QuickActions({}: QuickActionsProps) {
           </div>
         </div>
 
-        <div className="flex items-center gap-1 text-xs font-semibold text-zinc-400 group-hover:text-zinc-900 dark:group-hover:text-white transition-colors pl-2 flex-shrink-0">
-          <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+        <div className="flex items-center gap-1 text-xs font-semibold text-zinc-400 pl-2 flex-shrink-0">
+          <ArrowRight className="w-4 h-4" />
         </div>
       </button>
     </div>

@@ -286,11 +286,11 @@ export default function TrialSetupModal({
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-3xl w-full max-w-3xl p-6 sm:p-8 shadow-2xl space-y-6 relative max-h-[92vh] overflow-y-auto animate-in zoom-in-95 duration-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-sm animate-in fade-in duration-200">
+      <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-3xl w-full max-w-4xl lg:max-w-5xl p-5 sm:p-6 md:p-7 shadow-2xl space-y-4 sm:space-y-5 relative max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-200">
         <button
           onClick={onClose}
-          className="absolute top-5 right-5 w-8 h-8 rounded-xl bg-[var(--background)] hover:bg-[var(--hover-bg)] text-[var(--muted)] hover:text-[var(--heading)] flex items-center justify-center text-sm transition cursor-pointer border border-[var(--border)]"
+          className="absolute top-4 right-4 sm:top-5 sm:right-5 w-8 h-8 rounded-xl bg-[var(--background)] hover:bg-[var(--hover-bg)] text-[var(--muted)] hover:text-[var(--heading)] flex items-center justify-center text-sm transition cursor-pointer border border-[var(--border)] z-10"
         >
           ✕
         </button>
@@ -411,7 +411,7 @@ export default function TrialSetupModal({
             Select exactly <strong>{selectedAgentCount}</strong> personality role{selectedAgentCount > 1 ? 's' : ''} to activate for your <strong>{selectedPlan?.name || 'Selected'}</strong> trial.
           </p>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
             {(personalities && personalities.length > 0 ? personalities : PERSONALITY_OPTIONS).map((item) => {
               const isChecked = selectedPersonalities.includes(item.id)
               return (

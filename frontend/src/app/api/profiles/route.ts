@@ -95,13 +95,31 @@ export async function GET() {
     }
 
     const resolvedEmail = profile.email || user.email || ''
-    const resolvedFullName = profile.full_name || user.user_metadata?.full_name || ''
+    let resolvedFullName = (profile.full_name || '').trim()
+    if (!resolvedFullName) {
+      resolvedFullName = (
+        user.user_metadata?.full_name ||
+        user.user_metadata?.name ||
+        user.raw_user_meta_data?.full_name ||
+        user.raw_user_meta_data?.name ||
+        (user.email ? user.email.split('@')[0] : '')
+      ).trim()
+
+      if (resolvedFullName && profile.id) {
+        // Auto-heal empty full_name in database
+        try {
+          await admin.from('profiles').update({ full_name: resolvedFullName }).eq('id', profile.id)
+        } catch (healErr) {
+          console.warn('[/api/profiles GET] Could not auto-heal full_name:', healErr)
+        }
+      }
+    }
 
     return NextResponse.json({
       profile: {
         ...profile,
         email: resolvedEmail,
-        full_name: resolvedFullName,
+        full_name: resolvedFullName || 'Partner',
         region: profile.state || '',
         theme: profile.theme || 'light',
         theme_preference: profile.theme || 'light',

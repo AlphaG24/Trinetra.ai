@@ -82,10 +82,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const userEmail = (data.email || '').toLowerCase().trim()
           const isSuperAdmin = userEmail === 'raghav00424@gmail.com' || userEmail === 'raghav@trinetra.ai' || (process.env.NEXT_PUBLIC_ADMIN_EMAILS || '').includes(userEmail)
           const resolvedRole = isSuperAdmin ? 'super_admin' : (data.role || null)
-          setProfile({ ...data, role: resolvedRole })
+          const resolvedFullName = (data.full_name || user?.user_metadata?.full_name || user?.user_metadata?.name || (userEmail ? userEmail.split('@')[0] : '')).trim()
+          const enrichedProfile = { ...data, full_name: resolvedFullName || 'Partner', role: resolvedRole }
+          setProfile(enrichedProfile)
           setRole(resolvedRole)
           try {
-            sessionStorage.setItem(CACHE_KEY, JSON.stringify({ profile: { ...data, role: resolvedRole } }))
+            sessionStorage.setItem(CACHE_KEY, JSON.stringify({ profile: enrichedProfile }))
             if (resolvedRole) {
               sessionStorage.setItem('trinetra_user_role', resolvedRole)
             }
@@ -108,10 +110,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const userEmail = (data.email || '').toLowerCase().trim()
         const isSuperAdmin = userEmail === 'raghav00424@gmail.com' || userEmail === 'raghav@trinetra.ai' || (process.env.NEXT_PUBLIC_ADMIN_EMAILS || '').includes(userEmail)
         const resolvedRole = isSuperAdmin ? 'super_admin' : (data.role || null)
-        setProfile({ ...data, role: resolvedRole })
+        const resolvedFullName = (data.full_name || user?.user_metadata?.full_name || user?.user_metadata?.name || (userEmail ? userEmail.split('@')[0] : '')).trim()
+        const enrichedProfile = { ...data, full_name: resolvedFullName || 'Partner', role: resolvedRole }
+        setProfile(enrichedProfile)
         setRole(resolvedRole)
         try {
-          sessionStorage.setItem(CACHE_KEY, JSON.stringify({ profile: { ...data, role: resolvedRole } }))
+          sessionStorage.setItem(CACHE_KEY, JSON.stringify({ profile: enrichedProfile }))
           if (resolvedRole) {
             sessionStorage.setItem('trinetra_user_role', resolvedRole)
           }

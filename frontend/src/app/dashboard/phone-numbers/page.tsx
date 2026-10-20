@@ -23,10 +23,18 @@ import { ShieldAlert } from "lucide-react";
 export default function PhoneNumbersPage() {
   const { profile: authProfile, isLoading: authLoading } = useAuth();
   const { profile: storeProfile, setProfile } = useDashboardStore();
-  const profile = authProfile || storeProfile;
+  const [profileTimeoutPassed, setProfileTimeoutPassed] = useState(false);
+  const profile = authProfile || storeProfile || (profileTimeoutPassed ? { plan_tier: 'free', role: 'client' } : null);
 
   useEffect(() => {
-    if (!profile || profile.plan_tier === undefined) {
+    const timer = setTimeout(() => {
+      setProfileTimeoutPassed(true);
+    }, 1200);
+    return () => clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    if (!profile || (profile as any).plan_tier === undefined) {
       const loadProfile = async () => {
         try {
           const { createClient } = await import('@/utils/supabase/client');
@@ -37,7 +45,7 @@ export default function PhoneNumbersPage() {
               .from('profiles')
               .select('*')
               .eq('id', user.id)
-              .single();
+              .maybeSingle();
             if (dbProfile) {
               setProfile(dbProfile);
             }

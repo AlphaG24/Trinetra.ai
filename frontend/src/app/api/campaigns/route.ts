@@ -1,65 +1,68 @@
 import { NextResponse } from "next/server";
 import { authenticateRequest } from "@/lib/api-helpers";
+import { createClient as createAdminClient } from "@supabase/supabase-js";
+
+function getAdminClient() {
+  return createAdminClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  );
+}
 
 export async function GET(request: Request) {
   try {
-    const { authenticated, profile, error, supabase } = await authenticateRequest();
+    const { authenticated, profile, error } = await authenticateRequest();
     if (!authenticated || !profile) {
       return NextResponse.json({ error: error || "Unauthorized" }, { status: 401 });
     }
 
-    if (!profile.organization_id || profile.organization_id === "null" || profile.organization_id === "undefined") {
-      return NextResponse.json({ success: true, data: [] });
-    }
-    
-    const fastApiUrl = process.env.NEXT_PUBLIC_FASTAPI_URL || 'http://127.0.0.1:8000';
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 6000);
+    const orgId = profile.organization_id;
+    const userId = profile.id;
+    const admin = getAdminClient();
 
     try {
-      const response = await fetch(`${fastApiUrl}/api/campaigns?organization_id=${profile.organization_id}`, {
-        method: "GET",
-        cache: "no-store",
-        signal: controller.signal
-      });
-      
-      const data = await response.json();
-      clearTimeout(timeoutId);
-      
-      if (!response.ok) {
-        return NextResponse.json({ error: data.detail || "Failed to list campaigns" }, { status: response.status });
+      let query = admin
+        .from("campaigns")
+        .select(`
+          *,
+          agents (
+            name
+          )
+        `)
+        .order("created_at", { ascending: false });
+
+      if (orgId) {
+        query = query.or(`organization_id.eq.${orgId},organization_id.eq.${userId}`);
+      } else {
+        query = query.eq("organization_id", userId);
       }
-      
-      return NextResponse.json(data);
-    } catch (fetchErr: any) {
-      clearTimeout(timeoutId);
-      console.warn("[GET /api/campaigns] FastAPI fetch failed, falling back to direct database query:", fetchErr);
-      
-      try {
-        const { data: dbCampaigns, error: dbError } = await supabase
-          .from("campaigns")
-          .select(`
-            *,
-            agents (
-              name
-            )
-          `)
-          .eq("organization_id", profile.organization_id)
-          .order("created_at", { ascending: false });
 
-        if (dbError) {
-          console.error("[GET /api/campaigns] Supabase fallback database query failed:", dbError);
-          return NextResponse.json({ error: "Failed to list campaigns from database" }, { status: 500 });
-        }
+      const { data: dbCampaigns, error: dbError } = await query;
 
+      if (!dbError && dbCampaigns) {
         return NextResponse.json({
           success: true,
-          data: dbCampaigns || []
+          data: dbCampaigns
         });
-      } catch (dbFallbackErr: any) {
-        console.error("[GET /api/campaigns] Supabase fallback exception:", dbFallbackErr);
-        return NextResponse.json({ error: "Backend server is offline or unreachable" }, { status: 503 });
       }
+    } catch (dbErr) {
+      console.warn("[GET /api/campaigns] Direct DB query exception, trying simple select:", dbErr);
+    }
+
+    // Fallback: select without agents relation
+    try {
+      const { data: simpleCampaigns } = await admin
+        .from("campaigns")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      return NextResponse.json({
+        success: true,
+        data: simpleCampaigns || []
+      });
+    } catch {
+      return NextResponse.json({ success: true, data: [] });
     }
   } catch (err: any) {
     return NextResponse.json({ error: err.message || "Internal server error" }, { status: 500 });

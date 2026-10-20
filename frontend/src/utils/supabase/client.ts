@@ -36,38 +36,15 @@ const resilientFetch: typeof fetch = async (input, init) => {
   try {
     return await fetch(input, init)
   } catch (err: any) {
-    const urlStr =
-      typeof input === 'string'
-        ? input
-        : input instanceof Request
-        ? input.url
-        : String(input || '')
-
-    // For GoTrue auth endpoints (/auth/v1/), returning 503 triggers GoTrue's internal
-    // AuthRetryableFetchError retry storm. Returning a non-5xx (400) allows GoTrue
-    // to cleanly treat the session as expired/logged-out without crashing or looping.
-    if (urlStr.includes('/auth/v1/')) {
-      return new Response(
-        JSON.stringify({
-          error: 'invalid_grant',
-          error_description: 'Network temporarily offline or auth session expired.',
-        }),
-        {
-          status: 400,
-          statusText: 'Bad Request',
-          headers: { 'Content-Type': 'application/json' },
-        }
-      )
-    }
-
+    console.warn('[Supabase Client] Network fetch notice:', err?.message || err)
     return new Response(
       JSON.stringify({
         error: 'network_unavailable',
         message: 'Network service temporarily unavailable.',
       }),
       {
-        status: 400,
-        statusText: 'Bad Request',
+        status: 503,
+        statusText: 'Service Unavailable',
         headers: { 'Content-Type': 'application/json' },
       }
     )

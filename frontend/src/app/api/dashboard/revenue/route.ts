@@ -108,15 +108,13 @@ export async function GET(request: Request) {
     if (txs && txs.length > 0) {
       totalPaidToTrinetra = txs.reduce((sum: number, tx: any) => sum + (Number(tx.amount) || 0), 0)
     } else {
-      // Fallback estimate based on plan tier
-      const tier = profile?.plan_tier || 'starter'
-      const tierPrices: Record<string, number> = { starter: 999, pro: 2999, enterprise: 9999 }
-      totalPaidToTrinetra = tierPrices[tier] || 999
+      // If no transactions have occurred, real amount paid is 0
+      totalPaidToTrinetra = 0
     }
 
     const roiMultiplier = totalPaidToTrinetra > 0
       ? Number((confirmedRevenue / totalPaidToTrinetra).toFixed(1))
-      : 0
+      : (confirmedRevenue > 0 ? Number((confirmedRevenue / 1).toFixed(1)) : 0)
     const roiPercentage = totalPaidToTrinetra > 0
       ? Number((((confirmedRevenue - totalPaidToTrinetra) / totalPaidToTrinetra) * 100).toFixed(1))
       : 0

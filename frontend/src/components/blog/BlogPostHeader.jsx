@@ -96,12 +96,12 @@ export default function BlogPostHeader({ post }) {
         </span>
       </div>
 
-      {post.cover_image ? (
+      {(post.cover_image_url || post.cover_image) ? (
         <div className="mt-8 overflow-hidden rounded-2xl border border-border-subtle bg-trinetra-bg-secondary flex items-center justify-center"
              style={{ minHeight: '200px', maxHeight: '500px' }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src={post.cover_image}
+            src={post.cover_image_url || post.cover_image}
             alt={post.title || "Cover image"}
             className="max-h-[500px] w-auto max-w-full object-contain"
             loading="lazy"
