@@ -8,7 +8,7 @@ import {
   Activity, 
   Bot, 
   Clock, 
-  Sparkles, 
+  CheckCircle2, 
   Phone, 
   ArrowUpRight, 
   ChevronRight, 
@@ -126,7 +126,7 @@ export function PaidAgentDashboard({
           <div className="flex justify-between items-start">
             <span className="text-xs font-mono uppercase tracking-widest text-zinc-400">Positive Outcomes</span>
             <div className="p-2 bg-emerald-500/10 rounded-xl text-emerald-400">
-              <Sparkles className="w-5 h-5" />
+              <CheckCircle2 className="w-5 h-5" />
             </div>
           </div>
           <div className="mt-4">

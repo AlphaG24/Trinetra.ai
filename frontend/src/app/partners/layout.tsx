@@ -12,9 +12,13 @@ export default function PartnersLayout({
   const pathname = usePathname();
   const isLandingPage = pathname === "/partners";
 
+  if (isLandingPage) {
+    return <>{children}</>;
+  }
+
   return (
     <div className="partner-theme">
-      {isLandingPage ? <Layout>{children}</Layout> : children}
+      {children}
     </div>
   );
 }

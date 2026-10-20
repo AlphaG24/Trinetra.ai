@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ChevronDown, ArrowUpRight, Sparkles, Mic, Bot } from "lucide-react";
+import { ChevronDown, ArrowUpRight, Mic, Bot, CreditCard, MessageSquare } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { toast } from "sonner";
 
@@ -78,6 +78,11 @@ export function Navbar() {
   const [productsDropdownOpen, setProductsDropdownOpen] = useState(false);
   const [mobileProductsExpanded, setMobileProductsExpanded] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const [latestBlog, setLatestBlog] = useState<{
+    title: string;
+    image: string;
+    slug: string;
+  } | null>(null);
   const [announcement, setAnnouncement] = useState({
     enabled: false,
     tag: "PLATFORM",
@@ -119,6 +124,21 @@ export function Navbar() {
       .then((json) => {
         if (json?.data) {
           setAnnouncement(json.data);
+        }
+      })
+      .catch(() => {});
+
+    // Dynamically fetch latest published blog post image and title for the popup modal
+    fetch("/api/blog?limit=1")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data?.posts && data.posts.length > 0) {
+          const post = data.posts[0];
+          setLatestBlog({
+            title: post.title,
+            image: post.cover_image_url || "/images/vaakriti_blog.jpg",
+            slug: post.slug,
+          });
         }
       })
       .catch(() => {});
@@ -170,21 +190,21 @@ export function Navbar() {
   const pathname = usePathname();
   const isLanding = pathname === "/";
 
-  // Visual cards inside Products dropdown: About Us & Blogs
+  // Visual cards inside popup modal: About Us & Blogs (with live blog image)
   const dropdownCards = [
     {
       image: "/images/vaakriti_arch.jpg",
       tag: "About Us",
       title: "Vision Beyond the Surface",
-      subtitle: "Learn about Vaakriti & our journey",
+      subtitle: "Learn about Vaakriti & our voice journey",
       href: "/about",
     },
     {
-      image: "/images/vaakriti_blog.jpg",
-      tag: "Blogs & Research",
-      title: "Scaling Multilingual Voice AI",
+      image: latestBlog?.image || "/images/vaakriti_blog.jpg",
+      tag: latestBlog ? "Latest Post" : "Blogs & Research",
+      title: latestBlog?.title || "Scaling Multilingual Voice AI",
       subtitle: "Read latest engineering insights",
-      href: "/blog",
+      href: latestBlog?.slug ? `/blog/${latestBlog.slug}` : "/blog",
     },
   ];
 
@@ -243,8 +263,11 @@ export function Navbar() {
           </div>
         )}
 
-        {/* ── 2. MAIN NAVIGATION BAR ── */}
-        <div className="w-full max-w-[1536px] h-[54px] sm:h-[62px] mx-auto px-6 sm:px-10 lg:px-14 flex items-center justify-between">
+        {/* ── 2. MAIN NAVIGATION BAR (Hover opens popup modal, strictly NO buttons except Go to Dashboard) ── */}
+        <div 
+          onMouseEnter={handleMouseEnterProducts}
+          className="w-full max-w-[1536px] h-[54px] sm:h-[62px] mx-auto px-6 sm:px-10 lg:px-14 flex items-center justify-between"
+        >
           {/* Brand Logo on Left */}
           <div className="flex items-center gap-3">
             <Link href="/" className="group select-none flex items-center py-2" aria-label="Vaakriti Home">
@@ -254,83 +277,29 @@ export function Navbar() {
             </Link>
           </div>
 
-          {/* Navigation Links: Products (with dropdown) | Pricing | Contact Us */}
-          <nav className="hidden md:flex items-center gap-7 lg:gap-9">
-            {/* 1. Products Dropdown Trigger */}
-            <div
-              className="relative"
-              onMouseEnter={handleMouseEnterProducts}
-            >
-              <button
-                type="button"
-                onClick={() => setProductsDropdownOpen((prev) => !prev)}
-                className={`text-[13.5px] font-medium transition-colors font-sans py-2.5 flex items-center gap-1 cursor-pointer select-none ${
-                  productsDropdownOpen ? "text-[#2563EB] font-semibold" : "text-[#1E293B] hover:text-[#2563EB]"
-                }`}
-                aria-expanded={productsDropdownOpen}
-              >
-                <span>Products</span>
-                <ChevronDown
-                  className={`w-3.5 h-3.5 transition-transform duration-200 ${
-                    productsDropdownOpen ? "rotate-180 text-[#2563EB]" : "text-[#64748B]"
-                  }`}
-                />
-              </button>
-            </div>
-
-            {/* 2. Pricing Direct Link */}
-            <Link
-              href="/pricing"
-              className={`text-[13.5px] font-medium transition-colors font-sans py-2.5 cursor-pointer select-none ${
-                pathname === "/pricing" ? "text-[#2563EB] font-semibold" : "text-[#1E293B] hover:text-[#2563EB]"
-              }`}
-            >
-              Pricing
-            </Link>
-
-            {/* 3. Contact Us Direct Link */}
-            <Link
-              href="/contact"
-              className={`text-[13.5px] font-medium transition-colors font-sans py-2.5 cursor-pointer select-none ${
-                pathname === "/contact" ? "text-[#2563EB] font-semibold" : "text-[#1E293B] hover:text-[#2563EB]"
-              }`}
-            >
-              Contact Us
-            </Link>
-          </nav>
-
-          {/* Right Action Buttons: Trinetra Shiksha & Dashboard */}
-          <div className="hidden sm:flex items-center gap-3">
-            <a
-              href="https://shiksha.trinetraedu-ai.com"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hidden lg:inline-flex items-center justify-center px-4 py-2 text-[13px] font-semibold rounded-full border border-[#CBD5E1] bg-white text-[#0F172A] hover:border-[#2563EB] hover:text-[#2563EB] transition-all duration-200 shadow-2xs font-sans"
-            >
-              Trinetra Shiksha
-            </a>
-
+          {/* Right Action Button: Dashboard ONLY (Strictly no other buttons in topbar) */}
+          <div className="flex items-center gap-3">
             <Link
               href={dashboardHref}
               className="inline-flex items-center justify-center px-5 py-2 text-[13px] font-semibold rounded-full shadow-xs transition-all duration-200 cursor-pointer font-sans bg-[#0F172A] text-white hover:bg-[#1E293B]"
             >
               {user ? "Dashboard" : "Go to Dashboard"}
             </Link>
-          </div>
 
-          {/* Mobile Hamburger */}
-          <button
-            onClick={toggleMenu}
-            className="sm:hidden p-2 text-[#0F172A] hover:text-[#2563EB]"
-            aria-label="Toggle Navigation Menu"
-          >
-            <span className="block w-5 h-0.5 bg-current mb-1" />
-            <span className="block w-5 h-0.5 bg-current mb-1" />
-            <span className="block w-5 h-0.5 bg-current" />
-          </button>
+            {/* Mobile Hamburger (Only visible on small phones) */}
+            <button
+              onClick={toggleMenu}
+              className="sm:hidden p-2 text-[#0F172A] hover:text-[#2563EB]"
+              aria-label="Toggle Navigation Menu"
+            >
+              <span className="block w-5 h-0.5 bg-current mb-1" />
+              <span className="block w-5 h-0.5 bg-current mb-1" />
+              <span className="block w-5 h-0.5 bg-current" />
+            </button>
+          </div>
         </div>
 
-        {/* ── 3. PRODUCTS MEGAMENU POPOVER (DB Products on left + About Us & Blogs on right) ── */}
+        {/* ── 3. PRODUCTS MEGAMENU POPOVER (3 Headings on left + About Us & Blogs on right) ── */}
         <AnimatePresence>
           {productsDropdownOpen && (
             <motion.div
@@ -340,75 +309,130 @@ export function Navbar() {
               transition={{ duration: 0.16, ease: "easeOut" }}
               onMouseEnter={handleMouseEnterProducts}
               onMouseLeave={handleMouseLeaveProducts}
-              className="w-full bg-white/98 backdrop-blur-2xl border-t border-b border-[#E2E8F0] shadow-[0_24px_60px_rgba(15,23,42,0.08)] py-8 z-40 select-none"
+              className="w-full bg-white/98 backdrop-blur-2xl border-t border-b border-[#E2E8F0] shadow-[0_24px_60px_rgba(15,23,42,0.08)] py-7 z-40 select-none"
             >
               <div className="max-w-[1340px] mx-auto px-6 sm:px-10 lg:px-14 grid grid-cols-12 gap-8 items-stretch">
-                {/* Left Column: Live Database Products */}
-                <div className="col-span-12 lg:col-span-5 flex flex-col justify-center space-y-3 border-r-0 lg:border-r border-[#E2E8F0] pr-0 lg:pr-8">
-                  <div className="text-[11px] font-bold uppercase tracking-wider text-[#64748B] mb-1 font-sans">
-                    Available Products
+                {/* Left Column: 3 Core Headings (Products, Pricing, Contact Us) */}
+                <div className="col-span-12 lg:col-span-6 flex flex-col justify-center space-y-4 border-r-0 lg:border-r border-[#E2E8F0] pr-0 lg:pr-8">
+                  {/* Heading 1: Available Products */}
+                  <div>
+                    <div className="text-[11px] font-bold uppercase tracking-wider text-[#64748B] mb-2 font-sans flex items-center justify-between">
+                      <span>Products</span>
+                      <span className="text-[10px] text-[#2563EB] font-semibold">Live Systems</span>
+                    </div>
+
+                    {productsLoading ? (
+                      <div className="py-3 text-sm text-[#64748B] font-sans">Loading products...</div>
+                    ) : products.length === 0 ? (
+                      <div className="py-3 text-sm text-[#64748B] font-sans">No products available right now.</div>
+                    ) : (
+                      <div className="space-y-1.5">
+                        {products.map((product) => {
+                          const statusMeta = getStatusMeta(product.status);
+                          const isNavigable = canNavigateToProduct(product.status);
+
+                          const innerContent = (
+                            <div className="flex items-start gap-3 p-2.5 rounded-xl hover:bg-[#F8FAFC] border border-transparent hover:border-[#E2E8F0] transition-all duration-200 w-full text-left">
+                              <div className="w-8 h-8 rounded-lg bg-[#F1F5F9] group-hover:bg-[#2563EB]/10 border border-[#E2E8F0] group-hover:border-[#2563EB]/25 flex items-center justify-center text-[#475569] group-hover:text-[#2563EB] transition-colors shrink-0 mt-0.5">
+                                {product.slug.includes("voice") ? <Mic className="w-3.5 h-3.5" /> : <Bot className="w-3.5 h-3.5" />}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center justify-between gap-2">
+                                  <span className="text-[13.5px] font-semibold text-[#0F172A] group-hover:text-[#2563EB] transition-colors font-sans">
+                                    {product.name}
+                                  </span>
+                                  <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold border ${statusMeta.bgClass} ${statusMeta.textClass}`}>
+                                    <span className={`w-1.5 h-1.5 rounded-full ${statusMeta.dotClass}`} />
+                                    {statusMeta.label}
+                                  </span>
+                                </div>
+                                <p className="text-[11.5px] text-[#64748B] font-sans leading-relaxed truncate mt-0.5">
+                                  {product.tagline}
+                                </p>
+                              </div>
+                            </div>
+                          );
+
+                          if (!isNavigable) {
+                            return (
+                              <button
+                                key={product.slug}
+                                type="button"
+                                onClick={handleComingSoonClick}
+                                className="group block w-full text-left cursor-pointer"
+                              >
+                                {innerContent}
+                              </button>
+                            );
+                          }
+
+                          return (
+                            <Link
+                              key={product.slug}
+                              href={product.slug === "voice-agent" ? "/demo" : `/products/${product.slug}`}
+                              onClick={() => setProductsDropdownOpen(false)}
+                              className="group block w-full cursor-pointer"
+                            >
+                              {innerContent}
+                            </Link>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
 
-                  {productsLoading ? (
-                    <div className="py-6 text-sm text-[#64748B] font-sans">Loading products...</div>
-                  ) : products.length === 0 ? (
-                    <div className="py-6 text-sm text-[#64748B] font-sans">No products available right now.</div>
-                  ) : (
-                    products.map((product) => {
-                      const statusMeta = getStatusMeta(product.status);
-                      const isNavigable = canNavigateToProduct(product.status);
+                  <div className="h-px w-full bg-[#E2E8F0]/80 my-1" />
 
-                      const innerContent = (
-                        <div className="flex items-start gap-3.5 p-3.5 rounded-2xl hover:bg-[#F8FAFC] border border-transparent hover:border-[#E2E8F0] transition-all duration-200 w-full text-left">
-                          <div className="w-9 h-9 rounded-xl bg-[#F1F5F9] group-hover:bg-[#2563EB]/10 border border-[#E2E8F0] group-hover:border-[#2563EB]/25 flex items-center justify-center text-[#475569] group-hover:text-[#2563EB] transition-colors shrink-0 mt-0.5">
-                            {product.slug.includes("voice") ? <Mic className="w-4 h-4" /> : <Bot className="w-4 h-4" />}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center justify-between gap-2">
-                              <span className="text-[14px] font-semibold text-[#0F172A] group-hover:text-[#2563EB] transition-colors font-sans">
-                                {product.name}
-                              </span>
-                              <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10.5px] font-semibold border ${statusMeta.bgClass} ${statusMeta.textClass}`}>
-                                <span className={`w-1.5 h-1.5 rounded-full ${statusMeta.dotClass}`} />
-                                {statusMeta.label}
-                              </span>
-                            </div>
-                            <p className="text-[12px] text-[#64748B] font-sans leading-relaxed mt-1">
-                              {product.tagline}
-                            </p>
-                          </div>
+                  {/* Headings 2 & 3: Pricing & Contact Us */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    {/* Heading 2: Pricing */}
+                    <Link
+                      href="/pricing"
+                      onClick={() => setProductsDropdownOpen(false)}
+                      className="group flex items-start gap-3 p-3 rounded-xl hover:bg-[#F8FAFC] border border-[#E2E8F0]/70 hover:border-[#2563EB]/30 transition-all duration-200"
+                    >
+                      <div className="w-8 h-8 rounded-lg bg-[#2563EB]/10 border border-[#2563EB]/20 flex items-center justify-center text-[#2563EB] shrink-0 mt-0.5">
+                        <CreditCard className="w-3.5 h-3.5" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[13.5px] font-semibold text-[#0F172A] group-hover:text-[#2563EB] transition-colors font-sans">
+                            Pricing
+                          </span>
+                          <ArrowUpRight className="w-3.5 h-3.5 text-[#94A3B8] group-hover:text-[#2563EB] transition-colors" />
                         </div>
-                      );
+                        <p className="text-[11px] text-[#64748B] font-sans leading-relaxed mt-0.5">
+                          Transparent tiers & enterprise plans
+                        </p>
+                      </div>
+                    </Link>
 
-                      if (!isNavigable) {
-                        return (
-                          <button
-                            key={product.slug}
-                            type="button"
-                            onClick={handleComingSoonClick}
-                            className="group block w-full text-left cursor-pointer"
-                          >
-                            {innerContent}
-                          </button>
-                        );
-                      }
-
-                      return (
-                        <Link
-                          key={product.slug}
-                          href={product.slug === "voice-agent" ? "/demo" : `/products/${product.slug}`}
-                          onClick={() => setProductsDropdownOpen(false)}
-                          className="group block w-full cursor-pointer"
-                        >
-                          {innerContent}
-                        </Link>
-                      );
-                    })
-                  )}
+                    {/* Heading 3: Contact Us */}
+                    <Link
+                      href="/contact"
+                      onClick={() => setProductsDropdownOpen(false)}
+                      className="group flex items-start gap-3 p-3 rounded-xl hover:bg-[#F8FAFC] border border-[#E2E8F0]/70 hover:border-[#2563EB]/30 transition-all duration-200"
+                    >
+                      <div className="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-600 shrink-0 mt-0.5">
+                        <MessageSquare className="w-3.5 h-3.5" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[13.5px] font-semibold text-[#0F172A] group-hover:text-[#2563EB] transition-colors font-sans">
+                            Contact Us
+                          </span>
+                          <ArrowUpRight className="w-3.5 h-3.5 text-[#94A3B8] group-hover:text-[#2563EB] transition-colors" />
+                        </div>
+                        <p className="text-[11px] text-[#64748B] font-sans leading-relaxed mt-0.5">
+                          Talk to voice architecture specialists
+                        </p>
+                      </div>
+                    </Link>
+                  </div>
                 </div>
 
-                {/* Right Column: Visual Announcement Cards: About Us & Blogs */}
-                <div className="col-span-12 lg:col-span-7 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Right Column: Visual Announcement Cards: About Us & Blogs (with latest blog dynamic image) */}
+                <div className="col-span-12 lg:col-span-6 grid grid-cols-1 sm:grid-cols-2 gap-4 items-center">
                   {dropdownCards.map((card) => (
                     <Link
                       key={card.title}
@@ -424,14 +448,14 @@ export function Navbar() {
                           className="object-cover group-hover:scale-105 transition-transform duration-500"
                           sizes="(max-width: 768px) 100vw, 360px"
                         />
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-black/20 to-transparent" />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/25 to-transparent" />
                         <div className="absolute top-3 left-3">
                           <span className="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-white/90 backdrop-blur-md text-[#0F172A] shadow-xs">
                             {card.tag}
                           </span>
                         </div>
                         <div className="absolute bottom-3 left-3 right-3 text-white">
-                          <h4 className="text-[13.5px] font-bold font-sans drop-shadow-sm leading-snug">
+                          <h4 className="text-[13.5px] font-bold font-sans drop-shadow-sm leading-snug line-clamp-2">
                             {card.title}
                           </h4>
                         </div>
@@ -538,16 +562,6 @@ export function Navbar() {
             >
               Contact Us
             </Link>
-
-            <a
-              href="https://shiksha.trinetraedu-ai.com"
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={() => setMenuOpen(false)}
-              className="px-3 py-2.5 rounded-xl hover:bg-white text-base font-semibold text-[#0F172A]"
-            >
-              Trinetra Shiksha ↗
-            </a>
           </nav>
 
           <div className="mt-auto pt-6 flex flex-col gap-3">

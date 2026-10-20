@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Mail, MessageSquare, Bell, Clock, Inbox, ShieldAlert, Sparkles, Loader2 } from 'lucide-react'
+import { Mail, MessageSquare, Bell, Clock, Inbox, ShieldAlert, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import TelegramConnectionCard from '@/src/components/dashboard/TelegramConnectionCard'
 
@@ -323,7 +323,7 @@ export function NotificationsTab() {
           <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-6 space-y-4 shadow-sm relative overflow-hidden">
             <div className="flex items-center justify-between pb-3 border-b border-[var(--border)]">
               <div className="flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-zinc-900 dark:text-white" />
+                <Inbox className="w-4 h-4 text-zinc-900 dark:text-white" />
                 <h3 className="font-bold font-montserrat text-xs text-[var(--heading)] uppercase tracking-wider">Digest Mode</h3>
               </div>
               <button

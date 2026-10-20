@@ -50,6 +50,7 @@ export async function GET() {
       .from('byon_carrier_credentials')
       .select('id, carrier, account_sid, api_key_or_sid, webhook_url, status, last_synced_at, created_at')
       .eq('organization_id', orgId)
+      .order('updated_at', { ascending: false })
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 })
@@ -57,6 +58,7 @@ export async function GET() {
 
     const twilioCred = creds?.find(c => c.carrier === 'twilio') || null
     const exotelCred = creds?.find(c => c.carrier === 'exotel') || null
+    const sarvamCred = creds?.find(c => c.carrier === 'sarvam') || null
 
     return NextResponse.json({
       twilio: twilioCred ? {
@@ -75,6 +77,14 @@ export async function GET() {
         subdomain: exotelCred.webhook_url || 'api.exotel.com',
         status: exotelCred.status,
         last_synced_at: exotelCred.last_synced_at,
+      } : { connected: false },
+      sarvam: sarvamCred ? {
+        id: sarvamCred.id,
+        connected: sarvamCred.status === 'active',
+        account_sid: sarvamCred.account_sid,
+        caller_id: sarvamCred.account_sid,
+        status: sarvamCred.status,
+        last_synced_at: sarvamCred.last_synced_at,
       } : { connected: false },
     })
   } catch (err: any) {
@@ -110,13 +120,20 @@ export async function POST(req: Request) {
     const body = await req.json()
     const { carrier, account_sid, auth_token, api_key_or_sid, subdomain } = body
 
-    if (!carrier || !['twilio', 'exotel'].includes(carrier)) {
-      return NextResponse.json({ error: 'Carrier must be twilio or exotel' }, { status: 400 })
+    if (!carrier || !['twilio', 'exotel', 'sarvam'].includes(carrier)) {
+      return NextResponse.json({ error: 'Carrier must be twilio, exotel, or sarvam' }, { status: 400 })
     }
-    if (!account_sid || !auth_token) {
-      return NextResponse.json({ error: 'Account SID and Auth Token / API Secret are required' }, { status: 400 })
+    if (carrier === 'sarvam') {
+      if (!auth_token) {
+        return NextResponse.json({ error: 'Sarvam API Key is required' }, { status: 400 })
+      }
+    } else {
+      if (!account_sid || !auth_token) {
+        return NextResponse.json({ error: 'Account SID and Auth Token / API Secret are required' }, { status: 400 })
+      }
     }
 
+    const effectiveAccountSid = account_sid?.trim() || (carrier === 'sarvam' ? 'sarvam_main' : '')
     const encryptedToken = encryptToken(auth_token)
     const keyFingerprint = crypto.createHash('sha256').update(auth_token).digest('hex')
 
@@ -125,7 +142,7 @@ export async function POST(req: Request) {
       .upsert({
         organization_id: orgId,
         carrier,
-        account_sid: account_sid.trim(),
+        account_sid: effectiveAccountSid,
         api_key_or_sid: api_key_or_sid?.trim() || null,
         encrypted_auth_token: encryptedToken,
         key_fingerprint: keyFingerprint,
@@ -175,7 +192,7 @@ export async function DELETE(req: Request) {
     const { searchParams } = new URL(req.url)
     const carrier = searchParams.get('carrier')
 
-    if (!carrier || !['twilio', 'exotel'].includes(carrier)) {
+    if (!carrier || !['twilio', 'exotel', 'sarvam'].includes(carrier)) {
       return NextResponse.json({ error: 'Valid carrier required' }, { status: 400 })
     }
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Bot, GraduationCap, Users, ExternalLink } from "lucide-react";
+import { Bot, PhoneCall, Users, ExternalLink } from "lucide-react";
 import Link from "next/link";
 
 const cards = [
@@ -21,17 +21,17 @@ const cards = [
     clickable: true
   },
   {
-    id: "edu",
+    id: "telephony",
     accent: "amber",
-    icon: <GraduationCap size={24} className="text-[#D97706]" />,
+    icon: <PhoneCall size={24} className="text-[#D97706]" />,
     iconBg: "bg-[#D97706]/10",
     gradient: "from-[#D97706] to-[#F59E0B]",
     hoverBorder: "hover:border-[#D97706]/40",
     hoverShadow: "hover:shadow-[0_12px_36px_rgba(217,119,6,0.12)]",
-    title: "Smart Education",
-    description: "Adaptive exam platforms that understand each student's cognitive profile and personalize every question with real-time analytics.",
-    linkText: "Explore Trinetra Shiksha →",
-    linkRef: "https://shiksha.trinetraedu-ai.com",
+    title: "Enterprise Telephony",
+    description: "Carrier-grade SIP trunking, sub-second latency voice streaming, and intelligent real-time CRM handoffs.",
+    linkText: "Explore Voice Agents →",
+    linkRef: "/demo",
     linkStyle: "text-[#D97706] hover:text-[#171513] font-semibold transition-colors",
     clickable: true
   },

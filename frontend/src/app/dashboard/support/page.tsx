@@ -9,7 +9,7 @@ import {
 import { toast } from 'sonner'
 import { createClient } from '@/utils/supabase/client'
 
-const SUPPORT_EMAIL = "support@trinetraedu-ai.com"
+const SUPPORT_EMAIL = "support@vaakriti.com"
 const WHATSAPP_NUMBER = "919452045499"
 
 const FAQS = [

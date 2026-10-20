@@ -5,8 +5,8 @@ export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
 export const metadata = {
-  title: 'AI Agent Marketplace — Trinetra AI',
-  description: 'Deploy AI agents on Trinetra AI Marketplace in 60 seconds.',
+  title: 'AI Agent Marketplace — Vaakriti AI',
+  description: 'Deploy AI agents on Vaakriti AI Marketplace in 60 seconds.',
 }
 
 const FALLBACK_SERVICES = [

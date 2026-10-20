@@ -15,7 +15,7 @@ export default function DocsPage() {
                         <div className="h-8 w-8 bg-black border border-zinc-800 rounded-lg flex items-center justify-center text-zinc-500 group-hover:text-emerald-500 group-hover:border-emerald-500/50 transition-all shadow-lg">
                             <BookOpen size={16} />
                         </div>
-                        <span className="font-mono font-bold tracking-tighter text-lg text-zinc-500 group-hover:text-zinc-200 transition-colors">Trinetra Search Protocol</span>
+                        <span className="font-mono font-bold tracking-tighter text-lg text-zinc-500 group-hover:text-zinc-200 transition-colors">Vaakriti Search Protocol</span>
                     </Link>
                     <span className="px-2 py-0.5 rounded-full bg-zinc-900 border border-zinc-800 text-[10px] text-zinc-500 font-mono">
                         v1.0.0
@@ -88,7 +88,7 @@ export default function DocsPage() {
                                 Welcome to the Infrastructure.
                             </h1>
                             <p className="text-lg text-zinc-400 leading-relaxed">
-                                Trinetra provides a programmatic interface for autonomous compliance and intelligence gathering. You can interact with our agents via the Console or the API.
+                                Vaakriti provides a programmatic interface for autonomous compliance and intelligence gathering. You can interact with our agents via the Console or the API.
                             </p>
                             <div className="p-4 rounded-lg bg-zinc-900 border border-zinc-800/50 text-sm text-zinc-300 flex gap-3 items-start">
                                 <div className="mt-0.5 min-w-[16px] text-emerald-500">
@@ -116,8 +116,8 @@ export default function DocsPage() {
                             {/* Code Block */}
                             <CodeBlock
                                 language="bash"
-                                code={`curl -X POST https://api.trinetra.ai/v1/audit \\
-  -H "Authorization: Bearer sk_live_trinetra_..." \\
+                                code={`curl -X POST https://api.vaakriti.com/v1/audit \\
+  -H "Authorization: Bearer sk_live_vaakriti_..." \\
   -d '{"file_url": "https://..."}'`}
                             />
                         </section>
@@ -138,7 +138,7 @@ export default function DocsPage() {
                     {/* Footer */}
                     <footer className="border-t border-zinc-800 py-12 px-6 mt-20">
                         <div className="max-w-3xl mx-auto flex items-center justify-between text-zinc-500 text-sm">
-                            <span>&copy; 2024 Trinetra Systems</span>
+                            <span>&copy; 2026 Vaakriti AI</span>
                             <div className="flex gap-4">
                                 <Link href="#" className="hover:text-white transition-colors">Status</Link>
                                 <Link href="#" className="hover:text-white transition-colors">Twitter</Link>

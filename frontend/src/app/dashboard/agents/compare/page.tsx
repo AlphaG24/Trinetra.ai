@@ -7,7 +7,17 @@ import { createClient } from '@/utils/supabase/client'
 import { toast } from 'sonner'
 import useSWR from 'swr'
 
-const fetcher = (url: string) => fetch(url).then(res => res.json())
+const fetcher = async (url: string) => {
+  try {
+    const res = await fetch(url)
+    if (!res.ok) return []
+    const text = await res.text()
+    if (!text || !text.trim()) return []
+    return JSON.parse(text)
+  } catch {
+    return []
+  }
+}
 
 interface AgentPerformance {
   id: string

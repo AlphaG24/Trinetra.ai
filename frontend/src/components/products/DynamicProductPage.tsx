@@ -28,27 +28,27 @@ function getStatusMeta(status: ProductRecord["status"]) {
   switch (status) {
     case "live":
       return {
-        label: "Live",
-        textClass: "text-[#10B981]",
-        bgClass: "bg-[rgba(16,185,129,0.1)]",
-        borderClass: "border-[rgba(16,185,129,0.18)]",
-        dotClass: "bg-[#10B981]",
+        label: "Live Now",
+        textClass: "text-emerald-700",
+        bgClass: "bg-emerald-50",
+        borderClass: "border-emerald-200",
+        dotClass: "bg-emerald-500",
       };
     case "beta":
       return {
-        label: "Beta",
-        textClass: "text-[#F59E0B]",
-        bgClass: "bg-[rgba(245,158,11,0.1)]",
-        borderClass: "border-[rgba(245,158,11,0.18)]",
-        dotClass: "bg-[#F59E0B]",
+        label: "Beta Access",
+        textClass: "text-amber-700",
+        bgClass: "bg-amber-50",
+        borderClass: "border-amber-200",
+        dotClass: "bg-amber-500",
       };
     default:
       return {
         label: "Coming Soon",
-        textClass: "text-[#A8A0C0]",
-        bgClass: "bg-[rgba(107,96,136,0.12)]",
-        borderClass: "border-[rgba(107,96,136,0.18)]",
-        dotClass: "bg-[#6B6088]",
+        textClass: "text-slate-600",
+        bgClass: "bg-slate-100",
+        borderClass: "border-slate-200",
+        dotClass: "bg-slate-400",
       };
   }
 }
@@ -56,25 +56,25 @@ function getStatusMeta(status: ProductRecord["status"]) {
 function getAccent(product: ProductRecord | null) {
   switch (product?.agentType) {
     case "voice":
-      return { icon: Phone, glow: "rgba(139,92,246,0.1)", border: "#8B5CF6", iconClass: "text-[#A78BFA]" };
+      return { icon: Phone, glow: "rgba(37,99,235,0.06)", border: "#2563EB", iconClass: "text-[#2563EB]" };
     case "chat":
       return {
         icon: MessageCircleHeart,
-        glow: "rgba(192,132,252,0.14)",
-        border: "#C084FC",
-        iconClass: "text-[#F0ABFC]",
+        glow: "rgba(37,99,235,0.06)",
+        border: "#2563EB",
+        iconClass: "text-[#2563EB]",
       };
     case "social":
       return {
         icon: CalendarDays,
-        glow: "rgba(245,158,11,0.1)",
+        glow: "rgba(245,158,11,0.06)",
         border: "#F59E0B",
-        iconClass: "text-[#F59E0B]",
+        iconClass: "text-amber-600",
       };
     case "workflow":
-      return { icon: Network, glow: "rgba(167,139,250,0.1)", border: "#A78BFA", iconClass: "text-[#A78BFA]" };
+      return { icon: Network, glow: "rgba(37,99,235,0.06)", border: "#2563EB", iconClass: "text-[#2563EB]" };
     default:
-      return { icon: Bot, glow: "rgba(139,92,246,0.1)", border: "#8B5CF6", iconClass: "text-[#A78BFA]" };
+      return { icon: Bot, glow: "rgba(37,99,235,0.06)", border: "#2563EB", iconClass: "text-[#2563EB]" };
   }
 }
 
@@ -199,20 +199,20 @@ function ProductWaitlistForm({ slug }: { slug: string }) {
   return (
     <div className="w-full max-w-[520px]">
       {status === "success" ? (
-        <p className="text-center font-sans text-[15px] font-medium text-[#10B981]">{message}</p>
+        <p className="text-center font-sans text-[15px] font-medium text-emerald-600">{message}</p>
       ) : (
         <form className="flex flex-col gap-[14px] sm:flex-row" onSubmit={handleSubmit}>
           <input
             type="email"
             value={email}
             onChange={(event) => setEmail(event.target.value)}
-            placeholder="Enter your email"
-            className="h-[52px] flex-1 rounded-[12px] border border-[#1E0A35] bg-[#0C0118] px-[16px] font-sans text-[15px] text-[#F5F3FF] placeholder:text-[#6B6088] focus:border-[#8B5CF6] focus:outline-none"
+            placeholder="Enter your work email"
+            className="h-[52px] flex-1 rounded-xl border border-slate-200 bg-white px-4 font-sans text-[15px] text-[#0F172A] placeholder:text-slate-400 focus:border-[#2563EB] focus:ring-1 focus:ring-[#2563EB] focus:outline-none shadow-2xs"
           />
           <button
             type="submit"
             disabled={status === "submitting"}
-            className="h-[52px] rounded-[12px] bg-[#F59E0B] px-[22px] font-sans text-[15px] font-semibold text-[#080010] transition-all duration-300 hover:bg-[#D97706] disabled:cursor-not-allowed disabled:bg-[#A8A0C0]"
+            className="h-[52px] rounded-xl bg-[#2563EB] px-6 font-sans text-[15px] font-semibold text-white shadow-xs transition-all duration-300 hover:bg-[#1D4ED8] disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
           >
             {status === "submitting" ? "Submitting..." : "Get Early Access ->"}
           </button>
@@ -220,7 +220,7 @@ function ProductWaitlistForm({ slug }: { slug: string }) {
       )}
 
       {status === "error" ? (
-        <p className="mt-[12px] text-center font-sans text-[14px] text-[#EF4444]">{message}</p>
+        <p className="mt-[12px] text-center font-sans text-[14px] text-rose-500">{message}</p>
       ) : null}
     </div>
   );
@@ -320,9 +320,9 @@ export function DynamicProductPage({ slug }: { slug: string }) {
   if (loading) {
     return (
       <Layout>
-        <section className="min-h-[calc(100vh-72px)] bg-[#080010] px-[20px] pb-[120px] pt-[140px]">
-          <div className="mx-auto max-w-[720px] rounded-[24px] border border-[#1E0A35] bg-[#130224] px-[24px] py-[32px] text-center font-sans text-[15px] text-[#A8A0C0]">
-            Loading product...
+        <section className="min-h-[calc(100vh-72px)] bg-[#FAFAFA] px-5 pb-28 pt-36">
+          <div className="mx-auto max-w-[720px] rounded-2xl border border-slate-200 bg-white px-6 py-8 text-center font-sans text-[15px] text-[#64748B] shadow-xs">
+            Loading product details...
           </div>
         </section>
       </Layout>
@@ -332,12 +332,12 @@ export function DynamicProductPage({ slug }: { slug: string }) {
   if (!product) {
     return (
       <Layout>
-        <section className="min-h-[calc(100vh-72px)] bg-[#080010] px-[20px] pb-[120px] pt-[140px]">
-          <div className="mx-auto max-w-[720px] rounded-[24px] border border-[#1E0A35] bg-[#130224] px-[24px] py-[32px] text-center">
-            <p className="font-sans text-[16px] text-[#A8A0C0]">Product not found.</p>
+        <section className="min-h-[calc(100vh-72px)] bg-[#FAFAFA] px-5 pb-28 pt-36">
+          <div className="mx-auto max-w-[720px] rounded-2xl border border-slate-200 bg-white px-6 py-8 text-center shadow-xs">
+            <p className="font-sans text-base font-bold text-[#0F172A]">Product not found.</p>
             <Link
               href="/"
-              className="mt-[16px] inline-flex font-sans text-[15px] text-[#A78BFA] transition-colors hover:text-[#F5F3FF]"
+              className="mt-4 inline-flex font-sans text-sm font-semibold text-[#2563EB] transition-colors hover:text-[#1D4ED8]"
             >
               Back to Home
             </Link>
@@ -351,7 +351,7 @@ export function DynamicProductPage({ slug }: { slug: string }) {
 
   return (
     <Layout>
-      <div className="relative flex min-h-screen flex-col overflow-hidden bg-[#080010]">
+      <div className="relative flex min-h-screen flex-col overflow-hidden bg-[#FAFAFA] text-[#0F172A] font-sans selection:bg-blue-500/20">
         {isChatProduct ? (
           <RetellChatWidget
             enabled={true}
@@ -381,31 +381,31 @@ export function DynamicProductPage({ slug }: { slug: string }) {
         <div
           className="pointer-events-none absolute inset-0 z-0"
           style={{
-            background: `radial-gradient(ellipse 800px 500px at top center, ${accent.glow} 0%, transparent 70%)`,
+            background: `radial-gradient(ellipse 800px 500px at top center, rgba(37,99,235,0.06) 0%, transparent 70%)`,
           }}
         />
 
-        <section className="relative z-10 flex w-full flex-col items-center px-[20px] pb-[80px] pt-[140px] text-center">
+        {/* Hero Section */}
+        <section className="relative z-10 flex w-full flex-col items-center px-5 pb-16 pt-32 text-center">
           <div
-            className={`mb-[24px] inline-flex items-center gap-[8px] rounded-full border px-[16px] py-[6px] font-sans text-[13px] font-medium ${statusMeta.bgClass} ${statusMeta.borderClass} ${statusMeta.textClass}`}
+            className={`mb-6 inline-flex items-center gap-2 rounded-full border px-4 py-1.5 font-sans text-xs font-bold uppercase tracking-wider font-mono ${statusMeta.bgClass} ${statusMeta.borderClass} ${statusMeta.textClass}`}
           >
-            <span className={`h-[6px] w-[6px] rounded-full ${statusMeta.dotClass}`} />
+            <span className={`h-2 w-2 rounded-full ${statusMeta.dotClass}`} />
             {statusMeta.label}
           </div>
 
           <div
-            className="mb-[24px] flex h-[64px] w-[64px] items-center justify-center rounded-[16px] border bg-[#130224] shadow-[0_0_30px_rgba(139,92,246,0.18)]"
-            style={{ borderColor: accent.border }}
+            className="mb-6 flex h-16 w-16 items-center justify-center rounded-2xl border border-slate-200 bg-white shadow-xs"
           >
-            <AccentIcon size={32} className={accent.iconClass} />
+            <AccentIcon size={32} className="text-[#2563EB]" />
           </div>
 
-          <h1 className="mb-[24px] font-display text-[40px] font-bold leading-tight tracking-[-0.02em] text-[#F5F3FF] md:text-[52px]">
+          <h1 className="mb-4 font-sans text-3xl sm:text-4xl md:text-5xl font-black tracking-tight text-[#0F172A]">
             {product.name}
           </h1>
 
           {product.description ? (
-            <p className="mb-[40px] max-w-[620px] font-sans text-[16px] font-normal leading-relaxed text-[#A8A0C0] md:text-[18px]">
+            <p className="mb-8 max-w-[620px] font-sans text-sm sm:text-base leading-relaxed text-[#64748B]">
               {product.description}
             </p>
           ) : null}
@@ -413,17 +413,17 @@ export function DynamicProductPage({ slug }: { slug: string }) {
           {product.status === "coming_soon" ? (
             <ProductWaitlistForm slug={product.slug} />
           ) : (
-            <div className="flex w-full flex-col gap-[16px] sm:w-auto sm:flex-row">
+            <div className="flex w-full flex-col gap-3.5 sm:w-auto sm:flex-row">
               <Link
                 href="/login"
-                className="rounded-full bg-[#FBBF24] px-[32px] py-[16px] font-sans text-[16px] font-semibold text-[#080010] shadow-[0_0_30px_rgba(251,191,36,0.2)] transition-all hover:-translate-y-1 hover:bg-[#F59E0B]"
+                className="rounded-full bg-[#2563EB] px-8 py-3.5 font-sans text-sm sm:text-base font-bold text-white shadow-md shadow-blue-500/20 transition-all hover:bg-[#1D4ED8] hover:-translate-y-0.5"
               >
                 Activate Your AI {"->"}
               </Link>
               <button
                 type="button"
                 onClick={() => handleDemoClick()}
-                className="rounded-full border border-[#2D1255] bg-[rgba(19,2,36,0.5)] px-[32px] py-[16px] font-sans text-[16px] font-medium text-[#A78BFA] transition-all hover:-translate-y-1 hover:bg-[#2D1255] hover:text-[#F5F3FF]"
+                className="rounded-full border border-slate-200 bg-white px-8 py-3.5 font-sans text-sm sm:text-base font-semibold text-[#0F172A] shadow-2xs transition-all hover:bg-slate-50 hover:border-slate-300 cursor-pointer"
               >
                 {secondaryButtonLabel}
               </button>
@@ -432,7 +432,7 @@ export function DynamicProductPage({ slug }: { slug: string }) {
 
           {isVoiceProduct && voiceStatusCopy ? (
             <div
-              className={`mt-[18px] w-full max-w-[620px] rounded-[16px] border px-[18px] py-[14px] text-left font-sans text-[14px] leading-[1.6] ${voiceStatusTone}`}
+              className={`mt-4 w-full max-w-[620px] rounded-xl border px-4 py-3 text-left font-sans text-xs sm:text-sm leading-relaxed ${voiceStatusTone}`}
             >
               {voiceStatusCopy}
             </div>
@@ -440,35 +440,29 @@ export function DynamicProductPage({ slug }: { slug: string }) {
 
           {isChatProduct && chatStatusCopy ? (
             <div
-              className={`mt-[18px] w-full max-w-[620px] rounded-[16px] border px-[18px] py-[14px] text-left font-sans text-[14px] leading-[1.6] ${chatStatusTone}`}
+              className={`mt-4 w-full max-w-[620px] rounded-xl border px-4 py-3 text-left font-sans text-xs sm:text-sm leading-relaxed ${chatStatusTone}`}
             >
               {chatStatusCopy}
             </div>
           ) : null}
 
           {isChatProduct && chatConversationStarters.length > 0 ? (
-            <div className="mt-[28px] w-full max-w-[820px] rounded-[24px] border border-[rgba(45,18,85,0.78)] bg-[rgba(12,1,24,0.82)] px-[18px] py-[18px] sm:px-[24px]">
-              <span className="block text-center font-sans text-[12px] font-semibold uppercase tracking-[0.22em] text-[#6B6088]">
-                Conversation Starters
+            <div className="mt-8 w-full max-w-[820px] rounded-3xl border border-slate-200 bg-white p-5 sm:p-6 shadow-xs">
+              <span className="block text-center font-sans text-[11px] font-bold uppercase tracking-wider text-slate-400 font-mono">
+                Suggested Prompts
               </span>
-              <div className="mt-[16px] grid w-full grid-cols-1 gap-[12px] sm:grid-cols-2">
-                {chatConversationStarters.map((prompt, index) => {
+              <div className="mt-4 grid w-full grid-cols-1 gap-3 sm:grid-cols-2">
+                {chatConversationStarters.map((prompt) => {
                   const isActivePrompt = chatStarterPrompt === prompt;
-                  const shouldCenterLastPrompt =
-                    chatConversationStarters.length % 2 === 1 &&
-                    index === chatConversationStarters.length - 1;
-
                   return (
                     <button
                       key={prompt}
                       type="button"
                       onClick={() => handleDemoClick(prompt)}
-                      className={`min-h-[56px] w-full rounded-[18px] border px-[18px] py-[14px] text-center font-sans text-[14px] font-medium leading-[1.5] transition-all duration-300 hover:-translate-y-0.5 ${
-                        shouldCenterLastPrompt ? "sm:col-span-2 sm:mx-auto sm:max-w-[360px]" : ""
-                      } ${
+                      className={`min-h-[50px] w-full rounded-2xl border px-4 py-3 text-center font-sans text-xs sm:text-[13px] font-medium leading-relaxed transition-all duration-200 cursor-pointer ${
                         isActivePrompt
-                           ? "border-[rgba(192,132,252,0.5)] bg-[rgba(76,29,149,0.3)] text-[#F5D0FE]"
-                          : "border-[rgba(45,18,85,0.9)] bg-[rgba(19,2,36,0.52)] text-[#C4B5FD] hover:border-[rgba(192,132,252,0.45)] hover:bg-[rgba(45,18,85,0.45)] hover:text-[#F5F3FF]"
+                          ? "border-[#2563EB] bg-blue-50/80 text-[#2563EB] font-semibold"
+                          : "border-slate-200 bg-slate-50/60 text-[#334155] hover:border-[#2563EB]/40 hover:bg-blue-50/30 hover:text-[#2563EB]"
                       }`}
                     >
                       {prompt}
@@ -480,25 +474,26 @@ export function DynamicProductPage({ slug }: { slug: string }) {
           ) : null}
         </section>
 
+        {/* What It Does / Features */}
         {product.features.length > 0 ? (
-          <section className="relative z-10 w-full px-[20px] py-[80px]">
+          <section className="relative z-10 w-full px-5 py-16">
             <div className="mx-auto max-w-[1200px]">
-              <h2 className="mb-[40px] text-center font-display text-[32px] font-bold text-[#F5F3FF]">
-                What It Does
+              <h2 className="mb-10 text-center font-sans text-2xl sm:text-3xl font-extrabold text-[#0F172A]">
+                Core Capabilities
               </h2>
-              <div className={`grid grid-cols-1 gap-[24px] ${product.features.length > 1 ? "md:grid-cols-2 lg:grid-cols-3" : ""}`}>
+              <div className={`grid grid-cols-1 gap-5 ${product.features.length > 1 ? "md:grid-cols-2 lg:grid-cols-3" : ""}`}>
                 {product.features.map((feature) => (
                   <div
                     key={`${feature.title}-${feature.description}`}
-                    className="rounded-[16px] border border-[#1E0A35] bg-[#130224] p-[32px]"
+                    className="rounded-3xl border border-slate-200/90 bg-white p-7 shadow-xs hover:border-[#2563EB]/40 hover:shadow-[0_12px_32px_rgba(37,99,235,0.06)] transition-all duration-300"
                   >
                     {feature.title ? (
-                      <h3 className="mb-[12px] font-display text-[20px] font-semibold text-[#F5F3FF]">
+                      <h3 className="mb-2.5 font-sans text-lg font-bold text-[#0F172A]">
                         {feature.title}
                       </h3>
                     ) : null}
                     {feature.description ? (
-                      <p className="font-sans text-[15px] leading-[1.7] text-[#A8A0C0]">
+                      <p className="font-sans text-xs sm:text-sm leading-relaxed text-[#64748B]">
                         {feature.description}
                       </p>
                     ) : null}
@@ -509,27 +504,28 @@ export function DynamicProductPage({ slug }: { slug: string }) {
           </section>
         ) : null}
 
+        {/* How It Works */}
         {product.howItWorks.length > 0 ? (
-          <section className="relative z-10 w-full border-y border-[#1E0A35] bg-[#0C0118] px-[20px] py-[80px]">
+          <section className="relative z-10 w-full border-y border-slate-200 bg-[#F8FAFC] px-5 py-16">
             <div className="mx-auto flex max-w-[840px] flex-col items-center">
-              <h2 className="mb-[64px] font-display text-[32px] font-bold text-[#F5F3FF]">
+              <h2 className="mb-12 font-sans text-2xl sm:text-3xl font-extrabold text-[#0F172A]">
                 How It Works
               </h2>
-              <div className="relative flex w-full flex-col gap-[48px] pl-[20px]">
-                <div className="absolute bottom-[24px] left-[44px] top-[24px] z-0 w-[2px] border-l-2 border-dotted border-[#2D1255]" />
+              <div className="relative flex w-full flex-col gap-8 sm:gap-10 pl-5">
+                <div className="absolute bottom-6 left-10 top-6 z-0 w-[2px] border-l-2 border-dashed border-slate-300" />
                 {product.howItWorks.map((step, index) => (
-                  <div key={`${step.title}-${index}`} className="relative z-10 flex gap-[24px]">
-                    <div className="flex h-[48px] w-[48px] shrink-0 items-center justify-center rounded-full border border-[#8B5CF6] bg-[#130224] font-display text-[20px] font-bold text-[#A78BFA] shadow-[0_0_20px_rgba(139,92,246,0.2)]">
+                  <div key={`${step.title}-${index}`} className="relative z-10 flex gap-5">
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-blue-200 bg-white font-mono text-base font-bold text-[#2563EB] shadow-xs">
                       {index + 1}
                     </div>
-                    <div className="flex flex-col pt-[8px]">
+                    <div className="flex flex-col pt-1">
                       {step.title ? (
-                        <h3 className="mb-[8px] font-display text-[20px] font-semibold text-[#F5F3FF]">
+                        <h3 className="mb-1.5 font-sans text-base sm:text-lg font-bold text-[#0F172A]">
                           {step.title}
                         </h3>
                       ) : null}
                       {step.description ? (
-                        <p className="max-w-[560px] font-sans text-[15px] font-normal leading-relaxed text-[#A8A0C0]">
+                        <p className="max-w-[560px] font-sans text-xs sm:text-sm font-normal leading-relaxed text-[#64748B]">
                           {step.description}
                         </p>
                       ) : null}
@@ -541,27 +537,28 @@ export function DynamicProductPage({ slug }: { slug: string }) {
           </section>
         ) : null}
 
+        {/* Target Use Cases */}
         {product.useCases.length > 0 ? (
-          <section className="relative z-10 w-full px-[20px] py-[100px]">
+          <section className="relative z-10 w-full px-5 py-16">
             <div className="mx-auto max-w-[1200px]">
-              <h2 className="mb-[48px] text-center font-display text-[32px] font-bold text-[#F5F3FF]">
-                Built For
+              <h2 className="mb-10 text-center font-sans text-2xl sm:text-3xl font-extrabold text-[#0F172A]">
+                Engineered For Your Industry
               </h2>
-              <div className="grid grid-cols-1 gap-[24px] md:grid-cols-2">
+              <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
                 {product.useCases.map((useCase) => (
                   <div
                     key={`${useCase.industry}-${useCase.description}`}
-                    className="flex gap-[16px] rounded-[16px] border border-[#1E0A35] bg-[#130224] p-[24px]"
+                    className="flex gap-4 rounded-3xl border border-slate-200/90 bg-white p-6 shadow-xs"
                   >
-                    <div className="text-[32px] leading-none">{useCase.emoji || "*"}</div>
+                    <div className="text-2xl leading-none">{useCase.emoji || "⚡"}</div>
                     <div>
                       {useCase.industry ? (
-                        <h3 className="mb-[8px] font-display text-[18px] font-semibold text-[#F5F3FF]">
+                        <h3 className="mb-1.5 font-sans text-base font-bold text-[#0F172A]">
                           {useCase.industry}
                         </h3>
                       ) : null}
                       {useCase.description ? (
-                        <p className="font-sans text-[14px] leading-[1.7] text-[#A8A0C0]">
+                        <p className="font-sans text-xs sm:text-sm leading-relaxed text-[#64748B]">
                           {useCase.description}
                         </p>
                       ) : null}
@@ -573,34 +570,35 @@ export function DynamicProductPage({ slug }: { slug: string }) {
           </section>
         ) : null}
 
+        {/* FAQ */}
         {product.faq.length > 0 ? (
-          <section className="relative z-10 w-full border-t border-[#1E0A35] bg-[#0C0118] px-[20px] py-[80px]">
+          <section className="relative z-10 w-full border-t border-slate-200 bg-[#F8FAFC] px-5 py-16">
             <div className="mx-auto max-w-[840px]">
-              <h2 className="mb-[48px] text-center font-display text-[32px] font-bold text-[#F5F3FF]">
+              <h2 className="mb-10 text-center font-sans text-2xl sm:text-3xl font-extrabold text-[#0F172A]">
                 Frequently Asked Questions
               </h2>
-              <div className="flex flex-col gap-[16px]">
+              <div className="flex flex-col gap-3.5">
                 {product.faq.map((item, index) => {
                   const isOpen = openFaq === index;
                   return (
                     <div
                       key={`${item.question}-${index}`}
-                      className="overflow-hidden rounded-[12px] border border-[#1E0A35] bg-[#130224]"
+                      className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xs"
                     >
                       <button
                         type="button"
                         onClick={() => setOpenFaq((current) => (current === index ? null : index))}
-                        className="flex w-full items-center justify-between p-[20px] text-left"
+                        className="flex w-full items-center justify-between p-5 text-left cursor-pointer"
                       >
-                        <span className="font-sans text-[16px] font-medium text-[#F5F3FF]">
+                        <span className="font-sans text-sm sm:text-base font-bold text-[#0F172A]">
                           {item.question}
                         </span>
-                        <span className={`text-[#6B6088] transition-transform ${isOpen ? "rotate-180" : ""}`}>
-                          v
+                        <span className={`text-slate-400 font-mono transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}>
+                          ↓
                         </span>
                       </button>
                       {isOpen ? (
-                        <div className="px-[20px] pb-[20px] pt-[0px] font-sans text-[15px] leading-relaxed text-[#A8A0C0]">
+                        <div className="px-5 pb-5 pt-0 font-sans text-xs sm:text-sm leading-relaxed text-[#64748B] border-t border-slate-100 bg-slate-50/50">
                           {item.answer}
                         </div>
                       ) : null}
@@ -612,16 +610,17 @@ export function DynamicProductPage({ slug }: { slug: string }) {
           </section>
         ) : null}
 
-        <section className="relative z-10 flex w-full flex-col items-center px-[20px] py-[100px] text-center">
-          <h2 className="mb-[32px] font-display text-[36px] font-bold text-[#F5F3FF]">
-            Ready to get started?
+        {/* Bottom CTA */}
+        <section className="relative z-10 flex w-full flex-col items-center px-5 py-16 text-center">
+          <h2 className="mb-6 font-sans text-2xl sm:text-3xl font-black text-[#0F172A]">
+            Ready to deploy your AI voice pipeline?
           </h2>
           {product.status === "coming_soon" ? (
             <ProductWaitlistForm slug={product.slug} />
           ) : (
             <Link
               href="/login"
-              className="rounded-full bg-[#FBBF24] px-[40px] py-[20px] font-sans text-[18px] font-bold text-[#080010] shadow-[0_0_40px_rgba(251,191,36,0.25)] transition-all hover:-translate-y-1 hover:bg-[#F59E0B]"
+              className="rounded-full bg-[#2563EB] px-10 py-4 font-sans text-base font-bold text-white shadow-md shadow-blue-500/20 transition-all hover:bg-[#1D4ED8] hover:-translate-y-0.5"
             >
               Activate Your AI {"->"}
             </Link>

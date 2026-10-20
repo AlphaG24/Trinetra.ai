@@ -2,7 +2,13 @@
 
 import { useState, useEffect, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
-import { AlertTriangle, RefreshCw, BarChart3, Bot, IndianRupee, Sparkles, ArrowRight } from 'lucide-react'
+import {
+  AlertTriangle,
+  RefreshCw,
+  BarChart3,
+  IndianRupee,
+  PhoneCall
+} from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
 import { cleanAgentName } from '@/src/utils/formatAgentName'
 
@@ -36,6 +42,20 @@ interface AnalyticsData {
   recentCalls: any[]
 }
 
+const EMPTY_ANALYTICS_DATA: AnalyticsData = {
+  kpis: {
+    totalCalls: 0,
+    totalMinutes: 0,
+    avgDuration: 0,
+    leadsGenerated: 0,
+  },
+  callVolume: [],
+  sentiment: [],
+  leadFunnel: [],
+  callsByAgent: [],
+  recentCalls: [],
+}
+
 function AnalyticsDashboardContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
@@ -64,7 +84,7 @@ function AnalyticsDashboardContent() {
   const [agentId, setAgentId] = useState<string>('all')
   const [agents, setAgents] = useState<AgentOption[]>([])
   
-  // States for performance analytics data fetching
+  // Real-time data state: starts as null with loading=true to prevent initial mock flash
   const [data, setData] = useState<AnalyticsData | null>(null)
   const [loading, setLoading] = useState<boolean>(true)
   const [error, setError] = useState<string | null>(null)
@@ -83,7 +103,9 @@ function AnalyticsDashboardContent() {
           .eq('user_id', user.id)
           .order('name', { ascending: true })
 
-        setAgents((userAgents || []).map((a: any) => ({ id: a.id, agent_name: cleanAgentName(a.name) })))
+        if (userAgents && userAgents.length > 0) {
+          setAgents(userAgents.map((a: any) => ({ id: a.id, agent_name: cleanAgentName(a.name) })))
+        }
       } catch (err) {
         console.error('Failed to load agents list:', err)
       }
@@ -91,20 +113,25 @@ function AnalyticsDashboardContent() {
     loadAgents()
   }, [])
 
-  // 2. Fetch analytics data whenever range or agent selection changes
+  // 2. Fetch real analytics telemetry
   const fetchAnalytics = async () => {
     try {
       setLoading(true)
       setError(null)
       const res = await fetch(`/api/dashboard/analytics?range=${range}&agent_id=${agentId}`)
-      if (!res.ok) {
-        throw new Error(`Server returned status ${res.status}`)
+      if (res.ok) {
+        const text = await res.text()
+        const json = text && text.trim() ? JSON.parse(text) : null
+        if (json && json.kpis) {
+          setData(json)
+          return
+        }
       }
-      const json = await res.json()
-      setData(json)
+      setData(EMPTY_ANALYTICS_DATA)
     } catch (err: any) {
-      console.error('Failed to fetch analytics payload:', err)
-      setError(err?.message || 'Failed to retrieve analytics metrics.')
+      console.error('Failed to load analytics telemetry:', err)
+      setError(err?.message || 'Failed to load telemetry')
+      setData(EMPTY_ANALYTICS_DATA)
     } finally {
       setLoading(false)
     }
@@ -139,8 +166,7 @@ function AnalyticsDashboardContent() {
     </div>
   )
 
-  // Empty state when there are 0 calls
-  const showEmptyState = data && data.kpis.totalCalls === 0 && !loading && !error
+  const activeData = data || EMPTY_ANALYTICS_DATA
 
   return (
     <div className="space-y-6 text-left">
@@ -151,7 +177,7 @@ function AnalyticsDashboardContent() {
             Analytics
           </h1>
           <p className="text-xs text-[var(--muted)] leading-relaxed mt-0.5">
-            Monitor call activity, agent performance, and live revenue attribution
+            Monitor real-time call activity, agent performance, and live revenue attribution
           </p>
         </div>
 
@@ -181,14 +207,6 @@ function AnalyticsDashboardContent() {
           >
             <IndianRupee className="w-4 h-4" />
             <span>Revenue &amp; ROI</span>
-            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold tracking-wider ${
-              activeTab === 'revenue'
-                ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-400/40'
-                : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25'
-            }`}>
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              LIVE
-            </span>
           </button>
         </div>
       </div>
@@ -205,9 +223,9 @@ function AnalyticsDashboardContent() {
             agents={agents}
           />
 
-          {/* Loading State */}
+          {/* Loading Skeleton: prevents fake data flash on first mount */}
           {loading && (
-            <div className="space-y-8">
+            <div className="space-y-8 animate-in fade-in duration-150">
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 {[...Array(4)].map((_, i) => (
                   <div key={i} className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-5 h-28 animate-pulse" />
@@ -224,81 +242,50 @@ function AnalyticsDashboardContent() {
           {/* Error State */}
           {!loading && error && renderSectionError('Dashboard Metrics', fetchAnalytics)}
 
-          {/* Empty State */}
-          {showEmptyState && (
-            <div className="flex flex-col items-center justify-center py-20 text-center space-y-4 border border-dashed border-[var(--border)] rounded-2xl bg-[var(--card-bg)] max-w-xl mx-auto shadow-sm">
-              <div className="w-16 h-16 rounded-2xl bg-[var(--background)] border border-[var(--border)] flex items-center justify-center text-[var(--muted)] shadow-inner">
-                <BarChart3 className="w-8 h-8" />
-              </div>
-              <div className="space-y-1.5">
-                <h2 className="text-lg font-bold font-display text-[var(--heading)]">No analytics data yet</h2>
-                <p className="text-xs text-[var(--body)] font-merriweather max-w-xs mx-auto">
-                  Start provisioning agents and making calls to see live telemetry and charts.
-                </p>
-              </div>
-              <a
-                href="/dashboard/marketplace"
-                className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-[var(--primary-bg)] text-[var(--heading)] hover:bg-[var(--hover-bg)] border border-[var(--border)] font-bold text-xs uppercase tracking-wider transition-all hover:scale-[1.02] cursor-pointer"
-              >
-                <Bot className="w-4 h-4" /> Browse Marketplace
-              </a>
-            </div>
-          )}
-
-          {/* Render Data Components */}
-          {!loading && !error && data && !showEmptyState && (
+          {/* Render Real-Time Data Components */}
+          {!loading && (
             <div className="space-y-8 animate-in fade-in duration-300">
-              {/* KPIs */}
+              {/* KPIs (computed dynamically from live database) */}
               <KPICards
-                totalCalls={data.kpis.totalCalls}
-                totalMinutes={data.kpis.totalMinutes}
-                avgDuration={data.kpis.avgDuration}
-                leadsGenerated={data.kpis.leadsGenerated}
+                totalCalls={activeData.kpis.totalCalls}
+                totalMinutes={activeData.kpis.totalMinutes}
+                avgDuration={activeData.kpis.avgDuration}
+                leadsGenerated={activeData.kpis.leadsGenerated}
               />
 
-              {/* Row 1: Volume & Sentiment */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <CallVolumeChart data={data.callVolume} />
-                <SentimentChart data={data.sentiment} />
-              </div>
-
-              {/* Row 2: Funnel & Agent distribution */}
-              <div className={data.callsByAgent.length > 1 ? "grid grid-cols-1 md:grid-cols-2 gap-6" : "grid grid-cols-1 gap-6"}>
-                <LeadFunnelChart data={data.leadFunnel} />
-                {data.callsByAgent.length > 1 && <CallsByAgentChart data={data.callsByAgent} />}
-              </div>
-
-              {/* Revenue Teaser Banner */}
-              <div className="p-6 rounded-2xl bg-[var(--card-bg)] border border-[var(--border)] flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <Sparkles className="w-4 h-4 text-zinc-400" />
-                    <span className="text-xs font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-                      Revenue Attribution & Pipeline
-                    </span>
+              {activeData.kpis.totalCalls === 0 ? (
+                <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-10 flex flex-col items-center justify-center text-center space-y-3 shadow-xs">
+                  <div className="w-12 h-12 rounded-xl bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-zinc-400">
+                    <PhoneCall className="w-6 h-6" />
                   </div>
-                  <h3 className="text-base font-bold text-[var(--heading)]">
-                    Track quote estimates, confirmed deals, and AI return on investment
+                  <h3 className="text-sm font-bold text-[var(--heading)] font-montserrat uppercase tracking-wider">
+                    No Call Telemetry Recorded Yet
                   </h3>
-                  <p className="text-xs text-[var(--muted)]">
-                    See commercial quotes captured from calls and verified closed revenue by source.
+                  <p className="text-xs text-[var(--muted)] max-w-md mx-auto">
+                    As your AI agents connect with callers or test voice calls are initiated, real-time volume, duration, sentiment, and conversion telemetry will automatically plot here.
                   </p>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => handleTabChange('revenue')}
-                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 font-bold text-xs uppercase tracking-wider transition-all shadow-sm shrink-0 cursor-pointer active:scale-[0.98]"
-                >
-                  <span>Open Revenue & ROI</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </button>
-              </div>
+              ) : (
+                <>
+                  {/* Row 1: Volume & Sentiment */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <CallVolumeChart data={activeData.callVolume} />
+                    <SentimentChart data={activeData.sentiment} />
+                  </div>
+
+                  {/* Row 2: Funnel & Agent distribution */}
+                  <div className={activeData.callsByAgent.length > 1 ? "grid grid-cols-1 md:grid-cols-2 gap-6" : "grid grid-cols-1 gap-6"}>
+                    <LeadFunnelChart data={activeData.leadFunnel} />
+                    {activeData.callsByAgent.length > 1 && <CallsByAgentChart data={activeData.callsByAgent} />}
+                  </div>
+                </>
+              )}
             </div>
           )}
         </div>
       )}
 
-      {/* TAB 2: REVENUE FROM TRINETRA & ROI */}
+      {/* TAB 2: REVENUE FROM VAAKRITI & ROI */}
       {activeTab === 'revenue' && (
         <div className="animate-in fade-in duration-200">
           <RevenueDashboardClient embedded={true} />

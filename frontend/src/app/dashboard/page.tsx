@@ -13,7 +13,31 @@ import { AgentComparisonWidget } from '@/src/components/agents/AgentComparisonWi
 import { useDashboardStore } from '@/src/store/dashboardStore'
 import { useAuth } from '@/src/components/providers/AuthProvider'
 import { AlertTriangle, RefreshCw } from 'lucide-react'
-const fetcher = (url: string) => fetch(url).then(res => res.json())
+
+const fetcher = async (url: string) => {
+  try {
+    const res = await fetch(url)
+    if (!res.ok) {
+      if (res.status === 401) {
+        await new Promise(r => setTimeout(r, 600))
+        const retryRes = await fetch(url)
+        if (retryRes.ok) {
+          const retryText = await retryRes.text()
+          return retryText ? JSON.parse(retryText) : { stats: null, tools: [], activity: [] }
+        }
+      }
+      return { stats: null, tools: [], activity: [], error: `HTTP ${res.status}` }
+    }
+    const text = await res.text()
+    if (!text || !text.trim()) {
+      return { stats: null, tools: [], activity: [] }
+    }
+    return JSON.parse(text)
+  } catch (err: any) {
+    console.warn(`[Dashboard fetcher warning on ${url}]`, err?.message || err)
+    return { stats: null, tools: [], activity: [] }
+  }
+}
 
 interface UserProfile {
   full_name: string | null

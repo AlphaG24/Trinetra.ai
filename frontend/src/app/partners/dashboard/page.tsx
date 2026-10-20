@@ -42,7 +42,7 @@ export default async function DashboardPage() {
   const effectiveRate =
     partner.commission_rate_override ?? partner.commission_rate ?? policy?.commission_rate ?? 20
   const currency = policy?.currency ?? partner.currency ?? 'INR'
-  const referralLink = `https://trinetra.ai/?ref=${partner.referral_code}`
+  const referralLink = `https://vaakriti.com/?ref=${partner.referral_code}`
 
   return (
     <DashboardShell

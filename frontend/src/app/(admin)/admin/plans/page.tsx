@@ -12,7 +12,6 @@ import {
   AlertCircle,
   Search,
   RefreshCw,
-  Sparkles,
   PhoneCall,
   Users,
   ShieldCheck,
@@ -689,8 +688,7 @@ export default function PricingPlansAdminPage() {
                       {plan.is_active ? 'Active' : 'Deactivated'}
                     </span>
                     {plan.is_popular && (
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-violet-500/10 text-violet-600 dark:text-violet-400 border border-violet-500/20 flex items-center gap-1 font-playfair">
-                        <Sparkles className="w-2.5 h-2.5" />
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-zinc-100 dark:bg-white/10 text-zinc-800 dark:text-zinc-200 border border-zinc-200 dark:border-white/10 font-mono">
                         Popular
                       </span>
                     )}

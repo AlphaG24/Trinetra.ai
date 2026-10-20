@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { X, Headphones, MessageSquare, Bot, User, Clock, Sparkles, Copy, Check, Download } from 'lucide-react'
+import { X, Headphones, MessageSquare, Bot, User, Clock, Copy, Check, Download } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { toast } from 'sonner'
 import { CallAudioPlayer } from '@/src/components/shared/CallAudioPlayer'
@@ -302,7 +302,7 @@ export function TranscriptModal({
                 })
               ) : (
                 <div className="flex flex-col items-center justify-center h-52 text-center py-10">
-                  <Sparkles className="w-8 h-8 text-[var(--muted)] mb-3 animate-pulse" />
+                  <MessageSquare className="w-8 h-8 text-[var(--muted)] mb-3 opacity-30" />
                   <p className="text-sm font-bold text-[var(--heading)] font-display">No Transcript Available</p>
                   <p className="text-xs text-[var(--muted)] mt-1 max-w-xs leading-relaxed">
                     This call does not have transcript logs or they are currently compiling.

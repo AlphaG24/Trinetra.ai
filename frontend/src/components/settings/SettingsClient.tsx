@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { User, ShieldCheck, Bell, Sparkles } from 'lucide-react'
+import { User, ShieldCheck, Bell, Sliders } from 'lucide-react'
 
 // Tabs
 import { ProfileTab } from '@/src/components/settings/ProfileTab'
@@ -35,7 +35,7 @@ export function SettingsClient({ initialTab = 'profile' }: SettingsClientProps) 
     { id: 'security' as const, label: 'Security & Access', icon: ShieldCheck },
     { id: 'kyc' as const, label: 'KYC & Compliance', icon: ShieldCheck },
     { id: 'notifications' as const, label: 'Notifications', icon: Bell },
-    { id: 'integrations' as const, label: 'Integrations', icon: Sparkles },
+    { id: 'integrations' as const, label: 'Integrations', icon: Sliders },
   ]
 
   const renderTabContent = () => {

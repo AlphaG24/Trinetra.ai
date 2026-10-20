@@ -1,7 +1,7 @@
 import { createClient } from '@/utils/supabase/server'
 import { notFound, redirect } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Lock, ShieldAlert, Sparkles, Sliders, Play, Settings, Terminal, Activity, HelpCircle, ArrowRight } from 'lucide-react'
+import { ArrowLeft, Lock, ShieldAlert, Sliders, Play, Settings, Terminal, Activity, HelpCircle, ArrowRight } from 'lucide-react'
 import { WorkspaceClient } from '@/src/components/workspace/WorkspaceClient'
 
 interface PageProps {

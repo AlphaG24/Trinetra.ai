@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Download, ChevronDown, ChevronUp, PhoneCall, Calendar, Clock, Sparkles } from 'lucide-react'
+import { Download, ChevronDown, ChevronUp, PhoneCall, Calendar, Clock, FileText } from 'lucide-react'
 import { cleanAgentName } from '@/src/utils/formatAgentName'
 import { CallAudioPlayer } from '@/src/components/shared/CallAudioPlayer'
 
@@ -181,7 +181,7 @@ export function RecentCallsTable({ calls }: RecentCallsTableProps) {
                         <div className="border-t border-[var(--border)] bg-[var(--background)]/50 p-5 space-y-4">
                           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-3 border-b border-[var(--border)]">
                             <div className="flex flex-wrap items-center gap-2">
-                              <Sparkles className="w-4 h-4 text-[var(--muted)]" />
+                              <FileText className="w-4 h-4 text-[var(--muted)]" />
                               <span className="font-bold font-montserrat uppercase tracking-wider text-[10px] text-[var(--heading)]">
                                 Call Details & Transcript Preview
                               </span>

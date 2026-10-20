@@ -2,7 +2,7 @@ import nextDynamic from "next/dynamic";
 import { Layout } from "@/components/layout/Layout";
 import { Hero } from "@/components/landing/Hero";
 import { MetricsBar } from "@/components/landing/MetricsBar";
-import { WhyTrinetra } from "@/components/landing/WhyTrinetra";
+import { WhyVaakriti } from "@/components/landing/WhyTrinetra";
 import { CostOfInaction } from "@/components/landing/CostOfInaction";
 import { PlatformEcosystem } from "@/components/landing/PlatformEcosystem";
 import { GlobalTelephonyMap } from "@/components/landing/GlobalTelephonyMap";
@@ -35,13 +35,13 @@ export default function Home() {
           __html: JSON.stringify({
             '@context': 'https://schema.org',
             '@type': 'WebSite',
-            name: 'Vaakriti by Trinetra AI',
-            url: 'https://trinetraedu-ai.com',
+            name: 'Vaakriti AI — The Creation of Voice',
+            url: 'https://vaakriti.com',
             description:
               'Autonomous Voice AI Infrastructure for Indian Enterprise. Sub-480ms latency, native vernacular code-switching, and full statutory TRAI compliance.',
             potentialAction: {
               '@type': 'SearchAction',
-              target: 'https://trinetraedu-ai.com/marketplace?q={search_term_string}',
+              target: 'https://vaakriti.com/products?q={search_term_string}',
               'query-input': 'required name=search_term_string',
             },
           }),
@@ -56,7 +56,7 @@ export default function Home() {
             name: 'Vaakriti Enterprise Voice AI Platform',
             applicationCategory: 'BusinessApplication',
             operatingSystem: 'Web',
-            url: 'https://trinetraedu-ai.com',
+            url: 'https://vaakriti.com',
             description:
               'Autonomous Enterprise Voice Platform powering 24/7 inbound receptionists, high-velocity outbound campaigns, and real-time CRM intelligence across 12+ Indian languages.',
             offers: {
@@ -67,8 +67,8 @@ export default function Home() {
             },
             creator: {
               '@type': 'Organization',
-              name: 'Trinetra AI',
-              url: 'https://trinetraedu-ai.com',
+              name: 'Vaakriti AI',
+              url: 'https://vaakriti.com',
             },
           }),
         }}
@@ -99,7 +99,7 @@ export default function Home() {
           <LiveDemoSection />
 
           {/* 3. Core Enterprise Value Proposition & USPs */}
-          <WhyTrinetra />
+          <WhyVaakriti />
 
           {/* 4. The Problem & Financial Urgency: Unanswered Calls Cost Matrix */}
           <CostOfInaction />

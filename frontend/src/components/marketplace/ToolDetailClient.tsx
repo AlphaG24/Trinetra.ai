@@ -6,14 +6,13 @@ import Link from 'next/link'
 import { 
   ArrowLeft, Phone, Zap, Loader2, Bot, Lock, X, Play, ShieldCheck, 
   CheckCircle2, ChevronRight, HelpCircle, Video, Image as ImageIcon, 
-  Activity, Radio, Sparkles, Volume2, Mic, Terminal, ExternalLink, Calendar 
+  Activity, Radio, Volume2, Mic, Tag, ExternalLink, Calendar 
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import {
   FeaturesSection,
   WorkflowPipelineSection,
   UseCasesSection,
-  DeveloperHubSection,
   PricingSection,
   FAQSection,
 } from './ToolDetailSections'
@@ -42,12 +41,12 @@ export function ToolDetailClient({ tool, profile, config, agents }: ToolDetailCl
   const [showUpgradeModal, setShowUpgradeModal] = useState(false)
   const [blockedMessage, setBlockedMessage] = useState<string | null>(null)
   const [industryTemplate, setIndustryTemplate] = useState('')
-  const [activeTab, setActiveTab] = useState<'workflow' | 'features' | 'cases' | 'dev' | 'faq'>('workflow')
+  const [activeTab, setActiveTab] = useState<'workflow' | 'features' | 'cases' | 'faq'>('workflow')
 
   const meta = tool.marketplace_metadata || {}
-  const tagline = meta.tagline || tool.description || 'Pre-configured autonomous AI voice agent with real-time reasoning and calendar automation.'
+  const tagline = meta.tagline || tool.description || 'Pre-configured autonomous AI voice agent with intelligent reasoning and calendar automation.'
   const features = meta.features || [
-    'Sub-450ms Realtime Voice Reasoning',
+    'High-Speed Voice Reasoning',
     'Autonomous Cal.com & Google Calendar Booking',
     'Post-Call WhatsApp & SMS Summary Dispatch',
     'Human Barge-in & Interruption Recovery',
@@ -124,7 +123,7 @@ export function ToolDetailClient({ tool, profile, config, agents }: ToolDetailCl
   // Start Free Demo Logic
   const handleStartDemo = async () => {
     if (!profile) {
-      toast.error('Unable to verify user profile.')
+      router.push(`/login?redirect=${encodeURIComponent(`/dashboard/marketplace/${tool.slug}`)}`)
       return
     }
 
@@ -176,7 +175,7 @@ export function ToolDetailClient({ tool, profile, config, agents }: ToolDetailCl
   // Start Trial Logic
   const handleStartTrial = async () => {
     if (!profile) {
-      toast.error('Unable to verify user profile.')
+      router.push(`/login?redirect=${encodeURIComponent(`/dashboard/marketplace/${tool.slug}`)}`)
       return
     }
 
@@ -212,11 +211,7 @@ export function ToolDetailClient({ tool, profile, config, agents }: ToolDetailCl
         <div className="flex flex-wrap items-center gap-2 text-[11px] font-mono">
           <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-bold">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
-            <span>RUNTIME ONLINE</span>
-          </div>
-          <div className="hidden md:flex items-center gap-1.5 px-3 py-1 rounded-full bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 text-zinc-700 dark:text-zinc-300 font-bold">
-            <Zap className="w-3 h-3 text-amber-400" />
-            <span>&lt;450ms Latency</span>
+            <span>OPERATIONAL</span>
           </div>
           <div className="hidden lg:flex items-center gap-1.5 px-3 py-1 rounded-full bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 text-zinc-700 dark:text-zinc-300 font-bold">
             <Calendar className="w-3 h-3" />
@@ -230,23 +225,23 @@ export function ToolDetailClient({ tool, profile, config, agents }: ToolDetailCl
         <div className="flex flex-wrap items-center gap-2.5">
           <span className="px-3 py-1 text-[10px] font-black uppercase tracking-widest bg-zinc-100 dark:bg-white/10 text-zinc-800 dark:text-zinc-200 border border-zinc-200 dark:border-white/15 rounded-lg shadow-sm font-mono flex items-center gap-1.5">
             <Bot className="w-3.5 h-3.5 text-zinc-700 dark:text-zinc-300" />
-            <span>{tool.type.toUpperCase()} COGNITIVE AGENT</span>
+            <span>{tool.type.toUpperCase()} ASSISTANT</span>
           </span>
 
           {adminCustomPrice && (
-            <span className="px-3 py-1 text-[10px] font-black uppercase tracking-widest bg-amber-500/10 text-amber-600 dark:text-amber-300 border border-amber-500/30 rounded-lg shadow-sm font-mono flex items-center gap-1.5">
-              <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+            <span className="px-3 py-1 text-[10px] font-black uppercase tracking-widest bg-zinc-100 dark:bg-white/10 text-zinc-800 dark:text-zinc-200 border border-zinc-200 dark:border-white/15 rounded-lg shadow-sm font-mono flex items-center gap-1.5">
+              <Tag className="w-3.5 h-3.5 text-zinc-500" />
               <span>OFFICIAL PRICE: {adminCustomPrice}</span>
             </span>
           )}
 
           {tool.is_active ? (
             <span className="px-3 py-1 text-[10px] font-black uppercase tracking-widest bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25 rounded-lg font-mono">
-              PRODUCTION READY
+              READY TO DEPLOY
             </span>
           ) : (
-            <span className="px-3 py-1 text-[10px] font-black uppercase tracking-widest bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/25 rounded-lg font-mono">
-              DEVELOPMENT BETA
+            <span className="px-3 py-1 text-[10px] font-black uppercase tracking-widest bg-zinc-100 dark:bg-white/10 text-zinc-800 dark:text-zinc-300 border border-zinc-200 dark:border-white/15 rounded-lg font-mono">
+              READY TO CONFIGURE
             </span>
           )}
         </div>
@@ -268,10 +263,9 @@ export function ToolDetailClient({ tool, profile, config, agents }: ToolDetailCl
           {/* Interactive Navigation Tabs */}
           <div className="flex items-center gap-2 p-1.5 bg-zinc-100 dark:bg-white/[0.04] border border-zinc-200/90 dark:border-white/10 rounded-2xl overflow-x-auto no-scrollbar backdrop-blur-xl">
             {[
-              { key: 'workflow', label: 'Architecture & Pipeline', icon: Activity },
-              { key: 'features', label: 'Capabilities', icon: Sparkles },
+              { key: 'workflow', label: 'Overview & Workflow', icon: Activity },
+              { key: 'features', label: 'Capabilities', icon: Zap },
               { key: 'cases', label: 'Use Cases', icon: CheckCircle2 },
-              { key: 'dev', label: 'Developer & APIs', icon: Terminal },
               { key: 'faq', label: 'FAQs', icon: HelpCircle },
             ].map((tab) => {
               const Icon = tab.icon
@@ -308,12 +302,12 @@ export function ToolDetailClient({ tool, profile, config, agents }: ToolDetailCl
 
                   <div className="pt-4 border-t border-zinc-100 dark:border-white/5 grid grid-cols-2 sm:grid-cols-3 gap-4 text-xs">
                     <div>
-                      <span className="text-[10px] text-zinc-500 dark:text-zinc-400 block font-mono">LLM BACKBONE</span>
+                      <span className="text-[10px] text-zinc-500 dark:text-zinc-400 block font-mono">AI ENGINE</span>
                       <span className="font-bold text-zinc-900 dark:text-white">Gemini 2.5 Flash</span>
                     </div>
                     <div>
-                      <span className="text-[10px] text-zinc-500 dark:text-zinc-400 block font-mono">AUDIO ENGINE</span>
-                      <span className="font-bold text-zinc-900 dark:text-white">LiveKit WebRTC + VAD</span>
+                      <span className="text-[10px] text-zinc-500 dark:text-zinc-400 block font-mono">VOICE STREAMING</span>
+                      <span className="font-bold text-zinc-900 dark:text-white">High-Fidelity Audio</span>
                     </div>
                     <div>
                       <span className="text-[10px] text-zinc-500 dark:text-zinc-400 block font-mono">SCHEDULING SYNC</span>
@@ -333,10 +327,6 @@ export function ToolDetailClient({ tool, profile, config, agents }: ToolDetailCl
 
             {activeTab === 'cases' && (
               <UseCasesSection useCases={useCases} />
-            )}
-
-            {activeTab === 'dev' && (
-              <DeveloperHubSection agentSlug={tool.slug} />
             )}
 
             {activeTab === 'faq' && (
@@ -479,11 +469,11 @@ export function ToolDetailClient({ tool, profile, config, agents }: ToolDetailCl
                     <div className="flex items-center gap-2">
                       <div className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
                       <span className="text-[11px] font-mono font-bold text-emerald-400">
-                        LIVE CALL PIPELINE
+                        CALL SIMULATOR
                       </span>
                     </div>
-                    <span className="text-[10px] font-mono text-zinc-500 bg-white/5 px-2 py-0.5 rounded border border-white/5">
-                      320ms Latency
+                    <span className="text-[10px] font-mono text-zinc-400 bg-white/5 px-2 py-0.5 rounded border border-white/5">
+                      Instant Response
                     </span>
                   </div>
 
@@ -508,7 +498,7 @@ export function ToolDetailClient({ tool, profile, config, agents }: ToolDetailCl
                   <div className="relative z-10 bg-black/60 backdrop-blur-md border border-white/10 rounded-xl p-2.5 space-y-1 text-left">
                     <div className="text-[10px] text-zinc-400 font-mono flex items-center gap-1">
                       <Volume2 className="w-3 h-3 text-zinc-400" />
-                      <span>Simulated Realtime Call Flow:</span>
+                      <span>Simulated Voice Interaction:</span>
                     </div>
                     <p className="text-[11px] text-zinc-200 font-medium leading-snug">
                       &ldquo;Checking calendar for tomorrow... 3 PM is open! I&apos;ve reserved it and sent a confirmation to your phone.&rdquo;
@@ -537,7 +527,7 @@ export function ToolDetailClient({ tool, profile, config, agents }: ToolDetailCl
                   ₹{trialPrice.toFixed(0)}
                 </span>
                 <span className="text-xs text-zinc-500 dark:text-zinc-400 font-medium">
-                  / 7-Day Production Trial
+                  / 7-Day All-Access Trial
                 </span>
               </div>
               <p className="text-xs text-zinc-600 dark:text-zinc-300 leading-relaxed font-normal">
@@ -575,7 +565,7 @@ export function ToolDetailClient({ tool, profile, config, agents }: ToolDetailCl
                   <Loader2 className="w-4 h-4 animate-spin text-white" />
                 ) : (
                   <>
-                    <span className="font-extrabold tracking-widest text-white">Start Production Trial (₹{trialPrice.toFixed(0)})</span>
+                    <span className="font-extrabold tracking-widest text-white">Start 7-Day Trial (₹{trialPrice.toFixed(0)})</span>
                     <span className="text-zinc-400 group-hover:text-white group-hover:translate-x-0.5 transition-all duration-200">→</span>
                   </>
                 )}

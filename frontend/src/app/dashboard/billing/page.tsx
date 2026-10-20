@@ -26,7 +26,7 @@ import {
   AlertCircle,
   Wallet,
   ShieldCheck as ShieldCheckIcon,
-  Sparkles,
+  Building2,
   RefreshCw,
   ArrowRight,
   Eye,
@@ -1061,7 +1061,7 @@ function BillingContent() {
       active: currentTier === 'starter',
       features: [
         `${configs.starter_minutes || '500'} monthly minutes included`,
-        'Up to 5 active production agents',
+        'Up to 5 active agents',
         'Custom system prompt configurations',
         `Overage pricing of ₹${configs.overage_per_minute_paisa ? Math.round(parseInt(configs.overage_per_minute_paisa, 10) / 100) : 11}/min`,
         'Email & Telegram support alerts'
@@ -1241,18 +1241,18 @@ function BillingContent() {
         </p>
       </div>
 
-      {/* Main Grid: Products on Left, Shopping Cart on Right */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      {/* Main Grid: Products on Left, Shopping Cart on Right (Cart only shows when items present) */}
+      <div className={`grid grid-cols-1 ${cart.length > 0 ? 'lg:grid-cols-3' : 'lg:grid-cols-1'} gap-8`}>
 
         {/* Left Side: Product Selector list */}
-        <div className="lg:col-span-2 space-y-8">
+        <div className={`${cart.length > 0 ? 'lg:col-span-2' : 'lg:col-span-1'} space-y-8`}>
 
           {/* ₹99 Trial Tier Callout (Decision P2) for Free Users */}
           {isFree && (
             <div className="bg-zinc-100/80 dark:bg-zinc-900/40 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-6 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-6 text-left">
               <div className="space-y-2">
                 <div className="inline-flex items-center gap-2 px-2.5 py-0.5 rounded-full bg-zinc-200 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 text-zinc-800 dark:text-zinc-200 text-[10px] font-bold uppercase tracking-wider">
-                  <Sparkles className="w-3 h-3" /> Limited Trial Offer
+                  <Zap className="w-3 h-3 text-zinc-600 dark:text-zinc-400" /> Limited Trial Offer
                 </div>
                 <h3 className="font-bold text-base text-[var(--heading)] font-display flex items-center gap-2">
                   Activate 7-Day All-Access Trial for ₹99
@@ -1368,7 +1368,7 @@ function BillingContent() {
                   Activate Premium Voice Agents
                 </h3>
                 <p className="text-xs text-[var(--muted)] leading-relaxed max-w-lg">
-                  <strong className="text-[var(--heading)] font-semibold">First-time onboarding?</strong> Test agents in the <strong className="text-[var(--heading)] font-semibold">live sandbox</strong> with our <strong className="text-[var(--heading)] font-semibold">zero-risk trial</strong>, or explore our <strong className="text-[var(--heading)] font-semibold">template marketplace</strong> to deploy pre-configured sales, support, and receptionist specialists. Select your plan tier (<strong className="text-[var(--heading)] font-semibold">Starter / Professional</strong>) when activating your agent.
+                  <strong className="text-[var(--heading)] font-semibold">First-time onboarding?</strong> Test agents in the <strong className="text-[var(--heading)] font-semibold">interactive sandbox</strong> with our <strong className="text-[var(--heading)] font-semibold">zero-risk trial</strong>, or explore our <strong className="text-[var(--heading)] font-semibold">template marketplace</strong> to deploy pre-configured sales, support, and receptionist specialists. Select your plan tier (<strong className="text-[var(--heading)] font-semibold">Starter / Professional</strong>) when activating your agent.
                 </p>
               </div>
               <Link
@@ -1384,7 +1384,7 @@ function BillingContent() {
           {availableBundles.length > 0 && (
             <div>
               <h2 className="text-sm uppercase font-bold text-[var(--heading)] tracking-wider mb-4 font-display">Special Product Bundles</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className={`grid grid-cols-1 ${cart.length > 0 ? 'sm:grid-cols-2' : 'sm:grid-cols-2 lg:grid-cols-3'} gap-6`}>
                 {availableBundles.map((b) => (
                   <div key={b.id} className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-6 flex flex-col justify-between shadow-sm relative overflow-hidden">
                     <div className="absolute top-3 right-3 px-2 py-0.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 text-[8px] font-bold uppercase tracking-wider rounded-full">
@@ -1443,7 +1443,7 @@ function BillingContent() {
           <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-6 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-6 text-left">
             <div className="space-y-2">
               <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-zinc-200 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 text-zinc-800 dark:text-zinc-200 text-[10px] font-bold uppercase tracking-wider">
-                <Sparkles className="w-3 h-3 text-amber-500" /> Enterprise Scale
+                <Building2 className="w-3 h-3 text-zinc-600 dark:text-zinc-400" /> Enterprise Scale
               </div>
               <h3 className="font-bold text-sm text-[var(--heading)] font-display flex items-center gap-2">
                 <Bot className="w-4 h-4 text-[var(--heading)]" />
@@ -1465,21 +1465,15 @@ function BillingContent() {
         </div>
 
         {/* Right Side: Interactive Shopping Cart Sidebar */}
-        <div className="space-y-6 lg:pt-9">
-          <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-6 shadow-sm flex flex-col justify-between min-h-[640px]">
-            <div>
-              <div className="flex items-center gap-2 border-b border-[var(--border)] pb-4 mb-4">
-                <ShoppingCart className="w-5 h-5 text-zinc-900 dark:text-white" />
-                <h3 className="font-bold text-base font-display text-[var(--heading)]">Your Cart Summary</h3>
-              </div>
-
-              {cart.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-24 text-center text-[var(--muted)]">
-                  <ShoppingCart className="w-8 h-8 opacity-20 mb-3" />
-                  <p className="text-xs">Your shopping cart is empty.</p>
-                  <p className="text-[10px] mt-1">Select subscription upgrades or phone numbers on the left.</p>
+        {cart.length > 0 && (
+          <div className="space-y-6 lg:pt-9 sticky top-6">
+            <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-6 shadow-sm flex flex-col justify-between">
+              <div>
+                <div className="flex items-center gap-2 border-b border-[var(--border)] pb-4 mb-4">
+                  <ShoppingCart className="w-5 h-5 text-zinc-900 dark:text-white" />
+                  <h3 className="font-bold text-base font-display text-[var(--heading)]">Your Cart Summary</h3>
                 </div>
-              ) : (
+
                 <div className="space-y-4 max-h-[400px] overflow-y-auto pr-1">
                   {cart.map((item, index) => (
                     <div key={index} className="flex gap-3 justify-between items-center p-3 bg-[var(--background)] border border-[var(--border)] rounded-xl relative">
@@ -1523,7 +1517,6 @@ function BillingContent() {
                     </div>
                   ))}
                 </div>
-              )}
             </div>
 
             {/* Promo Code & GST Section */}
@@ -1573,34 +1566,38 @@ function BillingContent() {
 
                 {/* Onboarding & Setup Fee Line Item (Cases A, B, C) */}
                 {cartPrices.isTrial ? (
-                  <div className="flex justify-between items-center text-[11px] py-0.5">
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-[var(--muted)]">Onboarding & Setup Fee:</span>
-                      <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 font-bold">
+                  <div className="flex items-center justify-between gap-2 text-xs py-1">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span className="text-[var(--muted)] text-[11px] truncate">Onboarding &amp; Setup Fee:</span>
+                      <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 font-bold shrink-0">
                         TRIAL SPECIAL
                       </span>
                     </div>
-                    <span className="text-emerald-600 dark:text-emerald-400 font-bold font-mono">Waived Off (₹0)</span>
+                    <span className="text-emerald-600 dark:text-emerald-400 font-bold font-mono text-xs shrink-0 whitespace-nowrap">
+                      Waived Off (₹0)
+                    </span>
                   </div>
                 ) : cartPrices.onboardingFeeEnabled && cartPrices.onboardingFee > 0 ? (
-                  <div className="flex justify-between items-center text-[var(--heading)] font-semibold text-xs py-0.5">
-                    <div className="flex items-center gap-1.5">
-                      <span>Onboarding & Setup Fee:</span>
-                      <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-violet-500/10 text-violet-600 dark:text-violet-400 border border-violet-500/20 font-bold">
+                  <div className="flex items-center justify-between gap-2 text-[var(--heading)] font-semibold text-xs py-1">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span className="text-xs truncate">Onboarding &amp; Setup Fee:</span>
+                      <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-white/10 text-zinc-800 dark:text-zinc-200 border border-zinc-200 dark:border-white/15 font-bold shrink-0">
                         ONE-TIME
                       </span>
                     </div>
-                    <span className="font-mono">+{formatRawRupees(cartPrices.onboardingFee)}</span>
+                    <span className="font-mono text-xs shrink-0 whitespace-nowrap">+{formatRawRupees(cartPrices.onboardingFee)}</span>
                   </div>
                 ) : (
-                  <div className="flex justify-between items-center text-[11px] py-0.5">
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-[var(--muted)]">Onboarding & Setup Fee:</span>
-                      <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 font-bold">
+                  <div className="flex items-center justify-between gap-2 text-xs py-1">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span className="text-[var(--muted)] text-[11px] truncate">Onboarding &amp; Setup Fee:</span>
+                      <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 font-bold shrink-0">
                         100% WAIVED
                       </span>
                     </div>
-                    <span className="text-emerald-600 dark:text-emerald-400 font-bold font-mono">Waived Off (₹0)</span>
+                    <span className="text-emerald-600 dark:text-emerald-400 font-bold font-mono text-xs shrink-0 whitespace-nowrap">
+                      Waived Off (₹0)
+                    </span>
                   </div>
                 )}
 
@@ -1658,6 +1655,7 @@ function BillingContent() {
             )}
           </div>
         </div>
+      )}
       </div>
 
       {/* Payment History Section */}

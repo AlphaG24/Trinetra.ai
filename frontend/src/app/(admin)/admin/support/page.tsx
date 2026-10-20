@@ -3,7 +3,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { 
   LifeBuoy, 
-  Sparkles, 
   ArrowLeft, 
   Search, 
   FolderOpen, 

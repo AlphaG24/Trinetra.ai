@@ -46,13 +46,13 @@ export default function DashboardNav({ partner }: DashboardNavProps) {
           <Link href="/" className="flex items-center gap-2 lg:hidden">
             <Image
               src="/trident.png"
-              alt="Trinetra"
+              alt="Vaakriti"
               width={28}
               height={28}
               className="h-7 w-auto"
               priority
             />
-            <span className="text-sm font-semibold text-white">Trinetra AI</span>
+            <span className="text-sm font-semibold text-white">Vaakriti AI</span>
           </Link>
 
           <nav className="hidden items-center gap-1 sm:flex">

@@ -61,14 +61,14 @@ export default function DashboardSidebar({
         <Link href="/" className="flex items-center gap-2.5 transition-opacity hover:opacity-90">
           <Image
             src="/trident.png"
-            alt="Trinetra"
+            alt="Vaakriti"
             width={28}
             height={28}
             className="h-7 w-auto drop-shadow-[0_0_10px_rgba(245,197,24,0.2)]"
             priority
           />
           <span className="text-[15px] font-semibold tracking-wide text-white">
-            Trinetra AI
+            Vaakriti AI
           </span>
         </Link>
         <span className="text-[10px] font-semibold uppercase tracking-[0.25em] text-amber-500/70">

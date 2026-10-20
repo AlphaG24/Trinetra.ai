@@ -135,9 +135,9 @@ html.light,
   --primary-bg: rgba(124, 58, 237, 0.08);
   /* Transparent light violet */
   --hover-bg: rgba(0, 0, 0, 0.03);
-  --secondary: #E2E8F0;
-  --accent: #7C3AED;
-  --accent-light: #8B5CF6;
+  --secondary: #F8FAFC;
+  --accent: #18181B;
+  --accent-light: #27272A;
 }
 
 :root[data-theme='light'] body,
@@ -312,6 +312,21 @@ html.dark .dashboard-theme-root.admin-portal,
   opacity: 1;
 }
 
+/* Sidebar collapsed floating tooltips - always crisp white text on dark background */
+.sidebar-tooltip,
+.sidebar-item-inactive:hover span.sidebar-tooltip,
+.sidebar-item-active:hover span.sidebar-tooltip,
+.sidebar-item-inactive span.sidebar-tooltip,
+.sidebar-item-active span.sidebar-tooltip,
+:root[data-theme='dark'] .sidebar-item-inactive:hover span.sidebar-tooltip,
+:root[data-theme='dark'] .sidebar-item-active:hover span.sidebar-tooltip,
+.dark .sidebar-item-inactive:hover span.sidebar-tooltip,
+.dark .sidebar-item-active:hover span.sidebar-tooltip {
+  color: #ffffff !important;
+  background-color: #18181b !important;
+  opacity: 1 !important;
+}
+
 :root[data-theme='dark'] .sidebar-item-inactive,
 html[data-theme='dark'] .sidebar-item-inactive,
 html.dark .sidebar-item-inactive,
@@ -397,8 +412,8 @@ html.dark .sidebar-item-active span,
 .homepage-theme-root,
 [data-homepage="true"] {
   font-family: var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
-  background-color: var(--theme-bg, #F4F7FC) !important;
-  color: var(--theme-text-primary, #080D18) !important;
+  background-color: var(--theme-bg, #F4F7FC);
+  color: var(--theme-text-primary, #080D18);
 }
 
 .homepage-theme-root h1,

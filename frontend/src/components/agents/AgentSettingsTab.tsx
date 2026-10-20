@@ -104,12 +104,12 @@ export function AgentSettingsTab({ agent, onDelete }: AgentSettingsTabProps) {
               if (e.key === 'Enter') handleSaveName()
             }}
             placeholder="e.g. Shubh, Priya, Nexus Support"
-            className="flex-1 px-4 py-2.5 bg-zinc-50 dark:bg-black/40 border border-zinc-200 dark:border-white/10 rounded-xl text-sm text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500/30 transition-all"
+            className="flex-1 px-4 py-2.5 bg-zinc-50 dark:bg-black/40 border border-zinc-200 dark:border-white/10 rounded-xl text-sm text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-zinc-400/30 dark:focus:ring-white/20 transition-all"
           />
           <button
             onClick={handleSaveName}
             disabled={savingName || !agentName.trim()}
-            className="flex items-center justify-center gap-1.5 px-5 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-700 text-white font-bold text-xs uppercase tracking-wider transition-all disabled:opacity-50 cursor-pointer shadow-md"
+            className="flex items-center justify-center gap-1.5 px-5 py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 font-bold text-xs uppercase tracking-wider transition-all disabled:opacity-50 cursor-pointer shadow-sm active:scale-[0.99]"
           >
             {savingName ? (
               <>

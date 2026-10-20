@@ -1,10 +1,13 @@
 import { notFound } from 'next/navigation'
 import { createClient } from '@/utils/supabase/server'
-import { AgentDetailClient } from '@/src/components/marketplace/AgentDetailClient'
+import { ToolDetailClient } from '@/src/components/marketplace/ToolDetailClient'
 
 interface PageProps {
   params: Promise<{ slug: string }>
 }
+
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
 
 export async function generateMetadata({ params }: PageProps) {
   const { slug } = await params
@@ -18,7 +21,7 @@ export async function generateMetadata({ params }: PageProps) {
 
   if (!service) {
     return {
-      title: 'Agent Not Found | Trinetra AI',
+      title: 'Agent Not Found — Vaakriti AI',
     }
   }
 
@@ -44,14 +47,32 @@ export default async function AgentDetailPage({ params }: PageProps) {
     notFound()
   }
 
-  // 2. Fetch system configuration values (demo minutes, trial price etc)
-  const { data: configs, error: configErr } = await supabase
+  // 2. Fetch authenticated profile & agents if session exists
+  const { data: { user } } = await supabase.auth.getUser()
+  let profile = null
+  let agents: any[] = []
+
+  if (user) {
+    const { data: userProfile } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', user.id)
+      .maybeSingle()
+    profile = userProfile
+
+    if (profile?.organization_id) {
+      const { data: userAgents } = await supabase
+        .from('agents')
+        .select('*')
+        .eq('organization_id', profile.organization_id)
+      agents = userAgents || []
+    }
+  }
+
+  // 3. Fetch system configuration values (demo minutes, trial price etc)
+  const { data: configs } = await supabase
     .from('system_config')
     .select('config_key, config_value')
-
-  if (configErr) {
-    console.error("Failed to load system config:", configErr)
-  }
 
   const configMap = (configs || []).reduce((acc, curr) => {
     if (curr.config_key) {
@@ -61,9 +82,15 @@ export default async function AgentDetailPage({ params }: PageProps) {
   }, {} as Record<string, string>)
 
   return (
-    <AgentDetailClient 
-      service={service} 
-      config={configMap} 
-    />
+    <div className="min-h-screen bg-[#FAFAFA] text-[#0F172A] font-sans selection:bg-blue-500/20 pt-28 sm:pt-32 pb-16 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-7xl mx-auto">
+        <ToolDetailClient 
+          tool={service} 
+          profile={profile} 
+          config={configMap} 
+          agents={agents}
+        />
+      </div>
+    </div>
   )
 }

@@ -312,8 +312,8 @@ export function ManageNumberModal({
               onClick={() => setActiveTab("manage")}
               className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                 activeTab === "manage"
-                  ? "bg-violet-600 text-white shadow-sm"
-                  : "text-[var(--muted)] hover:text-[var(--heading)] bg-[var(--secondary)]"
+                  ? "bg-zinc-900 text-white dark:bg-white dark:text-zinc-950 shadow-sm"
+                  : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white bg-zinc-100 dark:bg-zinc-800/80 border border-zinc-200 dark:border-white/10"
               }`}
             >
               <Smartphone size={14} />
@@ -324,13 +324,13 @@ export function ManageNumberModal({
               onClick={() => setActiveTab("cfu")}
               className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                 activeTab === "cfu"
-                  ? "bg-violet-600 text-white shadow-sm"
-                  : "text-[var(--muted)] hover:text-[var(--heading)] bg-[var(--secondary)]"
+                  ? "bg-zinc-900 text-white dark:bg-white dark:text-zinc-950 shadow-sm"
+                  : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white bg-zinc-100 dark:bg-zinc-800/80 border border-zinc-200 dark:border-white/10"
               }`}
             >
               <PhoneForwarded size={14} />
               <span>Call Forwarding (CFU)</span>
-              <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 uppercase font-black">
+              <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 uppercase font-black">
                 Wizard
               </span>
             </button>
@@ -339,7 +339,7 @@ export function ManageNumberModal({
           {activeTab === "manage" ? (
             <>
               {/* Number Details */}
-              <div className="grid grid-cols-2 gap-4 rounded-xl bg-[var(--secondary)] p-4 border border-[var(--border)] mb-6">
+              <div className="grid grid-cols-2 gap-4 rounded-xl bg-zinc-50 dark:bg-zinc-900/60 p-4 border border-zinc-200 dark:border-white/10 mb-6">
                 <div className="flex flex-col gap-1">
                   <span className="text-xs text-[var(--muted)] flex items-center gap-1.5"><MapPin size={12}/> City</span>
                   <span className="text-sm text-[var(--heading)]">{phoneNumber.city || "N/A"}</span>
@@ -547,13 +547,13 @@ export function ManageNumberModal({
                   </span>
                 </div>
                 <div className="flex items-center justify-between gap-3 bg-[var(--background)] border border-[var(--border)] rounded-lg p-3">
-                  <span className="font-mono text-base font-black text-violet-400 tracking-wider select-all">
+                  <span className="font-mono text-base font-black text-zinc-900 dark:text-zinc-100 tracking-wider select-all">
                     {computedDialCode}
                   </span>
                   <button
                     type="button"
                     onClick={handleCopyCfuCode}
-                    className="px-3 py-1.5 rounded-md bg-violet-600 hover:bg-violet-700 text-white font-bold text-xs flex items-center gap-1.5 transition-all shadow-sm cursor-pointer"
+                    className="px-3 py-1.5 rounded-md bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 font-bold text-xs flex items-center gap-1.5 transition-all shadow-sm cursor-pointer active:scale-[0.98]"
                   >
                     {cfuCodeCopied ? <Check size={14} /> : <Copy size={14} />}
                     <span>{cfuCodeCopied ? "Copied!" : "Copy Code"}</span>
@@ -634,13 +634,13 @@ export function ManageNumberModal({
                         placeholder="e.g. Dual SIM Jio connection, MMI code gives error"
                         value={ticketNotes}
                         onChange={(e) => setTicketNotes(e.target.value)}
-                        className="w-full px-3 py-2 bg-[var(--background)] border border-[var(--border)] rounded-lg text-xs text-[var(--heading)] outline-none focus:border-violet-500"
+                        className="w-full px-3 py-2 bg-[var(--background)] border border-[var(--border)] rounded-lg text-xs text-[var(--heading)] outline-none focus:border-zinc-500"
                       />
                     </div>
                     <button
                       type="submit"
                       disabled={isSubmittingTicket}
-                      className="w-full py-2.5 rounded-lg bg-violet-600 hover:bg-violet-700 text-white font-bold text-xs uppercase tracking-wider transition-all disabled:opacity-50 flex items-center justify-center gap-1.5 shadow-md cursor-pointer"
+                      className="w-full py-2.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 font-bold text-xs uppercase tracking-wider transition-all disabled:opacity-50 flex items-center justify-center gap-1.5 shadow-sm cursor-pointer active:scale-[0.99]"
                     >
                       {isSubmittingTicket ? "Submitting..." : "Submit CFU Assistance Ticket (Urgent SLA 4h)"}
                     </button>

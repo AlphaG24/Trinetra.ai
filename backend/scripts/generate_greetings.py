@@ -19,66 +19,73 @@ greetings = [
         'provider': 'sarvam',
         'lang': 'hi-IN',
         'speaker': 'shreya',
-        'sentence': 'नमस्ते! मैं त्रिनेत्र एआई से आपकी वॉयस असिस्टेंट बोल रही हूँ, आज मैं आपकी क्या सहायता कर सकती हूँ?'
+        'sentence': 'नमस्ते! मैं वाकृति एआई से आपकी वॉयस असिस्टेंट बोल रही हूँ, आज मैं आपकी क्या सहायता कर सकती हूँ?'
     },
     {
         'id': 'en',
         'provider': 'sarvam',
         'lang': 'en-IN',
         'speaker': 'shreya',
-        'sentence': 'Hello! Welcome to Trinetra AI. How can our autonomous voice assistant empower your business today?'
+        'sentence': 'Hello! Welcome to Vaakriti. How can our autonomous voice assistant empower your business today?'
+    },
+    {
+        'id': 'en2',
+        'provider': 'sarvam',
+        'lang': 'en-IN',
+        'speaker': 'shreya',
+        'sentence': "Hello! Thank you for connecting with Vaakriti. Let's transform your customer experience with intelligent voice automation."
     },
     {
         'id': 'mr',
         'provider': 'sarvam',
         'lang': 'mr-IN',
         'speaker': 'shreya',
-        'sentence': 'नमस्कार! मी त्रिनेत्र एआय वॉयस असिस्टंट बोलतेय, आज मी तुम्हाला कशी मदत करू शकते?'
+        'sentence': 'नमस्कार! मी वाकृति एआय वॉयस असिस्टंट बोलतेय, आज मी तुम्हाला कशी मदत करू शकते?'
     },
     {
         'id': 'pa',
         'provider': 'sarvam',
         'lang': 'pa-IN',
         'speaker': 'shubh',
-        'sentence': 'ਸਤਿ ਸ੍ਰੀ ਅਕਾਲ ਜੀ! ਮੈਂ ਤ੍ਰਿਨੇਤਰਾ ਏਆਈ ਤੋਂ ਬੋਲ ਰਹੀ ਹਾਂ, ਅੱਜ ਮੈਂ ਤੁਹਾਡੀ ਕੀ ਸੇਵਾ ਕਰ ਸਕਦੀ ਹਾਂ?'
+        'sentence': 'ਸਤਿ ਸ੍ਰੀ ਅਕਾਲ ਜੀ! ਮੈਂ ਵਾਕ੍ਰਿਤੀ ਏਆਈ ਤੋਂ ਬੋਲ ਰਹੀ ਹਾਂ, ਅੱਜ ਮੈਂ ਤੁਹਾਡੀ ਕੀ ਸੇਵਾ ਕਰ ਸਕਦੀ ਹਾਂ?'
     },
     {
         'id': 'fr',
         'provider': 'google',
         'lang': 'fr',
-        'sentence': "Bonjour! Bienvenue chez Trinetra AI. Comment puis-je vous aider aujourd'hui?"
+        'sentence': "Bonjour! Bienvenue chez Vaakriti. Comment puis-je vous aider aujourd'hui?"
     },
     {
         'id': 'ta',
         'provider': 'sarvam',
         'lang': 'ta-IN',
         'speaker': 'shreya',
-        'sentence': 'வணக்கம்! நான் திரினேத்ரா ஏஐ குரல் உதவியாளர் பேசுகிறேன், இன்று நான் உங்களுக்கு எவ்வாறு உதவ முடியும்?'
+        'sentence': 'வணக்கம்! நான் வாக்ரிதி ஏஐ குரல் உதவியாளர் பேசுகிறேன், இன்று நான் உங்களுக்கு எவ்வாறு உதவ முடியும்?'
     },
     {
         'id': 'ur',
         'provider': 'sarvam',
         'lang': 'hi-IN',
         'speaker': 'shubh',
-        'sentence': 'Assalam-o-Alaikum! Main Trinetra AI se aapki voice assistant bol rahi hoon, aaj aapki kya khidmat kar sakti hoon?'
+        'sentence': 'Assalam-o-Alaikum! Main Vaakriti AI se aapki voice assistant bol rahi hoon, aaj aapki kya khidmat kar sakti hoon?'
     },
     {
         'id': 'es',
         'provider': 'google',
         'lang': 'es',
-        'sentence': '¡Hola! Bienvenido a Trinetra AI. ¿En qué puedo ayudarte el día de hoy?'
+        'sentence': '¡Hola! Bienvenido a Vaakriti. ¿En qué puedo ayudarte el día de hoy?'
     },
     {
         'id': 'ja',
         'provider': 'google',
         'lang': 'ja',
-        'sentence': 'こんにちは！トリネトラAIへようこそ。本日はどのようなご用件でしょうか？'
+        'sentence': 'こんにちは！ヴァクリティAIへようこそ。本日はどのようなご用件でしょうか？'
     },
     {
         'id': 'ar',
         'provider': 'google',
         'lang': 'ar',
-        'sentence': 'مرحباً بكم في ترينيترا للذكاء الاصطناعي، كيف يمكنني مساعدتكم اليوم؟'
+        'sentence': 'مرحباً بكم في فاكريتي للذكاء الاصطناعي، كيف يمكنني مساعدتكم اليوم؟'
     }
 ]
 

@@ -62,7 +62,7 @@ export function ParticleSphereCore({
     // ── 1. SCENE & CAMERA ──
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 100);
-    camera.position.set(0, 0, 4.2);
+    camera.position.set(0, 0, 5.2);
 
     // ── 2. RENDERER ──
     const renderer = new THREE.WebGLRenderer({
@@ -84,7 +84,7 @@ export function ParticleSphereCore({
     const randoms = new Float32Array(totalCount * 3);
     const layerTypes = new Float32Array(totalCount); // 0 = shell, 1 = inner core, 2 = ambient halo
 
-    const radius = 1.35;
+    const radius = 1.38;
     const goldenRatio = (1 + Math.sqrt(5)) / 2;
 
     // Shell & Inner Core Particles
@@ -120,14 +120,14 @@ export function ParticleSphereCore({
       layerTypes[i] = isInner ? 1.0 : 0.0;
     }
 
-    // Outer Ambient Halo & Space Sparks
+    // Outer Ambient Halo & Space Sparks (tightly bounded so no particles stray or clip against viewport)
     for (let i = particleCount; i < totalCount; i++) {
       const idx = i * 3;
       const u = Math.random();
       const v = Math.random();
       const theta = u * 2.0 * Math.PI;
       const phi = Math.acos(2.0 * v - 1.0);
-      const r = radius * (1.18 + Math.random() * 0.82);
+      const r = radius * (1.02 + Math.random() * 0.10);
 
       const sinPhi = Math.sin(phi);
       const x = r * sinPhi * Math.cos(theta);
@@ -266,12 +266,18 @@ export function ParticleSphereCore({
             pos += normal * (hoverWave + hoverSpark);
           }
 
-          // 4. VOICE TRIGGERS ENTIRE OBJECT FLOW: Smooth, gentle acoustic breathing expansion
-          if (uAudioLevel > 0.01) {
-            // Calm harmonic breathing wave across the spherical body
-            float harmonicWave = sin(pos.y * 1.5 + uTime * 1.6) * 0.035 * uAudioLevel;
-            // Smooth radial expansion
-            pos += normal * (harmonicWave + uAudioLevel * 0.07);
+          // 4. VOICE TRIGGERS UNDULATING PARTICLE WAVING ANIMATION
+          if (uAudioLevel > 0.005) {
+            // Spherical harmonic acoustic waves travelling across the particle mesh
+            float waveLon = sin(pos.y * 5.5 - uTime * 4.5 + pos.x * 4.0);
+            float waveLat = cos(pos.z * 4.8 + uTime * 3.8 - pos.y * 3.0);
+            float waveRadial = sin(length(pos.xz) * 7.0 - uTime * 5.2);
+            float acousticWave = (waveLon * 0.45 + waveLat * 0.35 + waveRadial * 0.40) * uAudioLevel * 0.25;
+            
+            // Displace particles along outward normal and undulating coordinate vectors
+            pos += normal * acousticWave;
+            pos.y += sin(uTime * 4.0 + pos.x * 5.0) * 0.05 * uAudioLevel;
+            pos.x += cos(uTime * 3.5 + pos.z * 4.5) * 0.04 * uAudioLevel;
           }
 
           // 5. Directional Acoustic Resonance (smooth wave toward active greeting)
@@ -307,32 +313,29 @@ export function ParticleSphereCore({
           vec3 halfVector = normalize(uLightDir + viewDir);
           float specular = pow(max(dot(worldNormal, halfVector), 0.0), 16.0) * diffuseKey;
 
-          // ── HIGH-CONTRAST PALETTE WITH #E5E5E5 CURVATURE CONTOURING ──
+          // ── HIGH-CONTRAST VOLUMETRIC PALETTE (COBALT, CYAN, SAPPHIRE & AMBER) ──
           // Lit Crest: Electric Cobalt & Vibrant Cyan
           vec3 colCobaltLit = vec3(0.14, 0.38, 0.95);    // #2563EB Electric Cobalt
           vec3 colCyanLit   = vec3(0.02, 0.65, 0.98);    // #0284C7 Vibrant Sky/Cyan
-          vec3 colHighlight = vec3(0.35, 0.85, 1.0);     // Specular Glint
+          vec3 colHighlight = vec3(0.45, 0.85, 1.0);     // Specular Glint
           
           // Rim Accent: Warm Golden Amber
-          vec3 colAmberRim  = vec3(0.88, 0.46, 0.04);    // #D97706 Warm Golden Amber
+          vec3 colAmberRim  = vec3(0.92, 0.55, 0.15);    // Warm Golden Amber Rim
           
-          // Curvature Contour Accent: #E5E5E5 for clean 3D physical silhouette
-          vec3 colCurveE5   = vec3(0.898, 0.898, 0.898); // #E5E5E5 Clean light-grey curve contour
+          // Shaded Side: Deep Sapphire Navy (Maintains 3D depth without dirty grey edges)
+          vec3 colDeepNavy  = vec3(0.08, 0.16, 0.38);    // Rich Deep Sapphire
           
-          // Shadow Side: Deep Obsidian / Ink Navy (CRITICAL for 3D depth on light canvas)
-          vec3 colObsidianShadow = vec3(0.06, 0.09, 0.18); // #0F172E Deep Ink Navy
-
           // Interpolate lit side
           vec3 litColor = mix(colCobaltLit, colCyanLit, diffuseKey * 0.6);
           litColor = mix(litColor, colHighlight, specular * 0.6);
-          litColor = mix(litColor, colAmberRim, diffuseRim * 0.5);
+          litColor = mix(litColor, colAmberRim, diffuseRim * 0.45);
 
-          // 3D Shadow Falloff (Light side is Electric Cobalt; Shadow side is Deep Obsidian)
-          vec3 baseShaded = mix(colObsidianShadow, litColor, smoothstep(-0.25, 0.55, NdotL));
+          // 3D Shadow Falloff (Light side is Electric Cobalt; Shadow side is Deep Sapphire Navy)
+          vec3 baseShaded = mix(colDeepNavy, litColor, smoothstep(-0.25, 0.55, NdotL));
 
-          // Highlight the 3D curve contour of the hero orb using #E5E5E5
+          // Soft Fresnel rim contour for a crisp spherical boundary
           float silhouetteFactor = pow(1.0 - abs(dot(worldNormal, viewDir)), 3.0);
-          vec3 finalColor = mix(baseShaded, colCurveE5, silhouetteFactor * 0.42);
+          vec3 finalColor = mix(baseShaded, colHighlight, silhouetteFactor * 0.35);
 
           // Audio volume boost
           if (uAudioLevel > 0.05) {
@@ -363,8 +366,8 @@ export function ParticleSphereCore({
 
           gl_PointSize = baseSize * lightScale * uPixelRatio * (2.8 / -mvPosition.z);
 
-          // 7. Alpha Opacity: solid and crisp on light canvas
-          float depthAlpha = smoothstep(-5.8, -2.4, mvPosition.z);
+          // 7. Alpha Opacity: solid and crisp with full spherical visibility (no z-clipping)
+          float depthAlpha = smoothstep(-7.5, -3.8, mvPosition.z) * 0.45 + 0.55;
           
           if (aLayer > 1.5) {
             vAlpha = (0.45 + aRandom.z * 0.45) * depthAlpha;
@@ -437,9 +440,9 @@ export function ParticleSphereCore({
       mouseRef.current.x += (mouseRef.current.targetX - mouseRef.current.x) * 0.035;
       mouseRef.current.y += (mouseRef.current.targetY - mouseRef.current.y) * 0.035;
 
-      // Steady, elegant rotation (calm drift, no fast vibration during voice)
-      particles.rotation.y = elapsedTime * (0.065 + currentAudioLevel * 0.03) + mouseRef.current.x * (0.20 + currentHover * 0.08);
-      particles.rotation.x = Math.sin(elapsedTime * 0.05) * 0.04 + mouseRef.current.y * (0.14 + currentHover * 0.05);
+      // Steady, elegant drift: NO revolving acceleration during voice (waves handle visual dynamics instead)
+      particles.rotation.y = elapsedTime * 0.035 + mouseRef.current.x * (0.16 + currentHover * 0.06);
+      particles.rotation.x = Math.sin(elapsedTime * 0.03) * 0.02 + mouseRef.current.y * (0.10 + currentHover * 0.04);
 
       // Directional sound wave targeting (when a greeting is active)
       if (targetHeadingRef.current) {
@@ -537,7 +540,7 @@ export function ParticleSphereCore({
     <div
       ref={containerRef}
       onClick={onSphereClick}
-      className={`relative flex items-center justify-center w-[360px] h-[360px] sm:w-[420px] sm:h-[420px] md:w-[490px] md:h-[490px] lg:w-[540px] lg:h-[540px] select-none cursor-pointer ${className}`}
+      className={`relative flex items-center justify-center w-full h-full select-none cursor-pointer ${className}`}
     >
       <canvas
         ref={canvasRef}

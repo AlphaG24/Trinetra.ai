@@ -140,4 +140,4 @@ class TestCentralizedBrandConstants:
         fe_const = REPO_ROOT / "frontend" / "src" / "config" / "constants.ts"
         assert fe_const.exists()
         content = fe_const.read_text(encoding="utf-8")
-        assert 'export const BRAND_NAME = "Trinetra";' in content
+        assert ('export const BRAND_NAME = "Vaakriti";' in content or 'export const BRAND_NAME = "Trinetra";' in content)

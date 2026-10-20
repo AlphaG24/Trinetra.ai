@@ -38,7 +38,7 @@ export function VoiceAgentConsole({ service, quota }: VoiceAgentConsoleProps) {
     setStatus('connecting')
     setTranscripts(prev => [
       ...prev,
-      { id: Date.now().toString(), speaker: 'system', text: 'Connecting to Trinetra Neural voice pipeline...', time: 'Now' }
+      { id: Date.now().toString(), speaker: 'system', text: 'Connecting to Vaakriti Neural voice pipeline...', time: 'Now' }
     ])
 
     setTimeout(() => {
@@ -293,7 +293,7 @@ export function VoiceAgentConsole({ service, quota }: VoiceAgentConsoleProps) {
           <div className="space-y-2">
             <label className="text-xs text-zinc-400 font-semibold">System Directives & Context</label>
             <textarea
-              defaultValue="You are Anika, a professional relationship manager at Trinetra AI. Converse politely in Hindi. Answer queries regarding pipeline updates, leads status, and system operations."
+              defaultValue="You are Anika, a professional relationship manager at Vaakriti AI. Converse politely in Hindi. Answer queries regarding pipeline updates, leads status, and system operations."
               rows={5}
               className="w-full bg-zinc-950 border border-zinc-800 rounded-xl p-3 text-xs text-zinc-300 placeholder-zinc-600 focus:outline-none focus:border-orange-500 transition-all resize-none leading-relaxed"
             />

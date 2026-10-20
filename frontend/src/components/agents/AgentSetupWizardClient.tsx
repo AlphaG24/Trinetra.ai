@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/utils/supabase/client'
-import { Bot, Sparkles, Building, Briefcase, Users, LayoutList, Loader2, ArrowRight } from 'lucide-react'
+import { Bot, CheckCircle2, Building, Briefcase, Users, LayoutList, Loader2, ArrowRight } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 interface AgentSetupWizardClientProps {
@@ -128,7 +128,7 @@ Target Audience: ${targetAudience}
       {/* Wizard Header */}
       <div className="text-center space-y-3 mb-10">
         <div className="w-14 h-14 bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-2xl flex items-center justify-center text-zinc-900 dark:text-white mx-auto shadow-sm">
-          <Sparkles className="w-7 h-7" />
+          <Bot className="w-7 h-7" />
         </div>
         <h1 className="text-2xl sm:text-3xl font-extrabold text-[var(--heading)] tracking-tight leading-tight" style={{ fontFamily: 'Playfair Display, Georgia, serif' }}>
           Configure Your Premium Assistant
@@ -289,7 +289,7 @@ Target Audience: ${targetAudience}
                 disabled={loading}
                 className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 font-bold text-xs uppercase tracking-wider transition-all disabled:opacity-50 cursor-pointer shadow-sm active:scale-[0.99]"
               >
-                {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+                {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
                 <span>{loading ? 'Compiling Prompt...' : 'Complete & Save'}</span>
               </button>
             </div>

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Bot, CreditCard, Check, ArrowLeft, ShieldCheck, Clock, Phone, BarChart3, Zap, Plus, Minus, Trash2, Gift, ShoppingCart, Tag, Sparkles } from 'lucide-react'
+import { Bot, CreditCard, Check, ArrowLeft, ShieldCheck, Clock, Phone, BarChart3, Zap, Plus, Minus, Trash2, Gift, ShoppingCart, Tag } from 'lucide-react'
 import { toast } from 'sonner'
 import Link from 'next/link'
 import Script from 'next/script'
@@ -708,7 +708,7 @@ function CheckoutContent() {
                   Special Discount Bundles
                 </h3>
                 <p className="text-[10px] text-[var(--muted)] mt-1">Unlock multiple agent slots & lines at a bundled rate.</p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3.5 mt-3">
                   {availableBundles.map(b => (
                     <div key={b.id} className="p-4 bg-[var(--background)] border border-[var(--border)] rounded-xl flex flex-col justify-between space-y-3">
                       <div>
@@ -795,34 +795,38 @@ function CheckoutContent() {
 
                 {/* Onboarding & Setup Fee Line Item (Cases A, B, C) */}
                 {cartPrices.isTrial ? (
-                  <div className="flex justify-between items-center text-[11px] py-0.5">
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-[var(--muted)]">Onboarding & Setup Fee:</span>
-                      <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 font-bold">
+                  <div className="flex items-center justify-between gap-2 text-xs py-1">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span className="text-[var(--muted)] text-[11px] truncate">Onboarding &amp; Setup Fee:</span>
+                      <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 font-bold shrink-0">
                         TRIAL SPECIAL
                       </span>
                     </div>
-                    <span className="text-emerald-600 dark:text-emerald-400 font-bold font-mono">Waived Off (₹0)</span>
+                    <span className="text-emerald-600 dark:text-emerald-400 font-bold font-mono text-xs shrink-0 whitespace-nowrap">
+                      Waived Off (₹0)
+                    </span>
                   </div>
                 ) : cartPrices.onboardingFeeEnabled && cartPrices.onboardingFee > 0 ? (
-                  <div className="flex justify-between items-center text-[var(--heading)] font-semibold text-xs py-0.5">
-                    <div className="flex items-center gap-1.5">
-                      <span>Onboarding & Setup Fee:</span>
-                      <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-violet-500/10 text-violet-600 dark:text-violet-400 border border-violet-500/20 font-bold">
+                  <div className="flex items-center justify-between gap-2 text-[var(--heading)] font-semibold text-xs py-1">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span className="text-xs truncate">Onboarding &amp; Setup Fee:</span>
+                      <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-white/10 text-zinc-800 dark:text-zinc-200 border border-zinc-200 dark:border-white/15 font-bold shrink-0">
                         ONE-TIME
                       </span>
                     </div>
-                    <span className="font-mono">+{formatRawRupees(cartPrices.onboardingFee)}</span>
+                    <span className="font-mono text-xs shrink-0 whitespace-nowrap">+{formatRawRupees(cartPrices.onboardingFee)}</span>
                   </div>
                 ) : (
-                  <div className="flex justify-between items-center text-[11px] py-0.5">
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-[var(--muted)]">Onboarding & Setup Fee:</span>
-                      <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 font-bold">
+                  <div className="flex items-center justify-between gap-2 text-xs py-1">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span className="text-[var(--muted)] text-[11px] truncate">Onboarding &amp; Setup Fee:</span>
+                      <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 font-bold shrink-0">
                         100% WAIVED
                       </span>
                     </div>
-                    <span className="text-emerald-600 dark:text-emerald-400 font-bold font-mono">Waived Off (₹0)</span>
+                    <span className="text-emerald-600 dark:text-emerald-400 font-bold font-mono text-xs shrink-0 whitespace-nowrap">
+                      Waived Off (₹0)
+                    </span>
                   </div>
                 )}
 
@@ -881,7 +885,7 @@ function CheckoutContent() {
                 {cartPrices.isTrial && (
                   <div className="p-3 rounded-xl bg-zinc-100 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 text-[10px] text-[var(--muted)] space-y-1">
                     <div className="font-bold text-[var(--heading)] flex items-center gap-1.5">
-                      <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                      <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
                       <span>7-Day Trial Autopay Mandate</span>
                     </div>
                     <p className="leading-relaxed">

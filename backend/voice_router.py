@@ -321,7 +321,7 @@ def is_valid_uuid(val: str) -> bool:
 
 
 class LiveKitTokenRequest(BaseModel):
-    room_name: str | None = "trinetra-demo-room"
+    room_name: str | None = "vaakriti-demo-room"
     participant_name: str | None = "User"
     agent_id: str | None = None
 
@@ -367,7 +367,7 @@ async def generate_livekit_token(req: LiveKitTokenRequest):
                             
                             print(f"[DEMO CHECK] Agent: {req.agent_id} | Days Active: {days_active}/5 | Mins Used: {demo_minutes_used}/{demo_minutes_limit}", flush=True)
 
-                            # Trinetra Dignity Quota Guarantee:
+                            # Vaakriti Dignity Quota Guarantee:
                             # Users keep their remaining voice quota minutes even after timeline expires.
                             # Only block if minutes quota is completely exhausted.
                             if demo_minutes_used >= demo_minutes_limit:
@@ -390,7 +390,7 @@ async def generate_livekit_token(req: LiveKitTokenRequest):
     now = int(datetime.utcnow().timestamp())
     participant_name = req.participant_name or "User"
     identity = f"{participant_name}_{uuid.uuid4().hex[:6]}"
-    room_name = req.room_name or "trinetra-demo-room"
+    room_name = req.room_name or "vaakriti-demo-room"
 
     payload = {
         "exp": now + 86400,
@@ -1183,7 +1183,7 @@ async def handle_exotel_voice_webhook(
         # Return ExoML Response
         exoml_response = """<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-    <Say>Thank you for connecting with Trinetra AI.</Say>
+    <Say>Thank you for connecting with Vaakriti AI.</Say>
     <Pause length="10" />
 </Response>"""
         return Response(content=exoml_response.strip(), media_type="application/xml")
@@ -1191,9 +1191,141 @@ async def handle_exotel_voice_webhook(
         print(f"[Exotel Webhook Error] {e}", flush=True)
         fallback = """<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-    <Say>Thank you for connecting with Trinetra AI.</Say>
+    <Say>Thank you for connecting with Vaakriti AI.</Say>
 </Response>"""
         return Response(content=fallback, media_type="application/xml")
+
+
+# --- SARVAM INBOUND & OUTBOUND VOICE WEBHOOKS ---
+
+@router.api_route("/webhooks/voice/sarvam/{organization_id}", methods=["GET", "POST"])
+@router.api_route("/webhooks/voice/sarvam", methods=["GET", "POST"])
+async def handle_sarvam_voice_webhook(
+    request: Request,
+    organization_id: Optional[str] = "default"
+):
+    """
+    Handle incoming & outbound Sarvam AI voice webhooks, event updates, and call recordings.
+    Supports both JSON payloads and Form submissions.
+    """
+    try:
+        data = {}
+        content_type = request.headers.get("content-type", "")
+        if "application/json" in content_type:
+            try:
+                data = await request.json()
+            except Exception:
+                data = dict(request.query_params)
+        elif "application/x-www-form-urlencoded" in content_type or "multipart/form-data" in content_type:
+            try:
+                form = await request.form()
+                data = dict(form)
+            except Exception:
+                data = dict(request.query_params)
+        else:
+            try:
+                data = await request.json()
+            except Exception:
+                data = dict(request.query_params)
+
+        call_id = data.get("call_id") or data.get("CallSid") or data.get("id") or str(uuid.uuid4())
+        from_number = data.get("from") or data.get("caller") or data.get("From") or request.query_params.get("from") or "Unknown"
+        to_number = data.get("to") or data.get("callee") or data.get("To") or request.query_params.get("to") or "+919513886363"
+        call_status = data.get("status") or data.get("event") or data.get("CallStatus") or "in-progress"
+        duration = int(data.get("duration") or data.get("duration_seconds") or 0)
+        recording_url = data.get("recording_url") or data.get("audio_url")
+
+        agent_id = request.query_params.get("agent_id") or data.get("agent_id")
+        contact_id = request.query_params.get("contact_id") or data.get("contact_id")
+        matched_org_id = None
+
+        print(f"[Sarvam Webhook] Received call: {call_id} | From: {from_number} -> To: {to_number} | Status: {call_status}", flush=True)
+
+        clean_to = to_number.replace("+", "").strip()
+        if not agent_id:
+            try:
+                def _find_sarvam_agent():
+                    p_res = supabase_admin.table("phone_numbers")\
+                        .select("id, assigned_agent_id, organization_id, assigned_org_id")\
+                        .or_(f"phone_number.eq.{to_number},phone_number.eq.+{clean_to},phone_number.eq.{clean_to}")\
+                        .limit(1)\
+                        .execute()
+                    if p_res.data and len(p_res.data) > 0:
+                        row = p_res.data[0]
+                        f_org = row.get("assigned_org_id") or row.get("organization_id")
+                        if row.get("assigned_agent_id"):
+                            a_res = supabase_admin.table("agents").select("*").eq("id", row["assigned_agent_id"]).maybe_single().execute()
+                            if a_res.data:
+                                return a_res.data, f_org
+                        m_res = supabase_admin.table("agent_phone_numbers").select("agent_id").eq("phone_number_id", row["id"]).limit(1).execute()
+                        if m_res.data and len(m_res.data) > 0:
+                            a_res = supabase_admin.table("agents").select("*").eq("id", m_res.data[0]["agent_id"]).maybe_single().execute()
+                            if a_res.data:
+                                return a_res.data, f_org
+                    lookup = supabase_admin.table("agents").select("*").or_(f"phone_number.eq.{to_number},phone_number.eq.+{clean_to},phone_number.eq.{clean_to}").limit(1).execute()
+                    if lookup.data and len(lookup.data) > 0:
+                        return lookup.data[0], lookup.data[0].get("organization_id")
+                    any_agent = supabase_admin.table("agents").select("*").limit(1).execute()
+                    return (any_agent.data[0], any_agent.data[0].get("organization_id")) if any_agent.data else (None, None)
+
+                srv_agent, matched_org = await asyncio.to_thread(_find_sarvam_agent)
+                if srv_agent:
+                    agent_id = srv_agent.get("id")
+                    matched_org_id = matched_org
+            except Exception as e:
+                print(f"[Sarvam Lookup Error] {e}", flush=True)
+
+        target_org = organization_id if (organization_id and organization_id != "default") else matched_org_id
+
+        async def _async_record_sarvam():
+            try:
+                stat_normalized = "completed" if call_status.lower() in ["completed", "terminated", "ended"] else "in_progress" if call_status.lower() in ["in-progress", "connected", "answered"] else call_status.lower()
+                supabase_admin.table("voice_calls").upsert({
+                    "organization_id": target_org if target_org != "default" else None,
+                    "agent_id": agent_id,
+                    "provider_call_id": call_id,
+                    "session_id": call_id,
+                    "caller_phone": from_number,
+                    "agent_number": to_number,
+                    "direction": "inbound" if not contact_id else "outbound",
+                    "status": stat_normalized,
+                    "duration_seconds": duration,
+                    "recording_url": recording_url,
+                    "metadata": {
+                        "provider": "sarvam",
+                        "agent_id": agent_id,
+                        "contact_id": contact_id,
+                        "raw_status": call_status
+                    }
+                }, on_conflict="provider_call_id").execute()
+
+                if contact_id and call_status.lower() in ["completed", "ended", "answered", "in-progress", "busy", "failed"]:
+                    stat_map = {
+                        "completed": "answered",
+                        "ended": "answered",
+                        "answered": "answered",
+                        "in-progress": "answered",
+                        "busy": "busy",
+                        "failed": "failed"
+                    }
+                    supabase_admin.table("campaign_contacts").update({
+                        "call_status": stat_map.get(call_status.lower(), "answered"),
+                        "last_attempt_at": datetime.utcnow().isoformat()
+                    }).eq("id", contact_id).execute()
+            except Exception as e:
+                print(f"[Sarvam Webhook DB Error] {e}", flush=True)
+
+        asyncio.create_task(_async_record_sarvam())
+
+        return JSONResponse(content={
+            "status": "success",
+            "provider": "sarvam",
+            "call_id": call_id,
+            "message": "Call handled by Vaakriti AI voice pipeline"
+        })
+    except Exception as e:
+        print(f"[Sarvam Webhook Error] {e}", flush=True)
+        return JSONResponse(status_code=500, content={"error": str(e)})
 
 
 # --- TWILIO INBOUND & OUTBOUND VOICE WEBHOOKS ---
@@ -1519,7 +1651,7 @@ async def handle_twilio_voice_webhook(
         print(f"[Twilio Webhook Error] {e}\n{traceback.format_exc()}", flush=True)
         fallback = """<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-    <Say>Thank you for calling. Your call is connected to Trinetra AI.</Say>
+    <Say>Thank you for calling. Your call is connected to Vaakriti AI.</Say>
 </Response>"""
         return Response(content=fallback, media_type="application/xml")
 

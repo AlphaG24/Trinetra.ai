@@ -17,6 +17,8 @@ import { useDashboardStore } from "@/store/dashboardStore";
 import UpgradePrompt from "@/src/components/shared/UpgradePrompt";
 import { useAuth } from "@/src/components/providers/AuthProvider";
 import { PageHeaderSkeleton, CardGridSkeleton, TableSkeleton } from "@/src/components/ui/skeleton";
+import EnterpriseContactModal from "@/components/enterprise/EnterpriseContactModal";
+import { ShieldAlert } from "lucide-react";
 
 export default function PhoneNumbersPage() {
   const { profile: authProfile, isLoading: authLoading } = useAuth();
@@ -52,7 +54,7 @@ export default function PhoneNumbersPage() {
   const [numbers, setNumbers] = useState<any[]>([]);
   const [purchasedLoading, setPurchasedLoading] = useState(true);
   const [purchasedError, setPurchasedError] = useState("");
-  const [maxLimit, setMaxLimit] = useState(5);
+  const [maxLimit, setMaxLimit] = useState(0);
 
   // Available Pool Numbers State
   const [poolNumbers, setPoolNumbers] = useState<any[]>([]);
@@ -107,6 +109,7 @@ export default function PhoneNumbersPage() {
   // Statutory Telecom KYC Compliance Gate State
   const [kycCompliance, setKycCompliance] = useState<any>(null);
   const [showKycRequiredModal, setShowKycRequiredModal] = useState(false);
+  const [isEnterpriseModalOpen, setIsEnterpriseModalOpen] = useState(false);
 
   const handleOpenBidModal = (num: any) => {
     setBidModalNumber(num);
@@ -119,6 +122,13 @@ export default function PhoneNumbersPage() {
   const handlePlaceBid = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!bidModalNumber) return;
+
+    const isAtLimit = Array.isArray(numbers) ? numbers.length >= maxLimit : false;
+    if (isAtLimit) {
+      toast.error(`You have reached your limit of ${maxLimit} numbers. Please contact support to request an increased allotment.`);
+      setIsEnterpriseModalOpen(true);
+      return;
+    }
 
     try {
       setSubmittingBid(true);
@@ -272,6 +282,13 @@ export default function PhoneNumbersPage() {
       return;
     }
 
+    const isAtLimit = Array.isArray(numbers) ? numbers.length >= maxLimit : false;
+    if (isAtLimit) {
+      toast.error(`You have reached your limit of ${maxLimit} numbers. Please contact support to request an increased allotment.`);
+      setIsEnterpriseModalOpen(true);
+      return;
+    }
+
     try {
       setBuyingId(poolNum.id);
       const res = await fetch("/api/phone-numbers/claim-included", {
@@ -315,7 +332,8 @@ export default function PhoneNumbersPage() {
 
     const isAtLimit = Array.isArray(numbers) ? numbers.length >= maxLimit : false;
     if (isAtLimit) {
-      toast.error(`You have reached the maximum limit of ${maxLimit} numbers.`);
+      toast.error(`You have reached your limit of ${maxLimit} numbers. Please contact support to request an increased allotment.`);
+      setIsEnterpriseModalOpen(true);
       return;
     }
 
@@ -346,14 +364,14 @@ export default function PhoneNumbersPage() {
         key: data.data.key,
         amount: data.data.amount,
         currency: data.data.currency,
-        name: "Trinetra AI",
+        name: "Vaakriti AI",
         description: `Purchase Phone Number ${data.data.phone_number}`,
         order_id: data.data.order_id,
         prefill: {
           name: data.data.user_name,
           email: data.data.user_email,
         },
-        theme: { color: "#7c3aed" },
+        theme: { color: "#18181b" },
         handler: async function (response: any) {
           // Open high-trust loader modal immediately with no-refresh warning
           setInvoiceModal({
@@ -448,14 +466,14 @@ export default function PhoneNumbersPage() {
         key: data.data.key,
         amount: data.data.amount,
         currency: data.data.currency,
-        name: "Trinetra AI",
+        name: "Vaakriti AI",
         description: `30-Day Renewal for ${data.data.phone_number}`,
         order_id: data.data.order_id,
         prefill: {
           name: data.data.user_name,
           email: data.data.user_email,
         },
-        theme: { color: "#7c3aed" },
+        theme: { color: "#18181b" },
         handler: async function (response: any) {
           // Open high-trust loader modal immediately with no-refresh warning
           setInvoiceModal({
@@ -574,7 +592,7 @@ export default function PhoneNumbersPage() {
         </div>
         <div className="flex items-center gap-3">
           <div className="bg-[var(--secondary)] border border-[var(--border)] rounded-xl px-4 py-2 text-xs font-bold text-[var(--heading)] flex items-center gap-1.5 font-mono">
-            Active Lines: {numbers.length} / {maxLimit}
+            {purchasedLoading ? "Active Lines: Loading..." : `Active Lines: ${numbers.length} / ${maxLimit}`}
           </div>
         </div>
       </div>
@@ -623,7 +641,7 @@ export default function PhoneNumbersPage() {
               className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
                 poolCategoryFilter === "all"
                   ? "bg-zinc-900 text-white dark:bg-white dark:text-zinc-950 shadow-sm"
-                  : "bg-[var(--secondary)] text-[var(--muted)] hover:text-[var(--heading)]"
+                  : "bg-zinc-100 dark:bg-zinc-800/80 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white border border-zinc-200 dark:border-white/10"
               }`}
             >
               All ({poolNumbers.length})
@@ -633,7 +651,7 @@ export default function PhoneNumbersPage() {
               className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
                 poolCategoryFilter === "available_now"
                   ? "bg-zinc-900 text-white dark:bg-white dark:text-zinc-950 shadow-sm"
-                  : "bg-[var(--secondary)] text-[var(--muted)] hover:text-[var(--heading)]"
+                  : "bg-zinc-100 dark:bg-zinc-800/80 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white border border-zinc-200 dark:border-white/10"
               }`}
             >
               Available Now
@@ -642,8 +660,8 @@ export default function PhoneNumbersPage() {
               onClick={() => setPoolCategoryFilter("bidding")}
               className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
                 poolCategoryFilter === "bidding"
-                  ? "bg-emerald-600 text-white shadow-md shadow-emerald-600/20"
-                  : "bg-[var(--secondary)] text-[var(--muted)] hover:text-[var(--heading)]"
+                  ? "bg-emerald-600 text-white shadow-sm"
+                  : "bg-zinc-100 dark:bg-zinc-800/80 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white border border-zinc-200 dark:border-white/10"
               }`}
             >
               Open for Bidding
@@ -652,15 +670,15 @@ export default function PhoneNumbersPage() {
               onClick={() => setPoolCategoryFilter("assigned_bidding")}
               className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
                 poolCategoryFilter === "assigned_bidding"
-                  ? "bg-amber-600 text-white shadow-md shadow-amber-600/20"
-                  : "bg-[var(--secondary)] text-[var(--muted)] hover:text-[var(--heading)]"
+                  ? "bg-amber-600 text-white shadow-sm"
+                  : "bg-zinc-100 dark:bg-zinc-800/80 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white border border-zinc-200 dark:border-white/10"
               }`}
             >
               Bid for Next Cycle
             </button>
             <button
               onClick={fetchPoolNumbers}
-              className="p-2 rounded-lg bg-[var(--secondary)] text-[var(--muted)] hover:text-[var(--heading)] ml-auto"
+              className="p-2 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white border border-zinc-200 dark:border-white/10 ml-auto cursor-pointer"
               title="Refresh Pool"
             >
               <RefreshCw size={12} className={poolLoading ? "animate-spin" : ""} />
@@ -677,7 +695,24 @@ export default function PhoneNumbersPage() {
               Your free trial tier supports web-calls only. To purchase and assign dedicated virtual phone numbers to your AI agents, please upgrade your plan.
             </p>
           </div>
-        ) : Array.isArray(numbers) && numbers.length < maxLimit && (
+        ) : !purchasedLoading && maxLimit > 0 && Array.isArray(numbers) && numbers.length >= maxLimit ? (
+          <div className="mb-6 px-5 py-4 rounded-xl bg-blue-500/10 border border-blue-500/20 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <h4 className="text-sm font-bold text-[var(--heading)] flex items-center gap-2">
+                <ShieldAlert className="w-4 h-4 text-blue-400" /> Phone Line Limit Reached ({numbers.length} / {maxLimit})
+              </h4>
+              <p className="text-xs text-[var(--muted)] mt-1">
+                You have claimed all {maxLimit} allotted phone lines included with your account. Need more dedicated lines for your agents? Contact our team for an increased allotment.
+              </p>
+            </div>
+            <button
+              onClick={() => setIsEnterpriseModalOpen(true)}
+              className="px-4 py-2 bg-zinc-900 hover:bg-zinc-800 dark:bg-white dark:hover:bg-zinc-200 text-white dark:text-zinc-950 rounded-xl text-xs font-bold shrink-0 transition-all cursor-pointer shadow-xs"
+            >
+              Request More Lines
+            </button>
+          </div>
+        ) : !purchasedLoading && maxLimit > 0 && Array.isArray(numbers) && numbers.length < maxLimit && (
           <div className="mb-6 px-5 py-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex flex-col justify-center">
             <h4 className="text-sm font-bold text-[var(--heading)]">
               You have {maxLimit - numbers.length} included phone {maxLimit - numbers.length === 1 ? "line" : "lines"} ready to claim!
@@ -774,7 +809,7 @@ export default function PhoneNumbersPage() {
             <button onClick={fetchPurchasedNumbers} className="underline cursor-pointer">Retry</button>
           </div>
         ) : numbers.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-12 text-center bg-[var(--secondary)] border border-[var(--border)] rounded-2xl p-6">
+          <div className="flex flex-col items-center justify-center py-12 text-center bg-white dark:bg-zinc-900/50 border border-zinc-200 dark:border-white/10 rounded-2xl p-8 shadow-xs">
             <PhoneCall size={36} className="text-[var(--muted)] mb-3" />
             <h3 className="text-base font-bold text-[var(--heading)] mb-1">No purchased numbers</h3>
             <p className="text-xs text-[var(--muted)] max-w-xs mb-1 font-medium">
@@ -863,7 +898,7 @@ export default function PhoneNumbersPage() {
                 : "Submit a competing bid for priority purchase on this open line."}
             </p>
 
-            <div className="p-3 bg-[var(--secondary)] rounded-xl border border-[var(--border)] text-xs mb-4 space-y-1">
+            <div className="p-3.5 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-white/10 rounded-xl text-xs mb-4 space-y-1">
               <p className="text-[var(--muted)]">Number Type: <span className="text-[var(--heading)] font-semibold uppercase">{bidModalNumber.did_type || "mobile"}</span></p>
               <p className="text-[var(--muted)]">Provider: <span className="text-[var(--heading)] font-semibold capitalize">{bidModalNumber.provider || "exotel"}</span></p>
               {bidModalNumber.current_bid_paisa ? (
@@ -1001,6 +1036,12 @@ export default function PhoneNumbersPage() {
             setInvoiceModal(prev => ({ ...prev, isOpen: false }));
           }
         }}
+      />
+
+      {/* Enterprise Quota Request Modal */}
+      <EnterpriseContactModal
+        isOpen={isEnterpriseModalOpen}
+        onClose={() => setIsEnterpriseModalOpen(false)}
       />
     </div>
   );

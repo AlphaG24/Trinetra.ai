@@ -59,9 +59,6 @@ export function QuickActions({}: QuickActionsProps) {
               <span className="text-sm font-bold font-heading text-zinc-900 dark:text-white tracking-tight">
                 Browse Marketplace
               </span>
-              <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-teal-500/10 text-teal-700 dark:text-teal-300 border border-teal-500/20 transition-all">
-                100+ Voices
-              </span>
             </div>
             <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5 truncate">
               Deploy pre-configured voice agents & workflows in 1 click
@@ -82,16 +79,13 @@ export function QuickActions({}: QuickActionsProps) {
         className="ambient-action-card group relative flex items-center justify-between p-4 rounded-2xl border border-zinc-200/90 dark:border-white/10 bg-white dark:bg-zinc-900 hover:border-black dark:hover:border-white text-zinc-900 dark:text-white transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md shadow-xs cursor-pointer w-full"
       >
         <div className="flex items-center gap-3.5 min-w-0">
-          <div className="w-10 h-10 rounded-xl bg-violet-500/10 border border-violet-500/20 text-violet-600 dark:text-violet-400 flex items-center justify-center flex-shrink-0 group-hover:border-violet-500/40 group-hover:bg-violet-500/15 transition-all">
+          <div className="w-10 h-10 rounded-xl bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-white/10 text-zinc-900 dark:text-zinc-100 flex items-center justify-center flex-shrink-0 group-hover:border-zinc-400 group-hover:bg-zinc-200 dark:group-hover:bg-zinc-700 transition-all">
             <AnimatedLabFlaskIcon />
           </div>
           <div className="min-w-0 text-left">
             <div className="flex items-center gap-2">
               <span className="text-sm font-bold font-heading text-zinc-900 dark:text-white tracking-tight">
                 View Demo Tools
-              </span>
-              <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-violet-500/10 text-violet-700 dark:text-violet-300 border border-violet-500/20 transition-all">
-                Live Sandbox
               </span>
             </div>
             <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5 truncate">

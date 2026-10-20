@@ -217,7 +217,7 @@ export default function ConsentPage() {
                 {termsAgreement && <Check className="w-3.5 h-3.5" />}
               </div>
               <span className="text-sm font-medium text-zinc-800 dark:text-zinc-200 select-none leading-relaxed">
-                I agree to the <a href="/terms" target="_blank" className="text-violet-600 dark:text-violet-400 hover:underline font-bold">Terms of Service</a> and <a href="/privacy" target="_blank" className="text-violet-600 dark:text-violet-400 hover:underline font-bold">Privacy Policy</a> <span className="text-rose-500 font-bold">*</span>
+                I agree to the <a href="/terms" target="_blank" className="text-zinc-900 dark:text-white hover:underline font-bold">Terms of Service</a> and <a href="/privacy" target="_blank" className="text-zinc-900 dark:text-white hover:underline font-bold">Privacy Policy</a> <span className="text-rose-500 font-bold">*</span>
               </span>
             </label>
 
@@ -227,7 +227,7 @@ export default function ConsentPage() {
           <button
             type="submit"
             disabled={!canContinue || loading}
-            className="w-full py-3.5 bg-violet-600 hover:bg-violet-700 text-white font-extrabold text-sm rounded-xl transition-all flex items-center justify-center gap-2 group shadow-md shadow-violet-500/10 disabled:opacity-50 disabled:pointer-events-none cursor-pointer"
+            className="w-full py-3.5 bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 font-extrabold text-sm rounded-xl transition-all flex items-center justify-center gap-2 group shadow-sm disabled:opacity-50 disabled:pointer-events-none cursor-pointer active:scale-[0.99]"
           >
             {loading ? (
               <Loader2 className="w-5 h-5 animate-spin" />

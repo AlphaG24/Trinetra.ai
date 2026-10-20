@@ -152,7 +152,7 @@ export function KPICards({ stats, loading = false, error = null, onRetry }: KPIC
   }
 
   const interactionsVal = stats?.totalInteractions ?? 0
-  const activeToolsVal = stats?.activeTools ?? 16
+  const activeToolsVal = stats?.activeTools ?? 0
   const leadsVal = stats?.leadsGenerated ?? 0
   const conversionVal = stats?.conversionRate ?? 0
 

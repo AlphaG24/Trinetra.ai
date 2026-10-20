@@ -57,13 +57,13 @@ export function SocialAgentGallery() {
           <div className="flex h-[36px] w-[36px] items-center justify-center rounded-full border border-[#D8D0EA] bg-white shadow-[0_6px_18px_rgba(0,0,0,0.08)]">
             <Image
               src="/trident.png"
-              alt="Trinetra logo"
+              alt="Vaakriti logo"
               width={30}
               height={30}
               className="h-auto w-[30px] object-contain brightness-0 contrast-150 saturate-0"
             />
           </div>
-          <div className="text-[13px] font-semibold text-[#1A1330]">trinetraedu.ai</div>
+          <div className="text-[13px] font-semibold text-[#1A1330]">vaakriti.com</div>
         </div>
         <MoreVertical size={15} className="text-[#2B2343]" />
       </div>
@@ -82,7 +82,7 @@ export function SocialAgentGallery() {
         <div className="mb-[8px] flex justify-center">
           <Image
             src="/trident.png"
-            alt="Trinetra emblem"
+            alt="Vaakriti emblem"
             width={80}
             height={80}
             className="h-auto w-[80px] object-contain brightness-0 invert"
@@ -94,10 +94,10 @@ export function SocialAgentGallery() {
             Things to learn about
           </div>
           <div className="mt-[4px] font-display text-[31px] font-bold leading-[0.92] text-white">
-            Trinetra
+            Vaakriti
           </div>
           <div className="font-display text-[31px] font-bold leading-[0.92] text-[#FFD526]">
-            edu.ai
+            AI
           </div>
         </div>
 
@@ -136,7 +136,7 @@ export function SocialAgentGallery() {
         <div className="text-[11px] font-semibold text-[#151127]">View insights</div>
 
         <div className="mt-[10px] text-[10px] leading-[1.5] text-[#2E2545]">
-          <span className="mr-[6px] font-semibold text-[#151127]">trinetraedu.ai</span>
+          <span className="mr-[6px] font-semibold text-[#151127]">vaakriti.com</span>
           Tired of switching between 10 platforms? We fixed it. AI tools, test series,
           1:1 mentorship, and skills in one place.
         </div>

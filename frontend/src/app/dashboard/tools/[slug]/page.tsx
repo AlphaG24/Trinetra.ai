@@ -2,7 +2,7 @@ import { createServerClient } from '@supabase/ssr'
 import { cookies, headers } from 'next/headers'
 import { redirect, notFound } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Lock, Sparkles, ChevronRight, Activity } from 'lucide-react'
+import { ArrowLeft, Lock, Zap, ChevronRight, Activity } from 'lucide-react'
 import { StructurerConsole } from './components/StructurerConsole'
 
 interface PageProps {
@@ -23,7 +23,7 @@ export async function generateMetadata({ params }: PageProps) {
     if (s === 'structurer') return 'Triscrap'
     return s.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
   }
-  const siteName = slug === 'structurer' ? 'Triscrap' : 'Trinetra'
+  const siteName = slug === 'structurer' ? 'Triscrap' : 'Vaakriti'
   return {
     title: `${formatName(slug)} — ${siteName} Autonomous OS`,
     description: `Access and manage your autonomous AI tool: ${formatName(slug)}.`,
@@ -204,9 +204,9 @@ export default async function ToolGatekeeperPage({ params }: PageProps) {
             <div className="flex flex-col w-full gap-3 pt-2">
               <Link 
                 href="/dashboard/billing"
-                className="w-full py-3.5 px-4 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-white font-semibold rounded-xl text-sm transition-all duration-300 shadow-lg shadow-amber-500/25 flex items-center justify-center gap-2 hover:-translate-y-0.5 active:translate-y-0 cursor-pointer"
+                className="w-full py-3.5 px-4 bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 font-semibold rounded-xl text-sm transition-all duration-200 shadow-sm flex items-center justify-center gap-2 cursor-pointer active:scale-[0.98]"
               >
-                <Sparkles className="w-4 h-4" />
+                <Zap className="w-4 h-4" />
                 Upgrade Plan
               </Link>
               <Link 

@@ -88,7 +88,7 @@ export default function PartnerSignupPage() {
                   </Link>
                   <h1 className="font-display font-bold text-3xl text-white tracking-tight mb-2">Create Account</h1>
                   <p className="text-zinc-400 text-sm leading-relaxed">
-                    Join Trinetra's network today and start monetizing your referrals instantly.
+                    Join Vaakriti's network today and start monetizing your referrals instantly.
                   </p>
                 </div>
 

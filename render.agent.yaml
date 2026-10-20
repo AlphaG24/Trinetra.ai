@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: trinetra-voice-agent
+    env: python
+    rootDir: backend
+    plan: free
+    buildCommand: pip install --no-cache-dir -r requirements.txt
+    startCommand: python agent.py start
+    healthCheckPath: /
+    autoDeploy: true

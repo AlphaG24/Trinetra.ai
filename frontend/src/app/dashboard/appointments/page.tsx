@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { 
   Calendar, Clock, Phone, User, Mail, Search, RefreshCw, 
   CheckCircle2, XCircle, Copy, Check, CalendarClock,
-  ExternalLink, CalendarDays, Bot, Sparkles, AlertCircle, ArrowRight
+  ExternalLink, CalendarDays, Bot, AlertCircle, ArrowRight
 } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";

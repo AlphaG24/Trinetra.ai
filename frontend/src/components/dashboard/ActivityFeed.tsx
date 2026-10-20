@@ -142,14 +142,13 @@ export function ActivityFeed({
   return (
     <div className="bg-transparent h-full flex flex-col">
       <div className="flex items-center justify-between pb-4 border-b border-zinc-100 dark:border-zinc-800 mb-5">
-        <h2 className="text-sm md:text-base font-bold font-montserrat text-zinc-900 dark:text-white uppercase tracking-wider">Live Activity</h2>
+        <h2 className="text-sm md:text-base font-bold font-montserrat text-zinc-900 dark:text-white uppercase tracking-wider">Recent Activity</h2>
         <div className="flex items-center gap-2">
-          <span className="relative flex h-2.5 w-2.5">
-            {(isConnected || isControlled) && <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>}
-            <span className={`relative inline-flex rounded-full h-2.5 w-2.5 ${(isConnected || isControlled) ? 'bg-emerald-500' : 'bg-zinc-300 dark:bg-zinc-700'}`}></span>
+          <span className="relative flex h-2 w-2">
+            <span className={`relative inline-flex rounded-full h-2 w-2 ${(isConnected || isControlled) ? 'bg-emerald-500' : 'bg-zinc-300 dark:bg-zinc-700'}`}></span>
           </span>
-          <span className={`text-xs font-semibold ${(isConnected || isControlled) ? 'text-emerald-600 dark:text-emerald-400' : 'text-zinc-400'}`}>
-            {(isConnected || isControlled) ? 'Live' : 'Connecting...'}
+          <span className={`text-xs font-semibold ${(isConnected || isControlled) ? 'text-zinc-600 dark:text-zinc-400' : 'text-zinc-400'}`}>
+            {(isConnected || isControlled) ? 'Active' : 'Connecting...'}
           </span>
         </div>
       </div>
@@ -178,7 +177,7 @@ export function ActivityFeed({
               <Activity className="w-6 h-6 text-zinc-400" />
             </div>
             <h3 className="text-sm md:text-base font-bold font-montserrat text-zinc-900 dark:text-white mb-1">No recent activity</h3>
-            <p className="text-xs text-zinc-500 dark:text-zinc-400 max-w-xs">Live events from the last 5 hours will appear here in real time.</p>
+            <p className="text-xs text-zinc-500 dark:text-zinc-400 max-w-xs">Events from the last 5 hours will appear here in real time.</p>
           </div>
         ) : (
           <div className="space-y-4">

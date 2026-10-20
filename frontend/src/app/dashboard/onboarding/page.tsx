@@ -2,8 +2,8 @@ import { Suspense } from 'react'
 import { OnboardingClient } from '@/src/components/onboarding/OnboardingClient'
 
 export const metadata = {
-  title: 'Onboarding | Trinetra AI',
-  description: 'Complete your onboarding details to start using Trinetra AI.',
+  title: 'Onboarding | Vaakriti AI',
+  description: 'Complete your onboarding details to start using Vaakriti AI.',
 }
 
 export default function OnboardingPage() {

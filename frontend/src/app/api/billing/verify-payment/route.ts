@@ -77,20 +77,31 @@ export async function POST(request: Request) {
     const config: Record<string, string> = {}
     configs?.forEach(c => { config[c.config_key] = c.config_value })
     
-    const keySecret = config.razorpay_test_key_secret || config.razorpay_key_secret || process.env.RAZORPAY_KEY_SECRET
+    const secretsToTry = [
+      config.razorpay_test_key_secret,
+      config.razorpay_key_secret,
+      process.env.RAZORPAY_KEY_SECRET
+    ].filter(Boolean) as string[]
     
-    if (!keySecret) {
+    if (secretsToTry.length === 0) {
       return NextResponse.json({ error: 'Payment gateway not configured' }, { status: 500 })
     }
     
-    // 2. Verify payment signature
-    const expectedSignature = crypto
-      .createHmac('sha256', keySecret)
-      .update(`${razorpay_order_id}|${razorpay_payment_id}`)
-      .digest('hex')
+    // 2. Verify payment signature against configured secrets
+    let signatureValid = false
+    for (const secret of secretsToTry) {
+      const expectedSignature = crypto
+        .createHmac('sha256', secret)
+        .update(`${razorpay_order_id}|${razorpay_payment_id}`)
+        .digest('hex')
+      if (expectedSignature === razorpay_signature) {
+        signatureValid = true
+        break
+      }
+    }
     
-    if (expectedSignature !== razorpay_signature) {
-      console.error('[Verify Payment] Signature mismatch', { expected: expectedSignature, actual: razorpay_signature })
+    if (!signatureValid) {
+      console.error('[Verify Payment] Signature mismatch for order:', razorpay_order_id)
       return NextResponse.json({ error: 'Invalid signature' }, { status: 400 })
     }
     console.log('[Verify Payment] 1F LOG: Signature verified successfully for order:', razorpay_order_id)
@@ -428,14 +439,21 @@ export async function POST(request: Request) {
             }
           }
 
-          // 3. Activity log
-          await adminClient.from('activity_log').insert({
-            user_id: user.id,
-            organization_id: profile.organization_id,
-            activity_type: 'number_provisioned',
-            title: 'Phone Number Purchased from Pool',
-            description: `Purchased number ${poolNumber.phone_number} (${poolNumber.city || 'Local'})`
-          })
+          // 3. Activity log (safe insert without non-existent columns)
+          try {
+            await adminClient.from('activity_log').insert({
+              user_id: user.id,
+              activity_type: 'number_provisioned',
+              title: 'Phone Number Purchased from Pool',
+              description: `Purchased number ${poolNumber.phone_number} (${poolNumber.city || 'Local'})`,
+              metadata: {
+                organization_id: profile.organization_id || null,
+                phone_number: poolNumber.phone_number
+              }
+            })
+          } catch (logErr) {
+            console.warn('[Verify Payment] Activity log insert non-fatal:', logErr)
+          }
 
           const itemRate = poolNumber.retail_price_paisa || 29900
           const itemTotal = itemRate * item.quantity
@@ -451,11 +469,27 @@ export async function POST(request: Request) {
         }
       } else if (item.type === 'number_renewal') {
         // Phone Number Renewal Processing
-        const { data: phoneRow } = await adminClient
-          .from('phone_numbers')
-          .select('*')
-          .eq('id', item.key)
-          .single()
+        let phoneRow = null
+        try {
+          const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(item.key || ''))
+          if (isUuid) {
+            const { data } = await adminClient
+              .from('phone_numbers')
+              .select('*')
+              .eq('id', item.key)
+              .maybeSingle()
+            phoneRow = data
+          } else {
+            const { data } = await adminClient
+              .from('phone_numbers')
+              .select('*')
+              .eq('phone_number', item.key)
+              .maybeSingle()
+            phoneRow = data
+          }
+        } catch (findErr) {
+          console.warn('[Verify Payment] Error finding renewing phone number:', findErr)
+        }
 
         if (phoneRow) {
           const validityDays = phoneRow.validity_days || 30
@@ -463,32 +497,59 @@ export async function POST(request: Request) {
           const baseTime = currentRenewal > Date.now() ? currentRenewal : Date.now()
           const newRenewalDateIso = new Date(baseTime + validityDays * 86400000).toISOString()
 
-          // Extend renewal date on phone_numbers
+          // Extend renewal date on phone_numbers and clear all grace/hold flags
           await adminClient
             .from('phone_numbers')
             .update({
               renewal_date: newRenewalDateIso,
               status: 'active',
+              is_assigned: true,
+              expired_at: null,
+              grace_period_ends_at: null,
+              hold_period_ends_at: null,
+              reactivated_at: new Date().toISOString(),
               expiry_alerts_sent: [],
               updated_at: new Date().toISOString()
             })
             .eq('id', phoneRow.id)
 
-          // Activity log
-          await adminClient.from('activity_log').insert({
-            user_id: user.id,
-            organization_id: profile.organization_id,
-            activity_type: 'number_renewed',
-            title: 'Phone Number Renewed',
-            description: `Extended subscription for ${phoneRow.phone_number} by ${validityDays} days`
-          })
+          // Activity log (safe metadata, no direct organization_id column)
+          try {
+            await adminClient.from('activity_log').insert({
+              user_id: user.id,
+              activity_type: 'number_renewed',
+              title: 'Phone Number Renewed',
+              description: `Extended subscription for ${phoneRow.phone_number} by ${validityDays} days`,
+              metadata: {
+                organization_id: profile.organization_id || null,
+                phone_number: phoneRow.phone_number
+              }
+            })
+          } catch (actErr) {
+            console.warn('[Verify Payment] Activity log insert non-fatal:', actErr)
+          }
 
-          const itemRate = phoneRow.retail_price_paisa || 29900
+          const itemRate = (phoneRow.retail_price_paisa && phoneRow.retail_price_paisa > 0)
+            ? phoneRow.retail_price_paisa
+            : parseInt(config.inbound_number_cost_paisa || '29900', 10)
           const itemTotal = itemRate * item.quantity
           totalPaidPaisa += itemTotal
 
           invoiceLines.push({
             item: `Virtual Phone Number 30-Day Renewal (${phoneRow.phone_number})`,
+            quantity: item.quantity,
+            rate: itemRate,
+            discount: 0,
+            amount: itemTotal
+          })
+        } else {
+          // Resilient fallback: ensure line item exists so invoice matches payment
+          const itemRate = parseInt(config.inbound_number_cost_paisa || '29900', 10)
+          const itemTotal = itemRate * item.quantity
+          totalPaidPaisa += itemTotal
+
+          invoiceLines.push({
+            item: `Virtual Phone Number 30-Day Renewal`,
             quantity: item.quantity,
             rate: itemRate,
             discount: 0,
@@ -688,13 +749,18 @@ export async function POST(request: Request) {
                     }
 
                     // Insert activity log
-                    await adminClient.from("activity_log").insert({
-                      user_id: user.id,
-                      organization_id: profile.organization_id || null,
-                      activity_type: 'number_provisioned',
-                      title: 'Pack Phone Number Assigned',
-                      description: `Assigned number ${availableNumber.phone_number} from purchased package`
-                    });
+                    try {
+                      await adminClient.from("activity_log").insert({
+                        user_id: user.id,
+                        activity_type: 'number_provisioned',
+                        title: 'Pack Phone Number Assigned',
+                        description: `Assigned number ${availableNumber.phone_number} from purchased package`,
+                        metadata: {
+                          organization_id: profile.organization_id || null,
+                          phone_number: availableNumber.phone_number
+                        }
+                      });
+                    } catch (e) {}
                     console.log('[Verify Payment] Automatically assigned pre-stocked number from package:', availableNumber.phone_number);
                   } else {
                     console.log('[Verify Payment] Inventory currently empty; user credited with number entitlement slot to claim from catalog.');
@@ -741,10 +807,11 @@ export async function POST(request: Request) {
       }
     }
 
-    // 3a. Onboarding & Setup Fee processing (if enabled in admin configs and not pure trial)
+    // 3a. Onboarding & Setup Fee processing (only applied to new paid subscription plans, not trials or number renewals)
     const isPureTrial = items.length === 1 && items.some((item: any) => item.type === 'subscription' && (item.key === 'trial' || item.key.endsWith('_trial')))
+    const hasPaidSubscription = items.some((item: any) => item.type === 'subscription' && item.key !== 'trial' && !item.key.endsWith('_trial'))
     const onboardingFeeEnabled = config.onboarding_fee_enabled === 'true'
-    const onboardingFeePaisa = (onboardingFeeEnabled && !isPureTrial)
+    const onboardingFeePaisa = (onboardingFeeEnabled && hasPaidSubscription)
       ? parseInt(config.onboarding_fee_paisa || '0', 10)
       : 0
 
@@ -812,27 +879,19 @@ export async function POST(request: Request) {
     const finalTotalPaisa = isPureTrial ? taxablePaisa : (taxablePaisa + taxPaisa)
 
     // 4. Update profiles table with fallback checks
+    const hasSubscriptionOrBundle = items.some((item: any) => item.type === 'subscription' || item.type === 'bundle')
     const updates: Record<string, any> = {
-      plan_tier: planTierToSet,
-      demo_minutes_limit: demoMinutesLimitToSet,
-      demo_minutes_used: 0,
-      paid_minutes_limit: paidMinutesLimitToSet,
-      paid_minutes_used: 0,
-      trial_started_at: trialStartedAtToSet,
-      trial_ends_at: trialEndsAtToSet,
       updated_at: new Date().toISOString()
     }
 
-    if (isPureTrial) {
-      const trialMeta = (body as any).trial_metadata || {}
-      updates.mandate_status = 'scheduled'
-      updates.mandate_id = razorpay_payment_id || razorpay_order_id
-      updates.mandate_target_plan = trialMeta.targetPlanSlug || 'starter'
-      updates.mandate_renewal_date = trialMeta.renewalDate || new Date(Date.now() + 7 * 86400000).toISOString()
-      updates.mandate_target_price_paisa = (trialMeta.targetPriceRupees || 4999) * 100
-      updates.mandate_personalities = trialMeta.selectedPersonalities || ['sales', 'support']
-    } else if (planTierToSet !== 'free' && planTierToSet !== 'free_demo') {
-      updates.mandate_status = 'active'
+    if (hasSubscriptionOrBundle) {
+      updates.plan_tier = planTierToSet
+      updates.demo_minutes_limit = demoMinutesLimitToSet
+      updates.demo_minutes_used = 0
+      updates.paid_minutes_limit = paidMinutesLimitToSet
+      updates.paid_minutes_used = 0
+      updates.trial_started_at = trialStartedAtToSet
+      updates.trial_ends_at = trialEndsAtToSet
     }
 
     if (save_gst_to_profile && cleanGSTIN) {
@@ -845,8 +904,12 @@ export async function POST(request: Request) {
     const currentAddAgents = profile.additional_agents || 0
     const currentAddNumbers = profile.additional_phone_numbers || 0
 
-    updates.additional_agents = currentAddAgents + additionalAgentsToAdd
-    updates.additional_phone_numbers = currentAddNumbers + additionalNumbersToAdd
+    if (additionalAgentsToAdd > 0) {
+      updates.additional_agents = currentAddAgents + additionalAgentsToAdd
+    }
+    if (additionalNumbersToAdd > 0) {
+      updates.additional_phone_numbers = currentAddNumbers + additionalNumbersToAdd
+    }
 
     const { error: profileUpdateErr } = await adminClient
       .from('profiles')
@@ -858,7 +921,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Failed to update plan limits' }, { status: 500 })
     }
     // Extend validity on active agents by 30 days upon paid plan upgrade or recurring renewal
-    if (planTierToSet !== 'trial' && planTierToSet !== 'free' && planTierToSet !== 'free_demo') {
+    if (hasSubscriptionOrBundle && planTierToSet !== 'trial' && planTierToSet !== 'free' && planTierToSet !== 'free_demo') {
       try {
         const renewalExpiresAt = new Date(Date.now() + 30 * 86400000).toISOString()
         let agentQuery = adminClient
@@ -895,7 +958,29 @@ export async function POST(request: Request) {
       )
     }
 
-    // 5. Create and save a single invoice with dynamic line items (VAK/ series per Task 11)
+    // 5. Ensure valid organization_id for invoices table (violates not-null constraint if null)
+    let orgId = profile.organization_id
+    if (!orgId) {
+      try {
+        const { data: newOrg } = await adminClient
+          .from('organizations')
+          .insert({
+            name: profile.company_name || profile.full_name || 'My Organization',
+            primary_email: user.email,
+            is_active: true
+          })
+          .select('id')
+          .maybeSingle()
+        if (newOrg) {
+          orgId = newOrg.id
+          await adminClient.from('profiles').update({ organization_id: orgId }).eq('id', user.id)
+        }
+      } catch (orgErr) {
+        console.warn('[Verify Payment] Could not create fallback organization:', orgErr)
+      }
+    }
+
+    // 6. Create and save a single invoice with dynamic line items (VAK/ series per Task 11)
     const { count: totalInvoices } = await adminClient
       .from('invoices')
       .select('*', { count: 'exact', head: true })
@@ -905,8 +990,9 @@ export async function POST(request: Request) {
     const { data: invoiceRecord, error: invoiceErr } = await adminClient
       .from('invoices')
       .insert({
-        organization_id: profile.organization_id || null,
+        organization_id: orgId || profile.organization_id,
         invoice_number: vakInvoiceNumber,
+        transaction_type: hasSubscriptionOrBundle ? 'subscription' : 'wallet_topup',
         period_start: new Date().toISOString(),
         period_end: new Date(Date.now() + 30 * 86400000).toISOString(),
         subscription_amount: taxablePaisa,

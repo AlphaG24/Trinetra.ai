@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Bot, Save, RotateCcw, Loader2, Plus, Trash2, 
-  UserCheck, ExternalLink, Sparkles, CheckCircle2, ChevronDown
+  UserCheck, ExternalLink, CheckCircle2, ChevronDown
 } from 'lucide-react';
 import Link from 'next/link';
 import { toast } from 'sonner';
@@ -356,7 +356,7 @@ export function DemoAgentsManager() {
           </div>
 
           <div className="pt-3 border-t border-zinc-800/80 flex items-center gap-2 text-xs text-zinc-400">
-            <Sparkles className="w-4 h-4 text-emerald-400 shrink-0" />
+            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
             <span>
               All prompt instructions, conversation behavior, objection handling, appointment calendar, and voice tuning are loaded in real time directly from this agent&apos;s dashboard.
             </span>

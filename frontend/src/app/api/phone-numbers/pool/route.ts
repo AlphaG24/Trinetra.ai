@@ -27,7 +27,7 @@ export async function GET() {
       .from('phone_numbers')
       .select('*')
       .eq('is_assigned', false)
-      .eq('status', 'active')
+      .in('status', ['active', 'released'])
       .is('organization_id', null)
       .is('assigned_org_id', null)
       .order('created_at', { ascending: false })

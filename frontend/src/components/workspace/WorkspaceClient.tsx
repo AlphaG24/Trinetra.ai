@@ -4,7 +4,7 @@ import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { 
-  Play, Pause, FileText, Database, ShieldAlert, Sparkles, Sliders, Settings, 
+  Play, Pause, FileText, Database, ShieldAlert, Sliders, Settings, 
   Terminal, Activity, ArrowRight, Phone, MessageSquare, Share2, Copy, Check, RefreshCw, Download, ExternalLink
 } from 'lucide-react'
 import { VoiceDemo } from '../demo/VoiceDemo'
@@ -308,7 +308,7 @@ function ExternalDataWorkspace({ tool, quota, user, logs, router }: ExternalData
           </div>
           <div>
             <h4 className="text-sm font-semibold text-white">External Compute Environment</h4>
-            <p className="text-xs text-zinc-400 mt-0.5">Trinetra Structurer requires a dedicated secure node.</p>
+            <p className="text-xs text-zinc-400 mt-0.5">Vaakriti Structurer requires a dedicated secure node.</p>
           </div>
         </div>
         

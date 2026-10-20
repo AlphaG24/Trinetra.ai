@@ -96,39 +96,39 @@ export function SupportPageClient({ user }: { user: any }) {
           </div>
         </a>
 
-        <div className="group flex flex-col items-center gap-3 p-6 bg-purple-500/10 border border-purple-500/30 hover:border-purple-500/60 rounded-2xl transition-all cursor-pointer">
-          <div className="w-12 h-12 rounded-xl bg-purple-500/20 flex items-center justify-center text-2xl group-hover:scale-110 transition-transform">
+        <div className="group flex flex-col items-center gap-3 p-6 bg-zinc-100/80 dark:bg-white/[0.03] border border-zinc-200 dark:border-white/10 hover:border-zinc-300 dark:hover:border-white/20 rounded-2xl transition-all cursor-pointer">
+          <div className="w-12 h-12 rounded-xl bg-zinc-200 dark:bg-white/10 flex items-center justify-center text-2xl group-hover:scale-110 transition-transform">
             📞
           </div>
           <div className="text-center">
-            <p className="font-bold text-white">Phone Support</p>
-            <p className="text-xs text-white/50 mt-1">Mon–Sat, 9AM–7PM IST</p>
-            <p className="text-sm text-purple-400 font-mono mt-2">+91 80 4748 3921</p>
+            <p className="font-bold text-zinc-900 dark:text-white">Phone Support</p>
+            <p className="text-xs text-zinc-500 dark:text-white/50 mt-1">Mon–Sat, 9AM–7PM IST</p>
+            <p className="text-sm text-zinc-700 dark:text-zinc-300 font-mono mt-2">+91 80 4748 3921</p>
           </div>
         </div>
       </div>
 
       {/* Submit Ticket */}
-      <div className="bg-[#0f1117]/90 border border-white/5 rounded-2xl p-6 space-y-5">
-        <h2 className="text-lg font-bold text-white">Submit a Support Ticket</h2>
+      <div className="bg-white dark:bg-[#0f1117]/90 border border-zinc-200 dark:border-white/10 rounded-2xl p-6 space-y-5 shadow-sm">
+        <h2 className="text-lg font-bold text-zinc-900 dark:text-white">Submit a Support Ticket</h2>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-white/60 uppercase tracking-wider">Subject</label>
+            <label className="text-xs font-semibold text-zinc-600 dark:text-white/60 uppercase tracking-wider">Subject</label>
             <input
               type="text"
               value={ticketForm.subject}
               onChange={e => setTicketForm(p => ({ ...p, subject: e.target.value }))}
               placeholder="e.g. Voice agent not answering calls"
-              className="w-full px-4 py-3 bg-black/40 border border-white/10 rounded-xl text-white placeholder-white/30 text-sm focus:outline-none focus:border-purple-500/50 transition-colors"
+              className="w-full px-4 py-3 bg-zinc-50 dark:bg-black/40 border border-zinc-200 dark:border-white/10 rounded-xl text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-white/30 text-sm focus:outline-none focus:border-zinc-400 dark:focus:border-white/30 transition-colors"
             />
           </div>
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-white/60 uppercase tracking-wider">Priority</label>
+            <label className="text-xs font-semibold text-zinc-600 dark:text-white/60 uppercase tracking-wider">Priority</label>
             <select
               value={ticketForm.priority}
               onChange={e => setTicketForm(p => ({ ...p, priority: e.target.value }))}
-              className="w-full px-4 py-3 bg-black/40 border border-white/10 rounded-xl text-white text-sm focus:outline-none focus:border-purple-500/50 appearance-none"
+              className="w-full px-4 py-3 bg-zinc-50 dark:bg-black/40 border border-zinc-200 dark:border-white/10 rounded-xl text-zinc-900 dark:text-white text-sm focus:outline-none focus:border-zinc-400 dark:focus:border-white/30 appearance-none"
             >
               <option value="low">Low — General question</option>
               <option value="normal">Normal — Need help soon</option>
@@ -139,20 +139,20 @@ export function SupportPageClient({ user }: { user: any }) {
         </div>
 
         <div className="space-y-1.5">
-          <label className="text-xs font-semibold text-white/60 uppercase tracking-wider">Describe your issue</label>
+          <label className="text-xs font-semibold text-zinc-600 dark:text-white/60 uppercase tracking-wider">Describe your issue</label>
           <textarea
             value={ticketForm.message}
             onChange={e => setTicketForm(p => ({ ...p, message: e.target.value }))}
             rows={5}
             placeholder="Please describe what's happening, what you expected, and any steps to reproduce..."
-            className="w-full px-4 py-3 bg-black/40 border border-white/10 rounded-xl text-white placeholder-white/30 text-sm focus:outline-none focus:border-purple-500/50 transition-colors resize-none"
+            className="w-full px-4 py-3 bg-zinc-50 dark:bg-black/40 border border-zinc-200 dark:border-white/10 rounded-xl text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-white/30 text-sm focus:outline-none focus:border-zinc-400 dark:focus:border-white/30 transition-colors resize-none"
           />
         </div>
 
         <button
           onClick={submitTicket}
           disabled={sending}
-          className="flex items-center gap-2 px-8 py-3 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white font-bold rounded-xl transition-colors"
+          className="flex items-center gap-2 px-8 py-3 bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 font-bold rounded-xl transition-all disabled:opacity-50 cursor-pointer shadow-sm active:scale-[0.99]"
         >
           {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
           Submit Ticket

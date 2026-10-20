@@ -1,24 +1,19 @@
 import React from "react";
-import { Globe } from "lucide-react";
 
-/* ═══════════════════════════════════════════════════════════════════════
-   CIRCULAR VECTOR COUNTRY FLAGS (Matching reference screenshot exactly)
-   ═══════════════════════════════════════════════════════════════════════ */
+/* ══════════════════════════════════════════════════════════════════════════════
+   CIRCULAR VECTOR COUNTRY FLAGS
+   ══════════════════════════════════════════════════════════════════════════════ */
 
-export function IndiaCircularFlag({ className = "w-7 h-7" }: { className?: string }) {
+export function IndiaCircularFlag({ className = "w-6 h-6" }: { className?: string }) {
   return (
     <svg viewBox="0 0 32 32" className={`shrink-0 rounded-full shadow-2xs ${className}`} xmlns="http://www.w3.org/2000/svg">
-      <clipPath id="circle-clip-in">
+      <clipPath id="circle-clip-in-flag">
         <circle cx="16" cy="16" r="16" />
       </clipPath>
-      <g clipPath="url(#circle-clip-in)">
-        {/* Saffron Top */}
+      <g clipPath="url(#circle-clip-in-flag)">
         <rect x="0" y="0" width="32" height="10.66" fill="#FF9933" />
-        {/* White Middle */}
         <rect x="0" y="10.66" width="32" height="10.66" fill="#FFFFFF" />
-        {/* Green Bottom */}
         <rect x="0" y="21.33" width="32" height="10.67" fill="#138808" />
-        {/* Ashoka Chakra (Navy Blue Wheel) */}
         <circle cx="16" cy="16" r="3.2" fill="none" stroke="#000080" strokeWidth="0.75" />
         <circle cx="16" cy="16" r="0.7" fill="#000080" />
         <path d="M 16 13 L 16 19 M 13 16 L 19 16 M 13.9 13.9 L 18.1 18.1 M 13.9 18.1 L 18.1 13.9" stroke="#000080" strokeWidth="0.5" />
@@ -27,13 +22,13 @@ export function IndiaCircularFlag({ className = "w-7 h-7" }: { className?: strin
   );
 }
 
-export function USACircularFlag({ className = "w-7 h-7" }: { className?: string }) {
+export function USACircularFlag({ className = "w-6 h-6" }: { className?: string }) {
   return (
     <svg viewBox="0 0 32 32" className={`shrink-0 rounded-full shadow-2xs ${className}`} xmlns="http://www.w3.org/2000/svg">
-      <clipPath id="circle-clip-us">
+      <clipPath id="circle-clip-us-flag">
         <circle cx="16" cy="16" r="16" />
       </clipPath>
-      <g clipPath="url(#circle-clip-us)">
+      <g clipPath="url(#circle-clip-us-flag)">
         <rect x="0" y="0" width="32" height="32" fill="#B22234" />
         <rect x="0" y="2.5" width="32" height="2.5" fill="#FFFFFF" />
         <rect x="0" y="7.5" width="32" height="2.5" fill="#FFFFFF" />
@@ -42,7 +37,7 @@ export function USACircularFlag({ className = "w-7 h-7" }: { className?: string 
         <rect x="0" y="22.5" width="32" height="2.5" fill="#FFFFFF" />
         <rect x="0" y="27.5" width="32" height="2.5" fill="#FFFFFF" />
         <rect x="0" y="0" width="14" height="15" fill="#3C3B6E" />
-        <g fill="#FFFFFF" fontSize="4" textAnchor="middle">
+        <g fill="#FFFFFF" fontSize="3.5" textAnchor="middle">
           <text x="3.5" y="5">★</text>
           <text x="7" y="5">★</text>
           <text x="10.5" y="5">★</text>
@@ -50,20 +45,19 @@ export function USACircularFlag({ className = "w-7 h-7" }: { className?: string 
           <text x="8.8" y="9">★</text>
           <text x="3.5" y="13">★</text>
           <text x="7" y="13">★</text>
-          <text x="10.5" y="13">★</text>
         </g>
       </g>
     </svg>
   );
 }
 
-export function UKCircularFlag({ className = "w-7 h-7" }: { className?: string }) {
+export function UKCircularFlag({ className = "w-6 h-6" }: { className?: string }) {
   return (
     <svg viewBox="0 0 32 32" className={`shrink-0 rounded-full shadow-2xs ${className}`} xmlns="http://www.w3.org/2000/svg">
-      <clipPath id="circle-clip-uk">
+      <clipPath id="circle-clip-uk-flag">
         <circle cx="16" cy="16" r="16" />
       </clipPath>
-      <g clipPath="url(#circle-clip-uk)">
+      <g clipPath="url(#circle-clip-uk-flag)">
         <rect x="0" y="0" width="32" height="32" fill="#012169" />
         <path d="M 0 0 L 32 32 M 32 0 L 0 32" stroke="#FFFFFF" strokeWidth="5.5" strokeLinecap="square" />
         <path d="M 0 0 L 32 32 M 32 0 L 0 32" stroke="#C8102E" strokeWidth="2.5" strokeLinecap="square" />
@@ -74,13 +68,13 @@ export function UKCircularFlag({ className = "w-7 h-7" }: { className?: string }
   );
 }
 
-export function UAECircularFlag({ className = "w-7 h-7" }: { className?: string }) {
+export function UAECircularFlag({ className = "w-6 h-6" }: { className?: string }) {
   return (
     <svg viewBox="0 0 32 32" className={`shrink-0 rounded-full shadow-2xs ${className}`} xmlns="http://www.w3.org/2000/svg">
-      <clipPath id="circle-clip-ae">
+      <clipPath id="circle-clip-ae-flag">
         <circle cx="16" cy="16" r="16" />
       </clipPath>
-      <g clipPath="url(#circle-clip-ae)">
+      <g clipPath="url(#circle-clip-ae-flag)">
         <rect x="8" y="0" width="24" height="10.66" fill="#00732F" />
         <rect x="8" y="10.66" width="24" height="10.66" fill="#FFFFFF" />
         <rect x="8" y="21.33" width="24" height="10.67" fill="#000000" />
@@ -90,401 +84,338 @@ export function UAECircularFlag({ className = "w-7 h-7" }: { className?: string 
   );
 }
 
-/* ═══════════════════════════════════════════════════════════════════════
-   MAIN GLOBAL TELEPHONY COMPONENT
-   ═══════════════════════════════════════════════════════════════════════ */
-
+/* ══════════════════════════════════════════════════════════════════════════════
+   GLOBAL CAPABILITY: BUILT FOR INDIA, READY FOR THE WORLD
+   2-Column Layout matching the reference design with accurate India geometry.
+   ══════════════════════════════════════════════════════════════════════════════ */
 export function GlobalTelephonyMap() {
   return (
-    <section
-      id="global-capability"
-      className="w-full py-12 sm:py-16 lg:py-20 px-4 sm:px-6 lg:px-10 select-none overflow-hidden font-sans transition-colors duration-300"
-      style={{
-        backgroundColor: "var(--theme-bg-map, #FAFAFA)",
-        borderTop: "1px solid var(--theme-border, #E5E5E5)",
-      }}
-    >
-      <div className="w-full max-w-[1440px] mx-auto">
-        <div className="flex flex-col lg:flex-row items-center justify-between gap-8 lg:gap-12 xl:gap-16">
+    <section className="relative py-14 sm:py-20 lg:py-24 overflow-hidden bg-transparent font-sans">
+      <div className="max-w-[1380px] mx-auto px-4 sm:px-6 lg:px-10">
+        
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-14 items-center">
           
-          {/* ══════════════════════════════════════════════════════════════
-              LEFT SIDE: REAL DOTTED WORLD MAP WITH DISTINCT MULTI-DIRECTIONAL ROUTES
-              ══════════════════════════════════════════════════════════════ */}
-          <div className="w-full lg:w-[54%] xl:w-[53%] relative flex items-center justify-center">
+          {/* ══════════════════════════════════════════════════════════════════
+              LEFT COLUMN: WORLD MAP WITH INDIA BLUE ACCURACY & ORBIT ARCS
+              ══════════════════════════════════════════════════════════════════ */}
+          <div className="lg:col-span-7 relative w-full aspect-[800/440] max-h-[500px] flex items-center justify-center select-none">
             
-            {/* Map Supporting Visual Canvas inside Card Frame */}
-            <div className="relative w-full max-w-[700px] rounded-3xl bg-white border border-[#E2E8F0] p-4 sm:p-6 shadow-[0_2px_14px_rgba(8,13,24,0.03)] aspect-[800/440] flex items-center justify-center">
-              
-              {/* SVG Vector World Map */}
-              <svg
-                viewBox="0 0 800 420"
-                className="w-full h-full object-contain"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                {/* 1. Real Dotted World Map (High-visibility dots from official GeoJSON boundaries) */}
-                <image
-                  href="/real-world-dots.svg"
-                  x="0"
-                  y="0"
-                  width="800"
-                  height="420"
-                  opacity="1"
-                />
+            {/* Ambient India Glow */}
+            <div className="pointer-events-none absolute right-[26%] top-[42%] -translate-y-1/2 w-[340px] h-[340px] rounded-full bg-blue-100/40 blur-[80px]" />
 
-                {/* 2. Destination Markers in 3 Distinct Geographic Locations */}
-                
-                {/* Location 1: North America West Coast (x: 220, y: 100) */}
-                <g>
-                  <circle cx="220" cy="100" r="4.5" fill="#315CFF" />
-                  <circle cx="220" cy="100" r="10" fill="none" stroke="#315CFF" strokeWidth="1.2" opacity="0.45" />
-                </g>
+            {/* SVG Canvas */}
+            <svg
+              viewBox="0 0 800 420"
+              className="w-full h-full object-contain relative z-10"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <defs>
+                {/* Blue Flight Arc Gradients */}
+                <linearGradient id="orbit-blue-west" x1="565" y1="185" x2="160" y2="135" gradientUnits="userSpaceOnUse">
+                  <stop offset="0%" stopColor="#2563EB" stopOpacity="0.9" />
+                  <stop offset="50%" stopColor="#3B82F6" stopOpacity="0.7" />
+                  <stop offset="100%" stopColor="#60A5FA" stopOpacity="0.4" />
+                </linearGradient>
 
-                {/* Location 2: Asia-Pacific / Tokyo (x: 745, y: 135) */}
-                <g>
-                  <circle cx="745" cy="135" r="4.5" fill="#45C5FF" />
-                  <circle cx="745" cy="135" r="10" fill="none" stroke="#45C5FF" strokeWidth="1.2" opacity="0.45" />
-                </g>
+                <linearGradient id="orbit-blue-uk" x1="565" y1="185" x2="395" y2="105" gradientUnits="userSpaceOnUse">
+                  <stop offset="0%" stopColor="#2563EB" stopOpacity="0.9" />
+                  <stop offset="100%" stopColor="#3B82F6" stopOpacity="0.6" />
+                </linearGradient>
 
-                {/* Location 3: Middle East / UAE (x: 505, y: 175) */}
-                <g>
-                  <circle cx="505" cy="175" r="4.5" fill="#18243A" />
-                  <circle cx="505" cy="175" r="10" fill="none" stroke="#18243A" strokeWidth="1.2" opacity="0.45" />
-                </g>
+                <linearGradient id="orbit-blue-uae" x1="565" y1="185" x2="492" y2="182" gradientUnits="userSpaceOnUse">
+                  <stop offset="0%" stopColor="#2563EB" stopOpacity="0.9" />
+                  <stop offset="100%" stopColor="#3B82F6" stopOpacity="0.6" />
+                </linearGradient>
 
-                {/* India Central Core Hub (x: 563, y: 183) - Completely unobstructed */}
-                <g>
-                  <circle
-                    cx="563"
-                    cy="183"
-                    r="18"
-                    fill="none"
-                    stroke="#315CFF"
-                    strokeWidth="1.75"
-                    opacity="0.45"
-                    className="animate-ping"
-                    style={{ transformOrigin: "563px 183px", animationDuration: "2.4s" }}
-                  />
-                  <circle cx="563" cy="183" r="6.5" fill="#315CFF" />
-                  <circle cx="563" cy="183" r="2.5" fill="#FFFFFF" />
-                </g>
+                {/* Pulse Filter */}
+                <filter id="blue-glow" x="-50%" y="-50%" width="200%" height="200%">
+                  <feGaussianBlur stdDeviation="2.5" result="blur" />
+                  <feMerge>
+                    <feMergeNode in="blur" />
+                    <feMergeNode in="SourceGraphic" />
+                  </feMerge>
+                </filter>
+              </defs>
 
-                {/* ── 3 COMPLETELY DISTINCT FLIGHT PATHS (NO OVERLAP) ── */}
-                
-                {/* Route 1: India -> High Polar North Arc to USA (Clears all other routes completely) */}
+              {/* 1. Dotted World Map Base */}
+              <image
+                href="/real-world-dots.svg"
+                x="0"
+                y="0"
+                width="800"
+                height="420"
+                opacity="0.85"
+              />
+
+              {/* 2. ACCURATE INDIA GEOMETRY (52 Geo-Aligned Vibrant Dots) */}
+              <g id="india-geometry-complete" fill="#2563EB">
+                {/* Subtle soft blue aura */}
+                <ellipse cx="568" cy="176" rx="40" ry="36" fill="#3B82F6" opacity="0.16" />
+
+                {/* 1. Jammu & Kashmir, Ladakh, Siachen */}
+                <circle cx="562.9" cy="136.3" r="2.8" />
+                <circle cx="569.2" cy="136.3" r="2.8" />
+                <circle cx="556.5" cy="144.1" r="2.8" />
+                <circle cx="562.9" cy="144.1" r="2.8" />
+                <circle cx="569.2" cy="144.1" r="2.8" />
+                <circle cx="575.6" cy="144.1" r="2.8" />
+
+                {/* 2. Punjab, Himachal, Uttarakhand, Haryana */}
+                <circle cx="556.5" cy="151.9" r="2.8" />
+                <circle cx="562.9" cy="151.9" r="2.8" />
+                <circle cx="569.2" cy="151.9" r="2.8" />
+                <circle cx="575.6" cy="151.9" r="2.8" />
+
+                {/* 3. Rajasthan, Delhi NCR, Uttar Pradesh */}
+                <circle cx="543.8" cy="159.7" r="2.8" />
+                <circle cx="550.2" cy="159.7" r="2.8" />
+                <circle cx="556.5" cy="159.7" r="2.8" />
+                <circle cx="562.9" cy="159.7" r="2.8" />
+                <circle cx="569.2" cy="159.7" r="2.8" />
+                <circle cx="575.6" cy="159.7" r="2.8" />
+
+                {/* 4. Gujarat, Madhya Pradesh, Bihar, West Bengal */}
+                <circle cx="537.5" cy="167.5" r="2.8" />
+                <circle cx="543.8" cy="167.5" r="2.8" />
+                <circle cx="550.2" cy="167.5" r="2.8" />
+                <circle cx="556.5" cy="167.5" r="2.8" />
+                <circle cx="562.9" cy="167.5" r="2.8" />
+                <circle cx="569.2" cy="167.5" r="2.8" />
+                <circle cx="575.6" cy="167.5" r="2.8" />
+                <circle cx="582.0" cy="167.5" r="2.8" />
+
+                {/* 5. Northeast Corridor & Seven Sister States */}
+                <circle cx="588.3" cy="167.5" r="2.8" />
+                <circle cx="594.7" cy="167.5" r="2.8" />
+                <circle cx="601.0" cy="167.5" r="2.8" />
+                <circle cx="607.4" cy="167.5" r="2.8" />
+                <circle cx="601.0" cy="175.3" r="2.8" />
+                <circle cx="607.4" cy="175.3" r="2.8" />
+
+                {/* 6. Maharashtra, Chhattisgarh, Odisha */}
+                <circle cx="543.8" cy="175.3" r="2.8" />
+                <circle cx="550.2" cy="175.3" r="2.8" />
+                <circle cx="556.5" cy="175.3" r="2.8" />
+                <circle cx="562.9" cy="175.3" r="2.8" />
+                <circle cx="569.2" cy="175.3" r="2.8" />
+                <circle cx="575.6" cy="175.3" r="2.8" />
+                <circle cx="582.0" cy="175.3" r="2.8" />
+
+                {/* 7. Goa, Karnataka, Telangana, Andhra Pradesh */}
+                <circle cx="550.2" cy="183.1" r="2.8" />
+                <circle cx="556.5" cy="183.1" r="2.8" />
+                <circle cx="562.9" cy="183.1" r="2.8" />
+                <circle cx="569.2" cy="183.1" r="2.8" />
+                <circle cx="575.6" cy="183.1" r="2.8" />
+
+                {/* 8. Kerala & Tamil Nadu */}
+                <circle cx="556.5" cy="190.9" r="2.8" />
+                <circle cx="562.9" cy="190.9" r="2.8" />
+                <circle cx="569.2" cy="190.9" r="2.8" />
+
+                {/* 9. Southern Tip (Kanyakumari) */}
+                <circle cx="562.9" cy="198.7" r="2.8" />
+              </g>
+
+              {/* 3. Blue Arched Flight Paths (India -> USA, UK, UAE) */}
+              <g fill="none">
+                {/* Arc 1: India -> USA */}
                 <path
-                  id="flight-route-west"
-                  d="M 563 183 Q 380 -5 220 100"
-                  fill="none"
-                  stroke="#315CFF"
-                  strokeWidth="1.8"
-                  strokeDasharray="4 6"
-                  opacity="0.85"
+                  d="M 565 185 C 430 40, 260 45, 160 135"
+                  stroke="url(#orbit-blue-west)"
+                  strokeWidth="2"
+                  strokeDasharray="4 4"
                 />
 
-                {/* Route 2: India -> Eastward Arc to Tokyo & Asia-Pacific (Points completely EAST) */}
+                {/* Arc 2: India -> UK */}
                 <path
-                  id="flight-route-east"
-                  d="M 563 183 Q 660 110 745 135"
-                  fill="none"
-                  stroke="#45C5FF"
-                  strokeWidth="1.8"
-                  strokeDasharray="5 5"
-                  opacity="0.85"
+                  d="M 565 185 Q 465 95 395 105"
+                  stroke="url(#orbit-blue-uk)"
+                  strokeWidth="2"
+                  strokeDasharray="4 4"
                 />
 
-                {/* Route 3: India -> Direct Southwest Arc into UAE (Points SOUTHWEST) */}
+                {/* Arc 3: India -> UAE */}
                 <path
-                  id="flight-route-southwest"
-                  d="M 563 183 Q 540 205 505 175"
-                  fill="none"
-                  stroke="#18243A"
-                  strokeWidth="1.8"
-                  strokeDasharray="3 5"
-                  opacity="0.85"
+                  d="M 565 185 Q 532 208 492 182"
+                  stroke="url(#orbit-blue-uae)"
+                  strokeWidth="2"
+                  strokeDasharray="3 4"
                 />
 
-                {/* ── AIRPLANE 1: Flying WEST to USA ── */}
-                <g>
+                {/* Traveling glowing pulses along arcs */}
+                <circle r="3" fill="#2563EB" filter="url(#blue-glow)">
                   <animateMotion
-                    path="M 563 183 Q 380 -5 220 100"
-                    dur="7s"
+                    dur="4.8s"
                     repeatCount="indefinite"
-                    rotate="auto"
+                    path="M 565 185 C 430 40, 260 45, 160 135"
                   />
-                  <g transform="scale(0.85)">
-                    <path
-                      d="M 12 0 L -5 -6 L -2 -1 L -9 -2 L -11 -4 L -13 -4 L -12 0 L -13 4 L -11 4 L -9 2 L -2 1 L -5 6 Z"
-                      fill="#315CFF"
-                      stroke="#FFFFFF"
-                      strokeWidth="0.8"
-                    />
-                  </g>
-                </g>
-
-                {/* ── AIRPLANE 2: Flying EAST to Asia-Pacific ── */}
-                <g>
+                </circle>
+                <circle r="3" fill="#2563EB" filter="url(#blue-glow)">
                   <animateMotion
-                    path="M 563 183 Q 660 110 745 135"
-                    dur="5.5s"
+                    dur="3.2s"
                     repeatCount="indefinite"
-                    rotate="auto"
-                    begin="1.2s"
+                    path="M 565 185 Q 465 95 395 105"
                   />
-                  <g transform="scale(0.8)">
-                    <path
-                      d="M 12 0 L -5 -6 L -2 -1 L -9 -2 L -11 -4 L -13 -4 L -12 0 L -13 4 L -11 4 L -9 2 L -2 1 L -5 6 Z"
-                      fill="#45C5FF"
-                      stroke="#FFFFFF"
-                      strokeWidth="0.8"
-                    />
-                  </g>
-                </g>
+                </circle>
+              </g>
 
-                {/* ── AIRPLANE 3: Flying SOUTHWEST to Middle East ── */}
-                <g>
-                  <animateMotion
-                    path="M 563 183 Q 540 205 505 175"
-                    dur="4s"
-                    repeatCount="indefinite"
-                    rotate="auto"
-                    begin="2.5s"
-                  />
-                  <g transform="scale(0.7)">
-                    <path
-                      d="M 12 0 L -5 -6 L -2 -1 L -9 -2 L -11 -4 L -13 -4 L -12 0 L -13 4 L -11 4 L -9 2 L -2 1 L -5 6 Z"
-                      fill="#18243A"
-                      stroke="#FFFFFF"
-                      strokeWidth="0.8"
-                    />
-                  </g>
-                </g>
-              </svg>
+              {/* 4. Destination Nodes */}
+              {/* USA (160, 135) */}
+              <g>
+                <circle cx="160" cy="135" r="7" fill="#EFF6FF" stroke="#2563EB" strokeWidth="1.5" />
+                <circle cx="160" cy="135" r="3.2" fill="#2563EB" />
+              </g>
 
-              {/* Floating India Telephony Hub Card */}
-              <div
-                className="absolute top-[48%] right-[8%] sm:right-[12%] backdrop-blur-md border rounded-2xl p-3 sm:p-3.5 shadow-[0_12px_28px_-6px_rgba(0,0,0,0.08)] flex flex-col gap-2 z-20 transition-colors duration-300"
-                style={{
-                  backgroundColor: "var(--theme-surface, #FFFFFF)",
-                  borderColor: "var(--theme-border, #E2E8F0)",
-                }}
-              >
-                <div className="flex items-center gap-2">
-                  <IndiaCircularFlag className="w-5 h-5" />
-                  <div>
-                    <h4
-                      className="text-xs font-bold leading-tight font-sans transition-colors duration-300"
-                      style={{ color: "var(--theme-text-primary, #080D18)" }}
-                    >
-                      India
-                    </h4>
-                    <p
-                      className="text-[10px] font-semibold flex items-center gap-1 font-sans transition-colors duration-300"
-                      style={{ color: "var(--theme-accent, #315CFF)" }}
-                    >
-                      <span
-                        className="w-1.5 h-1.5 rounded-full animate-pulse"
-                        style={{ backgroundColor: "var(--theme-accent, #315CFF)" }}
-                      />
-                      Global Telephony Hub
-                    </p>
-                  </div>
-                </div>
+              {/* UK (395, 105) */}
+              <g>
+                <circle cx="395" cy="105" r="7" fill="#EFF6FF" stroke="#2563EB" strokeWidth="1.5" />
+                <circle cx="395" cy="105" r="3.2" fill="#2563EB" />
+              </g>
 
-                {/* Representative Agent Avatars with Real Portraits */}
-                <div className="flex items-center -space-x-1.5 pt-0.5">
-                  <div
-                    className="w-6 h-6 rounded-full border-2 border-white bg-cover bg-center shadow-2xs"
-                    style={{ backgroundImage: "url('https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=80&q=80')" }}
-                    title="Arika"
-                  />
-                  <div
-                    className="w-6 h-6 rounded-full border-2 border-white bg-cover bg-center shadow-2xs"
-                    style={{ backgroundImage: "url('https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=80&q=80')" }}
-                    title="Vikram"
-                  />
-                  <div
-                    className="w-6 h-6 rounded-full border-2 border-white bg-cover bg-center shadow-2xs"
-                    style={{ backgroundImage: "url('https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=80&q=80')" }}
-                    title="Vaamika"
-                  />
-                  <div
-                    className="w-6 h-6 rounded-full border-2 border-white bg-cover bg-center shadow-2xs"
-                    style={{ backgroundImage: "url('https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=80&q=80')" }}
-                    title="Shubh"
-                  />
-                </div>
+              {/* UAE (492, 182) */}
+              <g>
+                <circle cx="492" cy="182" r="7" fill="#EFF6FF" stroke="#2563EB" strokeWidth="1.5" />
+                <circle cx="492" cy="182" r="3.2" fill="#2563EB" />
+              </g>
+
+              {/* India Core Node (565, 185) */}
+              <g>
+                <circle
+                  cx="565"
+                  cy="185"
+                  r="24"
+                  fill="none"
+                  stroke="#2563EB"
+                  strokeWidth="1.2"
+                  opacity="0.3"
+                  className="animate-ping"
+                  style={{ transformOrigin: "565px 185px", animationDuration: "3s" }}
+                />
+                <circle cx="565" cy="185" r="7.5" fill="#2563EB" />
+                <circle cx="565" cy="185" r="3" fill="#FFFFFF" />
+              </g>
+
+            </svg>
+
+            {/* 5. FLOATING INDIA LAUNCH MARKET BADGE (Clean, without mock avatars) */}
+            <div
+              className="absolute top-[30%] left-[62%] sm:left-[64%] bg-white/95 backdrop-blur-md border border-blue-200/90 rounded-2xl px-3 py-2 sm:px-3.5 sm:py-2.5 shadow-[0_10px_25px_rgba(37,99,235,0.12),0_2px_8px_rgba(15,23,42,0.06)] flex items-center gap-2.5 z-20 transition-transform hover:scale-105"
+            >
+              <IndiaCircularFlag className="w-5 h-5 sm:w-6 sm:h-6 shrink-0" />
+              <div>
+                <h4 className="text-xs font-bold leading-tight text-slate-900 font-sans">
+                  India
+                </h4>
+                <p className="text-[10px] font-semibold text-blue-600 leading-tight mt-0.5">
+                  Launch market
+                </p>
               </div>
-
-              {/* Hand-Drawn Note: Positioned with Arrow Curving UP-RIGHT Directly into India Hub Pin */}
-              <div className="absolute bottom-[3%] left-[44%] sm:left-[48%] flex flex-col items-center pointer-events-none select-none z-20">
-                {/* Arrow pointing UP-RIGHT directly at India node (563, 183) */}
-                <svg width="60" height="48" viewBox="0 0 60 48" fill="none" style={{ color: "var(--theme-accent, #315CFF)" }}>
-                  <path
-                    d="M 12 44 Q 38 34 42 12"
-                    stroke="currentColor"
-                    strokeWidth="2.2"
-                    strokeLinecap="round"
-                    fill="none"
-                  />
-                  {/* Arrowhead pointing UP-RIGHT into India */}
-                  <path
-                    d="M 34 18 L 42 10 L 48 18"
-                    stroke="currentColor"
-                    strokeWidth="2.2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-
-                <span
-                  className="font-serif italic text-sm sm:text-base tracking-wide whitespace-nowrap drop-shadow-xs -mt-1 font-bold"
-                  style={{ color: "var(--theme-accent, #315CFF)" }}
-                >
-                  India-first. <br />
-                  Built for the world.
-                </span>
-              </div>
-
             </div>
+
+            {/* 6. "India-first. Built for the world." CALLOUT WITH POINTER ARROW */}
+            <div className="absolute bottom-[3%] sm:bottom-[6%] left-[49%] sm:left-[52%] flex flex-col items-center z-20 pointer-events-none">
+              <svg width="44" height="34" viewBox="0 0 44 34" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path
+                  d="M 20 30 C 24 20, 30 12, 38 4"
+                  stroke="#2563EB"
+                  strokeWidth="2.2"
+                  strokeLinecap="round"
+                />
+                <path
+                  d="M 31 6 L 39 3 L 38 12"
+                  stroke="#2563EB"
+                  strokeWidth="2.2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+              <div className="text-center font-serif italic text-xs sm:text-[13px] font-bold text-[#2563EB] leading-tight bg-white/95 backdrop-blur-xs px-3 py-1.5 rounded-xl border border-blue-100 shadow-2xs mt-0.5">
+                <span>India-first.</span>
+                <br />
+                <span>Built for the world.</span>
+              </div>
+            </div>
+
           </div>
 
-          {/* ══════════════════════════════════════════════════════════════
-              RIGHT SIDE: CUSTOMER-FACING CONTENT & 2-WAY TYPOGRAPHY
-              ══════════════════════════════════════════════════════════════ */}
-          <div className="w-full lg:w-[46%] xl:w-[47%] flex flex-col justify-center">
+          {/* ══════════════════════════════════════════════════════════════════
+              RIGHT COLUMN: GLOBAL CAPABILITY EDITORIAL & REGIONS
+              ══════════════════════════════════════════════════════════════════ */}
+          <div className="lg:col-span-5 space-y-6">
             
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-[11px] font-mono font-bold tracking-wider uppercase mb-3 border bg-white border-[#E2E8F0] text-[#315CFF] w-fit">
-              <Globe className="w-3.5 h-3.5 text-[#315CFF]" />
-              <span>GLOBAL CARRIER FABRIC</span>
+            {/* Header copy */}
+            <div className="space-y-3.5">
+              <span className="text-xs sm:text-[13px] font-mono font-bold tracking-widest text-[#2563EB] uppercase">
+                GLOBAL CAPABILITY
+              </span>
+              <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black text-slate-900 tracking-tight leading-[1.12] font-sans">
+                Built for India. <br />
+                <span className="text-[#2563EB]">Ready for the world.</span>
+              </h2>
+              <p className="text-slate-600 text-sm sm:text-base leading-relaxed pt-1 font-sans">
+                India is the hardest linguistic market in the world. If our voice AI works here, it works anywhere. The same platform extends to the US, UK, UAE and beyond — with region-specific compliance, languages, and telephony providers.
+              </p>
             </div>
 
-            {/* Display Headline with Cal Sans Font */}
-            <h2
-              className="text-3xl sm:text-4xl lg:text-[44px] font-bold tracking-tight leading-[1.12] mb-3 font-[family-name:var(--font-cal-sans)] transition-colors duration-300"
-              style={{ color: "var(--theme-text-primary, #080D18)" }}
-            >
-              Built for India. <br />
-              <span style={{ color: "var(--theme-accent, #315CFF)" }}>
-                Ready for the world.
-              </span>
-            </h2>
-
-            {/* Customer-Centric Enterprise Narrative with Inter Font */}
-            <p
-              className="text-sm sm:text-base lg:text-[16.5px] font-normal leading-relaxed mb-6 max-w-xl font-sans transition-colors duration-300"
-              style={{ color: "var(--theme-text-secondary, #4A5568)" }}
-            >
-              Engineered with native vernacular code-switching, advanced noise filtration, and sub-480ms conversational latency. Vaakriti empowers global enterprises to deliver human-like voice intelligence across continents, regional dialects, and statutory telephony compliance standards.
-            </p>
-
-            {/* Flag Badges Row with Real Circular Vector Country Flags & Names */}
-            <div className="flex flex-wrap items-center gap-2.5 sm:gap-3">
+            {/* Region Pills Matching Reference Design */}
+            <div className="flex flex-wrap items-center gap-2.5 sm:gap-3 pt-2">
               
-              {/* India */}
-              <div
-                className="flex items-center gap-2.5 px-3.5 py-2 rounded-2xl border shadow-2xs transition-colors duration-300"
-                style={{
-                  backgroundColor: "var(--theme-surface, #FFFFFF)",
-                  borderColor: "var(--theme-border, #E2E8F0)",
-                }}
-              >
-                <IndiaCircularFlag className="w-7 h-7" />
-                <div className="flex flex-col text-left">
-                  <span
-                    className="text-xs font-bold leading-none font-sans"
-                    style={{ color: "var(--theme-text-primary, #080D18)" }}
-                  >
+              {/* India: Live now */}
+              <div className="flex items-center gap-2.5 px-3.5 py-2 rounded-2xl border border-slate-200 bg-white shadow-2xs hover:border-blue-200 transition-colors">
+                <IndiaCircularFlag className="w-6 h-6" />
+                <div className="text-left">
+                  <span className="text-xs font-bold block text-slate-900 leading-none">
                     India
                   </span>
-                  <span
-                    className="text-[10px] font-semibold leading-none mt-1 font-sans"
-                    style={{ color: "var(--theme-accent, #315CFF)" }}
-                  >
+                  <span className="text-[10px] font-semibold text-emerald-600 flex items-center gap-1 mt-1 leading-none">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                     Live now
                   </span>
                 </div>
               </div>
 
-              {/* USA */}
-              <div
-                className="flex items-center gap-2.5 px-3.5 py-2 rounded-2xl border shadow-2xs transition-colors duration-300"
-                style={{
-                  backgroundColor: "var(--theme-surface, #FFFFFF)",
-                  borderColor: "var(--theme-border, #E2E8F0)",
-                }}
-              >
-                <USACircularFlag className="w-7 h-7" />
-                <div className="flex flex-col text-left">
-                  <span
-                    className="text-xs font-bold leading-none font-sans"
-                    style={{ color: "var(--theme-text-primary, #080D18)" }}
-                  >
+              {/* USA: Coming soon */}
+              <div className="flex items-center gap-2.5 px-3.5 py-2 rounded-2xl border border-slate-200 bg-white shadow-2xs hover:border-slate-300 transition-colors">
+                <USACircularFlag className="w-6 h-6" />
+                <div className="text-left">
+                  <span className="text-xs font-bold block text-slate-900 leading-none">
                     USA
                   </span>
-                  <span
-                    className="text-[10px] font-medium leading-none mt-1 font-sans"
-                    style={{ color: "var(--theme-text-secondary, #718096)" }}
-                  >
+                  <span className="text-[10px] font-semibold text-slate-400 mt-1 block leading-none">
                     Coming soon
                   </span>
                 </div>
               </div>
 
-              {/* UK */}
-              <div
-                className="flex items-center gap-2.5 px-3.5 py-2 rounded-2xl border shadow-2xs transition-colors duration-300"
-                style={{
-                  backgroundColor: "var(--theme-surface, #FFFFFF)",
-                  borderColor: "var(--theme-border, #E2E8F0)",
-                }}
-              >
-                <UKCircularFlag className="w-7 h-7" />
-                <div className="flex flex-col text-left">
-                  <span
-                    className="text-xs font-bold leading-none font-sans"
-                    style={{ color: "var(--theme-text-primary, #080D18)" }}
-                  >
+              {/* UK: Coming soon */}
+              <div className="flex items-center gap-2.5 px-3.5 py-2 rounded-2xl border border-slate-200 bg-white shadow-2xs hover:border-slate-300 transition-colors">
+                <UKCircularFlag className="w-6 h-6" />
+                <div className="text-left">
+                  <span className="text-xs font-bold block text-slate-900 leading-none">
                     UK
                   </span>
-                  <span
-                    className="text-[10px] font-medium leading-none mt-1 font-sans"
-                    style={{ color: "var(--theme-text-secondary, #718096)" }}
-                  >
+                  <span className="text-[10px] font-semibold text-slate-400 mt-1 block leading-none">
                     Coming soon
                   </span>
                 </div>
               </div>
 
-              {/* UAE */}
-              <div
-                className="flex items-center gap-2.5 px-3.5 py-2 rounded-2xl border shadow-2xs transition-colors duration-300"
-                style={{
-                  backgroundColor: "var(--theme-surface, #FFFFFF)",
-                  borderColor: "var(--theme-border, #E2E8F0)",
-                }}
-              >
-                <UAECircularFlag className="w-7 h-7" />
-                <div className="flex flex-col text-left">
-                  <span
-                    className="text-xs font-bold leading-none font-sans"
-                    style={{ color: "var(--theme-text-primary, #080D18)" }}
-                  >
+              {/* UAE: Coming soon */}
+              <div className="flex items-center gap-2.5 px-3.5 py-2 rounded-2xl border border-slate-200 bg-white shadow-2xs hover:border-slate-300 transition-colors">
+                <UAECircularFlag className="w-6 h-6" />
+                <div className="text-left">
+                  <span className="text-xs font-bold block text-slate-900 leading-none">
                     UAE
                   </span>
-                  <span
-                    className="text-[10px] font-medium leading-none mt-1 font-sans"
-                    style={{ color: "var(--theme-text-secondary, #718096)" }}
-                  >
+                  <span className="text-[10px] font-semibold text-slate-400 mt-1 block leading-none">
                     Coming soon
                   </span>
                 </div>
               </div>
 
               {/* + more */}
-              <span
-                className="text-xs font-semibold pl-1 cursor-default font-sans"
-                style={{ color: "var(--theme-text-secondary, #475569)" }}
-              >
+              <span className="text-xs font-bold text-slate-400 px-2 py-1">
                 + more
               </span>
 
@@ -493,6 +424,7 @@ export function GlobalTelephonyMap() {
           </div>
 
         </div>
+
       </div>
     </section>
   );

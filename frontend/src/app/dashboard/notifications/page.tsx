@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation'
 import { NotificationsPageClient } from '@/src/components/pages/NotificationsPageClient'
 
 export const metadata = {
-  title: 'Notifications — Trinetra AI',
+  title: 'Notifications — Vaakriti AI',
   description: 'All your alerts and activity notifications.',
 }
 

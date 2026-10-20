@@ -3,7 +3,7 @@ import { KYCTab } from '@/src/components/settings/KYCTab'
 import { ShieldCheck } from 'lucide-react'
 
 export const metadata = {
-  title: 'KYC & Regulatory Compliance | Trinetra AI',
+  title: 'KYC & Regulatory Compliance | Vaakriti AI',
   description: 'Statutory identity verification and telecommunication compliance documents.',
 }
 

@@ -78,10 +78,15 @@ export function NumberCard({
       })
     : null;
 
+  const daysRemaining = phoneNumber.renewal_date
+    ? Math.ceil((new Date(phoneNumber.renewal_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+    : null;
+  const isExpiringSoon = daysRemaining !== null ? daysRemaining <= 7 : false;
+  const isExpiredOrGrace = phoneNumber.status === 'grace_period' || phoneNumber.status === 'hold_period';
+
   return (
-    <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl shadow-sm hover:border-violet-500/40 hover:shadow-md transition-all duration-150 p-5 flex flex-col justify-between text-left">
+    <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl shadow-sm hover:border-zinc-700/60 hover:shadow-md transition-all duration-150 p-5 flex flex-col justify-between text-left">
       <div>
-        {/* Top Row: Status and Provider */}
         {/* Top Row: Status and Provider */}
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
@@ -186,7 +191,7 @@ export function NumberCard({
       {/* Bottom Row */}
       <div className="pt-3 border-t border-[var(--border)] flex items-center justify-between gap-2">
         <div className="flex flex-col text-left">
-          <span className="text-[10px] font-bold text-violet-400 font-mono">{formattedPrice}</span>
+          <span className="text-[10px] font-bold text-zinc-300 font-mono">{formattedPrice}</span>
           {phoneNumber.bidding_enabled && (
             <span className="text-[9px] font-bold text-emerald-400 font-mono mt-0.5">
               {phoneNumber.current_bid_paisa 
@@ -235,32 +240,32 @@ export function NumberCard({
           )
         ) : (
           <div className="flex items-center gap-2">
-            {(phoneNumber.status === 'grace_period' || phoneNumber.status === 'hold_period') && onRenew ? (
+            {isExpiredOrGrace && onRenew ? (
               <button
                 onClick={() => onRenew(phoneNumber.id)}
                 className="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-black font-extrabold text-xs uppercase tracking-wider transition-all shadow-md cursor-pointer"
               >
                 Renew Line
               </button>
+            ) : isExpiringSoon && onRenew ? (
+              <button
+                onClick={() => onRenew(phoneNumber.id)}
+                className="px-2.5 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 font-bold text-xs uppercase tracking-wider transition-all cursor-pointer"
+              >
+                Renew ({daysRemaining}d left)
+              </button>
             ) : (
-              <>
-                {onRenew && (
-                  <button
-                    onClick={() => onRenew(phoneNumber.id)}
-                    className="text-xs font-bold text-violet-400 hover:underline cursor-pointer"
-                  >
-                    Renew
-                  </button>
-                )}
-                {onManage && (
-                  <button 
-                    onClick={() => onManage(phoneNumber.id)}
-                    className="px-3 py-1 rounded-lg bg-[var(--secondary)] hover:bg-[var(--border)] text-xs font-bold text-[var(--heading)] transition-all cursor-pointer"
-                  >
-                    Manage
-                  </button>
-                )}
-              </>
+              <span className="text-[11px] font-semibold text-emerald-500 flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Active
+              </span>
+            )}
+            {onManage && (
+              <button 
+                onClick={() => onManage(phoneNumber.id)}
+                className="px-3 py-1 rounded-lg bg-[var(--secondary)] hover:bg-[var(--border)] text-xs font-bold text-[var(--heading)] transition-all cursor-pointer"
+              >
+                Manage
+              </button>
             )}
           </div>
         )}

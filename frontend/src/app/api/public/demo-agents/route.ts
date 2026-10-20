@@ -81,21 +81,21 @@ const DEFAULT_DEMO_PERSONAS: DemoAgentItem[] = [
     is_managed_by_dev: true,
   },
   {
-    id: '35398818-24de-4b55-999e-8d317141a3e2', // Real DB Agent: Shiksha Advisor
+    id: '35398818-24de-4b55-999e-8d317141a3e2',
     name: 'Dr. Aarav',
     personality: 'Intellectual & Guiding',
-    archetype: 'Trinetra Shiksha Academic Mentor',
+    archetype: 'Vaakriti Solutions Architect',
     voice_id: 'shubh',
     language: 'English & Hindi',
     gender: 'male',
-    description: 'Demonstrates Shiksha cognitive profiling, adaptive testing insights, and pedagogical student engagement.',
-    greeting_message: 'Greetings! I am Dr. Aarav from Trinetra Shiksha, an AI academic guide. This session may be recorded for learning quality. How can I assist with your educational goals today?',
+    description: 'Demonstrates enterprise telephony pipelines, sub-second latency streaming, and scalable voice automations.',
+    greeting_message: 'Greetings! I am Dr. Aarav from Vaakriti, an AI enterprise specialist. This session may be recorded for learning quality. How can I assist with your voice deployment today?',
     accent_color: '#D97706', // Golden Saffron
     badge_color: 'bg-[#D97706]/10 text-[#D97706] border-[#D97706]/20',
     suggested_prompts: [
-      'How does Trinetra Shiksha personalize exam questions?',
-      'Explain cognitive profile mapping for students.',
-      'Can you demonstrate a mock reasoning question?',
+      'How does Vaakriti handle multilingual voice switching?',
+      'Explain carrier SIP trunking integration.',
+      'Can you demonstrate appointment booking?',
     ],
     is_managed_by_dev: true,
   },

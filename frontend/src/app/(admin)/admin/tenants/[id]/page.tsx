@@ -43,6 +43,8 @@ export default function TenantDetailPage({ params }: { params: Promise<{ id: str
 
   const [adminNotes, setAdminNotes] = useState('')
   const [demoMinutesLimit, setDemoMinutesLimit] = useState<number>(20)
+  const [phoneNumbersQuota, setPhoneNumbersQuota] = useState<number>(5)
+  const [savingPhoneQuota, setSavingPhoneQuota] = useState(false)
   const [status, setStatus] = useState<'active' | 'suspended' | 'trial'>('active')
   
   // Decision P5: Plans are exclusively chosen per customer (Not a both-ways toggle)
@@ -80,6 +82,7 @@ export default function TenantDetailPage({ params }: { params: Promise<{ id: str
       setStatus(json.tenant?.status || 'active')
       setAdminNotes(json.tenant?.admin_notes || '')
       setDemoMinutesLimit(json.tenant?.demo_minutes_limit ?? 20)
+      setPhoneNumbersQuota(json.tenant?.phone_numbers_quota ?? (5 + (json.tenant?.additional_phone_numbers ?? 0)))
       setBillingModel(json.tenant?.billing_model || 'subscription')
       if (json.wallet?.spend_limit_paisa !== undefined) {
         setSpendLimitInr(json.wallet.spend_limit_paisa / 100)
@@ -287,6 +290,7 @@ export default function TenantDetailPage({ params }: { params: Promise<{ id: str
           status: targetStatus,
           admin_notes: adminNotes,
           demo_minutes_limit: Number(demoMinutesLimit),
+          phone_numbers_limit: Number(phoneNumbersQuota),
           billing_model: billingModel, // P5
           spend_limit_paisa: Math.round(Number(spendLimitInr || 0) * 100), // P8
         }),
@@ -314,6 +318,28 @@ export default function TenantDetailPage({ params }: { params: Promise<{ id: str
       toast.error('Save failed: ' + err.message)
     } finally {
       setSaving(false)
+    }
+  }
+
+  const handleSavePhoneQuota = async (newQuota: number) => {
+    try {
+      setSavingPhoneQuota(true)
+      const res = await fetch(`/api/admin/tenants/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone_numbers_limit: newQuota }),
+      })
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}))
+        throw new Error(errJson.error || 'Failed to update phone number quota')
+      }
+      setPhoneNumbersQuota(newQuota)
+      toast.success(`Phone line quota updated to ${newQuota} lines for this customer!`)
+      await loadTenant(false)
+    } catch (err: any) {
+      toast.error('Quota update failed: ' + err.message)
+    } finally {
+      setSavingPhoneQuota(false)
     }
   }
 
@@ -1061,6 +1087,73 @@ export default function TenantDetailPage({ params }: { params: Promise<{ id: str
                     }`}
                   >
                     {preset > 0 ? `+${preset}` : preset}m
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Phone Numbers Allotment Quota Card */}
+          <div className="bg-zinc-950/60 border border-zinc-800/80 rounded-2xl p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-base font-bold text-white flex items-center gap-2">
+                <PhoneCall className="w-4 h-4 text-emerald-400" />
+                Phone Line Limit & Allotment
+              </h3>
+              <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                Active: {data?.tenant?.assigned_phone_numbers_count ?? 0} Lines
+              </span>
+            </div>
+
+            <p className="text-xs text-zinc-400 leading-relaxed">
+              Base quota is 5 lines. Increase allotment here so this customer can claim or buy more phone numbers.
+            </p>
+
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs text-zinc-400 flex items-center justify-between mb-1.5">
+                  <span>Total Allowed Lines</span>
+                  <span className="text-[10px] font-mono text-zinc-500">Base 5 + Extra {Math.max(0, phoneNumbersQuota - 5)}</span>
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min="5"
+                    max="100"
+                    value={phoneNumbersQuota}
+                    onChange={(e) => setPhoneNumbersQuota(Math.max(5, Number(e.target.value)))}
+                    className="w-28 bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-sm font-bold text-white font-mono focus:outline-none focus:border-emerald-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => handleSavePhoneQuota(phoneNumbersQuota)}
+                    disabled={savingPhoneQuota}
+                    className="px-4 py-2 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 border border-emerald-500/40 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  >
+                    {savingPhoneQuota ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                    Save Quota
+                  </button>
+                </div>
+              </div>
+
+              {/* Quick preset buttons */}
+              <div className="flex items-center gap-1.5 pt-1">
+                {[5, 10, 15, 20, 50].map((preset) => (
+                  <button
+                    key={preset}
+                    type="button"
+                    onClick={() => {
+                      setPhoneNumbersQuota(preset)
+                      handleSavePhoneQuota(preset)
+                    }}
+                    disabled={savingPhoneQuota}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer ${
+                      phoneNumbersQuota === preset
+                        ? 'bg-emerald-500 text-zinc-950 font-extrabold shadow-sm'
+                        : 'bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-700'
+                    }`}
+                  >
+                    {preset} Lines
                   </button>
                 ))}
               </div>

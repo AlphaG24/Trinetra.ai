@@ -107,7 +107,7 @@ export default function CommissionPolicyPanel({
       </div>
 
       <p className="mt-6 text-xs leading-5 text-white/45">
-        Commission rates are managed by Trinetra AI and may be updated with 30
+        Commission rates are managed by Vaakriti AI and may be updated with 30
         days notice. Last updated: {formatDate(policy?.updated_at ?? null)}
       </p>
     </section>

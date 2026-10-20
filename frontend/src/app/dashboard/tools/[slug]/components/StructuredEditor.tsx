@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react'
 import { 
   Undo2, Redo2, Search, Replace, HelpCircle, Check, 
   AlertCircle, Save, Trash2, Plus, ArrowUp, ArrowDown, 
-  Code, Eye, Sparkles, FileText, CheckCircle2, RefreshCw,
+  Code, Eye, FileText, CheckCircle2, RefreshCw,
   Image, Type, Table as TableIcon, List, Settings, Bold, Italic, Link, Info
 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -477,7 +477,7 @@ export function StructuredEditor({ runId, extractionId, initialData, referenceSc
     return (
       <div className="mt-2 p-2 bg-zinc-950/60 border border-zinc-800 rounded-lg text-orange-400 font-mono text-[11px] flex flex-col space-y-1">
         <span className="text-[9px] text-zinc-500 uppercase tracking-wider font-sans font-bold flex items-center gap-1">
-          <Sparkles className="w-3 h-3 text-orange-500 animate-pulse" />
+          <Eye className="w-3 h-3 text-zinc-400" />
           Equation Rendering (LaTeX Preview)
         </span>
         {matches.map((match, idx) => {

@@ -927,7 +927,7 @@ export function StructurerConsole({ service, quota }: StructurerConsoleProps) {
             <Sliders className="w-4.5 h-4.5" />
           </div>
           <div>
-            <h4 className="text-xs font-bold text-white">Trinetra Custom OCR & LLM</h4>
+            <h4 className="text-xs font-bold text-white">Vaakriti Custom OCR & LLM</h4>
             <p className="text-[10px] text-zinc-500 leading-normal mt-0.5">
               Validates JSON keys dynamically. Every successful run consumes exactly 1 document quota unit.
             </p>

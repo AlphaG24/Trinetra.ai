@@ -295,18 +295,19 @@ export default function AdminPhoneNumbersPage() {
 
   const isGrace = (num: any) => num.status === "grace_period";
   const isHold = (num: any) => num.status === "hold_period";
-  const isNumAssigned = (num: any) => {
-    return (
-      (num.is_assigned === true ||
-      num.status?.toLowerCase() === "assigned" ||
-      num.status?.toLowerCase() === "active" ||
-      Boolean(num.assigned_organization || num.assigned_org_id || num.assigned_agent_id)) &&
-      !isGrace(num) &&
-      !isHold(num)
-    );
-  };
   const isAvailable = (num: any) => {
-    return (num.status === "available" || !num.status) && !isNumAssigned(num) && !isGrace(num) && !isHold(num);
+    if (isGrace(num) || isHold(num)) return false;
+    if (num.status === "available" || num.status === "released" || !num.status) return true;
+    if (!num.organization_id && !num.assigned_org_id && !num.assigned_organization) return true;
+    return false;
+  };
+  const isNumAssigned = (num: any) => {
+    if (isGrace(num) || isHold(num) || isAvailable(num)) return false;
+    return (
+      num.is_assigned === true ||
+      num.status?.toLowerCase() === "assigned" ||
+      Boolean(num.assigned_organization || num.assigned_org_id || num.organization_id)
+    );
   };
 
   const filteredNumbers = numbers.filter((num) => {
@@ -552,7 +553,13 @@ export default function AdminPhoneNumbersPage() {
                     <td className="py-3.5 px-4 text-xs font-medium text-[var(--muted)]">
                       {num.assigned_organization ? (
                         <div>
-                          <p className="text-[var(--heading)] font-semibold">{num.assigned_organization.name}</p>
+                          <a
+                            href={`/admin/tenants/${num.organization_id || num.assigned_org_id || num.assigned_organization?.id}`}
+                            className="text-[var(--heading)] font-semibold hover:text-violet-500 hover:underline transition-colors"
+                            title="Manage Tenant & Phone Quotas"
+                          >
+                            {num.assigned_organization.name}
+                          </a>
                           {num.assigned_agent && (
                             <p className="text-[10px] text-violet-400">Agent: {num.assigned_agent.name}</p>
                           )}

@@ -14,7 +14,6 @@ import {
   BarChart3, 
   LifeBuoy, 
   ScrollText,
-  Sparkles,
   Bell,
   PhoneCall,
   Phone,
@@ -189,7 +188,7 @@ export function AdminSidebar({
                   {/* Floating tooltip when collapsed on desktop */}
                   {isCollapsed && (
                     <div className="absolute left-full ml-3 hidden group-hover:flex items-center z-50 pointer-events-none">
-                      <span className="px-2.5 py-1 text-xs font-semibold rounded-md shadow-lg bg-zinc-900 text-white dark:bg-zinc-800 dark:text-zinc-100 whitespace-nowrap font-playfair">
+                      <span className="sidebar-tooltip px-2.5 py-1 text-xs font-semibold rounded-md shadow-xl bg-zinc-900 !text-white dark:bg-zinc-800 dark:!text-white whitespace-nowrap font-playfair">
                         {item.name}
                       </span>
                     </div>
@@ -208,10 +207,10 @@ export function AdminSidebar({
           {!isCollapsed && (
             <div className="px-1 flex items-center justify-between text-[11px] text-[var(--muted)]">
               <div className="flex items-center gap-1.5">
-                <Sparkles className="w-3 h-3 text-violet-500 animate-pulse" />
+                <Bot className="w-3 h-3 text-zinc-500" />
                 <span className="font-playfair font-medium">Trinetra v2.0</span>
               </div>
-              <span className="font-mono text-[10px] text-emerald-500">Live</span>
+              <span className="font-mono text-[10px] text-emerald-500">Active</span>
             </div>
           )}
         </div>

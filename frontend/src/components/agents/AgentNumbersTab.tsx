@@ -147,7 +147,7 @@ export function AgentNumbersTab({ agentId, organizationId }: AgentNumbersTabProp
               <select
                 value={selectedNumberId}
                 onChange={(e) => setSelectedNumberId(e.target.value)}
-                className="flex-1 rounded-xl border border-[var(--border)] bg-[var(--background)] px-4 py-2.5 text-xs text-[var(--heading)] outline-none focus:border-violet-500 transition cursor-pointer appearance-none"
+                className="flex-1 rounded-xl border border-[var(--border)] bg-[var(--background)] px-4 py-2.5 text-xs text-[var(--heading)] outline-none focus:border-zinc-500 transition cursor-pointer appearance-none"
               >
                 {unassignedPool.map((num) => (
                   <option key={num.id} value={num.id}>
@@ -158,7 +158,7 @@ export function AgentNumbersTab({ agentId, organizationId }: AgentNumbersTabProp
               <button
                 onClick={handleAssign}
                 disabled={assigning || !selectedNumberId}
-                className="px-5 py-2.5 bg-violet-600 hover:bg-violet-750 text-white text-xs font-extrabold uppercase tracking-wider rounded-xl transition flex items-center justify-center gap-1.5 shadow-md disabled:opacity-50 cursor-pointer"
+                className="px-5 py-2.5 bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 text-xs font-extrabold uppercase tracking-wider rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-sm disabled:opacity-50 cursor-pointer active:scale-[0.99]"
               >
                 {assigning ? (
                   <>
@@ -174,7 +174,7 @@ export function AgentNumbersTab({ agentId, organizationId }: AgentNumbersTabProp
           <div className="flex items-center gap-3">
             <Link 
               href="/dashboard/phone-numbers"
-              className="bg-violet-600 hover:bg-violet-750 text-white transition-all rounded-lg px-5 py-2.5 font-bold text-xs uppercase tracking-wider shadow-md"
+              className="bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 transition-all rounded-lg px-5 py-2.5 font-bold text-xs uppercase tracking-wider shadow-sm"
             >
               Manage Phone Numbers
             </Link>
@@ -254,7 +254,7 @@ export function AgentNumbersTab({ agentId, organizationId }: AgentNumbersTabProp
         </div>
         <Link 
           href="/dashboard/phone-numbers"
-          className="shrink-0 bg-violet-600 text-white hover:bg-violet-750 transition-all rounded-lg px-4 py-2.5 font-bold text-xs uppercase tracking-wider shadow-md"
+          className="shrink-0 bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 transition-all rounded-lg px-4 py-2.5 font-bold text-xs uppercase tracking-wider shadow-sm active:scale-[0.99]"
         >
           Manage Numbers &rarr;
         </Link>

@@ -4,7 +4,7 @@ import React, { useState, useMemo, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   Target, Search, Phone, Mail, ChevronDown, Database,
-  Sparkles, Download, Trash2, Eye, User, Building, Calendar,
+  Download, Trash2, Eye, User, Building, Calendar,
   CheckCircle2, AlertCircle, RefreshCw, X, ArrowUpRight, Flame,
   IndianRupee, Check
 } from 'lucide-react'

@@ -11,7 +11,7 @@ export function Layout({ children, theme = "vaakriti" }: LayoutProps) {
     const isDark = theme === "dark";
     return (
         <div
-            className={`min-h-screen flex flex-col transition-colors duration-300 ${
+            className={`min-h-screen flex flex-col ${
                 isDark ? "bg-[#080010] text-[#E2E0FD] dark" : "bg-[#FAFAFA] text-[#0F172A]"
             }`}
             style={!isDark ? { backgroundColor: "var(--theme-bg, #FAFAFA)", color: "var(--theme-text-primary, #0F172A)" } : undefined}

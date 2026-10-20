@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react'
 import { 
   Bot, 
-  Sparkles, 
   ArrowLeft, 
   Save, 
   Plus, 

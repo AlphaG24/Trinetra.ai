@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Bell, LogOut, User, CheckCheck } from 'lucide-react'
 import { useAuth, UserProfile } from '@/src/components/providers/AuthProvider'
+import { VaakritiWordmark } from '@/components/ui/VaakritiWordmark'
 
 export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
   const { user: authUser, profile: authProfile, signOut: authSignOut } = useAuth()
@@ -203,14 +204,10 @@ export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
   return (
     <header className="fixed top-0 right-0 left-0 h-16 bg-[var(--card-bg)] border-b border-[var(--border)] z-[999]">
       <div className="flex items-center justify-between h-full px-6">
-        {/* Left side: Logo */}
-        <div className="flex items-center gap-3">
-          <Link href="/dashboard" className="flex items-center gap-2">
-            <img
-              src="/logo-transparent.png"
-              alt="Vaakriti"
-              className="dynamic-logo h-8 md:h-9 w-auto object-contain -mt-0.5"
-            />
+        {/* Left side: Text Logo Only */}
+        <div className="flex items-center">
+          <Link href="/dashboard" className="flex items-center group py-1" aria-label="Vaakriti Dashboard">
+            <VaakritiWordmark className="h-4 md:h-4.5 w-auto text-zinc-900 dark:text-white transition-colors" />
           </Link>
         </div>
 

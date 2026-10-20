@@ -11,6 +11,8 @@ export interface FloatingGreeting {
   id: string;
   text: string;
   phonetic: string;
+  sentence: string;
+  sentencePhonetic?: string;
   lang: string;
   script: string;
   langName: string;
@@ -31,11 +33,13 @@ export interface FloatingGreeting {
 
 // Multilingual Greetings floating cleanly around the elevated core (completely outside the orb perimeter)
 const GREETINGS: FloatingGreeting[] = [
-  // Top Center - Sanskrit / Hindi "नमस्ते" (Electric Cobalt) - High above the orb
+  // Top Center - Sanskrit / Hindi "नमस्ते" (Electric Cobalt) - High above the orb, ample breathing clearance
   {
     id: "namaste",
     text: "नमस्ते",
     phonetic: "Namaste",
+    sentence: "नमस्ते! मैं वाकृति एआई से आपकी वॉयस असिस्टेंट बोल रही हूँ, आज मैं आपकी क्या सहायता कर सकती हूँ?",
+    sentencePhonetic: "Namaste! Main Vaakriti AI se aapki voice assistant bol rahi hoon, aaj main aapki kya sahayata kar sakti hoon?",
     lang: "hi-IN",
     script: "Devanagari",
     langName: "Hindi",
@@ -43,240 +47,262 @@ const GREETINGS: FloatingGreeting[] = [
     color: "#2563EB",
     activeColor: "#1D4ED8",
     left: "50%",
-    top: "8%",
+    top: "7%",
     fontSize: "text-base sm:text-lg md:text-[18px]",
-    fontClass: "font-serif font-medium",
+    fontClass: "font-serif font-bold",
     initialOpacity: 0.95,
-    driftX: 2,
-    driftY: -3,
+    driftX: 0,
+    driftY: 1,
     duration: 6,
     delay: 0,
     activeOrder: 1,
   },
-  // Upper Left - English "Hello" (Obsidian Black) - Safely in upper-left quadrant
+  // Upper Left - English "Hello" (Obsidian Black) - Balanced diagonal
   {
     id: "hello-1",
     text: "Hello",
     phonetic: "Hello",
+    sentence: "Hello! Welcome to Vaakriti. How can our autonomous voice agent empower your business today?",
+    sentencePhonetic: "Hello! Welcome to Vaakriti. How can our autonomous voice agent empower your business today?",
     lang: "en-US",
     script: "Latin",
     langName: "English",
     audioSrc: "/audio/greetings/en.wav",
     color: "#0F172A",
     activeColor: "#2563EB",
-    left: "24%",
-    top: "15%",
+    left: "27%",
+    top: "18%",
     fontSize: "text-xs sm:text-sm md:text-[14px]",
-    fontClass: "font-sans font-medium",
+    fontClass: "font-sans font-bold",
     initialOpacity: 0.85,
-    driftX: -3,
-    driftY: -2,
+    driftX: -1,
+    driftY: 0,
     duration: 7,
     delay: 0.8,
     activeOrder: 2,
   },
-  // Upper Right - Tamil "வணக்கம்" (Obsidian Black) - Safely in upper-right quadrant
+  // Upper Right - Tamil "வணக்கம்" (Obsidian Black) - Balanced diagonal
   {
     id: "vanakkam",
     text: "வணக்கம்",
     phonetic: "Vanakkam",
+    sentence: "வணக்கம்! நான் வாக்ரிதி ஏஐ குரல் உதவியாளர் பேசுகிறேன், இன்று நான் உங்களுக்கு எவ்வாறு உதவ முடியும்?",
+    sentencePhonetic: "Vanakkam! Naan Vaakriti AI kural udhaviyaalar pesugiren, indru naan ungalukku evvaru udhava mudiyum?",
     lang: "ta-IN",
     script: "Tamil",
     langName: "Tamil",
     audioSrc: "/audio/greetings/ta.wav",
     color: "#0F172A",
     activeColor: "#2563EB",
-    left: "76%",
-    top: "15%",
+    left: "73%",
+    top: "18%",
     fontSize: "text-xs sm:text-sm md:text-[14px]",
-    fontClass: "font-medium",
+    fontClass: "font-bold",
     initialOpacity: 0.85,
-    driftX: 3,
-    driftY: -2,
+    driftX: 1,
+    driftY: 0,
     duration: 8,
     delay: 1.2,
     activeOrder: 3,
   },
-  // Mid Left Upper - Marathi / Hindi "नमस्कार" (Deep Slate)
+  // Mid Left Upper - Marathi / Hindi "नमस्कार" (Deep Slate) - Balanced flank
   {
     id: "namaskar",
     text: "नमस्कार",
     phonetic: "Namaskar",
+    sentence: "नमस्कार! मी वाकृति एआय वॉयस असिस्टंट बोलतेय, आज मी तुम्हाला कशी मदत करू शकते?",
+    sentencePhonetic: "Namaskar! Me Vaakriti AI voice assistant boltey, aaj me tumhala kashi madat karu shakto?",
     lang: "mr-IN",
     script: "Devanagari",
     langName: "Marathi",
     audioSrc: "/audio/greetings/mr.wav",
     color: "#1E293B",
     activeColor: "#2563EB",
-    left: "14%",
-    top: "32%",
+    left: "18%",
+    top: "33%",
     fontSize: "text-xs sm:text-sm md:text-[14px]",
-    fontClass: "font-serif font-medium",
+    fontClass: "font-serif font-bold",
     initialOpacity: 0.88,
-    driftX: -3,
-    driftY: 2,
+    driftX: -1,
+    driftY: 0,
     duration: 6.5,
     delay: 0.3,
     activeOrder: 4,
   },
-  // Mid Right Upper - Arabic/Urdu "Salaam" (Electric Cobalt)
+  // Mid Right Upper - Arabic/Urdu "Salaam" (Electric Cobalt) - Balanced flank
   {
     id: "salaam",
     text: "Salaam",
     phonetic: "Salaam",
+    sentence: "السلام علیکم! میں واکریتی اے آئی سے آپ کی وائس اسسٹنٹ ہوں، آج آپ کی کیا خدمت کر سکتی ہوں؟",
+    sentencePhonetic: "Assalam-o-Alaikum! Main Vaakriti AI se aapki voice assistant बोल रही हूँ, आज आपकी क्या ख़िदमत कर सकती हूँ?",
     lang: "ur-IN",
     script: "Latin/Urdu",
     langName: "Urdu",
     audioSrc: "/audio/greetings/ur.wav",
     color: "#2563EB",
     activeColor: "#1D4ED8",
-    left: "86%",
-    top: "32%",
+    left: "82%",
+    top: "33%",
     fontSize: "text-xs sm:text-sm md:text-[14px]",
-    fontClass: "font-serif italic font-medium",
+    fontClass: "font-serif italic font-bold",
     initialOpacity: 0.88,
-    driftX: 3,
-    driftY: 2,
+    driftX: 1,
+    driftY: 0,
     duration: 7.2,
     delay: 1.6,
     activeOrder: 5,
   },
-  // Far Left Mid - Sanskrit "हृदा" (Cobalt Cyan)
+  // Far Left Mid - Sanskrit "हृदा" (Cobalt Cyan) - Balanced outer equator
   {
     id: "hrida",
     text: "हृदा",
     phonetic: "Hrida",
+    sentence: "हृदा स्वागतम्! वाकृति एआई वाग्-सहायके भवतां स्वागतम्, कथम् अहं साहाय्यं कर्तुं शक्नोमि?",
+    sentencePhonetic: "Hrida swagatam! Vaakriti AI vaak-sahayake bhavatam swagatam, katham aham saahayyam kartum shaknomi?",
     lang: "hi-IN",
     script: "Devanagari",
     langName: "Sanskrit",
     color: "#0284C7",
     activeColor: "#2563EB",
-    left: "10%",
-    top: "49%",
+    left: "14%",
+    top: "50%",
     fontSize: "text-[11px] sm:text-xs md:text-[12px]",
-    fontClass: "font-serif font-medium",
+    fontClass: "font-serif font-bold",
     initialOpacity: 0.82,
-    driftX: -2,
-    driftY: -2,
+    driftX: -1,
+    driftY: 0,
     duration: 7.5,
     delay: 0.5,
     activeOrder: 6,
   },
-  // Far Right Mid - Spanish "Hola" (Rich Slate)
+  // Far Right Mid - Spanish "Hola" (Rich Slate) - Balanced outer equator
   {
     id: "hola",
     text: "Hola",
     phonetic: "Hola",
+    sentence: "¡Hola! Bienvenido a Vaakriti AI. ¿En qué podemos ayudarte el día de hoy?",
+    sentencePhonetic: "¡Hola! Bienvenido a Vaakriti AI. ¿En qué podemos ayudarte el día de hoy?",
     lang: "es-ES",
     script: "Latin",
     langName: "Spanish",
     audioSrc: "/audio/greetings/es.mp3",
     color: "#334155",
     activeColor: "#2563EB",
-    left: "90%",
-    top: "49%",
+    left: "86%",
+    top: "50%",
     fontSize: "text-xs sm:text-sm md:text-[13px]",
-    fontClass: "font-sans font-medium",
+    fontClass: "font-sans font-bold",
     initialOpacity: 0.8,
-    driftX: 2,
-    driftY: -2,
+    driftX: 1,
+    driftY: 0,
     duration: 6.8,
     delay: 2.1,
     activeOrder: 7,
   },
-  // Mid Left Lower - Punjabi "ਸਤਿ ਸ੍ਰੀ ਅਕਾਲ" (Obsidian Black)
+  // Mid Left Lower - Punjabi "ਸਤਿ ਸ੍ਰੀ ਅਕਾਲ" (Obsidian Black) - Balanced lower-left
   {
     id: "sat-sri-akal",
     text: "ਸਤਿ ਸ੍ਰੀ ਅਕਾਲ",
     phonetic: "Sat Sri Akal",
+    sentence: "ਸਤਿ ਸ੍ਰੀ ਅਕਾਲ ਜੀ! ਮੈਂ ਵਾਕ੍ਰਿਤੀ ਏਆਈ ਤੋਂ ਬੋਲ ਰਹੀ ਹਾਂ, ਅੱਜ ਮੈਂ ਤੁਹਾਡੀ ਕੀ ਸੇਵਾ ਕਰ ਸਕਦੀ ਹਾਂ?",
+    sentencePhonetic: "Sat Sri Akal ji! Main Vaakriti AI ton bol rahi haan, ajj main tuhadi ki sewa kar sakdi haan?",
     lang: "pa-IN",
     script: "Gurmukhi",
     langName: "Punjabi",
     audioSrc: "/audio/greetings/pa.wav",
     color: "#0F172A",
     activeColor: "#2563EB",
-    left: "14%",
-    top: "66%",
+    left: "18%",
+    top: "67%",
     fontSize: "text-xs sm:text-sm md:text-[14px]",
-    fontClass: "font-medium",
+    fontClass: "font-bold",
     initialOpacity: 0.85,
-    driftX: -2,
-    driftY: 2,
+    driftX: -1,
+    driftY: 0,
     duration: 8.5,
     delay: 1.4,
     activeOrder: 8,
   },
-  // Mid Right Lower - English "Hello" (Cyan Cobalt)
+  // Mid Right Lower - English "Hello" (Cyan Cobalt) - Balanced lower-right
   {
     id: "hello-2",
     text: "Hello",
     phonetic: "Hello",
+    sentence: "Hello! Thank you for connecting with Vaakriti. Let's transform your customer experience with intelligent voice automation.",
+    sentencePhonetic: "Hello! Thank you for connecting with Vaakriti. Let's transform your customer experience with intelligent voice automation.",
     lang: "en-US",
     script: "Latin",
     langName: "English",
-    audioSrc: "/audio/greetings/en.wav",
+    audioSrc: "/audio/greetings/en2.wav",
     color: "#0284C7",
     activeColor: "#2563EB",
-    left: "86%",
-    top: "66%",
+    left: "82%",
+    top: "67%",
     fontSize: "text-xs sm:text-sm md:text-[13px]",
-    fontClass: "font-sans font-medium",
+    fontClass: "font-sans font-bold",
     initialOpacity: 0.85,
-    driftX: 2,
-    driftY: -2,
+    driftX: 1,
+    driftY: 0,
     duration: 7.8,
     delay: 1.9,
     activeOrder: 9,
   },
-  // Bottom Left - French "Bonjour" (Slate Charcoal)
+  // Bottom Left - French "Bonjour" (Slate Charcoal) - Balanced bottom-left
   {
     id: "bonjour",
     text: "Bonjour",
     phonetic: "Bonjour",
+    sentence: "Bonjour! Bienvenue chez Vaakriti AI. Comment puis-je vous aider aujourd'hui?",
+    sentencePhonetic: "Bonjour! Bienvenue chez Vaakriti AI. Comment puis-je vous aider aujourd'hui?",
     lang: "fr-FR",
     script: "Latin",
     langName: "French",
     audioSrc: "/audio/greetings/fr.mp3",
     color: "#334155",
     activeColor: "#2563EB",
-    left: "24%",
-    top: "83%",
+    left: "27%",
+    top: "82%",
     fontSize: "text-xs sm:text-sm md:text-[13px]",
-    fontClass: "font-serif italic font-medium",
+    fontClass: "font-serif italic font-bold",
     initialOpacity: 0.8,
-    driftX: -2,
-    driftY: 2,
+    driftX: -1,
+    driftY: 0,
     duration: 6.2,
     delay: 2.5,
     activeOrder: 10,
   },
-  // Bottom Right - Arabic "مرحباً" (Deep Slate)
+  // Bottom Right - Arabic "مرحباً" (Deep Slate) - Balanced bottom-right
   {
     id: "marhaban",
     text: "مرحباً",
     phonetic: "Marhaban",
+    sentence: "مرحباً بكم في واكريتي للذكاء الاصطناعي، كيف يمكنني مساعدتكم اليوم؟",
+    sentencePhonetic: "Marhaban bikum fi Vaakriti lil-dhaka' al-istina'i, kayfa yumkinuni musa'adatukum al-yawm?",
     lang: "ar-SA",
     script: "Arabic",
     langName: "Arabic",
     audioSrc: "/audio/greetings/ar.mp3",
     color: "#1E293B",
     activeColor: "#2563EB",
-    left: "76%",
-    top: "83%",
+    left: "73%",
+    top: "82%",
     fontSize: "text-xs sm:text-sm md:text-[14px]",
-    fontClass: "font-serif font-medium",
+    fontClass: "font-serif font-bold",
     initialOpacity: 0.88,
-    driftX: 2,
-    driftY: 2,
+    driftX: 1,
+    driftY: 0,
     duration: 7,
     delay: 0.9,
     activeOrder: 11,
   },
-  // Bottom Center - Japanese "こんにちは" (Obsidian Black) - Cleared below the orb
+  // Bottom Center - Japanese "こんにちは" (Obsidian Black) - Centered safely below orb
   {
     id: "konnichiwa",
     text: "こんにちは",
     phonetic: "Konnichiwa",
+    sentence: "こんにちは！ヴァクリティAIへようこそ。本日はどのようなご用件でしょうか？",
+    sentencePhonetic: "Konnichiwa! Vaakriti AI he yokoso. Honjitsu wa dono yona go-yoken desho ka?",
     lang: "ja-JP",
     script: "Japanese",
     langName: "Japanese",
@@ -284,12 +310,12 @@ const GREETINGS: FloatingGreeting[] = [
     color: "#0F172A",
     activeColor: "#2563EB",
     left: "50%",
-    top: "91%",
+    top: "93%",
     fontSize: "text-[11px] sm:text-xs md:text-[12px]",
-    fontClass: "font-sans font-medium",
+    fontClass: "font-sans font-bold",
     initialOpacity: 0.82,
-    driftX: 2,
-    driftY: 2,
+    driftX: 0,
+    driftY: -1,
     duration: 8,
     delay: 2.2,
     activeOrder: 12,
@@ -407,7 +433,9 @@ export function Hero() {
               voices.find((v) => v.lang.toLowerCase() === g.lang.toLowerCase()) ||
               voices.find((v) => v.lang.toLowerCase().startsWith(prefix));
 
-            const textToSpeak = matched ? g.text : g.phonetic;
+            const textToSpeak = matched
+              ? (g.sentence || g.text)
+              : (g.sentencePhonetic || g.sentence || g.phonetic || g.text);
             const utterance = new SpeechSynthesisUtterance(textToSpeak);
 
             if (matched) {
@@ -501,8 +529,8 @@ export function Hero() {
       speakGreetingText(g);
     }
 
-    toast.success(`Agent speaks: "${g.phonetic || g.text}" (${g.langName})`, {
-      duration: 2500,
+    toast.success(`Agent speaks (${g.langName}): "${g.sentence || g.phonetic || g.text}"`, {
+      duration: 3500,
     });
   };
 
@@ -563,22 +591,22 @@ export function Hero() {
   };
 
   return (
-    <section className="relative w-full min-h-screen flex flex-col justify-between overflow-hidden bg-[#FAFAFA] select-none pt-24 sm:pt-28 md:pt-30 pb-0 transition-colors duration-500">
+    <section className="relative w-full h-[100dvh] min-h-[660px] max-h-[1080px] flex flex-col overflow-hidden bg-[#FAFAFA] select-none pt-[104px] sm:pt-[112px] md:pt-[116px] transition-colors duration-500">
       
       {/* ── 1. LUMINOUS AMBIENT VOLUMETRIC BACKDROP ── */}
       <div
         className="pointer-events-none absolute inset-0 z-0 select-none opacity-80"
         style={{
           background:
-            "radial-gradient(ellipse 70% 55% at 50% 42%, rgba(37,99,235,0.07) 0%, rgba(2,132,199,0.03) 40%, rgba(250,250,250,0) 80%)",
+            "radial-gradient(ellipse 70% 55% at 50% 48%, rgba(37,99,235,0.07) 0%, rgba(2,132,199,0.03) 40%, rgba(250,250,250,0) 80%)",
         }}
       />
 
-      {/* ── 2. ELEVATED HERO CENTER STAGE (OBJECT & GREETINGS MOVED A BIT ABOVE) ── */}
-      <div className="relative z-20 flex-1 flex items-center justify-center -translate-y-8 sm:-translate-y-12 md:-translate-y-14">
+      {/* ── 2. HERO CENTER STAGE & 3D ACOUSTIC ORB (CENTERED NATURALLY WITHIN REMAINING VIEWPORT) ── */}
+      <div className="relative z-20 flex-1 flex items-center justify-center pb-6 sm:pb-8">
         
         {/* Floating Multilingual Words (Pure Floating Typography - No boxes, No icons, Spaced cleanly outside the orb) */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute inset-0 max-w-[860px] mx-auto overflow-visible pointer-events-none px-4">
           {GREETINGS.map((g) => {
             const isIlluminated = speakingWordId === g.id;
             return (
@@ -586,12 +614,12 @@ export function Hero() {
                 key={g.id}
                 type="button"
                 onClick={() => handleGreetingClick(g)}
-                title={`Click to hear agent speak "${g.text}" (${g.phonetic}) in ${g.langName}`}
-                aria-label={`Listen to ${g.text} in ${g.langName}`}
+                title={`${g.text} (${g.langName})`}
+                aria-label={`Listen to ${g.langName} greeting: "${g.sentence}"`}
                 className={`absolute -translate-x-1/2 -translate-y-1/2 ${g.fontSize} ${g.fontClass} select-none transition-all duration-300 pointer-events-auto cursor-pointer focus:outline-none hover:scale-110 active:scale-95 z-30 group p-1 ${
                   isIlluminated
-                    ? "text-[#2563EB] font-bold drop-shadow-[0_0_12px_rgba(37,99,235,0.7)] scale-110"
-                    : "text-[#0F172A]/70 hover:text-[#2563EB] hover:drop-shadow-[0_0_8px_rgba(37,99,235,0.4)]"
+                    ? "text-[#2563EB] font-extrabold drop-shadow-[0_0_14px_rgba(37,99,235,0.75)] scale-110"
+                    : "text-[#0F172A] font-bold drop-shadow-[0_1px_2px_rgba(15,23,42,0.12)] hover:text-[#2563EB]"
                 }`}
                 style={{
                   left: g.left,
@@ -608,7 +636,7 @@ export function Hero() {
                   delay: g.delay,
                 }}
               >
-                <span className="tracking-wide font-medium">{g.text}</span>
+                <span className="tracking-wide font-bold sm:font-extrabold">{g.text}</span>
               </motion.button>
             );
           })}
@@ -656,102 +684,109 @@ export function Hero() {
 
         {/* Layer 4: Bottom Ambient Anchor (ensures 100% full-bleed coverage with zero bottom white gap) */}
         <div
-          className="absolute inset-x-0 bottom-0 h-28 sm:h-36"
+          className="absolute inset-x-0 bottom-0 h-20 sm:h-24"
           style={{
             background:
-              "linear-gradient(180deg, rgba(147,197,253,0) 0%, rgba(147,197,253,0.50) 60%, rgba(147,197,253,0.85) 100%)",
+              "linear-gradient(180deg, rgba(147,197,253,0) 0%, rgba(147,197,253,0.40) 60%, rgba(147,197,253,0.75) 100%)",
           }}
         />
       </div>
 
-      {/* ── 4. PREVIOUSLY BUILT TELEPHONY CALLBACK MODAL (RESTORED EXACTLY) ── */}
+      {/* ── 4. PREVIOUSLY BUILT TELEPHONY CALLBACK MODAL (UPDATED TO LUMINOUS SOVEREIGN AI THEME) ── */}
       <AnimatePresence>
         {isModalOpen && (
-          <div className="fixed inset-0 z-[999] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+          <div className="fixed inset-0 z-[999] flex items-center justify-center p-4 bg-[#080810]/75 backdrop-blur-md">
             <motion.div
               initial={{ opacity: 0, scale: 0.95, y: 15 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 15 }}
               transition={{ duration: 0.22, ease: "easeOut" }}
-              className="relative w-full max-w-md border border-white/10 bg-[#0C0118]/95 p-6 md:p-8 rounded-3xl shadow-2xl space-y-6 text-left"
+              className="relative w-full max-w-md border border-white/10 bg-[#0C101A] p-6 md:p-8 rounded-3xl shadow-[0_24px_64px_-12px_rgba(0,0,0,0.7),0_0_40px_rgba(37,99,235,0.2)] space-y-6 text-left text-white overflow-hidden"
             >
+              {/* Subtle top atmospheric glow */}
+              <div className="pointer-events-none absolute -top-16 left-1/2 -translate-x-1/2 w-48 h-24 bg-[#2563EB]/25 blur-3xl rounded-full" />
+
               {/* Close Button */}
               <button
                 type="button"
                 onClick={() => setIsModalOpen(false)}
-                className="absolute top-4 right-4 p-2 text-zinc-400 hover:text-white hover:bg-white/5 rounded-xl transition cursor-pointer"
+                className="absolute top-4 right-4 p-2 text-slate-400 hover:text-white hover:bg-white/10 rounded-xl transition cursor-pointer z-20"
+                aria-label="Close modal"
               >
                 <X size={18} />
               </button>
 
               {/* Header */}
-              <div className="space-y-1.5">
-                <h3 className="text-xl font-bold font-display text-white tracking-tight">
+              <div className="space-y-1.5 relative z-10">
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold tracking-wider uppercase bg-[#2563EB]/15 border border-[#2563EB]/30 text-[#60A5FA] mb-1">
+                  <span>Live Sandbox Demonstration</span>
+                </div>
+                <h3 className="text-xl font-bold font-sans text-white tracking-tight">
                   Receive a Live Call
                 </h3>
-                <p className="text-xs text-zinc-400 leading-relaxed font-sans">
+                <p className="text-xs text-slate-400 leading-relaxed font-sans">
                   Experience {VOICE_AGENT_NAME}&apos;s real-time sales and service conversation directly on your phone.
                 </p>
               </div>
 
               {success ? (
-                <div className="space-y-4 text-center py-6">
-                  <div className="w-12 h-12 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mx-auto text-emerald-400">
-                    <Phone className="w-6 h-6 animate-bounce" />
+                <div className="space-y-4 text-center py-6 relative z-10">
+                  <div className="w-14 h-14 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center mx-auto text-emerald-400 shadow-[0_0_24px_rgba(16,185,129,0.2)]">
+                    <Phone className="w-7 h-7 animate-bounce" />
                   </div>
                   <div className="space-y-1">
-                    <h4 className="text-sm font-bold text-white">Calling you now!</h4>
-                    <p className="text-xs text-zinc-400">
-                      Answer the call on your phone to start the live demonstration.
+                    <h4 className="text-base font-bold text-white">Calling you now!</h4>
+                    <p className="text-xs text-slate-400 max-w-xs mx-auto">
+                      Answer the incoming call on your phone to start the live interactive demonstration.
                     </p>
                   </div>
                   <button
                     type="button"
                     onClick={() => setIsModalOpen(false)}
-                    className="mt-4 px-5 py-2 bg-white/5 hover:bg-white/10 border border-white/10 text-white text-xs font-bold rounded-xl transition cursor-pointer"
+                    className="mt-4 px-6 py-2.5 bg-white/10 hover:bg-white/15 border border-white/10 text-white text-xs font-bold rounded-xl transition cursor-pointer"
                   >
                     Close Sandbox
                   </button>
                 </div>
               ) : (
-                <form onSubmit={handleCallbackSubmit} className="space-y-4">
+                <form onSubmit={handleCallbackSubmit} className="space-y-4 relative z-10">
                   {error && (
-                    <div className="p-3 bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs rounded-xl font-medium">
+                    <div className="p-3 bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs rounded-xl font-medium">
                       {error}
                     </div>
                   )}
 
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+                    <label className="text-[11px] font-bold uppercase tracking-wider text-slate-300 font-sans">
                       Your Phone Number
                     </label>
                     <div className="relative">
-                      <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+                      <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                       <input
                         type="tel"
                         required
                         value={phoneInput}
                         onChange={(e) => setPhoneInput(e.target.value)}
                         placeholder="e.g. +91 99999 88888 or 10-digit number"
-                        className="w-full pl-10 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl text-xs text-white placeholder-zinc-500 focus:outline-none focus:ring-1 focus:ring-violet-500/50 focus:border-violet-500 transition"
+                        className="w-full pl-10 pr-4 py-3 bg-[#131926] border border-white/10 rounded-xl text-xs text-white placeholder-slate-500 focus:bg-[#182236] focus:outline-none focus:ring-2 focus:ring-[#2563EB]/40 focus:border-[#2563EB] transition font-sans"
                       />
                     </div>
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+                    <label className="text-[11px] font-bold uppercase tracking-wider text-slate-300 font-sans">
                       Converse in Language
                     </label>
                     <div className="relative">
-                      <Globe className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500 pointer-events-none" />
+                      <Globe className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
                       <select
                         value={language}
                         onChange={(e) => setLanguage(e.target.value)}
-                        className="w-full pl-10 pr-4 py-3 bg-[#130224] border border-white/10 rounded-xl text-xs text-white focus:outline-none focus:ring-1 focus:ring-violet-500/50 focus:border-violet-500 transition cursor-pointer appearance-none"
+                        className="w-full pl-10 pr-4 py-3 bg-[#131926] border border-white/10 rounded-xl text-xs text-white focus:bg-[#182236] focus:outline-none focus:ring-2 focus:ring-[#2563EB]/40 focus:border-[#2563EB] transition cursor-pointer appearance-none font-sans"
                       >
-                        <option value="hi">Hindi (Indian Accent)</option>
-                        <option value="en-IN">English (Indian Accent)</option>
-                        <option value="en-US">English (US Accent)</option>
+                        <option value="hi" className="bg-[#131926] text-white">Hindi (Indian Accent)</option>
+                        <option value="en-IN" className="bg-[#131926] text-white">English (Indian Accent)</option>
+                        <option value="en-US" className="bg-[#131926] text-white">English (US Accent)</option>
                       </select>
                     </div>
                   </div>
@@ -759,7 +794,7 @@ export function Hero() {
                   <button
                     type="submit"
                     disabled={loading}
-                    className="w-full mt-2 py-3.5 bg-violet-600 hover:bg-violet-750 text-white font-extrabold text-xs uppercase tracking-wider rounded-xl transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:pointer-events-none cursor-pointer shadow-lg shadow-violet-500/10"
+                    className="w-full mt-2 py-3.5 bg-gradient-to-r from-[#2563EB] to-[#1D4ED8] hover:from-[#1D4ED8] hover:to-[#1E40AF] text-white font-bold text-xs uppercase tracking-wider rounded-xl transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:pointer-events-none cursor-pointer shadow-[0_4px_20px_rgba(37,99,235,0.4)] hover:shadow-[0_6px_26px_rgba(37,99,235,0.55)] active:scale-[0.99] font-sans"
                   >
                     {loading ? (
                       <>

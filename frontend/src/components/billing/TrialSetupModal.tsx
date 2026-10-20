@@ -2,7 +2,6 @@
 
 import { useState, useMemo, useEffect } from 'react'
 import {
-  Sparkles,
   Bot,
   Check,
   Calendar,
@@ -299,7 +298,7 @@ export default function TrialSetupModal({
         {/* Modal Header */}
         <div>
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-zinc-200 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 text-zinc-800 dark:text-zinc-200 text-[10px] font-bold uppercase tracking-wider mb-2">
-            <Sparkles className="w-3 h-3 text-amber-500" /> ₹99 7-Day All-Access Trial Setup
+            ₹99 7-Day All-Access Trial Setup
           </div>
           <h2 className="text-xl sm:text-2xl font-bold font-display text-[var(--heading)]">
             Configure Your AI Voice Workforce

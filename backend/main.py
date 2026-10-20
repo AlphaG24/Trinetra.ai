@@ -23,7 +23,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from voice_router import (
     router as voice_router, telegram_router, agents_router, telephony_audio_stream, 
     handle_exotel_voice_webhook, handle_twilio_voice_webhook, handle_twilio_voice_status,
-    handle_twilio_voice_recording, upload_call_recording, serve_call_recording
+    handle_twilio_voice_recording, handle_sarvam_voice_webhook, upload_call_recording, serve_call_recording
 )
 from telemetry_router import router as telemetry_router
 from knowledge_router import router as knowledge_router
@@ -83,8 +83,13 @@ app.api_route("/api/voice/webhooks/voice/twilio/recording/{organization_id}", me
 app.api_route("/webhooks/voice/exotel/recording", methods=["GET", "POST"])(handle_exotel_voice_webhook)
 app.api_route("/webhooks/voice/exotel/recording/{organization_id}", methods=["GET", "POST"])(handle_exotel_voice_webhook)
 app.api_route("/api/voice/webhooks/voice/exotel/recording", methods=["GET", "POST"])(handle_exotel_voice_webhook)
-app.api_route("/api/voice/webhooks/voice/exotel/recording/{organization_id}", methods=["GET", "POST"])(handle_exotel_voice_webhook)
 app.websocket("/webhooks/voice/twilio/stream/{room_name}")(telephony_audio_stream)
+
+# Support root-level HTTP routes for Sarvam AI telephony configured with or without /api/voice prefix
+app.api_route("/webhooks/voice/sarvam", methods=["GET", "POST"])(handle_sarvam_voice_webhook)
+app.api_route("/webhooks/voice/sarvam/{organization_id}", methods=["GET", "POST"])(handle_sarvam_voice_webhook)
+app.api_route("/api/voice/webhooks/voice/sarvam", methods=["GET", "POST"])(handle_sarvam_voice_webhook)
+app.api_route("/api/voice/webhooks/voice/sarvam/{organization_id}", methods=["GET", "POST"])(handle_sarvam_voice_webhook)
 # Explicit routes for call recording upload and audio playback to support all client URL configurations
 app.api_route("/api/voice/recordings/upload", methods=["POST"])(upload_call_recording)
 app.api_route("/api/voice/webhooks/voice/recordings/upload", methods=["POST"])(upload_call_recording)
@@ -129,8 +134,11 @@ async def app_startup():
         print(f"[Startup] Observability Sentry init warning: {e}", flush=True)
 
     try:
-        from agent import run_agent
-        print("[Startup] Agent runner pre-warmed successfully.", flush=True)
+        if os.getenv("ENABLE_INPROCESS_AGENT", "false").lower() == "true":
+            from agent import run_agent
+            print("[Startup] Agent runner pre-warmed successfully.", flush=True)
+        else:
+            print("[Startup] Standalone voice worker mode active; agent pre-warming deferred.", flush=True)
     except Exception as e:
         print(f"[Startup] Pre-warm agent warning: {e}", flush=True)
 

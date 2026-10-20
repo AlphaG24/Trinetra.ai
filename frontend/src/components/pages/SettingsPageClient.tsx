@@ -175,10 +175,10 @@ function AgentsTab({ agents }: { agents: any[] }) {
               type="email"
               defaultValue={agent.escalation_email || ''}
               placeholder="support@yourcompany.com"
-              className="w-full px-4 py-3 bg-black/40 border border-white/10 rounded-xl text-white placeholder-white/30 text-sm focus:outline-none focus:border-purple-500/50 transition-colors"
+              className="w-full px-4 py-3 bg-black/40 border border-white/10 rounded-xl text-white placeholder-white/30 text-sm focus:outline-none focus:border-zinc-400 dark:focus:border-white/30 transition-colors"
             />
           </div>
-          <button className="flex items-center gap-2 px-5 py-2.5 bg-purple-600 hover:bg-purple-500 text-white font-semibold rounded-xl transition-colors text-sm">
+          <button className="flex items-center gap-2 px-5 py-2.5 bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 font-semibold rounded-xl transition-all text-sm cursor-pointer shadow-sm active:scale-[0.99]">
             <Save className="w-4 h-4" /> Save Agent Settings
           </button>
         </div>
@@ -225,7 +225,7 @@ function IntegrationsTab() {
               <button className="text-xs text-red-400 hover:text-red-300 font-medium transition-colors">Disconnect</button>
             </div>
           ) : (
-            <button className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white font-semibold rounded-xl text-sm transition-colors">
+            <button className="px-4 py-2 bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 font-semibold rounded-xl text-sm transition-all cursor-pointer shadow-sm active:scale-[0.99]">
               Connect
             </button>
           )}

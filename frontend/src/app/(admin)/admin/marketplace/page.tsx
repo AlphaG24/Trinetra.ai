@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react'
 import { 
   Store, 
-  Sparkles, 
   ArrowLeft, 
   Plus, 
   Search, 

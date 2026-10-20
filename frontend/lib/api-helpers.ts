@@ -22,7 +22,7 @@ export async function authenticateRequest(): Promise<
   try {
     const authPromise = supabase.auth.getUser()
     const timeoutPromise = new Promise<{ data: { user: null }; error: Error }>((_, reject) =>
-      setTimeout(() => reject(new Error('Auth request timeout')), 2500)
+      setTimeout(() => reject(new Error('Auth request timeout')), 8000)
     )
     const result = await Promise.race([authPromise, timeoutPromise])
     user = result?.data?.user ?? null

@@ -20,7 +20,7 @@ export async function GET() {
     try {
       const authPromise = supabase.auth.getUser().catch(() => ({ data: { user: null } }))
       const timeoutPromise = new Promise<any>((_, reject) =>
-        setTimeout(() => reject(new Error('Auth timeout')), 2500)
+        setTimeout(() => reject(new Error('Auth timeout')), 15000)
       )
       const authRes = await Promise.race([authPromise, timeoutPromise])
       user = authRes?.data?.user ?? null
@@ -43,7 +43,7 @@ export async function GET() {
         .order('created_at', { ascending: false })
         .limit(30)
       const timeoutPromise = new Promise<any>((_, reject) =>
-        setTimeout(() => reject(new Error('DB timeout')), 2500)
+        setTimeout(() => reject(new Error('DB timeout')), 15000)
       )
       const { data, error } = await Promise.race([dbPromise, timeoutPromise])
       if (!error && data) {

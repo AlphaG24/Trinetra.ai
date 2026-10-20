@@ -25,7 +25,7 @@ export function getBaseUrl(): string {
     return url.startsWith('http') ? url : `https://${url}`;
   }
 
-  return 'https://trinetraedu-ai.com';
+  return 'https://vaakriti.com';
 }
 
 export function getBackendUrl(): string {

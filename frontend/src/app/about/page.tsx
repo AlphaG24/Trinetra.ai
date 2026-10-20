@@ -66,9 +66,7 @@ export default function AboutPage() {
             transition={{ duration: 0.6 }}
             className="relative z-10 max-w-3xl mx-auto flex flex-col items-center"
           >
-            <div className="inline-flex items-center gap-1.5 bg-[#2563EB]/10 border border-[#2563EB]/25 text-[#2563EB] font-sans font-semibold text-[12.5px] px-4 py-1.5 rounded-full mb-6">
-              <span>✦</span> About Us
-            </div>
+
             <h1 className="font-sans font-extrabold text-[36px] md:text-[50px] text-[#0F172A] tracking-tight leading-tight">
               Vision <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#2563EB] to-[#0284C7]">Beyond</span> the Surface
             </h1>
@@ -84,77 +82,77 @@ export default function AboutPage() {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.6, delay: 0.1 }}
-          className="w-full max-w-3xl mx-auto px-5"
+          className="w-full max-w-5xl mx-auto px-5"
         >
           <div className="font-sans text-[16px] text-[#334155] leading-relaxed flex flex-col gap-6">
             <h2 className="font-sans font-bold text-[22px] md:text-[26px] text-[#0F172A]">
               The Meaning Behind the Name
             </h2>
             <p>
-              In ancient wisdom, Trinetra refers to the &apos;Third Eye&apos; — the divine vision that sees beyond physical reality. It is the ability to perceive patterns, truths, and futures that remain invisible to the naked eye.
+              In Sanskrit wisdom, <strong className="text-[#0F172A] font-semibold">Vaakriti</strong> (वाक् + कृति) embodies the architecture of expression — the union of &apos;Vaak&apos; (the divine voice of truth) and &apos;Kriti&apos; (purposeful, intelligent creation). It is the capability to speak, listen, understand, and act with clarity.
             </p>
             <p>
-              We chose this name deliberately. In a world drowning in data but starving for insight, Trinetra is the vision that cuts through the noise. We don&apos;t just build AI tools — we build the infrastructure of intelligence that helps businesses see what they&apos;ve been missing.
+              We chose this name deliberately. In a world drowning in static noise and fragmented tools, Vaakriti is the sovereign voice intelligence layer that connects speech with action. We don&apos;t just build chatbot scripts — we engineer carrier-grade telephonic intelligence that powers mission-critical enterprise workflows.
             </p>
             
             <blockquote className="border-l-[3px] border-[#2563EB] pl-5 py-3 my-2 italic text-[#0F172A] bg-blue-50/50 rounded-r-xl leading-relaxed">
-              &quot;We didn&apos;t want to build another AI tool. We wanted to build the infrastructure of intelligence itself.&quot;
+              &quot;We didn&apos;t want to build another AI tool. We wanted to build the infrastructure of conversational intelligence itself.&quot;
             </blockquote>
             
             <h2 className="font-sans font-bold text-[22px] md:text-[26px] text-[#0F172A] mt-6">
               From Experimentation to Infrastructure
             </h2>
             <p>
-              Every meaningful venture has an origin story shaped by obsession with craft. Ours began when we started building specialized tools — extraction engines, data pipelines, automation scripts — and discovered a fundamental truth: individual AI tools solve individual problems, but fragmented solutions create fragmented businesses.
+              Every meaningful venture has an origin story shaped by obsession with craft. Ours began when we started building specialized tools — extraction engines, data pipelines, automation scripts — and discovered a fundamental truth: individual tools solve individual moments, but fragmented software stalls business momentum.
             </p>
             <p>
-              That realization changed everything. We stopped building isolated point solutions and started building foundational voice infrastructure. An intelligent layer that sits beneath a business and makes everything — calls, conversations, decisions, operations — smarter, faster, and autonomous.
+              That realization changed everything. We stopped building isolated point solutions and started building foundational voice infrastructure. An intelligent layer that sits beneath a business and makes everything — phone calls, customer qualification, appointment reservations, omnichannel messaging — faster, smarter, and autonomous.
             </p>
 
             <h2 className="font-sans font-bold text-[22px] md:text-[26px] text-[#0F172A] mt-6">
               The Mission: World-Class AI, Indian Heart
             </h2>
             <p>
-              The global AI landscape is dominated by solutions built for Silicon Valley budgets and Western workflows. A dental clinic in Jaipur, a hospital in Kochi, a regional distributor in Pune — they deserve the same caliber of voice intelligence that a global enterprise commands. But at a price point and in a language that makes sense for them.
+              The global AI landscape has long been dominated by solutions engineered for Silicon Valley budgets and Western telephony. A clinic in Jaipur, an academy in Lucknow, a hospital in Kochi, a regional distributor in Pune — they deserve the same caliber of voice intelligence that global tech giants command. In the languages and regional nuances their customers speak every day.
             </p>
             <p>
-              Trinetra AI was born to close this gap. We are building world-class autonomous AI agents — self-healing, multilingual, and deeply contextual — with transparent pricing and real-time sovereign telecom integrations.
+              Vaakriti AI was born to bridge this divide. We are building world-class autonomous AI agents — sub-500ms streaming latency, multilingual dialect switching, and carrier-grade reliability — with transparent pricing and real-time sovereign telecom integrations.
             </p>
 
             <blockquote className="border-l-[3px] border-[#2563EB] pl-5 py-3 my-2 italic text-[#0F172A] bg-blue-50/50 rounded-r-xl leading-relaxed">
-              &quot;While our ambition is global, our heart beats for the businesses and builders of India. We&apos;re not building the future of AI for India — we&apos;re building India&apos;s AI for the future.&quot;
+              &quot;While our ambition is global, our roots and dedication are firmly anchored in India. We&apos;re not building the future of AI for India — we&apos;re building India&apos;s AI for the future.&quot;
             </blockquote>
 
             <h2 className="font-sans font-bold text-[22px] md:text-[26px] text-[#0F172A] mt-6">
               What We&apos;re Building Toward
             </h2>
             <p>
-              Trinetra is an end-to-end intelligence ecosystem across three core dimensions:
+              Vaakriti is an end-to-end conversational ecosystem across core pillars:
             </p>
 
             <ul className="flex flex-col gap-4 my-2">
               <li className="flex items-start gap-3 p-4 rounded-xl bg-white border border-[#E2E8F0] shadow-xs">
                 <span className="shrink-0 text-xl">🔱</span>
                 <span className="font-sans text-[15px] text-[#334155]">
-                  <strong className="text-[#0F172A] font-semibold">Autonomous Business Agents</strong> — AI that handles calls, chats, social media, and operations with zero human friction.
+                  <strong className="text-[#0F172A] font-semibold">Autonomous Business Agents</strong> — AI that handles calls, chats, lead qualification, and customer bookings with sub-500ms latency.
                 </span>
               </li>
               <li className="flex items-start gap-3 p-4 rounded-xl bg-white border border-[#E2E8F0] shadow-xs">
-                <span className="shrink-0 text-xl">🎯</span>
+                <span className="shrink-0 text-xl">🎙️</span>
                 <span className="font-sans text-[15px] text-[#334155]">
-                  <strong className="text-[#0F172A] font-semibold">Adaptive Intelligence for Education</strong> — Scalable examination platforms through Trinetra Shiksha that understand each student&apos;s needs.
+                  <strong className="text-[#0F172A] font-semibold">Carrier-Grade Telephony & Voice AI</strong> — Sovereign voice infrastructure that seamlessly bridges standard phone lines, mobile carriers, and real-time agent pipelines.
                 </span>
               </li>
               <li className="flex items-start gap-3 p-4 rounded-xl bg-white border border-[#E2E8F0] shadow-xs">
                 <span className="shrink-0 text-xl">🤝</span>
                 <span className="font-sans text-[15px] text-[#334155]">
-                  <strong className="text-[#0F172A] font-semibold">Human Connection Platforms</strong> — Systems that bridge knowledge and enterprise scale, connecting insights with action.
+                  <strong className="text-[#0F172A] font-semibold">Human Connection Platforms</strong> — Systems that empower teams with automatic summaries, sentiment scoring, and instant agent handoffs.
                 </span>
               </li>
             </ul>
 
             <div className="font-sans font-bold text-[18px] md:text-[20px] mt-10 text-center text-[#2563EB]">
-              The third eye sees what others cannot. And we&apos;re just getting started.
+              Voice is the ultimate interface. And we&apos;re just getting started.
             </div>
           </div>
         </motion.section>
@@ -165,7 +163,7 @@ export default function AboutPage() {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.6 }}
-          className="w-full max-w-4xl mx-auto px-5 mt-16"
+          className="w-full max-w-5xl mx-auto px-5 mt-16"
         >
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Mission */}
@@ -199,10 +197,10 @@ export default function AboutPage() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.6 }}
-            className="w-full max-w-5xl mx-auto px-5 mt-20 flex flex-col items-center"
+            className="w-full max-w-6xl mx-auto px-5 mt-20 flex flex-col items-center"
           >
             <h2 className="font-sans font-bold text-[28px] md:text-[36px] text-[#0F172A] tracking-tight text-center">
-              The People Behind Trinetra
+              The People Behind Vaakriti
             </h2>
             <p className="font-sans text-[15px] text-[#64748B] mb-12 text-center mt-2">
               Engineers, researchers, and builders shaping conversational intelligence.
@@ -268,7 +266,7 @@ export default function AboutPage() {
 
         {/* BOTTOM CTA SECTION */}
         <section className="w-full px-5 pt-20 pb-8 text-center">
-          <div className="mx-auto max-w-2xl bg-white border border-[#E2E8F0] rounded-3xl p-10 shadow-xs">
+          <div className="mx-auto max-w-5xl bg-white border border-[#E2E8F0] rounded-3xl p-10 shadow-xs">
             <h2 className="font-sans font-bold text-[28px] md:text-[32px] text-[#0F172A] tracking-tight mb-4">
               Let&apos;s Build the Future Together
             </h2>

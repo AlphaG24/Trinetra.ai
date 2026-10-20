@@ -765,7 +765,7 @@ export function AgentOverviewTab({
                             type="button"
                             disabled={claimingEmergency || walletInfo.reliability_score <= 80}
                             onClick={handleClaimEmergency}
-                            className="px-2.5 py-1 bg-violet-600 hover:bg-violet-700 text-white font-bold text-[10px] uppercase tracking-wider rounded-lg transition shadow-sm cursor-pointer disabled:opacity-40 shrink-0"
+                            className="px-2.5 py-1 bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 font-bold text-[10px] uppercase tracking-wider rounded-lg transition-all shadow-sm cursor-pointer disabled:opacity-40 shrink-0 active:scale-[0.98]"
                           >
                             {claimingEmergency ? 'Claiming...' : 'Claim 50m'}
                           </button>

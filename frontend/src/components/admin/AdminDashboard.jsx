@@ -12,7 +12,7 @@ import {
   Pencil,
   Plus,
   Search,
-  Sparkles,
+  Smile,
   Trash2,
   Users,
   XCircle,
@@ -92,7 +92,7 @@ export default function AdminDashboard({ onCreateNew, onEdit }) {
       { key: "posts", label: "Posts", icon: FileText, count: stats.posts },
       { key: "comments", label: "Comments", icon: MessageCircle, count: stats.comments },
       { key: "likes", label: "Likes", icon: Heart, count: stats.likes },
-      { key: "reactions", label: "Reactions", icon: Sparkles, count: stats.reactions },
+      { key: "reactions", label: "Reactions", icon: Smile, count: stats.reactions },
       { key: "subscribers", label: "Subscribers", icon: Users, count: stats.subscribers },
     ],
     [stats.comments, stats.likes, stats.posts, stats.reactions, stats.subscribers]

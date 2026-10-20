@@ -5,6 +5,7 @@ import "./globals.css";
 import { Inter, JetBrains_Mono, Playfair_Display, Montserrat, Merriweather } from "next/font/google";
 import localFont from 'next/font/local';
 import { Toaster } from "sonner";
+import { Toaster as HotToaster } from "react-hot-toast";
 import { AuthProvider } from "@/src/components/providers/AuthProvider";
 // Client wrapper that applies ssr:false for MaintenanceWatcher
 import { MaintenanceWatcherLoader } from '@/src/components/dashboard/MaintenanceWatcherLoader';
@@ -38,51 +39,52 @@ const calSans = localFont({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL('https://trinetraedu-ai.com'),
+  metadataBase: new URL('https://vaakriti.com'),
   title: {
-    default: 'Trinetra AI — Intelligent Voice Agents for Indian Business',
-    template: '%s | Trinetra AI',
+    default: 'Vaakriti AI — The Creation of Voice | Intelligent Voice Agents',
+    template: '%s | Vaakriti AI',
   },
   description:
-    'Deploy AI voice agents in 60 seconds. Zero-code platform for Indian MSMEs. Hinglish & multilingual support. Start with ₹99 trial.',
+    'Deploy AI voice agents in 60 seconds. Zero-code platform for Indian MSMEs & global enterprises. Hinglish & multilingual support.',
   keywords: [
     'AI voice agent',
     'voice bot India',
     'Hinglish AI',
     'automated calling',
     'business phone agent',
-    'Trinetra AI',
+    'Vaakriti AI',
+    'Vaakriti',
     'AI agents',
     'autonomous AI',
     'AI workflows',
   ],
-  authors: [{ name: 'Trinetra AI', url: 'https://trinetraedu-ai.com' }],
-  creator: 'Trinetra AI',
-  publisher: 'Trinetra AI',
+  authors: [{ name: 'Vaakriti AI', url: 'https://vaakriti.com' }],
+  creator: 'Vaakriti AI',
+  publisher: 'Vaakriti AI',
   openGraph: {
     type: 'website',
     locale: 'en_US',
-    url: 'https://trinetraedu-ai.com',
-    siteName: 'Trinetra AI',
-    title: 'Trinetra AI — Intelligent Voice Agents for Indian Business',
+    url: 'https://vaakriti.com',
+    siteName: 'Vaakriti AI',
+    title: 'Vaakriti AI — The Creation of Voice | Intelligent Voice Agents',
     description:
-      'Deploy AI voice agents in 60 seconds. Zero-code platform for Indian MSMEs. Hinglish & multilingual support. Start with ₹99 trial.',
+      'Deploy AI voice agents in 60 seconds. Zero-code platform for Indian MSMEs & global enterprises. Hinglish & multilingual support.',
     images: [
       {
         url: '/og-image.png',
         width: 1200,
         height: 630,
-        alt: 'Trinetra AI — Intelligent Voice Agents',
+        alt: 'Vaakriti AI — Intelligent Voice Agents',
       },
     ],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Trinetra AI — Intelligent Voice Agents for Indian Business',
+    title: 'Vaakriti AI — The Creation of Voice | Intelligent Voice Agents',
     description:
-      'Deploy AI voice agents in 60 seconds. Zero-code platform for Indian MSMEs. Hinglish & multilingual support. Start with ₹99 trial.',
+      'Deploy AI voice agents in 60 seconds. Zero-code platform for Indian MSMEs & global enterprises. Hinglish & multilingual support.',
     images: ['/og-image.png'],
-    creator: '@trinetra_ai',
+    creator: '@vaakriti_ai',
   },
   robots: {
     index: true,
@@ -91,6 +93,8 @@ export const metadata: Metadata = {
   icons: {
     icon: [
       { url: "/favicon.svg", type: "image/svg+xml" },
+      { url: "/favicon-light.svg", type: "image/svg+xml", media: "(prefers-color-scheme: light)" },
+      { url: "/favicon-dark.svg", type: "image/svg+xml", media: "(prefers-color-scheme: dark)" },
       { url: "/favicon-32x32.png", sizes: "32x32", type: "image/png" },
       { url: "/favicon-16x16.png", sizes: "16x16", type: "image/png" },
     ],
@@ -99,7 +103,7 @@ export const metadata: Metadata = {
     ],
   },
   alternates: {
-    canonical: 'https://trinetraedu-ai.com',
+    canonical: 'https://vaakriti.com',
   }
 };
 
@@ -117,26 +121,26 @@ export default async function RootLayout({
     "@graph": [
       {
         "@type": "Organization",
-        "@id": "https://trinetraedu-ai.com/#organization",
-        "name": "Trinetra AI",
-        "url": "https://trinetraedu-ai.com",
-        "logo": "https://trinetraedu-ai.com/logo.png",
-        "description": "Intelligent Voice Agents for Indian Business. Deploy AI voice agents in 60 seconds.",
+        "@id": "https://vaakriti.com/#organization",
+        "name": "Vaakriti AI",
+        "url": "https://vaakriti.com",
+        "logo": "https://vaakriti.com/logo.png",
+        "description": "Intelligent Voice Agents for Modern Businesses. Deploy AI voice agents in 60 seconds.",
         "contactPoint": {
           "@type": "ContactPoint",
           "telephone": "+91-9999999999",
           "contactType": "customer service",
-          "email": "support@trinetraedu-ai.com",
+          "email": "support@vaakriti.com",
           "availableLanguage": ["en", "hi"]
         }
       },
       {
         "@type": "SoftwareApplication",
-        "@id": "https://trinetraedu-ai.com/#application",
-        "name": "Trinetra AI Platform",
+        "@id": "https://vaakriti.com/#application",
+        "name": "Vaakriti AI Platform",
         "applicationCategory": "BusinessApplication",
         "operatingSystem": "All",
-        "url": "https://trinetraedu-ai.com",
+        "url": "https://vaakriti.com",
         "offers": {
           "@type": "Offer",
           "price": "99.00",
@@ -191,6 +195,7 @@ export default async function RootLayout({
           </Suspense>
           {children}
           <Toaster position="bottom-right" theme={initialTheme === 'light' ? 'light' : 'dark'} />
+          <HotToaster position="top-right" toastOptions={{ style: { background: '#18181b', color: '#f4f4f5', border: '1px solid #27272a' } }} />
         </AuthProvider>
       </body>
     </html>

@@ -140,15 +140,24 @@ export async function GET(
 
     const { data: profMinutes } = await adminClient
       .from('profiles')
-      .select('paid_minutes_remaining, demo_minutes_limit')
+      .select('paid_minutes_remaining, demo_minutes_limit, additional_phone_numbers')
       .or(`organization_id.eq.${effectiveOrgId},id.eq.${id}`)
       .limit(1)
       .maybeSingle()
+
+    const { count: phoneCount } = await adminClient
+      .from('phone_numbers')
+      .select('id', { count: 'exact', head: true })
+      .or(`organization_id.eq.${effectiveOrgId},assigned_org_id.eq.${effectiveOrgId}`)
+      .in('status', ['active', 'provisioning'])
 
     tenantData = {
       ...tenantData,
       kyc_status: kycStatus,
       paid_minutes_remaining: profMinutes?.paid_minutes_remaining ?? profMinutes?.demo_minutes_limit ?? 20,
+      additional_phone_numbers: profMinutes?.additional_phone_numbers || 0,
+      phone_numbers_quota: 5 + (profMinutes?.additional_phone_numbers || 0),
+      assigned_phone_numbers_count: phoneCount || 0,
     }
 
     // 7. Fetch Wallet Data (P3, P4, P5, P7, P8) using adminClient to bypass RLS
@@ -270,11 +279,13 @@ export async function PUT(
         return NextResponse.json({ error: orgUpdateError.message }, { status: 500 })
       }
 
-      // Sync linked profile fields (demo_minutes_limit, is_active, plan_tier)
+      // Sync linked profile fields (demo_minutes_limit, is_active, plan_tier, additional_phone_numbers)
       const profileUpdate: Record<string, any> = {}
       if (body.demo_minutes_limit !== undefined) profileUpdate.demo_minutes_limit = body.demo_minutes_limit
       if (body.status !== undefined) profileUpdate.is_active = body.status === 'active'
       if (body.billing_model !== undefined) profileUpdate.plan_tier = body.billing_model
+      if (body.additional_phone_numbers !== undefined) profileUpdate.additional_phone_numbers = Math.max(0, Number(body.additional_phone_numbers))
+      if (body.phone_numbers_limit !== undefined) profileUpdate.additional_phone_numbers = Math.max(0, Number(body.phone_numbers_limit) - 5)
 
       if (Object.keys(profileUpdate).length > 0) {
         await adminClient
@@ -314,6 +325,8 @@ export async function PUT(
       if (body.demo_minutes_limit !== undefined) profUpdate.demo_minutes_limit = body.demo_minutes_limit
       if (body.status !== undefined) profUpdate.is_active = body.status === 'active'
       if (body.billing_model !== undefined) profUpdate.plan_tier = body.billing_model
+      if (body.additional_phone_numbers !== undefined) profUpdate.additional_phone_numbers = Math.max(0, Number(body.additional_phone_numbers))
+      if (body.phone_numbers_limit !== undefined) profUpdate.additional_phone_numbers = Math.max(0, Number(body.phone_numbers_limit) - 5)
 
       const { data: savedProf, error: profUpdateError } = await adminClient
         .from('profiles')

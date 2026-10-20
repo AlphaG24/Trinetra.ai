@@ -254,8 +254,8 @@ export default function ContactPage() {
 
   return (
     <Layout theme="vaakriti">
-      <div className="relative flex min-h-screen flex-col overflow-hidden bg-[#FAFAFA] text-[#0F172A] px-5 pb-24 pt-28 sm:pt-32">
-        <div className="relative z-10 mx-auto grid w-full max-w-6xl grid-cols-1 gap-12 lg:grid-cols-[58%_38%] lg:justify-between">
+      <div className="relative flex min-h-screen flex-col overflow-hidden bg-[#FAFAFA] text-[#0F172A] px-5 pb-24 pt-32 sm:pt-36">
+        <div className="relative z-10 mx-auto grid w-full max-w-6xl grid-cols-1 gap-10 lg:grid-cols-[58%_38%] lg:justify-between items-start">
           {/* Left Column: Form */}
           <motion.div
             id="contact-form-section"
@@ -618,7 +618,7 @@ export default function ContactPage() {
             </p>
 
             <a
-              href="https://wa.me/919580619562?text=Hi%2C+I+want+to+know+more+about+Trinetra+AI"
+              href="https://wa.me/919580619562?text=Hi%2C+I+want+to+know+more+about+Vaakriti+AI"
               target="_blank"
               rel="noopener noreferrer"
               className="flex w-full items-center justify-center gap-2 rounded-xl border border-[#CBD5E1] bg-white px-5 py-3 font-sans text-[14px] font-semibold text-[#0F172A] shadow-2xs transition-all hover:border-[#2563EB] hover:text-[#2563EB]"

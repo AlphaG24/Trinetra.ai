@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect } from 'react'
 import { toast } from 'sonner'
-import { Sparkles, BriefcaseBusiness, Headphones, CalendarCheck, UserSearch, ChevronDown, ChevronUp } from 'lucide-react'
+import { Bot, BriefcaseBusiness, Headphones, CalendarCheck, UserSearch, ChevronDown, ChevronUp } from 'lucide-react'
 
 interface PersonalityConfig {
   sales: boolean
@@ -165,8 +165,8 @@ export function PersonalitySelector({
         className="w-full flex items-center justify-between px-6 py-5 hover:bg-[var(--hover-bg)]/50 transition-colors group cursor-pointer text-left"
       >
         <div className="flex items-center gap-3.5">
-          <div className="w-10 h-10 rounded-xl bg-violet-500/10 border border-violet-500/25 flex items-center justify-center shrink-0">
-            <Sparkles className="w-5 h-5 text-violet-600 dark:text-violet-400" />
+          <div className="w-10 h-10 rounded-xl bg-zinc-100 dark:bg-white/10 border border-zinc-200 dark:border-white/10 flex items-center justify-center shrink-0">
+            <Bot className="w-5 h-5 text-zinc-800 dark:text-zinc-200" />
           </div>
           <div>
             <div className="flex items-center gap-2.5">
@@ -192,7 +192,7 @@ export function PersonalitySelector({
         </div>
         <div className="flex items-center gap-2.5">
           {saving && (
-            <div className="w-4 h-4 border-2 border-violet-500 border-t-transparent rounded-full animate-spin" />
+            <div className="w-4 h-4 border-2 border-zinc-900 dark:border-white border-t-transparent rounded-full animate-spin" />
           )}
           {expanded ? (
             <ChevronUp className="w-5 h-5 text-[var(--muted)] group-hover:text-[var(--heading)] transition-colors" />
@@ -206,8 +206,8 @@ export function PersonalitySelector({
       {expanded && (
         <div className="px-6 pb-6 pt-1 border-t border-[var(--border)] space-y-4">
           {/* Info Banner */}
-          <div className="mt-3 px-4 py-3 rounded-xl bg-violet-500/10 border border-violet-500/20 flex items-start gap-3">
-            <Sparkles className="w-4 h-4 text-violet-600 dark:text-violet-400 mt-0.5 shrink-0" />
+          <div className="mt-3 px-4 py-3 rounded-xl bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 flex items-start gap-3">
+            <Bot className="w-4 h-4 text-zinc-800 dark:text-zinc-200 mt-0.5 shrink-0" />
             <p className="text-xs text-[var(--heading)]/85 leading-relaxed font-sans">
               <strong>Dynamic Intent Switching:</strong> When 2 or more roles are enabled, the agent detects what the caller needs from their first few words and seamlessly adopts the right personality. When 1 role is enabled, the agent operates in dedicated mode.
             </p>

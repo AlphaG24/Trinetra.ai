@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Building2, Mail, Phone, Server, Send, Sparkles, CheckCircle2 } from 'lucide-react'
+import { Building2, Mail, Phone, Server, Send, CheckCircle2 } from 'lucide-react'
 import { toast } from 'sonner'
 
 interface EnterpriseContactModalProps {
@@ -102,7 +102,7 @@ export default function EnterpriseContactModal({
           <>
             <div>
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-zinc-200 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 text-zinc-800 dark:text-zinc-200 text-[10px] font-bold uppercase tracking-wider mb-2">
-                <Sparkles className="w-3 h-3 text-amber-500" /> Custom Architecture
+                Custom Architecture
               </div>
               <h2 className="text-xl sm:text-2xl font-bold font-display text-[var(--heading)]">
                 Connect with Enterprise Solutions
@@ -168,27 +168,27 @@ export default function EnterpriseContactModal({
 
                 <div>
                   <label className="block text-[11px] font-bold uppercase tracking-wider text-[var(--heading)] mb-1">
-                    Deployment Mode
+                    Hosting Preference
                   </label>
                   <select
                     value={formData.deployment_type}
                     onChange={(e) => setFormData({ ...formData, deployment_type: e.target.value })}
                     className="w-full bg-[var(--background)] border border-[var(--border)] rounded-xl px-3 py-2.5 text-xs text-[var(--heading)] focus:outline-none focus:border-zinc-500 transition-colors"
                   >
-                    <option value="cloud">Managed Trinetra Cloud (High Availability)</option>
-                    <option value="dedicated">Dedicated Private Tenant / VPC</option>
-                    <option value="on_premise">On-Premises / Air-Gapped Telephony</option>
+                    <option value="cloud">Fully Managed Cloud</option>
+                    <option value="dedicated">Dedicated Private Environment</option>
+                    <option value="on_premise">Custom In-House Setup</option>
                   </select>
                 </div>
               </div>
 
               <div>
                 <label className="block text-[11px] font-bold uppercase tracking-wider text-[var(--heading)] mb-1">
-                  Expected Monthly Minutes & Agents
+                  Expected Monthly Calling Volume
                 </label>
                 <input
                   type="text"
-                  placeholder="e.g. 25,000 minutes/month with 10 concurrent agents"
+                  placeholder="e.g. 25,000 minutes/month with 10 team agents"
                   value={formData.infrastructure_needs}
                   onChange={(e) => setFormData({ ...formData, infrastructure_needs: e.target.value })}
                   className="w-full bg-[var(--background)] border border-[var(--border)] rounded-xl px-3 py-2.5 text-xs text-[var(--heading)] placeholder-[var(--muted)] focus:outline-none focus:border-zinc-500 transition-colors"
@@ -201,7 +201,7 @@ export default function EnterpriseContactModal({
                 </label>
                 <textarea
                   rows={3}
-                  placeholder="CRM integration (Salesforce/HubSpot), custom fine-tuned voice models, SLA uptime agreements..."
+                  placeholder="CRM integration (Salesforce/HubSpot), custom voice personality, dedicated support..."
                   value={formData.message}
                   onChange={(e) => setFormData({ ...formData, message: e.target.value })}
                   className="w-full bg-[var(--background)] border border-[var(--border)] rounded-xl p-3 text-xs text-[var(--heading)] placeholder-[var(--muted)] focus:outline-none focus:border-zinc-500 transition-colors resize-none"

@@ -9,7 +9,17 @@ import {
 import { toast } from 'sonner'
 import Link from 'next/link'
 
-const fetcher = (url: string) => fetch(url).then(res => res.json())
+const fetcher = async (url: string) => {
+  try {
+    const res = await fetch(url)
+    if (!res.ok) return { logs: [], totalCount: 0 }
+    const text = await res.text()
+    if (!text || !text.trim()) return { logs: [], totalCount: 0 }
+    return JSON.parse(text)
+  } catch {
+    return { logs: [], totalCount: 0 }
+  }
+}
 
 interface QualityLog {
   id: string

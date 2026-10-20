@@ -387,7 +387,7 @@ export function CallbackDetailModal({
                     <button
                       type="submit"
                       disabled={loading}
-                      className="flex-1 py-2 text-xs font-bold rounded-lg bg-violet-600 hover:bg-violet-700 text-white flex items-center justify-center"
+                      className="flex-1 py-2 text-xs font-bold rounded-lg bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 flex items-center justify-center transition-all cursor-pointer shadow-sm active:scale-[0.99]"
                     >
                       Confirm
                     </button>

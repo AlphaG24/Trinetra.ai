@@ -10,8 +10,7 @@ function formatLink(url: string | null) {
 }
 
 const FALLBACK_SERVICES = [
-  { name: "Trinetra Shiksha", subdomain_url: "https://shiksha.trinetraedu-ai.com" },
-  { name: "Vikram Voice Assistant", subdomain_url: "/dashboard" },
+  { name: "Vaakriti Voice Assistant", subdomain_url: "/dashboard" },
   { name: "Autonomous Support Desk", subdomain_url: "/dashboard" },
   { name: "Outbound Sales Closer", subdomain_url: "/dashboard" },
   { name: "Lead Qualification Engine", subdomain_url: "/dashboard" },
@@ -35,7 +34,9 @@ export async function MetricsBar() {
         .order("name", { ascending: true });
 
       if (data && data.length > 0) {
-        services = data;
+        services = data.filter(
+          (s) => !s.name?.toLowerCase().includes("shiksha")
+        );
       }
     }
   } catch (err) {
@@ -44,13 +45,10 @@ export async function MetricsBar() {
 
   const activeItems =
     services.length > 0
-      ? [
-          { name: "Trinetra Shiksha", subdomain_url: "https://shiksha.trinetraedu-ai.com" },
-          ...services.map((s) => ({
-            name: s.name,
-            subdomain_url: s.subdomain_url,
-          })),
-        ]
+      ? services.map((s) => ({
+          name: s.name,
+          subdomain_url: s.subdomain_url,
+        }))
       : FALLBACK_SERVICES;
 
   // Repeat list items to comfortably fill width on large monitors

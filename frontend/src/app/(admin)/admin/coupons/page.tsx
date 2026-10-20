@@ -9,7 +9,6 @@ import {
   X,
   Edit3,
   Trash2,
-  Sparkles,
   Tag,
   Calendar,
   AlertCircle,
@@ -273,7 +272,7 @@ export default function AdminCouponsPage() {
         <div className="p-5 bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl shadow-xs">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-amber-600 dark:text-amber-400">Public Offers</span>
-            <Sparkles className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+            <Tag className="w-4 h-4 text-amber-600 dark:text-amber-400" />
           </div>
           <div className="text-2xl font-black text-[var(--heading)] mt-2 font-mono">{publicOffers}</div>
           <span className="text-[11px] text-[var(--muted)] mt-0.5 block">Visible in "Check today's Offer"</span>
@@ -281,8 +280,8 @@ export default function AdminCouponsPage() {
 
         <div className="p-5 bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl shadow-xs">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-violet-600 dark:text-violet-400">Total Redemptions</span>
-            <Layers className="w-4 h-4 text-violet-600 dark:text-violet-400" />
+            <span className="text-xs font-semibold text-zinc-600 dark:text-zinc-400">Total Redemptions</span>
+            <Layers className="w-4 h-4 text-zinc-600 dark:text-zinc-400" />
           </div>
           <div className="text-2xl font-black text-[var(--heading)] mt-2 font-mono">{totalRedemptions}</div>
           <span className="text-[11px] text-[var(--muted)] mt-0.5 block">Applied across orders</span>
@@ -665,7 +664,7 @@ export default function AdminCouponsPage() {
                   />
                   <div>
                     <label htmlFor="isPublicOffer" className="text-xs font-bold text-[var(--heading)] flex items-center gap-1.5 cursor-pointer">
-                      <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                      <Tag className="w-3.5 h-3.5 text-amber-500" />
                       <span>Show in "Check today's Offer" drawer at checkout</span>
                     </label>
                     <p className="text-[11px] text-[var(--muted)] mt-0.5">

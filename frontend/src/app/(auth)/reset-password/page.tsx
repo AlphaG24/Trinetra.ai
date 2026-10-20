@@ -1,14 +1,13 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { motion } from 'framer-motion'
-import { Mail, ArrowRight, ArrowLeft, Lock, Eye, EyeOff } from 'lucide-react'
-import toast from 'react-hot-toast'
+import { Eye, EyeOff } from 'lucide-react'
+import { toast } from 'sonner'
 import { createClient } from '@/lib/client'
 import { VaakritiSymbolVector } from '@/components/ui/VaakritiSymbolVector'
-import { VaakritiWordmarkVector } from '@/components/ui/VaakritiWordmarkVector'
+import { LivingGlobeCanvas } from '@/components/auth/LivingGlobeCanvas'
 
 export default function ResetPasswordPage() {
   const router = useRouter()
@@ -48,7 +47,7 @@ export default function ResetPasswordPage() {
     setIsLoading(true)
 
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
         redirectTo: `${window.location.origin}/auth/callback?next=/reset-password`,
       })
 
@@ -59,7 +58,7 @@ export default function ResetPasswordPage() {
 
       toast.success('Password reset email sent! Check your inbox.')
       router.push('/login')
-    } catch (err) {
+    } catch {
       toast.error('An unexpected error occurred')
     } finally {
       setIsLoading(false)
@@ -96,7 +95,7 @@ export default function ResetPasswordPage() {
       setTimeout(() => {
         window.location.href = '/dashboard'
       }, 1500)
-    } catch (err) {
+    } catch {
       toast.error('An unexpected error occurred')
     } finally {
       setIsLoading(false)
@@ -104,272 +103,154 @@ export default function ResetPasswordPage() {
   }
 
   if (!isMounted || checkingSession) {
-    return <div className="flex h-screen w-full bg-slate-50" />
+    return <div className="min-h-screen w-full bg-white" />
   }
 
   return (
-    <div className="flex min-h-screen w-full bg-[#F8FAFC] text-slate-900 overflow-x-hidden font-sans selection:bg-slate-200 selection:text-slate-900 relative items-center justify-center p-3 sm:p-5 lg:p-7">
+    <div className="min-h-screen w-full bg-white p-1 sm:p-1.5 lg:p-2 flex flex-col lg:flex-row gap-2 sm:gap-2.5 lg:gap-3 selection:bg-[#245CFF]/15 selection:text-[#101828]">
 
-      {/* ── AMBIENT SUBTLE BACKGROUND GRID & SOFT GRADIENT ── */}
-      <div className="fixed inset-0 pointer-events-none z-0">
-        <div 
-          className="absolute inset-0 opacity-40"
-          style={{
-            backgroundImage: "radial-gradient(#CBD5E1 1px, transparent 1px)",
-            backgroundSize: "28px 28px",
-          }}
-        />
-        <div 
-          className="absolute inset-0"
-          style={{
-            background: "linear-gradient(180deg, rgba(59, 130, 246, 0.08) 0%, rgba(37, 99, 235, 0.03) 25%, transparent 60%)",
-          }}
-        />
-      </div>
+      {/* ─────────────────────────────────────────────────────────────
+          LEFT PANEL — CRISP LIVING GLOBE WITH PIXEL DISPERSION PHYSICS
+          100% crisp high-DPI pixels, NO blur, interactive hover animation
+         ───────────────────────────────────────────────────────────── */}
+      <section className="relative w-full lg:w-1/2 h-[340px] sm:h-[440px] lg:h-auto lg:min-h-[calc(100vh-1rem)] rounded-xl sm:rounded-2xl lg:rounded-[20px] overflow-hidden bg-[#030712] shrink-0 border border-slate-200/80 shadow-xs">
+        <LivingGlobeCanvas />
+      </section>
 
-      {/* ── BACK TO LOGIN BUTTON ── */}
-      <div className="absolute top-5 left-5 sm:top-7 sm:left-7 z-50">
-        <Link
-          href="/login"
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs font-semibold text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-50 border border-slate-200 backdrop-blur-xl transition-all duration-200 shadow-sm hover:shadow group"
-        >
-          <ArrowLeft className="w-3.5 h-3.5 transition-transform duration-200 group-hover:-translate-x-1 text-slate-700" />
-          <span>Back to Sign In</span>
-        </Link>
-      </div>
+      {/* ─────────────────────────────────────────────────────────────
+          RIGHT PANEL — RECOVERY INTERFACE (50% WIDTH ON DESKTOP)
+         ───────────────────────────────────────────────────────────── */}
+      <section className="relative w-full lg:w-1/2 min-h-full flex-1 flex flex-col justify-center items-center px-4 sm:px-6 lg:px-10 py-6 sm:py-10 bg-white">
+        
+        <div className="w-full max-w-[410px] mx-auto flex flex-col items-center">
 
-      {/* ── MASTER DUAL-PANEL CONTAINER ── */}
-      <main className="relative z-10 w-full max-w-[1240px] min-h-[620px] lg:min-h-[700px] grid grid-cols-1 lg:grid-cols-12 rounded-[2.2rem] lg:rounded-[2.8rem] border-2 border-slate-200/90 bg-white/95 backdrop-blur-2xl shadow-[0_20px_70px_-15px_rgba(15,23,42,0.07),0_1px_3px_rgba(15,23,42,0.03)] overflow-hidden">
-
-        {/* ─────────────────────────────────────────────────────────────
-            LEFT PANEL: CLEAN BRAND SHOWCASE (ONLY LOGO, NO ORBS, NO TAGS)
-           ───────────────────────────────────────────────────────────── */}
-        <div className="hidden lg:flex lg:col-span-6 xl:col-span-6 p-4 xl:p-6">
-          <div className="relative w-full h-full rounded-[2rem] xl:rounded-[2.4rem] border border-slate-200/80 bg-gradient-to-b from-slate-50/70 via-white to-slate-50/50 overflow-hidden flex flex-col justify-between items-center p-8 xl:p-12 text-center shadow-sm">
-
-            <div 
-              className="absolute inset-0 opacity-15 pointer-events-none"
-              style={{
-                backgroundImage: "linear-gradient(rgba(148, 163, 184, 0.25) 1px, transparent 1px), linear-gradient(90deg, rgba(148, 163, 184, 0.25) 1px, transparent 1px)",
-                backgroundSize: "36px 36px",
-              }}
-            />
-
-            {/* Top spacer for clean vertical balance */}
-            <div className="w-full h-4" />
-
-            {/* Center: Sharp Logo Lockup (Emblem + Wordmark + Tagline) */}
-            <div className="relative z-10 flex flex-col items-center justify-center my-auto py-8">
-              <motion.div
-                initial={{ opacity: 0, scale: 0.92 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 0.6, ease: "easeOut" }}
-                className="mb-7 flex items-center justify-center"
-              >
-                <VaakritiSymbolVector className="w-28 xl:w-36 h-auto text-slate-900 select-none" />
-              </motion.div>
-
-              <motion.div
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, delay: 0.1 }}
-                className="mb-4 flex items-center justify-center w-full max-w-[280px] xl:max-w-[340px]"
-              >
-                <VaakritiWordmarkVector className="w-full h-auto text-slate-900 select-none" />
-              </motion.div>
-
-              <motion.p
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ duration: 0.6, delay: 0.2 }}
-                className="text-[11px] font-mono tracking-[0.38em] text-slate-500 uppercase font-semibold select-none"
-              >
-                THE CREATION OF VOICE
-              </motion.p>
-            </div>
-
-            <div className="relative z-10 text-[10px] text-slate-400 tracking-widest uppercase font-semibold">
-              © {new Date().getFullYear()} VAAKRITI AI. ALL RIGHTS RESERVED.
-            </div>
-          </div>
-        </div>
-
-        {/* ─────────────────────────────────────────────────────────────
-            RIGHT PANEL: RECOVERY FORM (NO BLUE TEXT)
-           ───────────────────────────────────────────────────────────── */}
-        <div className="lg:col-span-6 xl:col-span-6 flex flex-col justify-center items-center p-6 sm:p-10 xl:p-14 relative z-10 border-t lg:border-t-0 lg:border-l-2 border-slate-200/90 bg-white">
-
-          {/* Mobile Only: Header */}
-          <div className="flex lg:hidden flex-col items-center mb-8 text-center">
-            <VaakritiSymbolVector className="w-16 h-auto text-slate-900 mb-3 select-none drop-shadow-sm" />
-            <VaakritiWordmarkVector className="w-48 h-auto text-slate-900 mb-2 select-none" />
-            <p className="text-[10px] font-mono tracking-[0.3em] text-slate-500 uppercase font-semibold">
-              THE CREATION OF VOICE
-            </p>
+          {/* Emblem on Top Center */}
+          <div className="mb-4 flex items-center justify-center">
+            <Link href="/" className="group cursor-pointer" aria-label="Vaakriti Home">
+              <VaakritiSymbolVector className="w-11 h-11 text-[#18181B] group-hover:scale-105 transition-transform duration-200" />
+            </Link>
           </div>
 
-          <motion.div
-            initial={{ opacity: 0, y: 15 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, ease: "easeOut" }}
-            className="w-full max-w-[400px]"
-          >
-            {user ? (
-              /* UPDATE PASSWORD */
-              <>
-                <div className="mb-7 text-center lg:text-left">
-                  <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900 mb-1.5">
-                    Set New Password
-                  </h1>
-                  <p className="text-slate-500 text-xs sm:text-sm">
-                    Configure a strong new password (minimum 12 characters).
-                  </p>
-                </div>
+          {user ? (
+            /* Set New Password */
+            <>
+              <h1 className="text-2xl sm:text-[28px] font-semibold text-[#18181B] tracking-tight text-center font-display mb-2">
+                Set new password
+              </h1>
+              <p className="text-sm text-[#71717A] text-center mb-6">
+                Configure a strong new password (minimum 12 characters).
+              </p>
 
-                <form onSubmit={handleUpdatePassword} className="space-y-4">
-                  <div className="space-y-1.5 group">
-                    <label className="text-[11px] font-bold text-slate-700 uppercase tracking-widest pl-1">
-                      New Password
-                    </label>
-                    <div className="relative">
-                      <Lock className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 group-focus-within:text-slate-900 transition-colors pointer-events-none" />
-                      <input
-                        type={showPassword ? 'text' : 'password'}
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        required
-                        minLength={12}
-                        className="w-full bg-slate-50/80 hover:bg-slate-50 focus:bg-white border border-slate-200 hover:border-slate-300 focus:border-slate-800 rounded-2xl py-3 pl-11 pr-11 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-4 focus:ring-slate-900/10 transition-all text-sm shadow-sm"
-                        placeholder="••••••••••••"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer p-1"
-                      >
-                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="space-y-1.5 group">
-                    <label className="text-[11px] font-bold text-slate-700 uppercase tracking-widest pl-1">
-                      Confirm New Password
-                    </label>
-                    <div className="relative">
-                      <Lock className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 group-focus-within:text-slate-900 transition-colors pointer-events-none" />
-                      <input
-                        type={showConfirmPassword ? 'text' : 'password'}
-                        value={confirmPassword}
-                        onChange={(e) => setConfirmPassword(e.target.value)}
-                        required
-                        minLength={12}
-                        className="w-full bg-slate-50/80 hover:bg-slate-50 focus:bg-white border border-slate-200 hover:border-slate-300 focus:border-slate-800 rounded-2xl py-3 pl-11 pr-11 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-4 focus:ring-slate-900/10 transition-all text-sm shadow-sm"
-                        placeholder="••••••••••••"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                        className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer p-1"
-                      >
-                        {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                      </button>
-                    </div>
-                  </div>
-
+              <form onSubmit={handleUpdatePassword} className="w-full space-y-3.5">
+                <div className="relative">
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    minLength={12}
+                    placeholder="New password (min 12 chars)"
+                    className="w-full h-[48px] pl-4 pr-11 rounded-xl border border-[#E4E4E7] bg-white text-[#18181B] placeholder-[#A1A1AA] text-sm focus:outline-none focus:border-[#18181B] focus:ring-2 focus:ring-[#18181B]/10 transition-all"
+                  />
                   <button
-                    type="submit"
-                    disabled={isLoading}
-                    className="w-full mt-4 relative flex items-center justify-center gap-2 rounded-2xl bg-slate-900 hover:bg-black py-3.5 font-bold text-white text-sm transition-all shadow-[0_4px_16px_rgba(15,23,42,0.18)] hover:shadow-[0_6px_22px_rgba(15,23,42,0.25)] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed group overflow-hidden cursor-pointer"
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#71717A] hover:text-[#18181B] transition-colors p-1 cursor-pointer"
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
                   >
-                    {isLoading ? (
-                      <>
-                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                        <span>Updating Password...</span>
-                      </>
-                    ) : (
-                      <>
-                        <span>Update Password</span>
-                        <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
-                      </>
-                    )}
-                    <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/10 to-transparent group-hover:animate-[shimmer_1.5s_infinite]" />
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
-                </form>
-              </>
-            ) : (
-              /* REQUEST RESET LINK */
-              <>
-                <div className="mb-7 text-center lg:text-left">
-                  <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900 mb-1.5">
-                    Reset Password
-                  </h1>
-                  <p className="text-slate-500 text-xs sm:text-sm">
-                    Enter your work email and we'll send you a recovery link.
-                  </p>
                 </div>
 
-                <form onSubmit={handleReset} className="space-y-4">
-                  <div className="space-y-1.5 group">
-                    <label className="text-[11px] font-bold text-slate-700 uppercase tracking-widest pl-1">
-                      Work Email
-                    </label>
-                    <div className="relative">
-                      <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 group-focus-within:text-slate-900 transition-colors pointer-events-none" />
-                      <input
-                        type="email"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        required
-                        className="w-full bg-slate-50/80 hover:bg-slate-50 focus:bg-white border border-slate-200 hover:border-slate-300 focus:border-slate-800 rounded-2xl py-3 pl-11 pr-4 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-4 focus:ring-slate-900/10 transition-all text-sm shadow-sm"
-                        placeholder="agent@trinetra.ai"
-                      />
-                    </div>
-                  </div>
-
+                <div className="relative">
+                  <input
+                    type={showConfirmPassword ? 'text' : 'password'}
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    required
+                    minLength={12}
+                    placeholder="Confirm new password"
+                    className="w-full h-[48px] pl-4 pr-11 rounded-xl border border-[#E4E4E7] bg-white text-[#18181B] placeholder-[#A1A1AA] text-sm focus:outline-none focus:border-[#18181B] focus:ring-2 focus:ring-[#18181B]/10 transition-all"
+                  />
                   <button
-                    type="submit"
-                    disabled={isLoading}
-                    className="w-full mt-4 relative flex items-center justify-center gap-2 rounded-2xl bg-slate-900 hover:bg-black py-3.5 font-bold text-white text-sm transition-all shadow-[0_4px_16px_rgba(15,23,42,0.18)] hover:shadow-[0_6px_22px_rgba(15,23,42,0.25)] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed group overflow-hidden cursor-pointer"
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#71717A] hover:text-[#18181B] transition-colors p-1 cursor-pointer"
+                    aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
                   >
-                    {isLoading ? (
-                      <>
-                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                        <span>Sending Recovery Link...</span>
-                      </>
-                    ) : (
-                      <>
-                        <span>Send Recovery Link</span>
-                        <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
-                      </>
-                    )}
-                    <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/10 to-transparent group-hover:animate-[shimmer_1.5s_infinite]" />
+                    {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
-                </form>
-
-                <div className="mt-7 text-center">
-                  <p className="text-[12px] text-slate-500">
-                    Remember your password?{' '}
-                    <Link
-                      href="/login"
-                      className="text-slate-900 font-bold hover:underline cursor-pointer"
-                    >
-                      Sign In instead →
-                    </Link>
-                  </p>
                 </div>
-              </>
-            )}
-          </motion.div>
+
+                <button
+                  type="submit"
+                  disabled={isLoading}
+                  className="w-full h-[48px] mt-2 rounded-xl bg-[#27272A] hover:bg-[#18181B] text-white font-medium text-sm flex items-center justify-center gap-2 transition-all duration-200 cursor-pointer shadow-xs disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  {isLoading ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      <span>Updating password...</span>
+                    </>
+                  ) : (
+                    <span>Update Password</span>
+                  )}
+                </button>
+              </form>
+            </>
+          ) : (
+            /* Request Recovery Link */
+            <>
+              <h1 className="text-2xl sm:text-[28px] font-semibold text-[#18181B] tracking-tight text-center font-display mb-2">
+                Reset your password
+              </h1>
+              <p className="text-sm text-[#71717A] text-center mb-6">
+                Enter your work email and we&apos;ll send you a recovery link.
+              </p>
+
+              <form onSubmit={handleReset} className="w-full space-y-3.5">
+                <div>
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    placeholder="e.g., name@company.com"
+                    className="w-full h-[48px] px-4 rounded-xl border border-[#E4E4E7] bg-white text-[#18181B] placeholder-[#A1A1AA] text-sm focus:outline-none focus:border-[#18181B] focus:ring-2 focus:ring-[#18181B]/10 transition-all"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={isLoading}
+                  className="w-full h-[48px] mt-2 rounded-xl bg-[#27272A] hover:bg-[#18181B] text-white font-medium text-sm flex items-center justify-center gap-2 transition-all duration-200 cursor-pointer shadow-xs disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  {isLoading ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      <span>Sending link...</span>
+                    </>
+                  ) : (
+                    <span>Send Recovery Link</span>
+                  )}
+                </button>
+
+                <div className="pt-4 text-center text-xs text-[#71717A]">
+                  Remember your password?{' '}
+                  <Link
+                    href="/login"
+                    className="font-semibold text-[#18181B] hover:underline cursor-pointer ml-1"
+                  >
+                    Back to log in
+                  </Link>
+                </div>
+              </form>
+            </>
+          )}
+
         </div>
-      </main>
+      </section>
 
-      <style dangerouslySetInnerHTML={{
-        __html: `
-        @keyframes shimmer {
-          100% { transform: translateX(100%); }
-        }
-      `}} />
     </div>
   )
 }

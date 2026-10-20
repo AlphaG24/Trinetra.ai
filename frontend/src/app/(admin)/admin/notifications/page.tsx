@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { 
   Bell, 
-  Sparkles, 
   ArrowLeft, 
   Send, 
   Building2, 

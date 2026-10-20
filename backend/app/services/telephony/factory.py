@@ -23,20 +23,24 @@ def get_provider(provider_name: str) -> Any:
     
     if provider_name == "simulated":
         provider = SimulatedProvider()
+    elif provider_name == "sarvam":
+        from app.services.telephony.sarvam_adapter import SarvamAdapter
+        provider = SarvamAdapter()
     elif provider_name == "exotel":
         provider = ExotelAdapter()
     elif provider_name == "twilio":
         provider = TwilioProvider()
     else:
-        # Fallback default to Twilio
-        provider = TwilioProvider()
+        # Fallback default to Sarvam for India, or Twilio
+        from app.services.telephony.sarvam_adapter import SarvamAdapter
+        provider = SarvamAdapter()
         
     _provider_cache[provider_name] = provider
     return provider
 
 def get_best_provider(country_code: str = 'IN') -> str:
     if country_code == 'IN':
-        return 'exotel'
+        return os.getenv("TELEPHONY_PROVIDER", "sarvam")
     return 'twilio'
 
 def get_provider_for_organization(organization_id: str) -> AbstractTelephonyProvider:
@@ -45,7 +49,7 @@ def get_provider_for_organization(organization_id: str) -> AbstractTelephonyProv
         logger.info(f"Using environment override {env_override} for org {organization_id}")
         return get_provider(env_override)
         
-    return get_provider("exotel")
+    return get_provider("sarvam")
 
 def clear_provider_cache():
     logger.info("Clearing telephony provider cache")

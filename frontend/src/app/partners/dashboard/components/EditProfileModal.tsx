@@ -133,7 +133,7 @@ export default function EditProfileModal({
           />
           <LockedField
             label="Commission Rate"
-            value={`${effectiveRate}% - Set by Trinetra AI`}
+            value={`${effectiveRate}% - Set by Vaakriti AI`}
           />
 
           {error ? (

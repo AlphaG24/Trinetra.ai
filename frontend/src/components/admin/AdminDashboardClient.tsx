@@ -100,8 +100,8 @@ export function AdminDashboardClient({
             </a>
             <a 
               href="/admin/posts/new"
-              className="px-4 py-2 text-sm bg-purple-600 hover:bg-purple-700 
-                         rounded-lg text-white transition-all font-medium"
+              className="px-4 py-2 text-sm bg-white hover:bg-zinc-100 
+                         rounded-lg text-zinc-950 transition-all font-semibold shadow-sm"
             >
               + New Post
             </a>
@@ -113,7 +113,7 @@ export function AdminDashboardClient({
         {/* Stats Row */}
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
           {[
-            { label: 'Total Posts', value: stats.totalPosts, icon: FileText, color: 'purple' },
+            { label: 'Total Posts', value: stats.totalPosts, icon: FileText, color: 'zinc' },
             { label: 'Total Views', value: stats.totalViews, icon: Eye, color: 'blue' },
             { label: 'Total Likes', value: stats.totalLikes, icon: Heart, color: 'pink' },
             { label: 'Comments', value: stats.totalComments, icon: MessageCircle, color: 'green' },
@@ -142,9 +142,9 @@ export function AdminDashboardClient({
               key={tab.key}
               onClick={() => setActiveTab(tab.key)}
               className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm 
-                          font-medium transition-all whitespace-nowrap
+                          font-medium transition-all whitespace-nowrap cursor-pointer
                           ${activeTab === tab.key 
-                            ? 'bg-purple-600 text-white shadow-lg shadow-purple-500/20' 
+                            ? 'bg-white text-zinc-950 font-bold shadow-sm' 
                             : 'text-white/50 hover:text-white hover:bg-white/10'
                           }`}
             >

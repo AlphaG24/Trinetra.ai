@@ -39,6 +39,14 @@ export function KYCTab() {
   const [fileName, setFileName] = useState('')
   const [consentGiven, setConsentGiven] = useState(false)
 
+  // DigiLocker State
+  const [isDigiLockerModalOpen, setIsDigiLockerModalOpen] = useState(false)
+  const [digiDocType, setDigiDocType] = useState<'aadhaar' | 'pan'>('aadhaar')
+  const [digiId, setDigiId] = useState('')
+  const [digiName, setDigiName] = useState('')
+  const [digiConsent, setDigiConsent] = useState(false)
+  const [verifyingDigiLocker, setVerifyingDigiLocker] = useState(false)
+
   const fetchDocs = async () => {
     try {
       setLoading(true)
@@ -93,6 +101,31 @@ export function KYCTab() {
       return
     }
 
+    // Duplicate Prevention Check 1: Category already verified
+    const isAlreadyVerified = docs.some(d => d.document_type === docType && d.status === 'verified')
+    if (isAlreadyVerified) {
+      toast.error('This document category is already verified for your workspace. Re-uploading is blocked.')
+      return
+    }
+
+    // Duplicate Prevention Check 2: Category currently in compliance review
+    const isUnderReview = docs.some(d => d.document_type === docType && (d.status === 'pending_review' || (d as any).status === 'submitted'))
+    if (isUnderReview) {
+      toast.error('A document for this category is currently under review. Duplicate submissions are not allowed.')
+      return
+    }
+
+    // Duplicate Prevention Check 3: ID number already registered in vault
+    if (rawId.trim()) {
+      const cleanRaw = rawId.trim()
+      const last4 = cleanRaw.slice(-4)
+      const isDuplicateId = docs.some(d => d.id_number_masked?.endsWith(last4) && d.status !== 'rejected')
+      if (isDuplicateId) {
+        toast.error('This document identification number is already registered in your compliance vault.')
+        return
+      }
+    }
+
     try {
       setUploading(true)
       const res = await fetch('/api/kyc', {
@@ -121,6 +154,50 @@ export function KYCTab() {
       toast.error(err.message || 'Upload failed')
     } finally {
       setUploading(false)
+    }
+  }
+
+  const handleDigiLockerSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!digiConsent) {
+      toast.error('You must affirmatively consent to statutory DigiLocker verification')
+      return
+    }
+    if (!digiId.trim()) {
+      toast.error(`Please enter your ${digiDocType === 'aadhaar' ? '12-digit Aadhaar' : '10-character PAN'} number`)
+      return
+    }
+
+    try {
+      setVerifyingDigiLocker(true)
+      const res = await fetch('/api/kyc/digilocker', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'verify',
+          docType: digiDocType,
+          aadhaarNumber: digiDocType === 'aadhaar' ? digiId : undefined,
+          panNumber: digiDocType === 'pan' ? digiId : undefined,
+          legalName: digiName.trim(),
+          consent: digiConsent
+        })
+      })
+
+      const data = await res.json()
+      if (!res.ok) {
+        throw new Error(data.error || 'DigiLocker verification failed')
+      }
+
+      toast.success(data.message || 'Identity verified successfully via DigiLocker!')
+      setIsDigiLockerModalOpen(false)
+      setDigiId('')
+      setDigiName('')
+      setDigiConsent(false)
+      fetchDocs()
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to verify with DigiLocker')
+    } finally {
+      setVerifyingDigiLocker(false)
     }
   }
 
@@ -185,6 +262,34 @@ export function KYCTab() {
             Per Telecom Regulatory Authority guidelines (TRAI & DPDP Act), live production outbound calling and dedicated DID numbers require verified organization KYC. Documents are vaulted with AES-256 encryption with automatic UIDAI masking.
           </p>
         </div>
+      </div>
+
+      {/* DigiLocker Instant Verification Section */}
+      <div className="bg-white dark:bg-[#0D0120] border border-zinc-200 dark:border-white/10 rounded-2xl p-6 shadow-sm flex flex-col md:flex-row items-center justify-between gap-6 opacity-90">
+        <div className="space-y-2 text-left">
+          <div className="flex items-center gap-2">
+            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-white/10 flex items-center gap-1.5">
+              <Lock className="w-3 h-3 text-zinc-500" /> Coming Soon
+            </span>
+            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 border border-zinc-200 dark:border-white/10">
+              Direct Gateway Launching
+            </span>
+          </div>
+          <h3 className="font-bold text-base text-zinc-900 dark:text-white font-display flex items-center gap-2">
+            Verify Instantly via DigiLocker (Govt. of India)
+          </h3>
+          <p className="text-xs text-zinc-600 dark:text-zinc-400 max-w-xl leading-relaxed">
+            Direct MeitY DigiLocker gateway integration is currently in scheduled release. Once unlocked, you can fetch your government-verified Aadhaar or PAN digitally in 30 seconds. In the meantime, please complete statutory verification using the document upload portal below.
+          </p>
+        </div>
+        <button
+          type="button"
+          disabled
+          className="px-5 py-2.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-400 dark:text-zinc-500 font-bold text-xs uppercase tracking-wider rounded-xl cursor-not-allowed border border-zinc-200 dark:border-white/10 shrink-0 flex items-center gap-2 select-none"
+        >
+          <Lock className="w-4 h-4" />
+          <span>DigiLocker Locked</span>
+        </button>
       </div>
 
       {/* Mandatory Telecom Verification Checklist */}
@@ -274,7 +379,7 @@ export function KYCTab() {
             Submit Identity / Entity Document
           </h5>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-4" suppressHydrationWarning>
             <div>
               <label className="block text-[10px] font-bold font-montserrat text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mb-2">
                 Document Category
@@ -282,6 +387,7 @@ export function KYCTab() {
               <select
                 value={docType}
                 onChange={e => setDocType(e.target.value)}
+                suppressHydrationWarning
                 className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-white/10 text-zinc-900 dark:text-white text-xs font-semibold rounded-xl p-3 focus:outline-none focus:ring-1 focus:ring-zinc-900 dark:focus:ring-white"
               >
                 <optgroup label="India (Domestic)">
@@ -317,6 +423,7 @@ export function KYCTab() {
                 type="text"
                 value={rawId}
                 onChange={e => setRawId(e.target.value)}
+                suppressHydrationWarning
                 placeholder={
                   ['authorized_signatory_id', 'masked_aadhaar'].includes(docType) ? 'Masked Aadhaar (12 digits) or Voter ID' :
                   docType === 'passport' ? 'Passport Number (e.g. A1234567)' :
@@ -365,15 +472,33 @@ export function KYCTab() {
                   className="mt-0.5 rounded border-zinc-300 dark:border-white/20 text-violet-600 focus:ring-zinc-900 dark:focus:ring-white"
                 />
                 <span className="text-[11px] text-zinc-600 dark:text-zinc-400 leading-snug">
-                  I affirmatively declare that this identity document is authentic and grant consent to Trinetra AI and its authorized carriers for statutory telecom KYC verification pursuant to the Digital Personal Data Protection Act.
+                  I affirmatively declare that this identity document is authentic and grant consent to Vaakriti AI and its authorized carriers for statutory telecom KYC verification pursuant to the Digital Personal Data Protection Act.
                 </span>
               </label>
             </div>
 
+            {docs.some(d => d.document_type === docType && d.status === 'verified') && (
+              <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 shrink-0" />
+                <span>This document category is already verified for your workspace. Re-uploading is blocked.</span>
+              </div>
+            )}
+            {docs.some(d => d.document_type === docType && (d.status === 'pending_review' || (d as any).status === 'submitted')) && (
+              <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-600 dark:text-amber-400 font-medium flex items-center gap-2">
+                <Clock className="w-4 h-4 shrink-0" />
+                <span>A submission for this category is currently under review. Duplicate uploads are disabled until triage is finalized.</span>
+              </div>
+            )}
+
             <button
               type="submit"
-              disabled={uploading || !consentGiven || !fileBase64}
-              className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 font-bold text-xs uppercase tracking-wider transition-all cursor-pointer disabled:opacity-50 shadow-sm active:scale-[0.99]"
+              disabled={
+                uploading || 
+                !consentGiven || 
+                !fileBase64 || 
+                docs.some(d => d.document_type === docType && (d.status === 'verified' || d.status === 'pending_review' || (d as any).status === 'submitted'))
+              }
+              className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 font-bold text-xs uppercase tracking-wider transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shadow-sm active:scale-[0.99]"
             >
               {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />}
               <span>{uploading ? 'Vaulting Encrypted Document...' : 'Submit for Compliance Review'}</span>
@@ -443,6 +568,123 @@ export function KYCTab() {
           )}
         </div>
       </div>
+      {/* DigiLocker Instant Verification Modal */}
+      {isDigiLockerModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-white/10 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-200 text-left">
+            <div className="flex items-start justify-between">
+              <div className="space-y-1">
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 border border-zinc-200 dark:border-white/10 text-[10px] font-bold uppercase tracking-wider">
+                  <ShieldCheck className="w-3.5 h-3.5" /> DigiLocker • MeitY
+                </div>
+                <h3 className="text-base font-bold text-zinc-900 dark:text-white font-display">
+                  Govt. of India Digital Verification
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsDigiLockerModalOpen(false)}
+                className="p-1 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="flex rounded-xl bg-zinc-100 dark:bg-zinc-900 p-1 border border-zinc-200 dark:border-white/10">
+              <button
+                type="button"
+                onClick={() => { setDigiDocType('aadhaar'); setDigiId(''); }}
+                className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                  digiDocType === 'aadhaar'
+                    ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-xs'
+                    : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'
+                }`}
+              >
+                Aadhaar (UIDAI)
+              </button>
+              <button
+                type="button"
+                onClick={() => { setDigiDocType('pan'); setDigiId(''); }}
+                className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                  digiDocType === 'pan'
+                    ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-xs'
+                    : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'
+                }`}
+              >
+                Company / Individual PAN
+              </button>
+            </div>
+
+            <form onSubmit={handleDigiLockerSubmit} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1">
+                  Full Name (as per {digiDocType === 'aadhaar' ? 'Aadhaar' : 'PAN'})
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={digiName}
+                  onChange={e => setDigiName(e.target.value)}
+                  placeholder="e.g. Rahul Sharma / Acme Tech Pvt Ltd"
+                  className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-white/10 text-zinc-900 dark:text-white text-xs rounded-xl px-3.5 py-2.5 focus:outline-none focus:ring-1 focus:ring-zinc-900 dark:focus:ring-white"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1">
+                  {digiDocType === 'aadhaar' ? '12-Digit Aadhaar Number' : '10-Character PAN Number'}
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={digiId}
+                  onChange={e => setDigiId(e.target.value)}
+                  placeholder={digiDocType === 'aadhaar' ? 'xxxx xxxx xxxx' : 'ABCDE1234F'}
+                  maxLength={digiDocType === 'aadhaar' ? 14 : 10}
+                  className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-white/10 text-zinc-900 dark:text-white font-mono text-xs rounded-xl px-3.5 py-2.5 focus:outline-none focus:ring-1 focus:ring-zinc-900 dark:focus:ring-white"
+                />
+                <p className="text-[10px] text-zinc-500 dark:text-zinc-400 mt-1">
+                  {digiDocType === 'aadhaar'
+                    ? 'UIDAI Masking: Only last 4 digits are retained in audit records.'
+                    : 'Verified directly with Income Tax Department.'}
+                </p>
+              </div>
+
+              <div className="p-3 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-white/10 text-[11px] space-y-2">
+                <label className="flex items-start gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={digiConsent}
+                    onChange={e => setDigiConsent(e.target.checked)}
+                    className="mt-0.5 rounded border-zinc-300 text-zinc-900 dark:text-white focus:ring-zinc-900 dark:focus:ring-white accent-zinc-900 dark:accent-white cursor-pointer"
+                  />
+                  <span className="text-zinc-600 dark:text-zinc-300 leading-snug">
+                    I give affirmative consent to verify my identity via DigiLocker under the <strong>DPDP Act 2023</strong> and TRAI regulations for telecommunication voice agent services.
+                  </span>
+                </label>
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsDigiLockerModalOpen(false)}
+                  className="flex-1 px-4 py-2.5 rounded-xl border border-zinc-200 dark:border-white/10 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-semibold text-zinc-700 dark:text-zinc-300 transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={verifyingDigiLocker || !digiConsent}
+                  className="flex-1 px-4 py-2.5 bg-zinc-900 hover:bg-zinc-800 dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 text-white text-xs font-bold rounded-xl transition-all shadow-sm flex items-center justify-center gap-1.5 cursor-pointer active:scale-[0.98] disabled:opacity-50"
+                >
+                  {verifyingDigiLocker ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ShieldCheck className="w-3.5 h-3.5" />}
+                  <span>{verifyingDigiLocker ? 'Verifying...' : 'Verify Now'}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

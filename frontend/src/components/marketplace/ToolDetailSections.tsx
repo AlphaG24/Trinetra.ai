@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import * as LucideIcons from 'lucide-react'
 import { 
-  Sparkles, HelpCircle, Check, ChevronDown, ShieldCheck, Play, 
+  HelpCircle, Check, ChevronDown, ShieldCheck, Play, 
   ArrowRight, Radio, Cpu, Calendar, MessageSquare, Terminal, Copy, 
   ExternalLink, Activity, Zap, CheckCircle2, PhoneCall
 } from 'lucide-react'
@@ -15,9 +15,9 @@ import EnterpriseContactModal from '@/components/enterprise/EnterpriseContactMod
 
 // Resolve Lucide icons dynamically
 const getIcon = (name: string) => {
-  if (!name) return Sparkles
+  if (!name) return Zap
   const IconComponent = (LucideIcons as any)[name]
-  return IconComponent || Sparkles
+  return IconComponent || Zap
 }
 
 // 1. Workflow Pipeline Section (Replaces plain How It Works)
@@ -30,8 +30,8 @@ export function WorkflowPipelineSection({ steps, toolName }: { steps: any[]; too
       icon: PhoneCall
     },
     {
-      title: 'Autonomous Realtime Voice Reasoning',
-      desc: 'Gemini 2.5 Flash + ElevenLabs delivers sub-450ms conversational latency with natural human emotion and interruption handling.',
+      title: 'Autonomous Voice Reasoning',
+      desc: 'Gemini 2.5 Flash + high-fidelity audio delivers rapid voice interaction with natural human emotion and interruption handling.',
       tag: '02 • COGNITIVE CORE',
       icon: Cpu
     },
@@ -60,15 +60,15 @@ export function WorkflowPipelineSection({ steps, toolName }: { steps: any[]; too
       <div className="flex items-center justify-between">
         <div>
           <span className="text-[10px] font-bold tracking-widest text-zinc-500 dark:text-zinc-400 uppercase font-mono">
-            ENGINEERING PIPELINE
+            HOW IT WORKS
           </span>
           <h2 className="text-xl sm:text-2xl font-black text-zinc-900 dark:text-white tracking-tight mt-1">
-            How {toolName} Operates in Realtime
+            How {toolName} Operates
           </h2>
         </div>
         <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 text-zinc-700 dark:text-zinc-300 text-xs font-mono font-bold">
-          <Activity className="w-3.5 h-3.5 animate-pulse text-emerald-400" />
-          <span>&lt;450ms Voice Loop</span>
+          <Activity className="w-3.5 h-3.5 text-emerald-500" />
+          <span>Voice Ready</span>
         </div>
       </div>
 
@@ -121,8 +121,8 @@ export function FeaturesSection({ features }: { features: any[] }) {
   const capabilities = isPlainStrings
     ? features.map((feat: string, idx: number) => ({
         title: feat,
-        desc: 'Autonomous enterprise-grade function executed dynamically during active live calls.',
-        icon: idx % 3 === 0 ? 'Sparkles' : idx % 3 === 1 ? 'Calendar' : 'Zap'
+        desc: 'Autonomous enterprise-grade function executed dynamically during phone conversations.',
+        icon: idx % 3 === 0 ? 'Bot' : idx % 3 === 1 ? 'Calendar' : 'Zap'
       }))
     : features
 
@@ -140,7 +140,7 @@ export function FeaturesSection({ features }: { features: any[] }) {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {capabilities.map((feat: any, idx: number) => {
           const title = feat.title ?? feat
-          const desc = feat.desc || feat.description || 'Pre-configured capability active in both sandbox and production lines.'
+          const desc = feat.desc || feat.description || 'Pre-configured capability active in all voice channels.'
           const Icon = getIcon(feat.icon ?? 'CheckCircle2')
 
           return (
@@ -230,101 +230,6 @@ export function UseCasesSection({ useCases }: { useCases: any[] }) {
   )
 }
 
-// 4. Developer Hub & Integration Section
-export function DeveloperHubSection({ agentSlug }: { agentSlug: string }) {
-  const [copied, setCopied] = useState(false)
-
-  const curlExample = `curl -X POST https://api.trinetraedu-ai.com/v1/agents/${agentSlug}/call \\
-  -H "Authorization: Bearer trn_live_xxxxxxxx" \\
-  -H "Content-Type: application/json" \\
-  -d '{
-    "to": "+919876543210",
-    "customer_name": "Dr. Raghav Sharma",
-    "calendar_sync": true
-  }'`
-
-  const handleCopy = () => {
-    navigator.clipboard.writeText(curlExample)
-    setCopied(true)
-    toast.success('cURL command copied to clipboard')
-    setTimeout(() => setCopied(false), 2000)
-  }
-
-  const integrations = [
-    { name: 'Cal.com & Google Calendar', desc: 'Auto-book meetings & sync live slots', status: 'Active' },
-    { name: 'Twilio & WhatsApp Bot', desc: 'Post-call summary & instant confirmation', status: 'Active' },
-    { name: 'Custom CRM Webhooks', desc: 'Live JSON payload dispatch on call completion', status: 'Active' },
-    { name: 'Telegram Alerts', desc: 'Instant admin notifications on bookings', status: 'Active' },
-  ]
-
-  return (
-    <div className="space-y-6">
-      <div>
-        <span className="text-[10px] font-bold tracking-widest text-zinc-500 dark:text-zinc-400 uppercase font-mono">
-          DEVELOPER SPECIFICATIONS & WEBHOOKS
-        </span>
-        <h2 className="text-xl sm:text-2xl font-black text-zinc-900 dark:text-white tracking-tight mt-1">
-          Seamless Integrations & API Control
-        </h2>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* cURL API Box */}
-        <div className="bg-[#0c0c0e] border border-zinc-800 dark:border-white/10 rounded-2xl p-5 space-y-3 font-mono shadow-xl relative overflow-hidden">
-          <div className="flex items-center justify-between border-b border-white/5 pb-3">
-            <div className="flex items-center gap-2">
-              <div className="w-2.5 h-2.5 rounded-full bg-rose-500/80" />
-              <div className="w-2.5 h-2.5 rounded-full bg-amber-500/80" />
-              <div className="w-2.5 h-2.5 rounded-full bg-emerald-500/80" />
-              <span className="text-[11px] text-zinc-400 ml-2">trigger_call.sh</span>
-            </div>
-            <button
-              onClick={handleCopy}
-              className="flex items-center gap-1 text-[11px] text-zinc-400 hover:text-white transition cursor-pointer"
-            >
-              {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-              <span>{copied ? 'Copied' : 'Copy'}</span>
-            </button>
-          </div>
-
-          <pre className="text-[11px] text-zinc-300 leading-relaxed overflow-x-auto whitespace-pre p-2 bg-black/40 rounded-xl">
-            {curlExample}
-          </pre>
-
-          <div className="pt-2 flex items-center justify-between text-[10px] text-zinc-500">
-            <span>Authentication: Bearer Token</span>
-            <span className="text-emerald-400 font-bold">200 OK Response (JSON)</span>
-          </div>
-        </div>
-
-        {/* Integration List */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {integrations.map((item, idx) => (
-            <div
-              key={idx}
-              className="bg-white/70 dark:bg-white/[0.03] backdrop-blur-xl border border-zinc-200 dark:border-white/10 rounded-2xl p-4 flex flex-col justify-between hover:border-zinc-400 dark:hover:border-white/25 transition shadow-sm"
-            >
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <span className="text-[9px] font-bold text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20 font-mono">
-                    {item.status}
-                  </span>
-                </div>
-                <h4 className="text-xs font-bold text-zinc-900 dark:text-white">{item.name}</h4>
-                <p className="text-[11px] text-zinc-500 leading-snug">{item.desc}</p>
-              </div>
-              <div className="pt-2 mt-2 border-t border-zinc-100 dark:border-white/5 text-[10px] font-bold text-zinc-600 dark:text-zinc-400 flex items-center gap-1">
-                <span>Configured in Settings</span>
-                <ChevronDown className="w-3 h-3 -rotate-90" />
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  )
-}
-
 // 5. Reimagined Pricing Section
 interface PricingSectionProps {
   config: Record<string, string>
@@ -355,15 +260,14 @@ export function PricingSection({ config, agentType = 'voice', agentSlug = 'voice
   return (
     <div className="space-y-8">
       <div className="text-center max-w-xl mx-auto space-y-2">
-        <span className="text-[10px] font-bold tracking-widest text-violet-400 uppercase font-mono">
+        <span className="text-[10px] font-bold tracking-widest text-zinc-500 dark:text-zinc-400 uppercase font-mono">
           TRANSPARENT COMMERCIAL PLANS
         </span>
         <h2 className="text-2xl sm:text-3xl font-black text-zinc-900 dark:text-white tracking-tight">
           Choose the Perfect Scale for Your Agent
         </h2>
         {adminPrice && (
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-violet-500/10 border border-violet-500/30 text-violet-300 text-xs font-bold font-mono">
-            <Sparkles className="w-3 h-3 text-amber-300" />
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-zinc-100 dark:bg-white/10 border border-zinc-200 dark:border-white/15 text-zinc-800 dark:text-zinc-200 text-xs font-bold font-mono">
             <span>Admin Tag: {adminPrice}</span>
           </div>
         )}
@@ -412,7 +316,7 @@ export function PricingSection({ config, agentType = 'voice', agentSlug = 'voice
           </button>
         </div>
 
-        {/* 2. Production Trial (Featured) */}
+        {/* 2. All-Access Trial (Featured) */}
         <div className="relative bg-zinc-50 dark:bg-[#101014] backdrop-blur-2xl border-2 border-zinc-900 dark:border-white/30 rounded-3xl p-6 flex flex-col justify-between shadow-xl shadow-black/10 dark:shadow-black/40 md:-translate-y-2">
           <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-full bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 font-black text-[9px] uppercase tracking-widest font-mono shadow-md">
             BEST VALUE • START HERE
@@ -420,9 +324,9 @@ export function PricingSection({ config, agentType = 'voice', agentSlug = 'voice
 
           <div className="space-y-4 pt-2">
             <div className="flex justify-between items-center">
-              <h3 className="text-base font-bold text-zinc-900 dark:text-white">Production Trial</h3>
+              <h3 className="text-base font-bold text-zinc-900 dark:text-white">All-Access Trial</h3>
               <span className="text-[10px] font-bold font-mono px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">
-                ACTIVE PIPELINE
+                ALL-INCLUSIVE
               </span>
             </div>
             <div>
@@ -436,7 +340,7 @@ export function PricingSection({ config, agentType = 'voice', agentSlug = 'voice
             <ul className="space-y-3 text-xs text-zinc-800 dark:text-zinc-200 pt-2 border-t border-zinc-200/80 dark:border-white/10">
               <li className="flex items-center gap-2">
                 <ShieldCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                <span><strong>{trialMinutes} live phone call minutes</strong></span>
+                <span><strong>{trialMinutes} voice calling minutes</strong></span>
               </li>
               <li className="flex items-center gap-2">
                 <ShieldCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
@@ -471,7 +375,7 @@ export function PricingSection({ config, agentType = 'voice', agentSlug = 'voice
           <div className="space-y-4">
             <div className="flex justify-between items-center">
               <h3 className="text-base font-bold text-zinc-900 dark:text-white">Go Enterprise</h3>
-              <span className="text-[10px] font-bold font-mono px-2 py-0.5 rounded bg-violet-500/10 text-violet-600 dark:text-violet-400 border border-violet-500/20">
+              <span className="text-[10px] font-bold font-mono px-2 py-0.5 rounded bg-zinc-100 dark:bg-white/10 text-zinc-800 dark:text-zinc-200 border border-zinc-200 dark:border-white/15">
                 BESPOKE
               </span>
             </div>
@@ -554,7 +458,7 @@ export function FAQSection({ faqs }: { faqs: any[] }) {
     },
     {
       q: 'Can I test this agent before paying?',
-      a: 'Yes! You have a 100% free browser sandbox demo to speak directly with the agent. You can also start the 7-day Production Trial for just ₹99 with a real phone number.'
+      a: 'Yes! You have a 100% free browser sandbox demo to speak directly with the agent. You can also start the 7-day All-Access Trial for just ₹99 with a real phone number.'
     }
   ]
 

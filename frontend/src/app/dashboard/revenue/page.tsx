@@ -1,7 +1,12 @@
-import { redirect } from 'next/navigation'
+'use client'
 
-export const dynamic = 'force-dynamic'
+import { Suspense } from 'react'
+import { RevenueDashboardClient } from '@/src/components/dashboard/revenue/RevenueDashboardClient'
 
-export default function DeprecatedRevenuePage() {
-  redirect('/dashboard/analytics?tab=revenue')
+export default function RevenuePage() {
+  return (
+    <Suspense fallback={<div className="p-8 text-center text-xs text-[var(--muted)]">Loading revenue analytics...</div>}>
+      <RevenueDashboardClient embedded={false} />
+    </Suspense>
+  )
 }

@@ -66,12 +66,9 @@ export async function GET(request: Request) {
             };
         });
 
-        let baseLimit = 0;
-        const tier = profile.plan_tier?.toLowerCase() || 'free';
-        if (tier === 'trial') baseLimit = 1;
-        else if (tier === 'starter') baseLimit = 2;
-        else if (tier === 'professional') baseLimit = 5;
-
+        // Standard rule: Every user has a base limit of 5 phone numbers.
+        // Higher allotments must be granted by platform admins via Admin Center.
+        const baseLimit = 5;
         const limit = baseLimit + (profile.additional_phone_numbers || 0);
 
         return NextResponse.json({

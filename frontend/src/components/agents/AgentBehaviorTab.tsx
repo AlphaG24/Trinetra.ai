@@ -201,7 +201,7 @@ export function AgentBehaviorTab({ agent, unlocked, upgradeUrl }: AgentBehaviorT
                   type="button"
                   onClick={handleEnhancePrompt}
                   disabled={enhancing || resetting}
-                  className="text-[10px] bg-violet-500 hover:bg-violet-600 text-white px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors disabled:opacity-50"
+                  className="text-[10px] bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all disabled:opacity-50 font-bold uppercase tracking-wider cursor-pointer shadow-sm active:scale-[0.98]"
                 >
                   {enhancing ? <Loader2 className="w-3 h-3 animate-spin" /> : <Brain className="w-3 h-3" />}
                   Enhance with AI

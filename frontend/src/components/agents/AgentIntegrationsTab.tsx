@@ -410,7 +410,7 @@ export function AgentIntegrationsTab({ agent, unlocked, upgradeUrl }: AgentInteg
                       type="button"
                       disabled={savingType === type.id}
                       onClick={() => handleSaveConnection(type)}
-                      className="px-4 py-2 bg-violet-600 hover:bg-violet-500 disabled:bg-violet-600/55 text-white text-xs font-semibold rounded-xl shadow-md transition cursor-pointer flex items-center gap-1.5"
+                      className="px-4 py-2 bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 disabled:opacity-50 text-xs font-semibold rounded-xl shadow-sm transition-all cursor-pointer flex items-center gap-1.5 active:scale-[0.99]"
                     >
                       {savingType === type.id ? (
                         <>

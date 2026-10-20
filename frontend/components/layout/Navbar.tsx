@@ -256,15 +256,6 @@ export function Navbar() {
           </ul>
 
           <div className="navbar__actions">
-            <a
-              href="https://shiksha.trinetraedu-ai.com"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="group relative hidden lg:inline-flex items-center justify-center font-sans text-[14px] font-bold bg-[#0C0118] text-white rounded-full px-6 py-2 shadow-[0_0_25px_rgba(139,92,246,0.15)] transition-all duration-200 ease-out hover:-translate-y-[2px] hover:shadow-[0_0_40px_rgba(139,92,246,0.35)]"
-            >
-              <div className="absolute inset-0 rounded-full border border-[rgba(139,92,246,0.25)] transition-colors duration-200 ease-out group-hover:border-[#A78BFA]" />
-              <span className="relative z-10">Trinetra Shiksha</span>
-            </a>
             <Link href="/login" className="navbar__btn-deploy">
               Login
             </Link>
@@ -393,17 +384,6 @@ export function Navbar() {
               {link.name}
             </Link>
           ))}
-
-          <a
-            href="https://shiksha.trinetraedu-ai.com"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="group relative flex items-center justify-center font-sans text-[16px] font-bold w-[calc(100%-40px)] text-center my-[10px] bg-[#0C0118] text-white rounded-full px-6 py-2 shadow-[0_0_25px_rgba(139,92,246,0.15)] transition-all duration-200 ease-out hover:-translate-y-[2px] hover:shadow-[0_0_40px_rgba(139,92,246,0.35)]"
-            onClick={() => setMenuOpen(false)}
-          >
-            <div className="absolute inset-0 rounded-full border border-[rgba(139,92,246,0.25)] transition-colors duration-200 ease-out group-hover:border-[#A78BFA]" />
-            <span className="relative z-10">Trinetra Shiksha</span>
-          </a>
 
           <Link
             href="/login"

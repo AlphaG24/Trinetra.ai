@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { Megaphone, Save, RotateCcw, Loader2, Sparkles, CheckCircle2, AlertCircle } from 'lucide-react'
+import { Megaphone, Save, RotateCcw, Loader2, Eye, CheckCircle2, AlertCircle } from 'lucide-react'
 import { toast } from 'sonner'
 
 interface AnnouncementConfig {
@@ -133,7 +133,7 @@ export function AnnouncementBannerManager() {
       {/* Live Preview */}
       <div>
         <label className="block text-xs font-bold uppercase tracking-wider text-zinc-400 mb-2 flex items-center gap-1.5">
-          <Sparkles className="w-3.5 h-3.5 text-amber-400" /> Live Topbar Strip Preview
+          <Eye className="w-3.5 h-3.5 text-zinc-400" /> Topbar Strip Preview
         </label>
         <div className="w-full bg-[#F0FDFA] border border-teal-900/20 rounded-xl py-2 px-4 shadow-inner">
           <div className="flex items-center justify-center gap-2 sm:gap-2.5 text-[11px] sm:text-[12px] font-sans text-slate-800">

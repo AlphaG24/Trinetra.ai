@@ -14,25 +14,25 @@ SMTP_HOST = os.getenv("SMTP_HOST")
 SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
 SMTP_USER = os.getenv("SMTP_USER")
 SMTP_PASSWORD = os.getenv("SMTP_PASSWORD")
-SMTP_FROM = os.getenv("SMTP_FROM", "no-reply@trinetraedu-ai.com")
+SMTP_FROM = os.getenv("SMTP_FROM", "no-reply@vaakriti.com")
 
 def send_warning_email(email, last_sign_in_at):
-    subject = "Action Required: Your Trinetra AI account will be deleted in 30 days due to inactivity"
+    subject = "Action Required: Your Vaakriti AI account will be deleted in 30 days due to inactivity"
     body = f"""Hi there,
 
-We noticed you haven't logged into your Trinetra AI account since {last_sign_in_at}.
+We noticed you haven't logged into your Vaakriti AI account since {last_sign_in_at}.
 
 In compliance with our data protection policies (under the DPDP Act 2023), accounts that are inactive for more than 12 months are automatically deleted to safeguard personal data.
 
 To prevent your account, profile data, and AI training models from being permanently deleted, please log into your dashboard within the next 30 days:
-https://trinetraedu-ai.com/login
+https://vaakriti.com/login
 
 If you log in, your account status will automatically return to active standing.
 
-If you have any questions or require assistance, please reach out to support@trinetraedu-ai.com.
+If you have any questions or require assistance, please reach out to support@vaakriti.com.
 
 Best regards,
-The Trinetra AI Security & Compliance Team
+The Vaakriti AI Security & Compliance Team
 """
     if SMTP_HOST and SMTP_USER and SMTP_PASSWORD:
         try:

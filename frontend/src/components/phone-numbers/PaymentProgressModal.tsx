@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { 
   CheckCircle2, AlertCircle, PhoneCall, ShieldCheck, 
-  Radio, Sparkles, ArrowRight, RefreshCw, X
+  Radio, ArrowRight, RefreshCw, X
 } from "lucide-react";
 
 export interface PaymentProgressModalProps {

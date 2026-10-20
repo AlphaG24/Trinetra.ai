@@ -58,7 +58,7 @@ const cards = (metrics: DashboardMetrics, currency: string) => [
   {
     label: 'Revenue Generated',
     value: formatCurrency(metrics.revenueGenerated, currency),
-    sub: 'For Trinetra via your referrals',
+    sub: 'For Vaakriti via your referrals',
     icon: BarChart2,
     iconClass: 'text-[#f5c518]',
     iconBg: 'bg-[#f5c518]/10',

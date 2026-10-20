@@ -1,50 +1,43 @@
 import React from "react";
 import Link from "next/link";
-import { ArrowRight, BookOpen, PhoneCall, Wallet, Award, Mic, ShieldCheck, Layers } from "lucide-react";
+import { ArrowRight, CheckCircle2 } from "lucide-react";
 
-interface FeatureCard {
-  category: string;
-  title: string;
-  description: string;
-  icon: React.ComponentType<{ className?: string }>;
+interface InfrastructurePillar {
+  id: string;
+  name: string;
+  subtitle: string;
+  metric: string;
+  features: string[];
 }
 
-const FEATURE_CARDS: FeatureCard[] = [
+const PILLARS: InfrastructurePillar[] = [
   {
-    category: "Knowledge & Intelligence",
-    title: "Knowledge Base",
-    description: "Upload your documents, pricing sheets, FAQs, and policies for instant contextual retrieval.",
-    icon: BookOpen,
+    id: "intelligence",
+    name: "Knowledge & Intelligence",
+    subtitle: "Upload documents, catalogs, and FAQs for instant sub-20ms semantic contextual retrieval.",
+    metric: "<20ms retrieval",
+    features: ["Vector Embeddings", "Document Ingestion", "Contextual Recall"],
   },
   {
-    category: "Telephony Infrastructure",
-    title: "Number Management",
-    description: "Bring your existing virtual PBX numbers or provision clean regional DIDs across 100+ cities.",
-    icon: PhoneCall,
+    id: "telephony",
+    name: "Sovereign Infrastructure",
+    subtitle: "Direct Tier-1 telecom interconnects, SIP trunks, and clean regional DIDs across 100+ cities.",
+    metric: "100+ City DIDs",
+    features: ["Virtual PBX Sync", "Ultra-Low Latency", "Zero Jitter WebRTC"],
   },
   {
-    category: "Commercial Flexibility",
-    title: "Prepaid Wallet",
-    description: "Transparent pay-per-second billing with auto-reloads and zero upfront lock-in commitments.",
-    icon: Wallet,
+    id: "commercials",
+    name: "Commercial Flexibility",
+    subtitle: "Transparent pay-per-second billing with auto-reloads, no lock-in, and volume credit scores.",
+    metric: "Per-second metering",
+    features: ["Prepaid Wallet", "Zero Commitments", "Enterprise Credit Line"],
   },
   {
-    category: "Commercial Flexibility",
-    title: "Credit Score",
-    description: "Build an enterprise credit line with predictable consumption discounts on sustained volume.",
-    icon: Award,
-  },
-  {
-    category: "Governance & Storage",
-    title: "Call Recordings",
-    description: "Military-grade encrypted storage with searchable transcripts and sentiment analysis.",
-    icon: Mic,
-  },
-  {
-    category: "Governance & Security",
-    title: "Region-Aware Compliance",
-    description: "Enforces statutory calling floors (09:00 - 21:00), DND scrub lists, and AI disclosure notices.",
-    icon: ShieldCheck,
+    id: "governance",
+    name: "Governance & Compliance",
+    subtitle: "Statutory 09:00-21:00 calling windows, DND scrub engine, AI disclosure, and encrypted call vaults.",
+    metric: "AES-256 Encrypted",
+    features: ["DND Scrub Engine", "AI Identity Notice", "Searchable Transcripts"],
   },
 ];
 
@@ -52,86 +45,68 @@ export function PlatformEcosystem() {
   return (
     <section
       id="features"
-      className="w-full py-16 sm:py-20 lg:py-24 px-4 sm:px-6 lg:px-10 select-none font-sans transition-colors duration-300"
-      style={{
-        backgroundColor: "var(--theme-bg-eco, #FAFAFA)",
-        borderTop: "1px solid var(--theme-border, #E5E5E5)",
-      }}
+      className="w-full py-16 sm:py-20 lg:py-24 px-4 sm:px-6 lg:px-10 select-none font-sans bg-white border-t border-b border-slate-200"
     >
       <div className="w-full max-w-[1400px] mx-auto">
         
-        {/* Section Header */}
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12 sm:mb-14">
+        {/* ── SECTION HEADER ── */}
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-5 mb-8 sm:mb-10">
           <div className="max-w-2xl">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-[11px] font-mono font-bold tracking-wider uppercase mb-3 border bg-white border-[#E2E8F0] text-[#315CFF]">
-              <Layers className="w-3.5 h-3.5 text-[#315CFF]" />
-              <span>PLATFORM ARCHITECTURE</span>
-            </div>
-
-            <h2
-              className="text-3xl sm:text-4xl lg:text-[44px] font-bold tracking-tight leading-[1.12] mb-3 font-[family-name:var(--font-cal-sans)] transition-colors duration-300"
-              style={{ color: "var(--theme-text-primary, #080D18)" }}
-            >
-              More than a voice agent. <br />
-              <span style={{ color: "var(--theme-accent, #315CFF)" }}>
-                A complete business solution.
-              </span>
+            <h2 className="text-2xl sm:text-3xl lg:text-[38px] font-extrabold tracking-tight leading-[1.15] text-[#0F172A] font-sans">
+              More than a voice agent. <br className="hidden sm:inline" />
+              <span className="text-[#2563EB]">A complete business solution.</span>
             </h2>
-
-            <p
-              className="text-base sm:text-lg font-normal leading-relaxed font-sans transition-colors duration-300"
-              style={{ color: "var(--theme-text-secondary, #4A5568)" }}
-            >
-              Every foundational layer required to deploy, monitor, and scale sovereign enterprise voice pipelines.
-            </p>
           </div>
 
           <div className="shrink-0">
             <Link
               href="/marketplace"
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full border text-xs sm:text-sm font-semibold transition-all shadow-2xs group cursor-pointer font-sans bg-white border-[#CBD5E1] text-[#080D18] hover:border-[#315CFF] hover:text-[#315CFF]"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-full border text-xs sm:text-[13px] font-semibold transition-all shadow-xs group cursor-pointer font-sans bg-white border-slate-200 text-[#0F172A] hover:border-[#2563EB] hover:text-[#2563EB]"
             >
               <span>Explore all capabilities</span>
-              <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
+              <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-1" />
             </Link>
           </div>
         </div>
 
-        {/* 6 Structured Capability Cards (3x2 Grid for generous proportions) */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {FEATURE_CARDS.map((card, idx) => {
-            const Icon = card.icon;
+        {/* ── 4-PILLAR GRID ── */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
+          {PILLARS.map((pillar) => {
             return (
               <div
-                key={idx}
-                className="rounded-2xl border border-[#E2E8F0] bg-white p-6 sm:p-7 flex flex-col justify-between shadow-[0_2px_12px_rgba(8,13,24,0.02)] hover:border-[#315CFF]/50 hover:shadow-[0_8px_24px_rgba(49,92,255,0.06)] hover:-translate-y-0.5 transition-all duration-200"
+                key={pillar.id}
+                className="relative rounded-2xl border border-slate-200/90 p-5 sm:p-6 transition-all duration-300 ease-out flex flex-col justify-between group cursor-pointer bg-white shadow-[0_1px_4px_rgba(15,23,42,0.04)] hover:border-[#2563EB]/45 hover:-translate-y-1.5 hover:shadow-[0_16px_36px_-10px_rgba(37,99,235,0.12),0_4px_12px_rgba(15,23,42,0.04)] overflow-hidden"
               >
-                <div>
-                  {/* Category Pill and Icon Header */}
-                  <div className="flex items-center justify-between mb-5">
-                    <div className="w-11 h-11 rounded-xl bg-[#315CFF]/8 border border-[#315CFF]/15 flex items-center justify-center text-[#315CFF]">
-                      <Icon className="w-5 h-5" />
-                    </div>
-                    <span className="text-[10.5px] font-mono font-semibold uppercase tracking-wider text-[#718096]">
-                      {card.category}
+                {/* Ambient Soft Glow on Hover (No harsh lines) */}
+                <div className="pointer-events-none absolute inset-0 rounded-2xl bg-gradient-to-b from-blue-50/60 via-transparent to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+
+                <div className="relative z-10">
+                  {/* Metric Badge */}
+                  <div className="mb-4">
+                    <span className="inline-block px-2.5 py-1 rounded-lg text-[10px] font-bold font-mono tracking-wide uppercase transition-all duration-200 bg-slate-50 text-slate-500 border border-slate-100 group-hover:bg-blue-50 group-hover:text-[#2563EB] group-hover:border-blue-200/80">
+                      {pillar.metric}
                     </span>
                   </div>
 
-                  {/* Card Title */}
-                  <h3
-                    className="text-lg font-bold tracking-tight leading-snug mb-2 font-sans"
-                    style={{ color: "var(--theme-text-primary, #080D18)" }}
-                  >
-                    {card.title}
+                  {/* Title */}
+                  <h3 className="text-[15px] sm:text-base font-bold text-[#0F172A] tracking-tight font-sans leading-snug mb-2.5 transition-colors duration-200 group-hover:text-[#2563EB]">
+                    {pillar.name}
                   </h3>
 
-                  {/* Card Description */}
-                  <p
-                    className="text-xs sm:text-[13.5px] font-normal leading-relaxed font-sans"
-                    style={{ color: "var(--theme-text-secondary, #4A5568)" }}
-                  >
-                    {card.description}
+                  {/* Description */}
+                  <p className="text-xs sm:text-[13px] text-[#64748B] leading-relaxed font-sans mb-5">
+                    {pillar.subtitle}
                   </p>
+                </div>
+
+                {/* Feature Bullets */}
+                <div className="relative z-10 pt-4 border-t border-slate-100 space-y-2">
+                  {pillar.features.map((feat, fIdx) => (
+                    <div key={fIdx} className="flex items-center gap-2 text-xs font-medium text-slate-600 transition-colors duration-200 group-hover:text-[#0F172A]">
+                      <CheckCircle2 className="w-3.5 h-3.5 shrink-0 transition-all duration-200 text-slate-300 group-hover:text-[#2563EB] group-hover:scale-105" />
+                      <span>{feat}</span>
+                    </div>
+                  ))}
                 </div>
               </div>
             );

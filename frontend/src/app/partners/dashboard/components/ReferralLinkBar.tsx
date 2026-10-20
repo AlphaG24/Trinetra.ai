@@ -13,8 +13,8 @@ export default function ReferralLinkBar({
   const linkedInShare = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(
     referralLink
   )}`
-  const emailShare = `mailto:?subject=Try Trinetra AI&body=${encodeURIComponent(
-    `I've been using Trinetra AI to automate my business. Check it out here: ${referralLink}`
+  const emailShare = `mailto:?subject=Try Vaakriti AI&body=${encodeURIComponent(
+    `I've been using Vaakriti AI to automate my business. Check it out here: ${referralLink}`
   )}`
 
   return (

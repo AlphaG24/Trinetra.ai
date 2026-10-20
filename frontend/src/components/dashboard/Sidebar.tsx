@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, Bot, Users, Phone, Megaphone,
-  BarChart3, CreditCard, Settings, HelpCircle, Pencil,
+  BarChart3, IndianRupee, CreditCard, Settings, HelpCircle, Pencil,
   ChevronLeft, ChevronRight, Calendar, Target, PhoneCall, ShieldCheck
 } from 'lucide-react'
 
@@ -14,7 +14,7 @@ import { useDashboardStore } from '@/src/store/dashboardStore'
 
 /**
  * Navigation items matching the dashboard structure:
- * Upper section: Overview, Agents, Calls, Leads, Appointments, Customers, Campaigns, Phone Numbers, Analytics, Billing
+ * Upper section: Overview, Agents, Calls, Leads, Appointments, Customers, Campaigns, Phone Numbers, Analytics, Revenue, Billing
  * Lower section: Custom Agent (Deploy), KYC Vault, Settings, Support
  */
 const topNavItems = [
@@ -27,6 +27,7 @@ const topNavItems = [
   { label: 'Campaigns', href: '/dashboard/campaigns', icon: Megaphone },
   { label: 'Phone Numbers', href: '/dashboard/phone-numbers', icon: Phone },
   { label: 'Analytics', href: '/dashboard/analytics', icon: BarChart3 },
+  { label: 'Revenue', href: '/dashboard/revenue', icon: IndianRupee },
   { label: 'Billing', href: '/dashboard/billing', icon: CreditCard },
 ]
 
@@ -142,7 +143,7 @@ export function Sidebar({ isOpen, onClose }: { isOpen?: boolean; onClose?: () =>
         {/* Floating tooltip when collapsed in desktop / split screen */}
         {collapsed && (
           <div className="absolute left-full ml-3 hidden group-hover:flex items-center z-50 pointer-events-none">
-            <span className="px-2.5 py-1 text-xs font-semibold rounded-md shadow-lg bg-zinc-900 text-white dark:bg-zinc-800 dark:text-zinc-100 whitespace-nowrap">
+            <span className="sidebar-tooltip px-2.5 py-1 text-xs font-semibold rounded-md shadow-xl bg-zinc-900 !text-white dark:bg-zinc-800 dark:!text-white whitespace-nowrap">
               {item.label}
             </span>
           </div>

@@ -170,6 +170,78 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Document type and file payload are required' }, { status: 400 })
     }
 
+    // ── DUPLICATE DOCUMENT PREVENTION SHIELD ──────────────────────────────
+    // 1. Block duplicate upload if category is already verified
+    const { data: existingVerifiedCategory } = await admin
+      .from('kyc_documents')
+      .select('id, status, document_type')
+      .eq('organization_id', orgId)
+      .eq('document_type', document_type)
+      .eq('status', 'verified')
+      .limit(1)
+      .maybeSingle()
+
+    if (existingVerifiedCategory) {
+      return NextResponse.json({
+        error: 'This document category is already verified for your organization. Duplicate uploads are blocked.',
+        is_duplicate: true,
+      }, { status: 409 })
+    }
+
+    // 2. Block duplicate upload if category is currently under review
+    const { data: existingPendingCategory } = await admin
+      .from('kyc_documents')
+      .select('id, status, document_type')
+      .eq('organization_id', orgId)
+      .eq('document_type', document_type)
+      .in('status', ['pending_review', 'submitted'])
+      .limit(1)
+      .maybeSingle()
+
+    if (existingPendingCategory) {
+      return NextResponse.json({
+        error: 'A document for this category is currently under compliance review. Duplicate submissions are not allowed until triage is complete.',
+        is_duplicate: true,
+      }, { status: 409 })
+    }
+
+    // 3. Block exact same file payload upload via SHA-256 fingerprint
+    const checksum = crypto.createHash('sha256').update(file_base64).digest('hex')
+    const { data: duplicateFile } = await admin
+      .from('kyc_documents')
+      .select('id, status, document_type')
+      .eq('organization_id', orgId)
+      .eq('file_sha256_checksum', checksum)
+      .limit(1)
+      .maybeSingle()
+
+    if (duplicateFile) {
+      return NextResponse.json({
+        error: 'Duplicate document detected. This exact file has already been uploaded to your compliance vault.',
+        is_duplicate: true,
+      }, { status: 409 })
+    }
+
+    // 4. Block duplicate ID number registration
+    const maskedId = raw_id_number ? maskIdNumber(raw_id_number, document_type) : null
+    if (maskedId) {
+      const { data: duplicateIdDoc } = await admin
+        .from('kyc_documents')
+        .select('id, status, document_type')
+        .eq('organization_id', orgId)
+        .eq('id_number_masked', maskedId)
+        .neq('status', 'rejected')
+        .limit(1)
+        .maybeSingle()
+
+      if (duplicateIdDoc) {
+        return NextResponse.json({
+          error: `This document identification number (${maskedId}) has already been submitted to your compliance vault.`,
+          is_duplicate: true,
+        }, { status: 409 })
+      }
+    }
+
     // Fetch organization name for entity matching
     let orgName = ''
     if (orgId) {
@@ -198,9 +270,6 @@ export async function POST(req: Request) {
       }, { status: 422 })
     }
 
-    // UIDAI & statutory masking: NEVER store raw ID number in plaintext
-    const maskedId = raw_id_number ? maskIdNumber(raw_id_number, document_type) : null
-    const checksum = crypto.createHash('sha256').update(file_base64).digest('hex')
     const encryptedPath = `kyc_vault/${orgId}/${document_type}_${Date.now()}.enc`
 
     const statutoryConsentText = 'I affirmatively consent to the verification and encrypted vault storage of this identity document in accordance with the Digital Personal Data Protection Act (DPDP), UIDAI statutory masking guidelines, and Trinetra AI Telephony Compliance.'

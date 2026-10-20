@@ -6,7 +6,7 @@ import { cleanAgentName } from '@/src/utils/formatAgentName'
 export const dynamic = 'force-dynamic'
 
 export const metadata = {
-  title: 'Leads — Trinetra AI',
+  title: 'Leads — Vaakriti AI',
   description: 'Track and manage all leads captured by your AI agents.',
 }
 

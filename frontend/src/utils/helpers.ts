@@ -8,7 +8,7 @@ export const getURL = (path: string = '') => {
       ? process.env.NEXT_PUBLIC_SITE_URL
       : typeof window !== 'undefined'
       ? window.location.origin
-      : 'https://trinetraedu-ai.com';
+      : 'https://vaakriti.com';
 
   // Include web protocol if missing
   url = url.includes('http') ? url : `https://${url}`;

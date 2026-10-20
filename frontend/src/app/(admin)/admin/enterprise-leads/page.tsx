@@ -9,7 +9,6 @@ import {
   Calendar,
   ExternalLink,
   MessageSquare,
-  Sparkles,
   Phone,
   Server,
   Cloud,
@@ -21,7 +20,17 @@ import {
 import useSWR from 'swr'
 import { toast } from 'sonner'
 
-const fetcher = (url: string) => fetch(url).then(res => res.json())
+const fetcher = async (url: string) => {
+  try {
+    const res = await fetch(url)
+    if (!res.ok) return { leads: [], totalCount: 0 }
+    const text = await res.text()
+    if (!text || !text.trim()) return { leads: [], totalCount: 0 }
+    return JSON.parse(text)
+  } catch {
+    return { leads: [], totalCount: 0 }
+  }
+}
 
 interface EnterpriseLead {
   id: string
@@ -94,7 +103,7 @@ export default function AdminEnterpriseLeadsPage() {
           <div className="flex items-baseline gap-2 mt-1">
             <span className="text-2xl font-bold font-mono text-[var(--heading)]">{leads.length}</span>
             <span className="text-[10px] text-emerald-500 font-semibold flex items-center gap-0.5">
-              <Sparkles className="w-2.5 h-2.5" /> Direct Inbound
+              <CheckCircle2 className="w-2.5 h-2.5" /> Direct Inbound
             </span>
           </div>
         </div>
