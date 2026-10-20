@@ -4,7 +4,7 @@ export async function POST(request: Request) {
   try {
     const body = await request.json()
     const localUrl = (process.env.NEXT_PUBLIC_FASTAPI_URL || process.env.NEXT_PUBLIC_BACKEND_URL || 'http://127.0.0.1:8000').replace(/\/$/, '')
-    const fallbackProdUrl = 'https://trinetra-ai-3d0a.onrender.com'
+    const fallbackProdUrl = 'https://trinetra-ai-1-6f2n.onrender.com'
     
     let response: Response
     try {

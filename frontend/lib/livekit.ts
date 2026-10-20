@@ -50,7 +50,7 @@ export async function getLiveKitToken(
   
   const remoteUrl = (!isLocalBackend && configuredBackend) 
     ? configuredBackend 
-    : (isProd ? 'https://trinetra-ai-3d0a.onrender.com' : null);
+    : (isProd ? 'https://trinetra-ai-1-6f2n.onrender.com' : null);
 
   if (!remoteUrl) {
     throw new Error('Could not establish LiveKit voice session. Please ensure your session is active or reload the page.');

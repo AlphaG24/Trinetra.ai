@@ -131,7 +131,7 @@ export function useVoiceAgent() {
     // 2. Fallback: Upload to backend FastAPI server directly
     try {
       const isProd = typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1'
-      const fallbackUrl = isProd ? 'https://trinetra-ai-3d0a.onrender.com' : 'http://127.0.0.1:8000'
+      const fallbackUrl = isProd ? 'https://trinetra-ai-1-6f2n.onrender.com' : 'http://127.0.0.1:8000'
       const apiUrl = (process.env.NEXT_PUBLIC_BACKEND_URL || process.env.NEXT_PUBLIC_FASTAPI_URL || fallbackUrl).replace(/\/$/, '')
       const fallbackRes = await fetch(`${apiUrl}/api/voice/recordings/upload`, {
         method: 'POST',
