@@ -54,7 +54,7 @@ export const GET = safeApiHandler(async (request: NextRequest) => {
   // Build paginated query
   let query = admin
     .from('voice_calls')
-    .select('id, created_at, duration_seconds, sentiment, outcome, caller_name, caller_phone, recording_url, agent_id', { count: 'exact' })
+    .select('id, created_at, duration_seconds, sentiment, outcome, caller_name, caller_phone, recording_url, transcript, agent_id', { count: 'exact' })
 
   if (!isPrivileged) {
     if (profile?.organization_id) {

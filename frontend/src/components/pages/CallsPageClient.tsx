@@ -57,7 +57,7 @@ export function CallsPageClient({ agents }: { agents: any[] }) {
         const supabase = createClient()
         let query = supabase
           .from('voice_calls')
-          .select('id, created_at, duration_seconds, sentiment, outcome, caller_name, caller_phone, recording_url, agent_id', { count: 'estimated' })
+          .select('id, created_at, duration_seconds, sentiment, outcome, caller_name, caller_phone, recording_url, transcript, agent_id', { count: 'estimated' })
           .order('created_at', { ascending: false })
           .range((page - 1) * perPage, page * perPage - 1)
 

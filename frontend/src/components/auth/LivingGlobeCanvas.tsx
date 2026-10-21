@@ -80,7 +80,9 @@ export function LivingGlobeCanvas() {
         let finalR = r
         let finalG = g
         let finalB = b
-        if (r > 140 && g > 110 && b < 120 && (r > b * 1.3 || g > b * 1.3)) {
+        const isYellowHue = (r > 95 && g > 80 && b < 145 && (r > b * 1.15 || g > b * 1.15)) ||
+                            (r > 150 && g > 140 && b < 170 && (r + g > b * 2.1))
+        if (isYellowHue) {
           finalR = 18
           finalG = 32
           finalB = 68
@@ -117,10 +119,11 @@ export function LivingGlobeCanvas() {
     const ctx = canvas.getContext('2d', { alpha: false })
     if (!ctx) return
 
-    // Preload image
+    // Preload image with unique cache buster to force browsers to discard stale cached yellow pixels
     const img = new Image()
-    img.src = '/images/auth-concept-globe.jpg'
+    img.src = '/images/auth-concept-globe.jpg?v=20261021_v3'
     img.crossOrigin = 'anonymous'
+
 
     let isRunning = true
 

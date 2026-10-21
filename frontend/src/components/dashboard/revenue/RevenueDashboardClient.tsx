@@ -124,7 +124,6 @@ export function RevenueDashboardClient({ embedded = false }: { embedded?: boolea
       })
 
       if (res.ok) {
-        toast.success(`Deal marked as Won (₹${amt.toLocaleString()})`)
         setSelectedEventForWon(null)
         setCustomWonAmount('')
         fetchMetrics(range)
@@ -152,11 +151,11 @@ export function RevenueDashboardClient({ embedded = false }: { embedded?: boolea
       })
 
       if (res.ok) {
-        toast.success('Deal marked as Lost')
         fetchMetrics(range)
       } else {
         toast.error('Failed to update deal status')
       }
+
     } catch {
       toast.error('Error updating deal status')
     } finally {

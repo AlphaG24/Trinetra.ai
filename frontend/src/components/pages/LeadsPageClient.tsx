@@ -227,12 +227,7 @@ export function LeadsPageClient({ initialLeads, agents = [], services = [], init
         return [data.event, ...prev]
       })
 
-      if (dealStatus === 'won') {
-        const amtStr = wonAmount ? ` (₹${wonAmount.toLocaleString('en-IN')})` : ''
-        toast.success(`🎉 Deal marked as Won${amtStr}!`)
-      } else {
-        toast.success('Deal marked as Lost')
-      }
+      // Removed popup toast notifications for deal won/lost as per presentation design requirements
       setClosingDealLead(null)
     } catch (err: any) {
       toast.error(err.message || 'Failed to update deal status')

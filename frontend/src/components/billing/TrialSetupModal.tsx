@@ -286,8 +286,8 @@ export default function TrialSetupModal({
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-3xl w-full max-w-4xl lg:max-w-5xl p-5 sm:p-6 md:p-7 shadow-2xl space-y-4 sm:space-y-5 relative max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-200">
+    <div className="fixed inset-0 z-[1000] flex items-center justify-center p-3 sm:p-5 md:p-8 bg-black/80 backdrop-blur-md overflow-y-auto animate-in fade-in duration-200">
+      <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-3xl w-full max-w-4xl lg:max-w-5xl p-5 sm:p-7 md:p-8 shadow-2xl space-y-4 sm:space-y-5 relative my-auto max-h-[86vh] overflow-y-auto animate-in zoom-in-95 duration-200">
         <button
           onClick={onClose}
           className="absolute top-4 right-4 sm:top-5 sm:right-5 w-8 h-8 rounded-xl bg-[var(--background)] hover:bg-[var(--hover-bg)] text-[var(--muted)] hover:text-[var(--heading)] flex items-center justify-center text-sm transition cursor-pointer border border-[var(--border)] z-10"

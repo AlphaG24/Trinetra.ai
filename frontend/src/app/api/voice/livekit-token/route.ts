@@ -103,6 +103,8 @@ async function generateLiveKitToken({
           status: 'in_progress',
           started_at: new Date().toISOString(),
           duration_seconds: 0,
+          outcome: 'In Progress',
+          sentiment: 'neutral',
           metadata: {
             room_name,
             provider_call_id: room_name,

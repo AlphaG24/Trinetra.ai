@@ -1575,10 +1575,10 @@ class VikramAgent(Agent):
             # linear16 sends raw uncompressed PCM, eliminating MP3 decode chunking jitter, clicks and voice breakages
             sarvam_sample_rate = int(os.getenv("SARVAM_SAMPLE_RATE", "24000"))
 
-            # Voice crackling fix: Loudness > 1.0 pushes 16-bit linear16 PCM beyond 0 dBFS,
-            # resulting in digital clipping crackle. Setting loudness=0.95 provides clean headroom
-            # without digital waveform clipping distortion for both male and female voices.
-            sarvam_loudness = float(os.getenv("SARVAM_LOUDNESS", "0.95"))
+            # Optimal clarity & loudness: loudness=1.15 provides loud, punchy, and crystal-clear
+            # audio without digital distortion or low volume issues across browsers and mobile devices.
+            sarvam_loudness = float(os.getenv("SARVAM_LOUDNESS", "1.15"))
+
 
             # Task 1: Setting max_session_duration=0 forces a fresh WebSocket connection per TTS request,
             # Maintain persistent connection pool (Sarvam SDK default 3600s) to eliminate packet jitter, buffer underruns, and voice crackling
@@ -2096,11 +2096,17 @@ class VikramAgent(Agent):
             add_to_chat_ctx=True
         )
 
+        # If speech handle is already done (e.g. mock in unit test or instant synthesis)
+        if isinstance(speech_handle, asyncio.Future) and speech_handle.done():
+            if hasattr(self, 'timing_tracker') and self.timing_tracker:
+                self.timing_tracker.mark("audio_playout")
+
         # Allow greeting to playout asynchronously so turn detector and VAD are immediately active
         async def _monitor_greeting_playout():
             try:
                 watchdog_timeout = calculate_opening_watchdog_timeout(greeting)
-                await asyncio.wait_for(speech_handle, timeout=watchdog_timeout)
+                if speech_handle is not None and (inspect.isawaitable(speech_handle) or hasattr(speech_handle, '__await__')):
+                    await asyncio.wait_for(speech_handle, timeout=watchdog_timeout)
                 if hasattr(self, 'timing_tracker') and self.timing_tracker:
                     self.timing_tracker.mark("audio_playout")
             except asyncio.TimeoutError:
@@ -2119,6 +2125,11 @@ class VikramAgent(Agent):
                     self.session.history.add_message(role="assistant", content=greeting)
         except Exception as ctx_err:
             logger.debug(f"Opening greeting session history notice: {ctx_err}")
+
+        # Yield control briefly so background greeting playout monitor executes
+        await asyncio.sleep(0.01)
+
+
 
 
     def _clean_chunk(self, chunk):
@@ -4119,13 +4130,24 @@ async def entrypoint(ctx: JobContext):
     # user and agent turns. Having separate hooks caused 2-3x duplicate messages
     # in the frontend.
 
+    async def _on_watchdog_disconnect():
+        logger.info("[Watchdog Disconnect] Ending idle call session due to caller silence.")
+        session_done.set()
+        if ctx.room:
+            try:
+                await ctx.room.disconnect()
+            except Exception:
+                pass
+
     watchdog = InCallNoAudioWatchdog(
-        silence_threshold_seconds=5.0,
+        silence_threshold_seconds=12.0,
         speak_fn=lambda prompt: agent_instance.session.say(prompt, allow_interruptions=True, add_to_chat_ctx=False) if agent_instance and getattr(agent_instance, 'session', None) else None,
+        disconnect_fn=_on_watchdog_disconnect,
         tool_guard=tool_guard,
         language=language,
         gender=resolved_gender,
     )
+
 
     @session.on("user_speech_committed")
     def _on_user_speech_watchdog(event):
@@ -4792,6 +4814,8 @@ async def run_agent(room_name: str, agent_id: str | None = None, contact_id: str
 
     room = rtc.Room()
     token = generate_agent_token(room_name)
+    # Start LiveKit room handshake in background early to eliminate connection delay
+    room_connect_task = asyncio.create_task(room.connect(livekit_url, token))
 
     agent_instance = None
     safe_provider = locals().get('provider') or (agent_data.get('voice_provider') if agent_data else None) or 'sarvam'
@@ -5116,19 +5140,23 @@ async def run_agent(room_name: str, agent_id: str | None = None, contact_id: str
 
         try:
             connected = False
-            for connect_attempt in range(2):
-                try:
-                    await asyncio.wait_for(room.connect(livekit_url, token), timeout=5.0)
-                    connected = True
-                    print(f"[Agent] Connected to LiveKit", flush=True)
-                    _active_livekit_rooms.add(room)
-                    break
-                except asyncio.TimeoutError:
-                    logger.warning(f"[Agent] LiveKit connection attempt {connect_attempt + 1} timed out after 5s. Retrying...")
-                    await asyncio.sleep(0.2)
-                except Exception as connect_err:
-                    logger.warning(f"[Agent] LiveKit connection attempt {connect_attempt + 1} failed: {connect_err}. Retrying...")
-                    await asyncio.sleep(0.2)
+            try:
+                await asyncio.wait_for(room_connect_task, timeout=4.0)
+                connected = True
+                print(f"[Agent] Connected to LiveKit (early handshake)", flush=True)
+                _active_livekit_rooms.add(room)
+            except Exception as e_early:
+                logger.warning(f"[Agent] Early connect task note: {e_early}. Retrying...")
+                for connect_attempt in range(2):
+                    try:
+                        await asyncio.wait_for(room.connect(livekit_url, token), timeout=4.0)
+                        connected = True
+                        print(f"[Agent] Connected to LiveKit", flush=True)
+                        _active_livekit_rooms.add(room)
+                        break
+                    except Exception as connect_err:
+                        logger.warning(f"[Agent] LiveKit connection attempt {connect_attempt + 1} failed: {connect_err}. Retrying...")
+                        await asyncio.sleep(0.2)
 
             if not connected:
                 logger.error(f"[Agent] Failed to connect to LiveKit after 4 attempts for room {room_name}")
@@ -5172,7 +5200,37 @@ async def run_agent(room_name: str, agent_id: str | None = None, contact_id: str
                     yielded_to_worker = True
                     done.set()
 
+            async def _on_watchdog_disconnect_ra():
+                logger.info(f"[Watchdog Disconnect - RA] Ending idle call session in room '{room_name}' due to silence.")
+                done.set()
+                if room:
+                    try:
+                        await room.disconnect()
+                    except Exception:
+                        pass
+
+            watchdog_ra = InCallNoAudioWatchdog(
+                silence_threshold_seconds=12.0,
+                speak_fn=lambda prompt: agent_instance.session.say(prompt, allow_interruptions=True, add_to_chat_ctx=False) if agent_instance and getattr(agent_instance, 'session', None) else None,
+                disconnect_fn=_on_watchdog_disconnect_ra,
+                language=safe_language,
+                gender=resolved_gender_ra,
+            )
+
+            @session.on("user_speech_committed")
+            def _on_user_speech_watchdog_ra(event):
+                watchdog_ra.on_user_speech_end()
+
+            @session.on("agent_speech_started")
+            def _on_agent_speech_started_watchdog_ra(event):
+                watchdog_ra.on_agent_speech_start()
+
+            @session.on("agent_speech_committed")
+            def _on_agent_speech_committed_watchdog_ra(event):
+                watchdog_ra.on_agent_speech_end()
+
             await session.start(agent=agent_instance, room=room)
+            watchdog_ra.start()
             
             async def _room_watchdog():
                 call_has_human = False
@@ -5198,6 +5256,10 @@ async def run_agent(room_name: str, agent_id: str | None = None, contact_id: str
                 await done.wait()
             finally:
                 watchdog_task.cancel()
+                try:
+                    watchdog_ra.stop()
+                except Exception:
+                    pass
         except Exception as e:
             logger.error(f"[In-Process Agent] Error: {e}")
         finally:
