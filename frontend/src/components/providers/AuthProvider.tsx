@@ -64,6 +64,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setProfile(parsed.profile)
           setRole(parsed.profile.role || null)
         }
+        // Also restore user so displayName works instantly before getUser() resolves
         if (parsed?.user) {
           setUser(parsed.user)
         }
@@ -73,7 +74,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [])
 
-  const fetchProfile = useCallback(async (userId: string) => {
+  const fetchProfile = useCallback(async (userId: string, userObj?: any) => {
+    // userObj is passed directly to avoid stale closure on `user` state
+    const resolveFullName = (profileData: any, u: any) => {
+      const fromProfile = (profileData?.full_name || '').trim()
+      if (fromProfile) return fromProfile
+      return (
+        u?.user_metadata?.full_name ||
+        u?.user_metadata?.name ||
+        u?.raw_user_meta_data?.full_name ||
+        u?.raw_user_meta_data?.name ||
+        (u?.email ? u.email.split('@')[0] : '') ||
+        ''
+      ).trim()
+    }
+
     try {
       const res = await fetch('/api/profiles')
       if (res.ok) {
@@ -82,12 +97,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const userEmail = (data.email || '').toLowerCase().trim()
           const isSuperAdmin = userEmail === 'raghav00424@gmail.com' || userEmail === 'raghav@trinetra.ai' || (process.env.NEXT_PUBLIC_ADMIN_EMAILS || '').includes(userEmail)
           const resolvedRole = isSuperAdmin ? 'super_admin' : (data.role || null)
-          const resolvedFullName = (data.full_name || user?.user_metadata?.full_name || user?.user_metadata?.name || (userEmail ? userEmail.split('@')[0] : '')).trim()
-          const enrichedProfile = { ...data, full_name: resolvedFullName || 'Partner', role: resolvedRole }
+          const resolvedFullName = resolveFullName(data, userObj) || 'Partner'
+          const enrichedProfile = { ...data, full_name: resolvedFullName, role: resolvedRole }
           setProfile(enrichedProfile)
           setRole(resolvedRole)
           try {
-            sessionStorage.setItem(CACHE_KEY, JSON.stringify({ profile: enrichedProfile }))
+            sessionStorage.setItem(CACHE_KEY, JSON.stringify({ profile: enrichedProfile, user: userObj }))
             if (resolvedRole) {
               sessionStorage.setItem('trinetra_user_role', resolvedRole)
             }
@@ -110,12 +125,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const userEmail = (data.email || '').toLowerCase().trim()
         const isSuperAdmin = userEmail === 'raghav00424@gmail.com' || userEmail === 'raghav@trinetra.ai' || (process.env.NEXT_PUBLIC_ADMIN_EMAILS || '').includes(userEmail)
         const resolvedRole = isSuperAdmin ? 'super_admin' : (data.role || null)
-        const resolvedFullName = (data.full_name || user?.user_metadata?.full_name || user?.user_metadata?.name || (userEmail ? userEmail.split('@')[0] : '')).trim()
-        const enrichedProfile = { ...data, full_name: resolvedFullName || 'Partner', role: resolvedRole }
+        const resolvedFullName = resolveFullName(data, userObj) || 'Partner'
+        const enrichedProfile = { ...data, full_name: resolvedFullName, role: resolvedRole }
         setProfile(enrichedProfile)
         setRole(resolvedRole)
         try {
-          sessionStorage.setItem(CACHE_KEY, JSON.stringify({ profile: enrichedProfile }))
+          sessionStorage.setItem(CACHE_KEY, JSON.stringify({ profile: enrichedProfile, user: userObj }))
           if (resolvedRole) {
             sessionStorage.setItem('trinetra_user_role', resolvedRole)
           }
@@ -147,7 +162,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       setUser(currentUser)
-      await fetchProfile(currentUser.id)
+      await fetchProfile(currentUser.id, currentUser)
     } catch (err: any) {
       if (err?.name !== 'AuthRetryableFetchError') {
         console.warn('[AuthProvider] Load user error:', err)
@@ -189,7 +204,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
 
         setUser(currentUser)
-        await fetchProfile(currentUser.id)
+        await fetchProfile(currentUser.id, currentUser)
       } catch (err: any) {
         if (err?.name !== 'AuthRetryableFetchError') {
           console.warn('[AuthProvider] Init user error:', err)
@@ -208,19 +223,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
           if (session?.user) {
             setUser(session.user)
-            await fetchProfile(session.user.id)
+            await fetchProfile(session.user.id, session.user)
           }
         }
         if (event === 'SIGNED_OUT') {
-          setUser(null)
-          setProfile(null)
-          setRole(null)
-          try {
-            sessionStorage.removeItem(CACHE_KEY)
-            sessionStorage.removeItem('trinetra_user_role')
-          } catch {}
-          router.push('/')
-          router.refresh()
+          // Verify if session truly expired or if this was triggered during route transitions
+          const cached = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem(CACHE_KEY) : null
+          if (!cached) {
+            setUser(null)
+            setProfile(null)
+            setRole(null)
+            try {
+              sessionStorage.removeItem('trinetra_user_role')
+            } catch {}
+            router.push('/')
+            router.refresh()
+          }
         }
       }
     )
@@ -241,16 +259,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = useCallback(async () => {
     try {
-      await supabase.auth.signOut()
       try {
         sessionStorage.removeItem(CACHE_KEY)
         sessionStorage.removeItem('trinetra_user_role')
         localStorage.removeItem('supabase.auth.token')
       } catch {}
+      setUser(null)
+      setProfile(null)
+      setRole(null)
+      await supabase.auth.signOut()
       router.push('/')
       router.refresh()
     } catch (err) {
       console.error('[AuthProvider] Signout error:', err)
+      router.push('/')
     }
   }, [supabase, router])
 

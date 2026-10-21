@@ -212,7 +212,7 @@ export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
   const avatarUrl = profile?.avatar_url || authProfile?.avatar_url
 
   return (
-    <header className="fixed top-0 right-0 left-0 h-16 bg-[var(--card-bg)] border-b border-[var(--border)] z-30">
+    <header className="fixed top-0 right-0 left-0 h-16 bg-[var(--card-bg)] border-b border-[var(--border)] z-50">
       <div className="flex items-center justify-between h-full px-6">
         {/* Left side: Text Logo Only */}
         <div className="flex items-center">

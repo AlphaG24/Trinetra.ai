@@ -653,8 +653,8 @@ export function AgentDetailPageClient({
         </div>
       )}
 
-      {/* Top Bar (Sticky, always visible) */}
-      <div className="sticky top-0 z-35 bg-[var(--card-bg)] border border-[var(--border)] p-5 rounded-2xl shadow-md flex flex-wrap items-center justify-between gap-4 transition-all">
+      {/* Top Bar (Sticky, always visible below fixed dashboard header) */}
+      <div className="sticky top-16 z-20 bg-[var(--card-bg)] border border-[var(--border)] p-5 rounded-2xl shadow-md flex flex-wrap items-center justify-between gap-4 transition-all">
         <div className="flex items-center gap-4">
           <div className="w-12 h-12 rounded-xl bg-[var(--background)] border border-[var(--border)] flex items-center justify-center text-[var(--heading)] shadow-inner">
             <Bot className="w-6 h-6" />
@@ -811,8 +811,8 @@ export function AgentDetailPageClient({
         </div>
       ) : (
         <>
-          {/* Tab Bar (Sticky below top bar) */}
-          <div className="sticky top-24 z-30 bg-[var(--card-bg)] border border-[var(--border)] p-1 rounded-xl shadow-sm flex flex-wrap gap-1">
+          {/* Tab Bar (Sticky below agent header card) */}
+          <div className="sticky top-36 z-10 bg-[var(--card-bg)] border border-[var(--border)] p-1 rounded-xl shadow-sm flex flex-wrap gap-1">
             {tabs.map((tab) => {
               const Icon = tab.icon
               const unlocked = isFeatureUnlocked(tab.id)

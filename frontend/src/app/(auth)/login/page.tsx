@@ -12,7 +12,7 @@ import { toast } from 'sonner'
 import { createClient } from '@/lib/client'
 import { getURL } from '@/src/utils/helpers'
 import { VaakritiSymbolVector } from '@/components/ui/VaakritiSymbolVector'
-import { AuthArtSwitcher } from '@/components/auth/AuthArtSwitcher'
+import { LivingGlobeCanvas } from '@/components/auth/LivingGlobeCanvas'
 
 function AuthForm() {
   const router = useRouter()
@@ -242,7 +242,7 @@ function AuthForm() {
           NO logo, NO text on artwork as requested
          ───────────────────────────────────────────────────────────── */}
       <section className="relative w-full lg:w-1/2 h-[340px] sm:h-[440px] lg:h-auto lg:min-h-[calc(100vh-1rem)] rounded-xl sm:rounded-2xl lg:rounded-[20px] overflow-hidden bg-[#030712] shrink-0 border border-slate-200/80 shadow-xs">
-        <AuthArtSwitcher />
+        <LivingGlobeCanvas isActive={true} />
       </section>
 
       {/* ─────────────────────────────────────────────────────────────
@@ -395,13 +395,12 @@ function AuthForm() {
               {/* Bottom Switch Link */}
               <div className="pt-4 text-center text-xs text-[#71717A]">
                 Don&apos;t have an account?{' '}
-                <button
-                  type="button"
-                  onClick={() => setAuthMode('signup')}
+                <Link
+                  href="/signup"
                   className="font-semibold text-[#18181B] hover:underline cursor-pointer ml-1"
                 >
                   Create one
-                </button>
+                </Link>
               </div>
             </form>
           ) : (

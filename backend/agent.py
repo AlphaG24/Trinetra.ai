@@ -4149,6 +4149,10 @@ async def entrypoint(ctx: JobContext):
     )
 
 
+    @session.on("user_speech_started")
+    def _on_user_speech_started_watchdog(event):
+        watchdog.on_user_speech_start()
+
     @session.on("user_speech_committed")
     def _on_user_speech_watchdog(event):
         timing_tracker.mark("user_speech_end")

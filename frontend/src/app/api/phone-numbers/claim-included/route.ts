@@ -105,12 +105,16 @@ export async function POST(request: Request) {
     }
 
     // 3. Claim the number for this user's organization for ₹0 (included in plan)
+    const renewalDate = new Date();
+    renewalDate.setDate(renewalDate.getDate() + 30);
+
     const updatePayload: Record<string, any> = {
       is_assigned: true,
       status: "active",
       organization_id: profile.organization_id,
       assigned_org_id: profile.organization_id,
-      assigned_at: new Date().toISOString()
+      renewal_date: renewalDate.toISOString(),
+      updated_at: new Date().toISOString()
     };
 
     if (agent_id) {

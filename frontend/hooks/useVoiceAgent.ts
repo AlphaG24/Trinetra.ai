@@ -183,9 +183,7 @@ export function useVoiceAgent() {
                 callMeta?.roomName?.includes('sandbox') ||
                 callMeta?.roomName?.includes('preview')
               );
-              if (!isSandboxOrDemo) {
-                toast.success('Call recording saved successfully');
-              }
+              // Recording saved silently — no disruptive toast
             }
           } catch (err) {
             console.warn('[useVoiceAgent] Recording upload error:', err)

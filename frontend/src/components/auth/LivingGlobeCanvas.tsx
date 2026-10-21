@@ -12,7 +12,6 @@ interface Pixel {
   color: string
   size: number
   isBright: boolean
-  isGold: boolean
 }
 
 export interface LivingGlobeCanvasProps {
@@ -32,19 +31,17 @@ export function LivingGlobeCanvas({ isActive = true }: LivingGlobeCanvasProps) {
     isActiveRef.current = isActive
   }, [isActive])
 
-  // Initialize and sample the image into crisp, high-definition pixels
+  // Sample image naturally with high fidelity and zero horizontal streak distortions
   const initPixels = useCallback((width: number, height: number, img: HTMLImageElement) => {
-    // Step size 3.0px - 3.2px provides ultra-crisp digital representation while ensuring butter-smooth 60+ FPS
-    const step = width < 500 ? 3.0 : 3.2
+    // 2.8px to 3.0px step ensures ultra-crisp pixel definition with zero blur
+    const step = width < 500 ? 2.5 : 2.8
     
-    // Create an offscreen canvas to sample the image with cover proportions
     const offscreen = document.createElement('canvas')
     offscreen.width = width
     offscreen.height = height
     const offCtx = offscreen.getContext('2d', { willReadFrequently: true })
     if (!offCtx) return []
 
-    // Calculate aspect fill cover dimensions
     const imgAspect = img.naturalWidth / img.naturalHeight
     const containerAspect = width / height
     let renderW = width
@@ -85,11 +82,7 @@ export function LivingGlobeCanvas({ isActive = true }: LivingGlobeCanvasProps) {
         const brightness = (r * 0.299 + g * 0.587 + b * 0.114)
         if (a < 15 || brightness < 10) continue
 
-        // Retain natural colors including India's radiant golden aura and glowing network flow
-        const isGold = (r > 140 && g > 100 && b < 100 && r > b * 1.35) || (r > 175 && g > 130 && b < 115)
         const isBright = brightness > 140
-
-        // Use slightly expanded integer block to eliminate sub-pixel antialiasing gaps
         const blockSize = Math.ceil(step)
 
         newPixels.push({
@@ -102,7 +95,6 @@ export function LivingGlobeCanvas({ isActive = true }: LivingGlobeCanvasProps) {
           color: `rgb(${r},${g},${b})`,
           size: blockSize,
           isBright,
-          isGold,
         })
       }
     }
@@ -129,9 +121,9 @@ export function LivingGlobeCanvas({ isActive = true }: LivingGlobeCanvasProps) {
     }, { threshold: 0.05 })
     observer.observe(container)
 
-    // Preload image with unique cache buster
+    // Preload image
     const img = new Image()
-    img.src = '/images/auth-concept-globe.jpg?v=20261021_v4'
+    img.src = '/images/auth-concept-globe.jpg'
     img.crossOrigin = 'anonymous'
 
     img.onload = () => {
@@ -172,15 +164,13 @@ export function LivingGlobeCanvas({ isActive = true }: LivingGlobeCanvasProps) {
       if (!isRunning) return
       animationFrameRef.current = requestAnimationFrame(render)
 
-      // Skip render work if component is inactive in switcher or offscreen
       if (!isActiveRef.current || !isVisible) {
         lastTime = now
         return
       }
 
-      const dt = Math.min((now - lastTime) / 1000, 0.05)
-      lastTime = now
       time += 0.025
+      lastTime = now
 
       const rect = container.getBoundingClientRect()
       const width = rect.width
@@ -310,3 +300,5 @@ export function LivingGlobeCanvas({ isActive = true }: LivingGlobeCanvasProps) {
     </div>
   )
 }
+
+export default LivingGlobeCanvas
