@@ -197,7 +197,8 @@ export function LiveDemoSection() {
 
   const handleStartCall = async () => {
     try {
-      await startCall(undefined, undefined, selectedProduct.id);
+      const roomName = `vaakriti-demo-${selectedProduct.id.slice(0, 8)}-${Date.now().toString().slice(-6)}`;
+      await startCall(roomName, "StudioGuest", selectedProduct.id);
       toast.success("Connected! Start speaking into your microphone.");
     } catch {
       toast.error("Failed to connect live session. Please check your microphone.");

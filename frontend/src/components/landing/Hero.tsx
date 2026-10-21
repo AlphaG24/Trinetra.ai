@@ -111,7 +111,7 @@ const GREETINGS: FloatingGreeting[] = [
     text: "नमस्कार",
     phonetic: "Namaskar",
     sentence: "नमस्कार! मी वाकृति एआय वॉयस असिस्टंट बोलतेय, आज मी तुम्हाला कशी मदत करू शकते?",
-    sentencePhonetic: "Namaskar! Me Vaakriti AI voice assistant boltey, aaj me tumhala kashi madat karu shakto?",
+    sentencePhonetic: "Namaskar! Me Vaakriti AI voice assistant boltey, aaj me tumhala kashi madat karu shakte?",
     lang: "mr-IN",
     script: "Devanagari",
     langName: "Marathi",
@@ -163,6 +163,7 @@ const GREETINGS: FloatingGreeting[] = [
     lang: "hi-IN",
     script: "Devanagari",
     langName: "Sanskrit",
+    audioSrc: "/audio/greetings/sa.wav",
     color: "#0284C7",
     activeColor: "#2563EB",
     left: "14%",
@@ -484,6 +485,8 @@ export function Hero() {
   const handleGreetingClick = (g: FloatingGreeting) => {
     if (typeof window === "undefined") return;
 
+    window.speechSynthesis?.cancel();
+
     playAgentChime();
     setSpeakingWordId(g.id);
 
@@ -500,6 +503,13 @@ export function Hero() {
       activeAudioElRef.current = null;
     }
 
+    // Cancel any pending browser speech synthesis immediately to avoid overlapping speech
+    if (typeof window !== "undefined" && "speechSynthesis" in window) {
+      try {
+        window.speechSynthesis.cancel();
+      } catch {}
+    }
+
     if (g.audioSrc) {
       try {
         const audio = new Audio(g.audioSrc);
@@ -512,17 +522,21 @@ export function Hero() {
           setTimeout(() => setTargetHeading(null), 800);
         };
 
-        audio.onerror = () => {
+        audio.onerror = (e) => {
+          console.warn("[Hero] Greeting audio playback error, falling back to speech synthesis:", e);
           speakGreetingText(g);
         };
 
         const playPromise = audio.play();
         if (playPromise !== undefined) {
-          playPromise.catch(() => {
-            speakGreetingText(g);
+          playPromise.catch((err: any) => {
+            // Ignore AbortError / NotAllowedError caused by rapid clicking or pause
+            if (err?.name === "AbortError" || err?.name === "NotAllowedError") return;
+            console.warn("[Hero] Greeting audio play notice:", err?.message);
           });
         }
-      } catch {
+      } catch (audioErr) {
+        console.warn("[Hero] Greeting audio creation error:", audioErr);
         speakGreetingText(g);
       }
     } else {

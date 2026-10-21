@@ -117,6 +117,8 @@ supabase/.temp/
 backend/recordings/
 *.mp3
 *.wav
+!frontend/public/audio/**
+
 
 # Next.js auto-generated agent rules files
 AGENTS.md

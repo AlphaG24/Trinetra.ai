@@ -21,23 +21,34 @@ export async function GET() {
 
     const adminClient = getAdminClient();
 
-    // Retrieve only genuine unallocated, active inventory numbers from the pool
+    // Retrieve only genuine platform pool numbers
     // Master Plan Section 18.7: Exclude any numbers owned by tenants, in grace_period, or in hold_period
-    const { data: availableNumbers, error } = await adminClient
+    const { data: numbers, error } = await adminClient
       .from('phone_numbers')
       .select('*')
       .eq('is_assigned', false)
       .in('status', ['active', 'released'])
       .is('organization_id', null)
       .is('assigned_org_id', null)
-      .order('created_at', { ascending: false })
+      .order('created_at', { ascending: false });
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
+    // Strictly exclude any BYON, Exotel, or personal integration numbers from the public pool
+    const availableNumbers = (numbers || []).filter((n: any) => {
+      const isByon = 
+        n.source === 'byon' || 
+        n.provider === 'exotel' || 
+        n.provider === 'byon' || 
+        Boolean(n.metadata?.byon) ||
+        Boolean(n.metadata?.is_byon);
+      return !isByon;
+    });
+
     // Unallocated inventory numbers in the platform pool are available for assignment
-    return NextResponse.json({ success: true, data: availableNumbers || [] })
+    return NextResponse.json({ success: true, data: availableNumbers });
   } catch (error: any) {
     return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 })
   }

@@ -18,7 +18,7 @@ if sys.platform == 'win32':
     except Exception:
         pass
 import re
-from datetime import datetime
+from datetime import datetime, timedelta
 import httpx
 import json
 import time
@@ -286,6 +286,51 @@ def clean_ssml(text: str, is_transcript: bool = False) -> str:
     text = re.sub(r'\s+', ' ', text).strip()
     text = text.strip('"\'`“”‘’').strip()
     return text
+
+
+def parse_datetime_to_iso(dt_str: str, default_tz: str = 'Asia/Kolkata') -> str:
+    """Convert natural language datetime strings to ISO-8601 UTC for PostgreSQL timestamptz."""
+    import zoneinfo
+    try:
+        import dateutil.parser as dateutil_parser
+    except ImportError:
+        dateutil_parser = None
+    if not dt_str or not str(dt_str).strip() or str(dt_str).strip().lower() in ('upcoming', 'scheduled', 'none', 'null', 'tbd', ''):
+        dt = datetime.now(zoneinfo.ZoneInfo(default_tz)) + timedelta(days=1)
+        dt = dt.replace(hour=10, minute=0, second=0, microsecond=0)
+        return dt.astimezone(zoneinfo.ZoneInfo('UTC')).strftime('%Y-%m-%dT%H:%M:%SZ')
+    clean_s = str(dt_str).strip()
+    if dateutil_parser:
+        try:
+            parsed = dateutil_parser.parse(clean_s)
+            if not parsed.tzinfo:
+                parsed = parsed.replace(tzinfo=zoneinfo.ZoneInfo(default_tz))
+            return parsed.astimezone(zoneinfo.ZoneInfo('UTC')).strftime('%Y-%m-%dT%H:%M:%SZ')
+        except Exception:
+            pass
+    s_lower = clean_s.lower()
+    now = datetime.now(zoneinfo.ZoneInfo(default_tz))
+    target_date = now.date()
+    if any(w in s_lower for w in ['tomorrow', 'kal', 'agla din', 'next day']):
+        target_date = now.date() + timedelta(days=1)
+    elif any(w in s_lower for w in ['parso', 'day after tomorrow']):
+        target_date = now.date() + timedelta(days=2)
+    elif any(w in s_lower for w in ['today', 'aaj', 'evening', 'shaam', 'dopahar']):
+        target_date = now.date()
+    hour, minute = 10, 0
+    time_match = re.search(r'(\d{1,2})(?::(\d{2}))?\s*(am|pm|baje)?', s_lower)
+    if time_match:
+        h = int(time_match.group(1))
+        m = int(time_match.group(2)) if time_match.group(2) else 0
+        ampm = time_match.group(3) or ''
+        if 'pm' in ampm or (ampm == 'baje' and h in [1, 2, 3, 4, 5, 6, 7]):
+            if h < 12: h += 12
+        elif 'am' in ampm:
+            if h == 12: h = 0
+        hour, minute = h, m
+    res_dt = datetime(target_date.year, target_date.month, target_date.day, hour, minute, 0, tzinfo=zoneinfo.ZoneInfo(default_tz))
+    return res_dt.astimezone(zoneinfo.ZoneInfo('UTC')).strftime('%Y-%m-%dT%H:%M:%SZ')
+
 
 DIGIT_WORDS = {
     '0': 'zero', '1': 'one', '2': 'two', '3': 'three', '4': 'four',
@@ -1334,10 +1379,9 @@ def create_appointment_tools(
                 apt_payload = {
                     "user_id": user_id,
                     "agent_id": agent_id,
-                    "organization_id": organization_id,
                     "contact_name": caller_name or "Client",
                     "contact_phone": cleaned or phone_number or "Online Caller",
-                    "scheduled_at": scheduled_at or "Upcoming",
+                    "scheduled_at": parse_datetime_to_iso(scheduled_at) if scheduled_at else parse_datetime_to_iso("Upcoming"),
                     "duration_minutes": 30,
                     "status": "scheduled",
                     "booked_via": "voice",
@@ -1412,7 +1456,7 @@ def create_appointment_tools(
                     apt_id = res.data[0]["id"]
                     await asyncio.to_thread(
                         supabase_admin.table("appointments")
-                        .update({"scheduled_at": new_scheduled_at, "status": "rescheduled", "notes": f"Rescheduled via voice agent to {new_scheduled_at}"})
+                        .update({"scheduled_at": parse_datetime_to_iso(new_scheduled_at), "status": "rescheduled", "notes": f"Rescheduled via voice agent to {new_scheduled_at}"})
                         .eq("id", apt_id)
                         .execute
                     )
@@ -1537,7 +1581,7 @@ class VikramAgent(Agent):
             sarvam_loudness = float(os.getenv("SARVAM_LOUDNESS", "0.95"))
 
             # Task 1: Setting max_session_duration=0 forces a fresh WebSocket connection per TTS request,
-            # eliminating audio degradation, packet jitter, and crackling caused by long-lived WebSockets.
+            # Maintain persistent connection pool (Sarvam SDK default 3600s) to eliminate packet jitter, buffer underruns, and voice crackling
             try:
                 tts_plugin = sarvam.TTS(
                     target_language_code=target_lang,
@@ -1548,51 +1592,17 @@ class VikramAgent(Agent):
                     loudness=sarvam_loudness,
                     speech_sample_rate=sarvam_sample_rate,
                     output_audio_codec="linear16",
-                    max_session_duration=0,  # type: ignore # Fresh WebSocket per request prevents connection degradation & crackling
                 )
-            except TypeError:
-                # Fallback if installed sarvam plugin version manages max_session_duration via connection pool
+            except Exception as sarvam_err:
+                logger.warning(f"[VikramAgent] Sarvam TTS custom init error ({sarvam_err}), falling back to safe linear16 defaults")
                 tts_plugin = sarvam.TTS(
                     target_language_code=target_lang,
                     model=model_name,
                     speaker=sarvam_speaker,
-                    pace=sarvam_pace,
-                    pitch=sarvam_pitch,
                     loudness=sarvam_loudness,
                     speech_sample_rate=sarvam_sample_rate,
                     output_audio_codec="linear16",
                 )
-                if hasattr(tts_plugin, "_pool"):
-                    try:
-                        tts_plugin._pool._max_session_duration = 0
-                    except Exception:
-                        pass
-            except Exception as sarvam_err:
-                logger.warning(f"[VikramAgent] Sarvam TTS custom init error ({sarvam_err}), falling back to safe linear16 defaults")
-                try:
-                    tts_plugin = sarvam.TTS(
-                        target_language_code=target_lang,
-                        model=model_name,
-                        speaker=sarvam_speaker,
-                        loudness=sarvam_loudness,
-                        speech_sample_rate=sarvam_sample_rate,
-                        output_audio_codec="linear16",
-                        max_session_duration=0,  # type: ignore # Fresh WebSocket per request prevents degradation & crackling
-                    )
-                except TypeError:
-                    tts_plugin = sarvam.TTS(
-                        target_language_code=target_lang,
-                        model=model_name,
-                        speaker=sarvam_speaker,
-                        loudness=sarvam_loudness,
-                        speech_sample_rate=sarvam_sample_rate,
-                        output_audio_codec="linear16",
-                    )
-                    if hasattr(tts_plugin, "_pool"):
-                        try:
-                            tts_plugin._pool._max_session_duration = 0
-                        except Exception:
-                            pass
         else:
             tts_plugin = elevenlabs.TTS(voice_id=voice_id)
 
@@ -1638,20 +1648,7 @@ class VikramAgent(Agent):
 
         global _groq_healthy
         if '_groq_healthy' not in globals():
-            _groq_healthy = None
-
-        if groq_api_key and _groq_healthy is None:
-            try:
-                # Fast 1.2s probe to verify Groq key validity
-                with httpx.Client(timeout=1.2) as client:
-                    probe_res = client.get(
-                        "https://api.groq.com/openai/v1/models",
-                        headers={"Authorization": f"Bearer {groq_api_key}"}
-                    )
-                    _groq_healthy = (probe_res.status_code == 200)
-            except Exception:
-                _groq_healthy = False
-            logger.info(f"[VikramAgent] Groq health check result: {_groq_healthy}")
+            _groq_healthy = bool(groq_api_key)
 
         prompt_len = len(instructions or "")
         # Groq on-demand tier enforces an 8,000 TPM limit across all models.
@@ -2421,7 +2418,7 @@ Only return valid JSON."""
                     "https://api.groq.com/openai/v1/chat/completions",
                     headers={"Authorization": f"Bearer {groq_key}", "Content-Type": "application/json"},
                     json={
-                        "model": os.getenv("GROQ_LLM_MODEL", "openai/gpt-oss-120b"),
+                        "model": os.getenv("GROQ_LLM_MODEL", "llama-3.3-70b-versatile"),
                         "messages": [{"role": "user", "content": prompt}],
                         "temperature": 0.1,
                         "max_completion_tokens": 600,
@@ -2441,7 +2438,7 @@ Only return valid JSON."""
             g_client = genai.Client(api_key=gemini_key)
             g_res = await asyncio.to_thread(
                 g_client.models.generate_content,
-                model="gemini-2.5-flash",
+                model="gemini-2.0-flash",
                 contents=prompt,
                 config={"response_mime_type": "application/json"}
             )
@@ -2601,7 +2598,7 @@ Only return valid JSON."""
     if original_call_id:
         try:
             raw_sentiment = str(lead_data.get("sentiment", "neutral")).lower().strip()
-            if (computed_outcome in ("Lead Captured", "Callback Scheduled") or lead_data.get("is_lead")) and raw_sentiment != "negative":
+            if (computed_outcome in ("Lead Captured", "Callback Scheduled", "Appointment Booked") or lead_data.get("is_lead")) and raw_sentiment != "negative":
                 sentiment_val = "positive"
             else:
                 sentiment_val = raw_sentiment if raw_sentiment in ("positive", "neutral", "negative") else "neutral"
@@ -2808,6 +2805,7 @@ Only return valid JSON."""
                         else:
                             raise ins_apt_err
 
+                if appointment_id:
                     if original_call_id:
                         try:
                             await asyncio.to_thread(
@@ -3625,8 +3623,8 @@ async def entrypoint(ctx: JobContext):
                 # 10. Lookup Existing Appointment Records in DB with tenant isolation
                 try:
                     apt_query = supabase_admin.table("appointments").select("contact_name, contact_phone, scheduled_at, meeting_type, status").order("created_at", desc=True)
-                    if organization_id:
-                        apt_query = apt_query.eq("organization_id", organization_id)
+                    if agent_id:
+                        apt_query = apt_query.eq("agent_id", agent_id)
                     elif user_id:
                         apt_query = apt_query.eq("user_id", user_id)
 
@@ -4645,8 +4643,8 @@ async def run_agent(room_name: str, agent_id: str | None = None, contact_id: str
                 # 10. Lookup Existing Appointment Records in DB with tenant isolation
                 try:
                     apt_query = supabase_admin.table("appointments").select("contact_name, contact_phone, scheduled_at, meeting_type, status").order("created_at", desc=True)
-                    if organization_id:
-                        apt_query = apt_query.eq("organization_id", organization_id)
+                    if agent_id:
+                        apt_query = apt_query.eq("agent_id", agent_id)
                     elif user_id:
                         apt_query = apt_query.eq("user_id", user_id)
 

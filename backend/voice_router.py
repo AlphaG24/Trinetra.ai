@@ -140,6 +140,12 @@ async def safe_run_agent(r_name: str, a_id: str | None = None):
         traceback.print_exc()
 
 def dispatch_agent_to_room(room_name: str, agent_id: str | None = None):
+    # Guard against duplicate concurrent spawns for the exact same room
+    if room_name in _running_agent_rooms or room_name in _active_agent_spawns:
+        print(f"[LIVEKIT AGENT] Agent already running or spawned for room '{room_name}'. Skipping duplicate dispatch.", flush=True)
+        return
+
+    _active_agent_spawns.add(room_name)
     in_process_enabled = os.getenv("ENABLE_IN_PROCESS_AGENT", "true").lower() in ("true", "1", "yes")
     if in_process_enabled:
         try:
@@ -147,10 +153,11 @@ def dispatch_agent_to_room(room_name: str, agent_id: str | None = None):
             _active_agent_tasks.add(agent_task)
             agent_task.add_done_callback(_active_agent_tasks.discard)
             print(f"[LIVEKIT AGENT] Dispatched in-process agent task for room {room_name}", flush=True)
+            return
         except Exception as spawn_err:
             print(f"[LIVEKIT AGENT SPAWN ERROR] Failed to spawn agent task: {spawn_err}", flush=True)
 
-    # Also attempt LiveKit Cloud agent dispatch for standalone worker
+    # Only fall back to LiveKit Cloud agent dispatch if in-process is disabled
     try:
         from livekit import api
         from livekit.protocol import agent_dispatch
@@ -418,33 +425,8 @@ async def generate_livekit_token(req: LiveKitTokenRequest):
         print(f"[LIVEKIT TOKEN ERROR] PyJWT generation failed: {str(e)}", flush=True)
         token = f"dev_token_{identity}_{room_name}"
 
-    # Pre-record voice_calls entry for this web session to guarantee deterministic recording and transcript association
-    if req.agent_id:
-        try:
-            call_uid = None
-            call_oid = None
-            ag_data = supabase_admin.table("agents").select("user_id, organization_id").eq("id", req.agent_id).limit(1).execute()
-            if ag_data and ag_data.data:
-                call_uid = ag_data.data[0].get("user_id")
-                call_oid = ag_data.data[0].get("organization_id")
-            supabase_admin.table("voice_calls").insert({
-                "agent_id": req.agent_id,
-                "user_id": call_uid,
-                "organization_id": call_oid,
-                "caller_name": participant_name,
-                "caller_phone": "Browser Sandbox",
-                "status": "in_progress",
-                "started_at": datetime.utcnow().isoformat(),
-                "duration_seconds": 0,
-                "metadata": {
-                    "room_name": room_name,
-                    "provider_call_id": room_name,
-                    "session_id": room_name,
-                    "direction": "sandbox"
-                }
-            }).execute()
-        except Exception as vc_pre_err:
-            print(f"[LIVEKIT TOKEN] voice_calls pre-create notice: {vc_pre_err}", flush=True)
+    # NOTE: voice_calls pre-record is handled by the Next.js frontend livekit-token route.
+    # Removed duplicate insert here to prevent double call log entries.
 
     # Dispatch agent to join the room (in-process fallback + cloud dispatch)
     dispatch_agent_to_room(room_name, req.agent_id)

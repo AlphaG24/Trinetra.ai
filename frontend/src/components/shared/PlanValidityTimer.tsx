@@ -11,6 +11,7 @@ export interface PlanValidityTimerProps {
   size?: "xs" | "sm" | "md";
   showProgress?: boolean;
   className?: string;
+  hasRemainingQuota?: boolean;
 }
 
 export function PlanValidityTimer({
@@ -20,7 +21,8 @@ export function PlanValidityTimer({
   label = "Validity",
   size = "sm",
   showProgress = true,
-  className = ""
+  className = "",
+  hasRemainingQuota = false
 }: PlanValidityTimerProps) {
   const [timeLeft, setTimeLeft] = useState<{
     days: number;
@@ -62,7 +64,7 @@ export function PlanValidityTimer({
           minutes: 0,
           daysPassed: totalDays,
           percentPassed: 100,
-          isExpired: true
+          isExpired: !hasRemainingQuota
         });
         return;
       }
@@ -99,7 +101,7 @@ export function PlanValidityTimer({
     calculateTime();
     const interval = setInterval(calculateTime, 60000); // recalculate every minute
     return () => clearInterval(interval);
-  }, [createdAt, expiresAt, validityDays]);
+  }, [createdAt, expiresAt, validityDays, hasRemainingQuota]);
 
   const isUrgent = !timeLeft.isExpired && timeLeft.days <= 5;
 
@@ -123,6 +125,8 @@ export function PlanValidityTimer({
           <span className={`${size === "xs" ? "text-[10px]" : "text-[11px]"} font-medium text-[var(--muted)] font-mono`}>
             {timeLeft.isExpired ? (
               <span className="text-rose-400 font-bold">Pack Expired</span>
+            ) : timeLeft.days === 0 && timeLeft.hours === 0 ? (
+              <span className="text-emerald-500 font-bold">Active (Minutes Remaining)</span>
             ) : (
               <span>
                 <strong className={isUrgent ? "text-amber-400" : "text-[var(--heading)]"}>
@@ -137,7 +141,7 @@ export function PlanValidityTimer({
         </div>
 
         <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider border ${badgeBg}`}>
-          {timeLeft.isExpired ? "Expired" : `${100 - timeLeft.percentPassed}% Remain`}
+          {timeLeft.isExpired ? "Expired" : timeLeft.days === 0 && timeLeft.hours === 0 ? "Active" : `${100 - timeLeft.percentPassed}% Remain`}
         </span>
       </div>
 

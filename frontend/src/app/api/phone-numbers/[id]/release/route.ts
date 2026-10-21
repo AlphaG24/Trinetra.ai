@@ -98,23 +98,41 @@ export async function POST(
             console.warn('[Release API] Backend release ping notice:', backendErr);
         }
 
-        // 7. Update phone_numbers record to released and clear all assignments
-        const { error: updateError } = await adminClient
-            .from("phone_numbers")
-            .update({ 
-                status: 'released',
-                organization_id: null,
-                assigned_org_id: null,
-                assigned_agent_id: null,
-                is_assigned: false,
-                renewal_date: null,
-                released_at: new Date().toISOString() 
-            })
-            .eq("id", phone_number_id);
+        const isByon = 
+            Boolean(phone_number.metadata?.byon) || 
+            phone_number.provider === 'exotel' || 
+            phone_number.source === 'byon';
 
-        if (updateError) {
-            console.error('[Release API] Error releasing phone number:', updateError);
-            return NextResponse.json({ error: "Database error releasing number: " + updateError.message }, { status: 500 });
+        if (isByon) {
+            // BYON numbers are tenant-owned integrated numbers; delete instead of returning to global pool
+            const { error: deleteNumError } = await adminClient
+                .from("phone_numbers")
+                .delete()
+                .eq("id", phone_number_id);
+
+            if (deleteNumError) {
+                console.error('[Release API] Error removing BYON phone number:', deleteNumError);
+                return NextResponse.json({ error: "Database error removing BYON number: " + deleteNumError.message }, { status: 500 });
+            }
+        } else {
+            // 7. Update phone_numbers record to released and clear all assignments
+            const { error: updateError } = await adminClient
+                .from("phone_numbers")
+                .update({ 
+                    status: 'released',
+                    organization_id: null,
+                    assigned_org_id: null,
+                    assigned_agent_id: null,
+                    is_assigned: false,
+                    renewal_date: null,
+                    released_at: new Date().toISOString() 
+                })
+                .eq("id", phone_number_id);
+
+            if (updateError) {
+                console.error('[Release API] Error releasing phone number:', updateError);
+                return NextResponse.json({ error: "Database error releasing number: " + updateError.message }, { status: 500 });
+            }
         }
 
         // 8. In-app activity and notification
@@ -122,21 +140,26 @@ export async function POST(
             await adminClient.from("notifications").insert({
                 user_id: user.id,
                 organization_id: profile.organization_id,
-                title: "Phone Number Released",
-                message: `Phone number ${phone_number.phone_number} has been released and returned to the pool.`,
-                type: "number_released",
+                title: isByon ? "BYON Number Removed" : "Phone Number Released",
+                message: isByon 
+                    ? `BYON phone number ${phone_number.phone_number} has been removed.`
+                    : `Phone number ${phone_number.phone_number} has been released and returned to the pool.`,
+                type: isByon ? "byon_number_removed" : "number_released",
                 read: false
             });
 
             await adminClient.from("activity_log").insert({
                 user_id: user.id,
-                activity_type: "number_released",
-                title: "Phone Number Released",
-                description: `Released number ${phone_number.phone_number}`,
+                activity_type: isByon ? "byon_number_removed" : "number_released",
+                title: isByon ? "BYON Number Removed" : "Phone Number Released",
+                description: isByon 
+                    ? `Removed BYON number ${phone_number.phone_number}`
+                    : `Released number ${phone_number.phone_number}`,
                 metadata: {
                     organization_id: profile.organization_id,
                     phone_number: phone_number.phone_number,
-                    phone_number_id: phone_number_id
+                    phone_number_id: phone_number_id,
+                    is_byon: isByon
                 }
             });
         } catch (logErr) {
@@ -145,7 +168,9 @@ export async function POST(
 
         return NextResponse.json({ 
             success: true, 
-            message: `Number ${phone_number.phone_number} successfully released.` 
+            message: isByon 
+                ? `BYON number ${phone_number.phone_number} successfully removed.`
+                : `Number ${phone_number.phone_number} successfully released.` 
         });
 
     } catch (err: any) {

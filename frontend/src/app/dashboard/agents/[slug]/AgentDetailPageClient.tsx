@@ -521,10 +521,8 @@ export function AgentDetailPageClient({
   const demoMinutesUsed = profile?.demo_minutes_used ?? 0
   const remainingMinutes = Math.max(0, demoMinutesLimit - demoMinutesUsed)
   
-  // Demo Agent Expiration: older than 5 days OR demo minutes used >= limit (10 minutes)
-  const agentCreatedAt = agent?.created_at ? new Date(agent.created_at) : new Date()
-  const daysActive = Math.ceil((Date.now() - agentCreatedAt.getTime()) / (1000 * 60 * 60 * 24))
-  const isDemoExpired = (tier === 'free_demo' || agent?.is_demo) && (daysActive > 5 || demoMinutesUsed >= demoMinutesLimit)
+  // Demo Agent Expiration: demo minutes used >= limit (10 minutes)
+  const isDemoExpired = (tier === 'free_demo' || agent?.is_demo) && (demoMinutesUsed >= demoMinutesLimit)
   const isPaused = agent?.status === 'paused' || agent?.status === 'Paused'
   const isExpired = isDemoExpired || isPaused
 
@@ -588,9 +586,6 @@ export function AgentDetailPageClient({
   const upgradeUrl = '/dashboard/billing'
 
   if (isExpired) {
-    const daysActiveValue = (Date.now() - agentCreatedAt.getTime()) / (1000 * 60 * 60 * 24)
-    const isLifespanExceeded = daysActiveValue > 5
-
     return (
       <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/75 backdrop-blur-md p-4">
         <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-8 max-w-md w-full shadow-2xl text-center space-y-6 animate-in zoom-in-95 duration-200">
@@ -601,9 +596,7 @@ export function AgentDetailPageClient({
           <p className="text-xs text-[var(--muted)] leading-relaxed">
             {isPaused 
               ? 'This agent has been paused. You cannot interact with it or make calls while it is paused.'
-              : isLifespanExceeded
-                ? 'This free demo agent has expired because its 5-day trial period has ended.' 
-                : 'This free demo agent has expired because its calls minutes quota has been fully exhausted.'}
+              : 'This free demo agent has expired because its calls minutes quota has been fully exhausted.'}
             {' '}
             {!isPaused && 'Please upgrade to a paid plan or purchase a bundle pack to reactivate settings and continue calling.'}
           </p>
@@ -807,7 +800,7 @@ export function AgentDetailPageClient({
           <p className="text-[var(--body)] max-w-md mx-auto mb-8 leading-relaxed">
             {isTrialExpired 
               ? "Your trial period has ended. Please upgrade to a paid plan to unlock full access to this agent and all features."
-              : "This demo agent has expired because it has been active for more than 5 days or has reached its minute limit. Please upgrade to a paid plan to unlock full access to this agent and all features."}
+              : "This demo agent has expired because its call minutes quota has been fully exhausted. Please upgrade to a paid plan to unlock full access to this agent and all features."}
           </p>
           <Link
             href={upgradeUrl}

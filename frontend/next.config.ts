@@ -108,6 +108,11 @@ const nextConfig: NextConfig = {
         permanent: false,
       },
       {
+        source: '/dashboard/settings/kyc',
+        destination: '/dashboard/kyc',
+        permanent: false,
+      },
+      {
         source: '/dashboard/integrations',
         destination: '/dashboard/settings?tab=integrations',
         permanent: false,

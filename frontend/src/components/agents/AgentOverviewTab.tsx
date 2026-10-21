@@ -708,6 +708,7 @@ export function AgentOverviewTab({
                   validityDays={agent.validity_days || 30}
                   size="sm"
                   showProgress={true}
+                  hasRemainingQuota={Boolean(!agentUsage || agentUsage.limit === 0 || agentUsage.used < agentUsage.limit)}
                 />
               </div>
               {usageLoading ? (

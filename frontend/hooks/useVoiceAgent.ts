@@ -178,7 +178,14 @@ export function useVoiceAgent() {
               window.dispatchEvent(new CustomEvent('trinetra:call_completed', {
                 detail: { roomName: callMeta?.roomName, agentId: callMeta?.agentId, duration: dur }
               }))
-              toast.success('Call recording saved successfully')
+              const isSandboxOrDemo = Boolean(
+                callMeta?.roomName?.includes('demo') || 
+                callMeta?.roomName?.includes('sandbox') ||
+                callMeta?.roomName?.includes('preview')
+              );
+              if (!isSandboxOrDemo) {
+                toast.success('Call recording saved successfully');
+              }
             }
           } catch (err) {
             console.warn('[useVoiceAgent] Recording upload error:', err)
@@ -218,7 +225,7 @@ export function useVoiceAgent() {
   }, [cleanupCallResources, stopTimer, uploadRecording])
 
   const startCall = useCallback(async (
-    roomName: string = 'trinetra-demo-room',
+    rawRoomName?: string,
     participantName?: string,
     agentId?: string
   ) => {
@@ -228,6 +235,10 @@ export function useVoiceAgent() {
     // Clean up any residual resources from previous calls first
     cleanupCallResources()
     disconnectingRef.current = false
+
+    const roomName = (!rawRoomName || rawRoomName === 'trinetra-demo-room') 
+      ? `room-${agentId ? agentId.slice(0, 8) + '-' : ''}${Date.now().toString().slice(-6)}` 
+      : rawRoomName;
 
     setConnectionState('connecting')
     setTranscripts([])

@@ -160,11 +160,20 @@ class NumberService:
             provider = get_provider(number_data.get("provider"))
             await provider.release_number(number_data.get("provider_number_id"))
 
-            # STEP 4: Update phone_numbers status
-            self.supabase.table("phone_numbers").update({
-                "status": "released",
-                "released_at": datetime.now(timezone.utc).isoformat()
-            }).eq("id", phone_number_id).execute()
+            is_byon = (
+                number_data.get("provider") == "exotel" or
+                number_data.get("source") == "byon" or
+                bool((number_data.get("metadata") or {}).get("byon")) or
+                bool((number_data.get("metadata") or {}).get("is_byon"))
+            )
+            if is_byon:
+                self.supabase.table("phone_numbers").delete().eq("id", phone_number_id).execute()
+            else:
+                self.supabase.table("phone_numbers").update({
+                    "status": "released",
+                    "organization_id": None,
+                    "released_at": datetime.now(timezone.utc).isoformat()
+                }).eq("id", phone_number_id).execute()
 
             # STEP 5: Write to audit_logs
             try:

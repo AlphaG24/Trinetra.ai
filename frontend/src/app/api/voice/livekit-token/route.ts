@@ -125,21 +125,24 @@ async function generateLiveKitToken({
     });
 
     let dispatched = false;
-    // 1. Try local FastAPI backend if active
-    try {
-      const localController = new AbortController();
-      const localTimeout = setTimeout(() => localController.abort(), 1200);
-      const localRes = await fetch('http://127.0.0.1:8000/api/voice/livekit-token', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: payload,
-        signal: localController.signal,
-      });
-      clearTimeout(localTimeout);
-      if (localRes.ok) {
-        dispatched = true;
-      }
-    } catch {}
+    const isCloudEnv = process.env.NODE_ENV === 'production' || Boolean(process.env.VERCEL);
+    // 1. Try local FastAPI backend only in local dev environment
+    if (!isCloudEnv) {
+      try {
+        const localController = new AbortController();
+        const localTimeout = setTimeout(() => localController.abort(), 300);
+        const localRes = await fetch('http://127.0.0.1:8000/api/voice/livekit-token', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: payload,
+          signal: localController.signal,
+        });
+        clearTimeout(localTimeout);
+        if (localRes.ok) {
+          dispatched = true;
+        }
+      } catch {}
+    }
 
     // 2. If local backend did not dispatch, dispatch via Render cloud backend
     if (!dispatched) {

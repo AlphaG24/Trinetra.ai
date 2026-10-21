@@ -46,7 +46,7 @@ greetings = [
         'id': 'pa',
         'provider': 'sarvam',
         'lang': 'pa-IN',
-        'speaker': 'shubh',
+        'speaker': 'shreya',
         'sentence': 'ਸਤਿ ਸ੍ਰੀ ਅਕਾਲ ਜੀ! ਮੈਂ ਵਾਕ੍ਰਿਤੀ ਏਆਈ ਤੋਂ ਬੋਲ ਰਹੀ ਹਾਂ, ਅੱਜ ਮੈਂ ਤੁਹਾਡੀ ਕੀ ਸੇਵਾ ਕਰ ਸਕਦੀ ਹਾਂ?'
     },
     {
@@ -66,7 +66,7 @@ greetings = [
         'id': 'ur',
         'provider': 'sarvam',
         'lang': 'hi-IN',
-        'speaker': 'shubh',
+        'speaker': 'shreya',
         'sentence': 'Assalam-o-Alaikum! Main Vaakriti AI se aapki voice assistant bol rahi hoon, aaj aapki kya khidmat kar sakti hoon?'
     },
     {

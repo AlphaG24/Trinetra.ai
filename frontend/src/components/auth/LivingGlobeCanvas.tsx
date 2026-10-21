@@ -76,8 +76,16 @@ export function LivingGlobeCanvas() {
         const brightness = (r * 0.299 + g * 0.587 + b * 0.114)
         if (a < 15 || brightness < 10) continue
 
-        // Check if pixel is India's golden amber beacon
-        const isGold = (r > 150 && g > 110 && b < 100 && r > b * 1.5)
+        // Sanitize any residual yellow/amber artifact pixels to harmonious deep blue/indigo
+        let finalR = r
+        let finalG = g
+        let finalB = b
+        if (r > 140 && g > 110 && b < 120 && (r > b * 1.3 || g > b * 1.3)) {
+          finalR = 18
+          finalG = 32
+          finalB = 68
+        }
+
         const isBright = brightness > 140
 
         // Use slightly expanded integer block to eliminate sub-pixel antialiasing gaps
@@ -90,10 +98,10 @@ export function LivingGlobeCanvas() {
           y: py,
           vx: 0,
           vy: 0,
-          color: `rgb(${r},${g},${b})`,
+          color: `rgb(${finalR},${finalG},${finalB})`,
           size: blockSize,
           isBright,
-          isGold,
+          isGold: false,
         })
       }
     }

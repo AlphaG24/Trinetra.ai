@@ -142,8 +142,15 @@ export default function AgentsDashboardPage() {
   }
 
   // Group Agents into Demo vs Deployed
-  const demoAgents = agents.filter(a => a.is_demo === true || a.status === 'draft' || a.status === 'beta' || a.agent_type === 'free_demo')
-  const deployedAgents = agents.filter(a => !(a.is_demo === true || a.status === 'draft' || a.status === 'beta' || a.agent_type === 'free_demo'))
+  const isDemoAgent = (a: any) => {
+    const planTier = a.config?.plan_tier || a.plan_tier;
+    if (planTier && ['starter', 'professional', 'enterprise', 'outcome_based'].includes(planTier)) {
+      return false;
+    }
+    return a.is_demo === true || a.agent_type === 'free_demo';
+  }
+  const demoAgents = agents.filter(isDemoAgent)
+  const deployedAgents = agents.filter(a => !isDemoAgent(a))
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
