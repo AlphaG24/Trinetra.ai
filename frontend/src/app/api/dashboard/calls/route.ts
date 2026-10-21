@@ -3,7 +3,7 @@ import { createClient } from '@/lib/server'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { safeApiHandler } from '@/utils/apiAuth'
 
-export const GET = safeApiHandler(async (request: NextRequest) => {
+export const GET = safeApiHandler(async (request: Request) => {
   const supabase = await createClient()
   const { data: { user }, error: authError } = await supabase.auth.getUser()
 

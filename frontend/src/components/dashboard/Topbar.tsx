@@ -11,7 +11,7 @@ import { VaakritiWordmark } from '@/components/ui/VaakritiWordmark'
 export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
   const { user: authUser, profile: authProfile, signOut: authSignOut } = useAuth()
   const [profile, setProfile] = useState<UserProfile | null>(null)
-  const [user, setUser] = useState<{ email?: string; user_metadata?: { full_name?: string } } | null>(null)
+  const [user, setUser] = useState<{ email?: string; user_metadata?: { full_name?: string; name?: string; [key: string]: any } } | null>(null)
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
   const [notifications, setNotifications] = useState<any[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
