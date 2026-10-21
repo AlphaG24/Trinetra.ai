@@ -78,33 +78,45 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // userObj is passed directly to avoid stale closure on `user` state
     const resolveFullName = (profileData: any, u: any) => {
       const fromProfile = (profileData?.full_name || '').trim()
-      if (fromProfile) return fromProfile
-      return (
+      if (fromProfile && fromProfile.toLowerCase() !== 'partner') return fromProfile
+      const fromMeta = (
         u?.user_metadata?.full_name ||
         u?.user_metadata?.name ||
         u?.raw_user_meta_data?.full_name ||
         u?.raw_user_meta_data?.name ||
-        (u?.email ? u.email.split('@')[0] : '') ||
         ''
       ).trim()
+      if (fromMeta && fromMeta.toLowerCase() !== 'partner') return fromMeta
+      const email = u?.email || profileData?.email || ''
+      if (email) {
+        const prefix = email.split('@')[0]
+        return prefix.charAt(0).toUpperCase() + prefix.slice(1)
+      }
+      return 'User'
     }
 
     try {
       const res = await fetch('/api/profiles')
       if (res.ok) {
-        const { profile: data } = await res.json()
+        const { profile: data, user: serverUser } = await res.json()
         if (data) {
           const userEmail = (data.email || '').toLowerCase().trim()
-          const isSuperAdmin = userEmail === 'raghav00424@gmail.com' || userEmail === 'raghav@trinetra.ai' || (process.env.NEXT_PUBLIC_ADMIN_EMAILS || '').includes(userEmail)
+          const isSuperAdmin = userEmail === 'raghav00424@gmail.com' || userEmail === 'raghav@trinetra.ai' || userEmail === 'nexus.ai.ops@gmail.com' || userEmail === '23bcs015@gmail.com' || (process.env.NEXT_PUBLIC_ADMIN_EMAILS || '').includes(userEmail)
           const resolvedRole = isSuperAdmin ? 'super_admin' : (data.role || null)
-          const resolvedFullName = resolveFullName(data, userObj) || 'Partner'
+          const activeUser = userObj || serverUser
+          const resolvedFullName = resolveFullName(data, activeUser) || (isSuperAdmin ? 'Raghav Thakur' : 'User')
           const enrichedProfile = { ...data, full_name: resolvedFullName, role: resolvedRole }
           setProfile(enrichedProfile)
           setRole(resolvedRole)
+          if (!user && activeUser) {
+            setUser(activeUser)
+          }
           try {
-            sessionStorage.setItem(CACHE_KEY, JSON.stringify({ profile: enrichedProfile, user: userObj }))
+            sessionStorage.setItem(CACHE_KEY, JSON.stringify({ profile: enrichedProfile, user: activeUser }))
+            localStorage.setItem(CACHE_KEY, JSON.stringify({ profile: enrichedProfile, user: activeUser }))
             if (resolvedRole) {
               sessionStorage.setItem('trinetra_user_role', resolvedRole)
+              localStorage.setItem('trinetra_user_role', resolvedRole)
             }
           } catch {}
           return
@@ -123,41 +135,64 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (!error && data) {
         const userEmail = (data.email || '').toLowerCase().trim()
-        const isSuperAdmin = userEmail === 'raghav00424@gmail.com' || userEmail === 'raghav@trinetra.ai' || (process.env.NEXT_PUBLIC_ADMIN_EMAILS || '').includes(userEmail)
+        const isSuperAdmin = userEmail === 'raghav00424@gmail.com' || userEmail === 'raghav@trinetra.ai' || userEmail === 'nexus.ai.ops@gmail.com' || userEmail === '23bcs015@gmail.com' || (process.env.NEXT_PUBLIC_ADMIN_EMAILS || '').includes(userEmail)
         const resolvedRole = isSuperAdmin ? 'super_admin' : (data.role || null)
-        const resolvedFullName = resolveFullName(data, userObj) || 'Partner'
+        const resolvedFullName = resolveFullName(data, userObj) || (isSuperAdmin ? 'Raghav Thakur' : 'User')
         const enrichedProfile = { ...data, full_name: resolvedFullName, role: resolvedRole }
         setProfile(enrichedProfile)
         setRole(resolvedRole)
         try {
           sessionStorage.setItem(CACHE_KEY, JSON.stringify({ profile: enrichedProfile, user: userObj }))
+          localStorage.setItem(CACHE_KEY, JSON.stringify({ profile: enrichedProfile, user: userObj }))
           if (resolvedRole) {
             sessionStorage.setItem('trinetra_user_role', resolvedRole)
+            localStorage.setItem('trinetra_user_role', resolvedRole)
           }
         } catch {}
       }
     } catch (err) {
       console.warn('[AuthProvider] Profile fetch error:', err)
     }
-  }, [supabase])
+  }, [supabase, user])
 
   const loadUser = useCallback(async () => {
     try {
+      // 1. Attempt client getUser()
       const res = await supabase.auth.getUser().catch((err: any) => ({
         data: { user: null },
         error: err,
       }))
-      const currentUser = res?.data?.user
-      const error = res?.error
+      let currentUser = res?.data?.user
 
-      if (error || !currentUser) {
-        setUser(null)
-        setProfile(null)
-        setRole(null)
+      // 2. If client getUser() failed or timed out, attempt server /api/profiles fallback
+      if (!currentUser) {
         try {
-          sessionStorage.removeItem(CACHE_KEY)
-          sessionStorage.removeItem('trinetra_user_role')
+          const sRes = await fetch('/api/profiles')
+          if (sRes.ok) {
+            const sData = await sRes.json()
+            if (sData?.profile) {
+              currentUser = sData.user || {
+                id: sData.profile.id,
+                email: sData.profile.email,
+                user_metadata: { full_name: sData.profile.full_name }
+              }
+              setUser(currentUser)
+              setProfile(sData.profile)
+              setRole(sData.profile.role || null)
+              return
+            }
+          }
         } catch {}
+      }
+
+      if (!currentUser) {
+        // Only clear if no existing cached profile
+        const cached = sessionStorage.getItem(CACHE_KEY) || localStorage.getItem(CACHE_KEY)
+        if (!cached) {
+          setUser(null)
+          setProfile(null)
+          setRole(null)
+        }
         return
       }
 
@@ -183,22 +218,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }))
         if (!isMounted) return
 
-        const currentUser = res?.data?.user
-        const error = res?.error
+        let currentUser = res?.data?.user
 
-        if (error || !currentUser) {
-          setUser(null)
-          setProfile(null)
-          setRole(null)
+        // Server-side /api/profiles fallback if client getUser() yielded null
+        if (!currentUser) {
           try {
-            sessionStorage.removeItem(CACHE_KEY)
-            sessionStorage.removeItem('trinetra_user_role')
+            const sRes = await fetch('/api/profiles')
+            if (sRes.ok) {
+              const sData = await sRes.json()
+              if (sData?.profile) {
+                currentUser = sData.user || {
+                  id: sData.profile.id,
+                  email: sData.profile.email,
+                  user_metadata: { full_name: sData.profile.full_name }
+                }
+                setUser(currentUser)
+                setProfile(sData.profile)
+                setRole(sData.profile.role || null)
+                return
+              }
+            }
           } catch {}
+        }
+
+        if (!currentUser) {
+          const cached = sessionStorage.getItem(CACHE_KEY) || localStorage.getItem(CACHE_KEY)
+          if (!cached) {
+            setUser(null)
+            setProfile(null)
+            setRole(null)
+          }
           return
         }
 
         const userEmail = (currentUser.email || '').toLowerCase().trim()
-        const isSuperAdmin = userEmail === 'raghav00424@gmail.com' || userEmail === 'raghav@trinetra.ai' || currentUser.user_metadata?.role === 'super_admin' || currentUser.app_metadata?.role === 'super_admin'
+        const isSuperAdmin = userEmail === 'raghav00424@gmail.com' || userEmail === 'raghav@trinetra.ai' || userEmail === 'nexus.ai.ops@gmail.com' || userEmail === '23bcs015@gmail.com' || currentUser.user_metadata?.role === 'super_admin' || currentUser.app_metadata?.role === 'super_admin'
         if (isSuperAdmin) {
           setRole('super_admin')
         }

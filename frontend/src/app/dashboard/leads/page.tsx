@@ -16,13 +16,34 @@ export default async function LeadsPage() {
 
   if (!user) redirect('/login')
 
-  // Fetch user's actual agents
-  const { data: dbAgents } = await supabase
+  const userEmail = (user.email || '').toLowerCase().trim()
+  const isSuperAdmin = userEmail === 'raghav00424@gmail.com' || userEmail === 'raghav@trinetra.ai' || userEmail === 'nexus.ai.ops@gmail.com' || userEmail === '23bcs015@gmail.com'
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('organization_id, role')
+    .eq('id', user.id)
+    .maybeSingle()
+
+  const isPrivileged = isSuperAdmin || ['developer_tester', 'admin', 'super_admin'].includes(profile?.role || '')
+  const orgId = profile?.organization_id || (isSuperAdmin ? 'b1ddf1e9-abc1-4ff4-90f5-3ac66913738a' : null)
+
+  // Fetch agents
+  let agentQuery = supabase
     .from('agents')
     .select('id, name, agent_type, status')
-    .eq('user_id', user.id)
     .neq('status', 'deleted')
     .order('name', { ascending: true })
+
+  if (!isPrivileged) {
+    if (orgId) {
+      agentQuery = agentQuery.or(`user_id.eq.${user.id},organization_id.eq.${orgId}`)
+    } else {
+      agentQuery = agentQuery.eq('user_id', user.id)
+    }
+  }
+
+  const { data: dbAgents } = await agentQuery
 
   const agents = (dbAgents || []).map((a: any) => ({
     id: a.id,
@@ -31,18 +52,32 @@ export default async function LeadsPage() {
     status: a.status
   }))
 
-  // Fetch leads for the current user
-  const { data: leads } = await supabase
+  // Fetch leads
+  let leadQuery = supabase
     .from('leads')
     .select('*')
-    .eq('user_id', user.id)
     .order('created_at', { ascending: false })
 
-  // Fetch revenue events for the current user/business
-  const { data: revenueEvents } = await supabase
+  if (!isPrivileged) {
+    if (orgId) {
+      leadQuery = leadQuery.or(`user_id.eq.${user.id},organization_id.eq.${orgId}`)
+    } else {
+      leadQuery = leadQuery.eq('user_id', user.id)
+    }
+  }
+
+  const { data: leads } = await leadQuery
+
+  // Fetch revenue events
+  let revQuery = supabase
     .from('revenue_events')
     .select('id, lead_id, call_id, quoted_amount, won_amount, deal_status, price_type, source')
-    .eq('business_id', user.id)
+
+  if (!isPrivileged) {
+    revQuery = revQuery.eq('business_id', user.id)
+  }
+
+  const { data: revenueEvents } = await revQuery
 
   return (
     <LeadsPageClient 

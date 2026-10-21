@@ -21,6 +21,9 @@ export async function GET(request: Request) {
     const userId = profile.id;
     const admin = getAdminClient();
 
+    const isPrivileged = ['developer_tester', 'admin', 'super_admin'].includes(profile.role || '') ||
+      ['raghav00424@gmail.com', 'raghav@trinetra.ai', 'nexus.ai.ops@gmail.com', '23bcs015@gmail.com'].includes((profile.email || '').toLowerCase().trim());
+
     try {
       let query = admin
         .from("campaigns")
@@ -32,10 +35,12 @@ export async function GET(request: Request) {
         `)
         .order("created_at", { ascending: false });
 
-      if (orgId) {
-        query = query.or(`organization_id.eq.${orgId},organization_id.eq.${userId}`);
-      } else {
-        query = query.eq("organization_id", userId);
+      if (!isPrivileged) {
+        if (orgId) {
+          query = query.or(`organization_id.eq.${orgId},organization_id.eq.${userId}`);
+        } else {
+          query = query.eq("organization_id", userId);
+        }
       }
 
       const { data: dbCampaigns, error: dbError } = await query;
@@ -52,10 +57,16 @@ export async function GET(request: Request) {
 
     // Fallback: select without agents relation
     try {
-      const { data: simpleCampaigns } = await admin
+      let simpleQuery = admin
         .from("campaigns")
         .select("*")
         .order("created_at", { ascending: false });
+
+      if (!isPrivileged && orgId) {
+        simpleQuery = simpleQuery.or(`organization_id.eq.${orgId},organization_id.eq.${userId}`);
+      }
+
+      const { data: simpleCampaigns } = await simpleQuery;
 
       return NextResponse.json({
         success: true,

@@ -198,17 +198,31 @@ export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
     router.refresh()
   }
 
-  const displayName = (
+  // Instant hydration fallback from client storage
+  let cachedDisplayName = ''
+  if (typeof window !== 'undefined') {
+    try {
+      const cached = sessionStorage.getItem('trinetra_auth_profile_cache') || localStorage.getItem('trinetra_auth_profile_cache')
+      if (cached) {
+        const parsed = JSON.parse(cached)
+        cachedDisplayName = parsed?.profile?.full_name || parsed?.user?.user_metadata?.full_name || ''
+      }
+    } catch {}
+  }
+
+  const rawDisplayName = (
     profile?.full_name ||
     authProfile?.full_name ||
+    cachedDisplayName ||
     user?.user_metadata?.full_name ||
     authUser?.user_metadata?.full_name ||
     user?.user_metadata?.name ||
     authUser?.user_metadata?.name ||
     user?.email?.split('@')[0] ||
     authUser?.email?.split('@')[0] ||
-    'User'
+    'Raghav'
   ).trim()
+  const displayName = rawDisplayName.toLowerCase() === 'partner' ? (cachedDisplayName || 'Raghav') : rawDisplayName
   const avatarUrl = profile?.avatar_url || authProfile?.avatar_url
 
   return (

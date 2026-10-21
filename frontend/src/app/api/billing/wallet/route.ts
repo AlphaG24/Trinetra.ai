@@ -37,9 +37,30 @@ export async function GET() {
       .eq('id', user.id)
       .single()
 
-    const orgId = profile?.organization_id
+    const PRIMARY_TRINETRA_ORG = 'b1ddf1e9-abc1-4ff4-90f5-3ac66913738a'
+    let orgId = profile?.organization_id
     if (!orgId) {
-      return NextResponse.json({ error: 'No organization linked to profile' }, { status: 400 })
+      const userEmail = (user.email || '').toLowerCase().trim()
+      const isSuperAdmin = userEmail === 'raghav00424@gmail.com' || userEmail === 'raghav@trinetra.ai' || userEmail === 'nexus.ai.ops@gmail.com' || userEmail === '23bcs015@gmail.com'
+      if (isSuperAdmin) {
+        orgId = PRIMARY_TRINETRA_ORG
+      } else {
+        try {
+          const { data: newOrg } = await adminClient
+            .from('organizations')
+            .insert({ name: `${user.user_metadata?.full_name || user.email?.split('@')[0] || 'User'}'s Workspace` })
+            .select('id')
+            .single()
+          orgId = newOrg?.id || PRIMARY_TRINETRA_ORG
+        } catch {
+          orgId = PRIMARY_TRINETRA_ORG
+        }
+      }
+      try {
+        await adminClient.from('profiles').update({ organization_id: orgId }).eq('id', user.id)
+      } catch (upErr) {
+        console.warn('Failed to auto-heal org in billing route:', upErr)
+      }
     }
 
     // Fetch dynamic system_config (P3, P7, P8)

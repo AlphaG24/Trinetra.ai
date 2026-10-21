@@ -206,11 +206,10 @@ export function RevenueDashboardClient({ embedded = false }: { embedded?: boolea
             <button
               key={tab}
               onClick={() => setRange(tab)}
-              className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                range === tab
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${range === tab
                   ? 'bg-neutral-900 text-white shadow-sm dark:bg-white dark:text-neutral-900'
                   : 'text-[var(--muted)] hover:text-[var(--heading)] hover:bg-[var(--hover-bg)]'
-              }`}
+                }`}
             >
               {tab === 'this_month' ? 'This Month' : tab === '30d' ? 'Last 30 Days' : 'Last 7 Days'}
             </button>
@@ -442,13 +441,12 @@ export function RevenueDashboardClient({ embedded = false }: { embedded?: boolea
                       </td>
                       <td className="py-3.5 whitespace-nowrap">
                         <span
-                          className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
-                            isWon
+                          className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${isWon
                               ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30'
                               : isLost
-                              ? 'bg-zinc-500/15 text-zinc-600 dark:text-zinc-400 border border-zinc-500/30'
-                              : 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30'
-                          }`}
+                                ? 'bg-zinc-500/15 text-zinc-600 dark:text-zinc-400 border border-zinc-500/30'
+                                : 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30'
+                            }`}
                         >
                           {ev.deal_status}
                         </span>

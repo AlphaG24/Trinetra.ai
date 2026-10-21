@@ -50,6 +50,10 @@ export function CallAudioPlayer({
         return `/api/recordings/twilio/${last}.mp3`
       }
     }
+    // Route Supabase storage URLs through proxy to eliminate cross-origin, byte range, and codec issues
+    if (trimmed.startsWith('https://') && trimmed.includes('.supabase.co/storage/')) {
+      return `/api/recordings/proxy?url=${encodeURIComponent(trimmed)}`
+    }
     return trimmed
   }, [recordingUrl])
 
@@ -120,9 +124,12 @@ export function CallAudioPlayer({
   }
 
   const handleError = () => {
-    setAudioError(true)
-    setIsPlaying(false)
-    setIsLoading(false)
+    // Only set audioError if the user was actively trying to play or if the source is completely unplayable
+    if (isPlaying) {
+      setAudioError(true)
+      setIsPlaying(false)
+      setIsLoading(false)
+    }
   }
 
   // Handle scrubber seek
@@ -221,6 +228,7 @@ export function CallAudioPlayer({
         <audio
           ref={audioRef}
           src={normalizedRecordingUrl}
+          crossOrigin="anonymous"
           onTimeUpdate={handleTimeUpdate}
           onLoadedMetadata={handleLoadedMetadata}
           onEnded={handleEnded}

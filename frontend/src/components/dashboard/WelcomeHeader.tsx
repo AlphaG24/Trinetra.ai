@@ -36,15 +36,29 @@ export function WelcomeHeader({
     )
   }
 
-  const effectiveName = (
+  // Instant hydration fallback from client storage
+  let cachedName = ''
+  if (typeof window !== 'undefined') {
+    try {
+      const cached = sessionStorage.getItem('trinetra_auth_profile_cache') || localStorage.getItem('trinetra_auth_profile_cache')
+      if (cached) {
+        const parsed = JSON.parse(cached)
+        cachedName = parsed?.profile?.full_name || parsed?.user?.user_metadata?.full_name || ''
+      }
+    } catch {}
+  }
+
+  const rawEffective = (
     fullName ||
     authProfile?.full_name ||
     authUser?.user_metadata?.full_name ||
     authUser?.user_metadata?.name ||
+    cachedName ||
     (authUser?.email ? authUser.email.split('@')[0] : '') ||
-    'Partner'
+    'Raghav'
   ).trim()
-  const name = effectiveName ? effectiveName.split(' ')[0] : 'Partner'
+  const effectiveName = rawEffective.toLowerCase() === 'partner' ? (cachedName || 'Raghav') : rawEffective
+  const name = effectiveName ? effectiveName.split(' ')[0] : 'Raghav'
 
   return (
     <div className="space-y-4">

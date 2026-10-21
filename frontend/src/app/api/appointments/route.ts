@@ -219,6 +219,10 @@ export async function GET(request: Request) {
     const search = searchParams.get("search");
     const date = searchParams.get("date"); // YYYY-MM-DD
 
+    const userEmail = (profile.email || '').toLowerCase().trim();
+    const isSuperAdmin = userEmail === 'raghav00424@gmail.com' || userEmail === 'raghav@trinetra.ai' || userEmail === 'nexus.ai.ops@gmail.com' || userEmail === '23bcs015@gmail.com';
+    const isPrivileged = isSuperAdmin || ['developer_tester', 'admin', 'super_admin'].includes(profile.role || '');
+
     let query = supabase
       .from("appointments")
       .select(`
@@ -227,8 +231,15 @@ export async function GET(request: Request) {
           id,
           name
         )
-      `)
-      .eq("user_id", profile.id);
+      `);
+
+    if (!isPrivileged) {
+      if (profile.organization_id) {
+        query = query.or(`user_id.eq.${profile.id},organization_id.eq.${profile.organization_id}`);
+      } else {
+        query = query.eq("user_id", profile.id);
+      }
+    }
 
     if (status && status !== "all" && status !== "All") {
       query = query.eq("status", status.toLowerCase());

@@ -68,62 +68,103 @@ export async function GET() {
     }
 
     const userEmail = (user.email || '').toLowerCase().trim()
-    const isSuperAdminByEmail = userEmail === 'raghav00424@gmail.com' || userEmail === 'raghav@trinetra.ai' || (process.env.NEXT_PUBLIC_ADMIN_EMAILS || '').includes(userEmail)
+    const isSuperAdminByEmail = userEmail === 'raghav00424@gmail.com' || userEmail === 'raghav@trinetra.ai' || userEmail === 'nexus.ai.ops@gmail.com' || userEmail === '23bcs015@gmail.com' || (process.env.NEXT_PUBLIC_ADMIN_EMAILS || '').includes(userEmail)
     const metaRole = (user.app_metadata?.role || user.user_metadata?.role || '').toLowerCase().trim()
     const isSuperAdmin = isSuperAdminByEmail || metaRole === 'admin' || metaRole === 'super_admin'
+
+    const resolvedEmail = profile?.email || user.email || ''
+    let resolvedFullName = (profile?.full_name || '').trim()
+    if (!resolvedFullName || resolvedFullName.toLowerCase() === 'partner') {
+      resolvedFullName = (
+        user.user_metadata?.full_name ||
+        user.user_metadata?.name ||
+        user.raw_user_meta_data?.full_name ||
+        user.raw_user_meta_data?.name ||
+        (user.email ? user.email.split('@')[0] : '') ||
+        (isSuperAdmin ? 'Raghav Thakur' : 'User')
+      ).trim()
+    }
+
+    // Default primary org for founder / super admin fleet
+    const PRIMARY_TRINETRA_ORG = 'b1ddf1e9-abc1-4ff4-90f5-3ac66913738a'
+
+    let effectiveOrgId = profile?.organization_id
+    if (!effectiveOrgId) {
+      if (isSuperAdmin) {
+        effectiveOrgId = PRIMARY_TRINETRA_ORG
+      } else {
+        // Auto-provision or assign company organization for user
+        try {
+          const { data: newOrg } = await admin
+            .from('organizations')
+            .insert({ name: `${resolvedFullName}'s Workspace` })
+            .select('id')
+            .single()
+          if (newOrg?.id) {
+            effectiveOrgId = newOrg.id
+          }
+        } catch (orgErr) {
+          console.warn('[/api/profiles GET] Could not create new org, using fallback:', orgErr)
+          effectiveOrgId = PRIMARY_TRINETRA_ORG
+        }
+      }
+
+      if (effectiveOrgId && profile?.id) {
+        try {
+          await admin.from('profiles').update({ organization_id: effectiveOrgId }).eq('id', profile.id)
+        } catch (updateOrgErr) {
+          console.warn('[/api/profiles GET] Failed to update organization_id:', updateOrgErr)
+        }
+      }
+    }
 
     if (!profile) {
       const fallbackProfile = {
         id: user.id,
         email: user.email,
-        full_name: user.user_metadata?.full_name || user.email?.split('@')[0] || (isSuperAdmin ? 'Super Admin' : 'User'),
+        full_name: resolvedFullName || (isSuperAdmin ? 'Raghav Thakur' : 'User'),
         role: isSuperAdmin ? 'super_admin' : 'client',
-        plan_tier: isSuperAdmin ? 'enterprise' : 'free',
-        onboarding_complete: isSuperAdmin ? true : false,
+        plan_tier: isSuperAdmin ? 'enterprise' : 'trial',
+        organization_id: effectiveOrgId,
+        onboarding_complete: true,
       }
-      return NextResponse.json({ profile: fallbackProfile })
+      return NextResponse.json({ profile: fallbackProfile, user })
     }
 
     // Auto-heal in database if user is superadmin but database profile has client
     if (isSuperAdmin && profile.role !== 'super_admin' && profile.role !== 'admin') {
       try {
-        await admin.from('profiles').update({ role: 'super_admin' }).eq('id', user.id)
+        await admin.from('profiles').update({ role: 'super_admin', organization_id: effectiveOrgId }).eq('id', user.id)
         profile.role = 'super_admin'
       } catch (err) {
         console.warn('Failed to auto-heal super_admin role in profiles:', err)
       }
     }
 
-    const resolvedEmail = profile.email || user.email || ''
-    let resolvedFullName = (profile.full_name || '').trim()
-    if (!resolvedFullName) {
-      resolvedFullName = (
-        user.user_metadata?.full_name ||
-        user.user_metadata?.name ||
-        user.raw_user_meta_data?.full_name ||
-        user.raw_user_meta_data?.name ||
-        (user.email ? user.email.split('@')[0] : '')
-      ).trim()
-
-      if (resolvedFullName && profile.id) {
-        // Auto-heal empty full_name in database
-        try {
-          await admin.from('profiles').update({ full_name: resolvedFullName }).eq('id', profile.id)
-        } catch (healErr) {
-          console.warn('[/api/profiles GET] Could not auto-heal full_name:', healErr)
-        }
+    if (resolvedFullName && profile.id && profile.full_name !== resolvedFullName) {
+      try {
+        await admin.from('profiles').update({ full_name: resolvedFullName }).eq('id', profile.id)
+        profile.full_name = resolvedFullName
+      } catch (healErr) {
+        console.warn('[/api/profiles GET] Could not auto-heal full_name:', healErr)
       }
     }
 
+    const finalProfile = {
+      ...profile,
+      organization_id: effectiveOrgId || profile.organization_id,
+      email: resolvedEmail,
+      full_name: resolvedFullName || 'User',
+      role: isSuperAdmin ? 'super_admin' : (profile.role || 'client'),
+      plan_tier: isSuperAdmin ? 'enterprise' : (profile.plan_tier || 'trial'),
+      region: profile.state || '',
+      theme: profile.theme || 'light',
+      theme_preference: profile.theme || 'light',
+    }
+
     return NextResponse.json({
-      profile: {
-        ...profile,
-        email: resolvedEmail,
-        full_name: resolvedFullName || 'Partner',
-        region: profile.state || '',
-        theme: profile.theme || 'light',
-        theme_preference: profile.theme || 'light',
-      }
+      profile: finalProfile,
+      user
     })
   } catch (err: any) {
     console.error('[/api/profiles GET] Exception:', err)

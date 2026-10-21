@@ -33,10 +33,20 @@ export async function GET() {
         
       const orgId = profile?.organization_id
 
-      const { data: userAgents } = await supabase
+      const userEmail = (user.email || '').toLowerCase().trim()
+      const isSuperAdmin = userEmail === 'raghav00424@gmail.com' || userEmail === 'raghav@trinetra.ai' || userEmail === 'nexus.ai.ops@gmail.com' || userEmail === '23bcs015@gmail.com'
+      const effectiveOrgId = orgId || (isSuperAdmin ? 'b1ddf1e9-abc1-4ff4-90f5-3ac66913738a' : null)
+
+      let agentQuery = supabase
         .from('agents')
         .select('id, name, agent_type, status, last_active_at, updated_at, health_score')
-        .eq('user_id', user.id)
+      if (effectiveOrgId) {
+        agentQuery = agentQuery.or(`user_id.eq.${user.id},organization_id.eq.${effectiveOrgId}`)
+      } else {
+        agentQuery = agentQuery.eq('user_id', user.id)
+      }
+
+      const { data: userAgents } = await agentQuery
         
       const agents = userAgents || []
       const agentIds = agents.map(a => a.id)
@@ -59,21 +69,21 @@ export async function GET() {
         .select('id', { count: 'estimated', head: true })
         .gte('created_at', startOfMonth.toISOString())
         
-      if (orgId) {
-        callsQuery = callsQuery.eq('organization_id', orgId)
+      if (effectiveOrgId) {
+        callsQuery = callsQuery.or(`organization_id.eq.${effectiveOrgId},user_id.eq.${user.id}`)
       } else {
         callsQuery = callsQuery.eq('user_id', user.id)
       }
 
       let interactionsQuery: any = null
-      if (orgId || agentIds.length > 0) {
+      if (effectiveOrgId || agentIds.length > 0) {
         interactionsQuery = supabase
           .from('interactions')
           .select('id', { count: 'estimated', head: true })
           .gte('created_at', startOfMonth.toISOString())
           
-        if (orgId) {
-          interactionsQuery = interactionsQuery.eq('organization_id', orgId)
+        if (effectiveOrgId) {
+          interactionsQuery = interactionsQuery.eq('organization_id', effectiveOrgId)
         } else {
           interactionsQuery = interactionsQuery.in('agent_id', agentIds)
         }
@@ -84,22 +94,30 @@ export async function GET() {
         .select('id', { count: 'estimated', head: true })
         .in('status', ['live', 'active'])
         
-      if (orgId) {
-        activeToolsQuery = activeToolsQuery.eq('organization_id', orgId)
+      if (effectiveOrgId) {
+        activeToolsQuery = activeToolsQuery.or(`organization_id.eq.${effectiveOrgId},user_id.eq.${user.id}`)
       } else {
         activeToolsQuery = activeToolsQuery.eq('user_id', user.id)
       }
 
-      const totalLeadsQuery = supabase
+      let totalLeadsQuery = supabase
         .from('leads')
         .select('id', { count: 'estimated', head: true })
-        .eq('user_id', user.id)
+      if (effectiveOrgId) {
+        totalLeadsQuery = totalLeadsQuery.or(`user_id.eq.${user.id},organization_id.eq.${effectiveOrgId}`)
+      } else {
+        totalLeadsQuery = totalLeadsQuery.eq('user_id', user.id)
+      }
         
-      const convertedLeadsQuery = supabase
+      let convertedLeadsQuery = supabase
         .from('leads')
         .select('id', { count: 'estimated', head: true })
-        .eq('user_id', user.id)
         .or('status.in.(converted,won,qualified),stage.in.(converted,won,qualified)')
+      if (effectiveOrgId) {
+        convertedLeadsQuery = convertedLeadsQuery.or(`user_id.eq.${user.id},organization_id.eq.${effectiveOrgId}`)
+      } else {
+        convertedLeadsQuery = convertedLeadsQuery.eq('user_id', user.id)
+      }
 
       // 2. Activity Query (Strictly live activities from the last 6 hours, max 10)
       const sixHoursAgo = new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString()
@@ -112,11 +130,15 @@ export async function GET() {
         .limit(10)
 
       // 3. Tools calls for today
-      const toolsCallsQuery = supabase
+      let toolsCallsQuery = supabase
         .from('voice_calls')
         .select('agent_id')
-        .eq('user_id', user.id)
         .gte('created_at', today.toISOString())
+      if (effectiveOrgId) {
+        toolsCallsQuery = toolsCallsQuery.or(`user_id.eq.${user.id},organization_id.eq.${effectiveOrgId}`)
+      } else {
+        toolsCallsQuery = toolsCallsQuery.eq('user_id', user.id)
+      }
 
       // Exec parallel
       const [

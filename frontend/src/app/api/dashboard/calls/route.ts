@@ -27,7 +27,9 @@ export const GET = safeApiHandler(async (request: Request) => {
     .eq('id', user.id)
     .maybeSingle()
 
-  const isPrivileged = ['developer_tester', 'admin', 'super_admin'].includes(profile?.role || '')
+  const userEmail = (user.email || '').toLowerCase().trim()
+  const isSuperAdmin = userEmail === 'raghav00424@gmail.com' || userEmail === 'raghav@trinetra.ai' || userEmail === 'nexus.ai.ops@gmail.com' || userEmail === '23bcs015@gmail.com'
+  const isPrivileged = isSuperAdmin || ['developer_tester', 'admin', 'super_admin'].includes(profile?.role || '')
 
   // If specific call requested for transcript modal
   if (callId) {
