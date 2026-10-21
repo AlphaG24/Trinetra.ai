@@ -465,7 +465,7 @@ def resolve_agent_gender(
     # 3. Persona-name guess as last resort
     if agent_name and str(agent_name).strip():
         n_low = str(agent_name).strip().lower()
-        if any(m in n_low for m in ["vikram", "rahul", "amit", "rohan", "kabir", "arvind", "raj", "suresh", "deepak"]):
+        if any(m in n_low for m in ["vikram", "shubh", "rahul", "amit", "rohan", "kabir", "arvind", "raj", "suresh", "deepak"]):
             logger.info(f"[resolve_agent_gender] Gender guessed as 'male' from persona name '{agent_name}'")
             return "male", "guessed"
         if any(f in n_low for f in ["arika", "priya", "aditi", "riya", "neha", "pooja", "kavya", "ananya", "shreya"]):

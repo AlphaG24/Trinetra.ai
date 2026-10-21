@@ -329,16 +329,33 @@ export function AgentDetailPageClient({
         raw_name: rawName,           // keep original for API/dedup use
       })
 
-      // 3. Fetch call logs matching this agent
-      const { data: logsData, error: logsErr } = await supabase
-        .from('voice_calls')
-        .select('id, duration_seconds, sentiment, transcript, recording_url, created_at')
-        .eq('agent_id', agentData.id)
-        .order('created_at', { ascending: false })
-        .limit(30)
-
-      if (logsErr) throw logsErr
-      setCallLogs(logsData || [])
+      // 3. Fetch call logs matching this agent via server endpoint (handles org unification & RLS bypass)
+      try {
+        const callsRes = await fetch(`/api/agents/${agentData.id}/calls`)
+        if (callsRes.ok) {
+          const callsJson = await callsRes.json()
+          if (Array.isArray(callsJson)) {
+            setCallLogs(callsJson)
+          }
+        } else {
+          // Fallback to client supabase query
+          const { data: logsData } = await supabase
+            .from('voice_calls')
+            .select('id, duration_seconds, sentiment, transcript, recording_url, created_at')
+            .eq('agent_id', agentData.id)
+            .order('created_at', { ascending: false })
+            .limit(30)
+          setCallLogs(logsData || [])
+        }
+      } catch {
+        const { data: logsData } = await supabase
+          .from('voice_calls')
+          .select('id, duration_seconds, sentiment, transcript, recording_url, created_at')
+          .eq('agent_id', agentData.id)
+          .order('created_at', { ascending: false })
+          .limit(30)
+        setCallLogs(logsData || [])
+      }
 
       // 4. Fetch user profile (for plan details and metrics)
       const { data: profileData, error: profileErr } = await supabase

@@ -235,7 +235,26 @@ export async function GET(request: Request) {
 
     if (!isPrivileged) {
       if (profile.organization_id) {
-        query = query.or(`user_id.eq.${profile.id},organization_id.eq.${profile.organization_id}`);
+        const { data: orgAgents } = await supabase
+          .from("agents")
+          .select("id")
+          .eq("organization_id", profile.organization_id);
+        const orgAgentIds = (orgAgents || []).map((a: any) => a.id);
+
+        const { data: orgUsers } = await supabase
+          .from("profiles")
+          .select("id")
+          .eq("organization_id", profile.organization_id);
+        const orgUserIds = (orgUsers || []).map((u: any) => u.id);
+
+        const idFilters: string[] = [`user_id.eq.${profile.id}`];
+        if (orgUserIds.length > 0) {
+          idFilters.push(`user_id.in.(${orgUserIds.join(",")})`);
+        }
+        if (orgAgentIds.length > 0) {
+          idFilters.push(`agent_id.in.(${orgAgentIds.join(",")})`);
+        }
+        query = query.or(idFilters.join(","));
       } else {
         query = query.eq("user_id", profile.id);
       }

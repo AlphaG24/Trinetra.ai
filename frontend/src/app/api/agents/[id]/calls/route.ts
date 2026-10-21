@@ -26,18 +26,28 @@ export async function GET(
       return NextResponse.json({ error: "Organization not found" }, { status: 404 });
     }
 
-    // 3. Query voice_calls WHERE agent_id = requested agent AND (organization_id = user's org OR user_id = user.id)
+    // 3. Verify agent belongs to user or user's organization
+    const { data: agentRecord } = await supabase
+      .from("agents")
+      .select("id, organization_id, user_id")
+      .eq("id", agentId)
+      .maybeSingle();
+
+    if (agentRecord && agentRecord.organization_id !== profile.organization_id && agentRecord.user_id !== user.id) {
+      return NextResponse.json({ error: "Unauthorized access to agent calls" }, { status: 403 });
+    }
+
+    // 4. Query voice_calls WHERE agent_id = requested agent
     const { data: calls, error: queryError } = await supabase
       .from("voice_calls")
-      .select("id, created_at, duration_seconds, sentiment, outcome, caller_phone, transcript_text:transcript, status, recording_url")
+      .select("id, created_at, duration_seconds, sentiment, outcome, caller_phone, transcript, status, recording_url")
       .eq("agent_id", agentId)
-      .or(`organization_id.eq.${profile?.organization_id || user.id},user_id.eq.${user.id}`)
       .order("created_at", { ascending: false })
       .limit(50);
 
     if (queryError) {
       console.error("[Calls API] Query error:", queryError);
-      return NextResponse.json({ error: queryError.message }, { status: 550 });
+      return NextResponse.json({ error: queryError.message }, { status: 500 });
     }
 
     return NextResponse.json(calls || []);

@@ -247,7 +247,7 @@ class InCallNoAudioWatchdog:
     """
     def __init__(
         self,
-        silence_threshold_seconds: float = 12.0,
+        silence_threshold_seconds: float = 35.0,
         speak_fn: Optional[Callable[[str], Awaitable[None]]] = None,
         disconnect_fn: Optional[Callable[[], Awaitable[None]]] = None,
         tool_guard: Optional[ToolExecutionGuard] = None,

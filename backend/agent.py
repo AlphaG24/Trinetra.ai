@@ -2511,9 +2511,13 @@ Only return valid JSON."""
                 lead_data["contact_phone"] = cleaned_p
 
     if not lead_data.get("contact_name") or lead_data.get("contact_name") in ("Prospect", "Unknown", "Caller", "None"):
-        name_match = re.search(r'(?:mera naam|my name is|naam hai|naam)\s*(?:hai|is|:)?\s*([A-Za-z\u0900-\u097f]+)', transcript, re.IGNORECASE)
+        cust_text = "\n".join([l.replace("customer:", "").strip() for l in transcript.split("\n") if l.strip().startswith("customer:")])
+        name_match = re.search(r'(?:mera naam|my name is|naam hai|naam)\s*(?:hai|is|:)?\s*([A-Za-z\u0900-\u097f]+)', cust_text, re.IGNORECASE)
         if name_match:
-            lead_data["contact_name"] = name_match.group(1).strip()
+            candidate_n = name_match.group(1).strip()
+            name_stopwords = {"aur", "kya", "bata", "bataiye", "hai", "hain", "pehle", "kaunsa", "nahi", "kar", "sir", "madam", "ji", "to", "bhi", "tha", "thi", "the", "and", "the", "is", "for", "with", "from", "right", "mere", "mera", "naam"}
+            if candidate_n.lower() not in name_stopwords and len(candidate_n) >= 2:
+                lead_data["contact_name"] = candidate_n.capitalize()
 
     # Programmatic failsafe for third-party pickup & absent prospect auto-rescheduling
     absent_patterns = [
@@ -4140,8 +4144,8 @@ async def entrypoint(ctx: JobContext):
                 pass
 
     watchdog = InCallNoAudioWatchdog(
-        silence_threshold_seconds=12.0,
-        speak_fn=lambda prompt: agent_instance.session.say(prompt, allow_interruptions=True, add_to_chat_ctx=False) if agent_instance and getattr(agent_instance, 'session', None) else None,
+        silence_threshold_seconds=35.0,
+        speak_fn=lambda prompt: agent_instance.session.say(prompt, allow_interruptions=True, add_to_chat_ctx=True) if agent_instance and getattr(agent_instance, 'session', None) else None,
         disconnect_fn=_on_watchdog_disconnect,
         tool_guard=tool_guard,
         language=language,
@@ -4417,12 +4421,7 @@ async def run_agent(room_name: str, agent_id: str | None = None, contact_id: str
                 if agent_data.get("primary_language"): language = agent_data["primary_language"]
                 if agent_data.get("voice_speed"): speed = agent_data["voice_speed"]
                 if agent_data.get("voice_pitch"): pitch = agent_data["voice_pitch"]
-                # 1. Resolve Gender and Clean Name
-                gender_tag = 'female' if str(voice_id).lower() in SARVAM_FEMALE_VOICES else 'male'
-                is_female = (gender_tag == 'female')
-                if provider == 'sarvam':
-                    voice_id = sanitize_sarvam_speaker(voice_id, is_female=is_female)
-
+                # 1. Resolve Clean Name and Robust Gender
                 raw_name = agent_data.get('name', 'Agent')
                 clean_name = re.sub(r'^\[[^\]]+\]\s*', '', raw_name)
                 clean_name = re.sub(r'\s*-\s*(Demo|Trial)\s*$', '', clean_name, flags=re.IGNORECASE).strip()
@@ -4430,11 +4429,28 @@ async def run_agent(room_name: str, agent_id: str | None = None, contact_id: str
                     v_str = str(voice_id).strip().lower()
                     if v_str in SARVAM_FEMALE_VOICES or v_str in SARVAM_MALE_VOICES:
                         clean_name = v_str.capitalize()
-                    elif gender_tag == 'female':
-                        clean_name = "Aditi"
-                    else:
+                    elif str(agent_data.get("gender")).lower() == 'male':
                         clean_name = "Vikram"
+                    else:
+                        clean_name = "Aditi"
                 bot_name = clean_name
+
+                explicit_gender = agent_data.get("gender")
+                if explicit_gender in ("male", "female"):
+                    gender_tag = explicit_gender
+                elif str(bot_name).lower() in ('shubh', 'vikram', 'rahul', 'amit', 'rohan', 'kabir', 'arvind', 'aditya', 'dev', 'varun', 'sumit', 'raghav'):
+                    gender_tag = 'male'
+                elif str(voice_id).lower() in SARVAM_MALE_VOICES:
+                    gender_tag = 'male'
+                elif str(voice_id).lower() in SARVAM_FEMALE_VOICES:
+                    gender_tag = 'female'
+                else:
+                    resolved_g, _ = resolve_agent_gender(gender=explicit_gender, voice=voice_id, agent_name=bot_name)
+                    gender_tag = resolved_g if resolved_g in ('male', 'female') else ('male' if str(bot_name).lower() in ('shubh', 'vikram') else 'female')
+
+                is_female = (gender_tag == 'female')
+                if provider == 'sarvam':
+                    voice_id = sanitize_sarvam_speaker(voice_id, is_female=is_female)
 
                 # 2. Fetch User Profile & Business Info
                 profile_data = {}
@@ -5214,12 +5230,16 @@ async def run_agent(room_name: str, agent_id: str | None = None, contact_id: str
                         pass
 
             watchdog_ra = InCallNoAudioWatchdog(
-                silence_threshold_seconds=12.0,
-                speak_fn=lambda prompt: agent_instance.session.say(prompt, allow_interruptions=True, add_to_chat_ctx=False) if agent_instance and getattr(agent_instance, 'session', None) else None,
+                silence_threshold_seconds=35.0,
+                speak_fn=lambda prompt: agent_instance.session.say(prompt, allow_interruptions=True, add_to_chat_ctx=True) if agent_instance and getattr(agent_instance, 'session', None) else None,
                 disconnect_fn=_on_watchdog_disconnect_ra,
                 language=safe_language,
                 gender=resolved_gender_ra,
             )
+
+            @session.on("user_speech_started")
+            def _on_user_speech_started_watchdog_ra(event):
+                watchdog_ra.on_user_speech_start()
 
             @session.on("user_speech_committed")
             def _on_user_speech_watchdog_ra(event):

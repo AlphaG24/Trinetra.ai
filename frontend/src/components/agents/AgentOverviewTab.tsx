@@ -9,6 +9,7 @@ import { createClient } from '@/utils/supabase/client'
 import { useVoiceAgent } from '@/hooks/useVoiceAgent'
 import { AgentCallingStatus } from './AgentCallingStatus'
 import { PlanValidityTimer } from '@/src/components/shared/PlanValidityTimer'
+import { CallAudioPlayer } from '@/src/components/shared/CallAudioPlayer'
 
 interface CallLog {
   id: string
@@ -649,11 +650,22 @@ export function AgentOverviewTab({
                       </div>
 
                       {isExpanded && (
-                        <div className="p-4 bg-[var(--background)]/30 border-t border-[var(--border)] space-y-2">
-                          <h4 className="text-[10px] uppercase tracking-wider font-montserrat font-bold text-[var(--muted)]">Transcript:</h4>
-                          <p className="text-xs font-sans text-[var(--body)] leading-relaxed bg-[var(--card-bg)] p-3 rounded-lg border border-[var(--border)] max-h-40 overflow-y-auto whitespace-pre-wrap">
-                            {getTranscriptString(log.transcript) || 'No transcript generated for this call.'}
-                          </p>
+                        <div className="p-4 bg-[var(--background)]/30 border-t border-[var(--border)] space-y-4">
+                          {log.recording_url && (
+                            <div className="rounded-xl border border-[var(--border)] bg-[var(--card-bg)] p-3">
+                              <CallAudioPlayer 
+                                recordingUrl={log.recording_url} 
+                                callId={log.id} 
+                                durationSeconds={log.duration_seconds} 
+                              />
+                            </div>
+                          )}
+                          <div>
+                            <h4 className="text-[10px] uppercase tracking-wider font-montserrat font-bold text-[var(--muted)] mb-1">Transcript:</h4>
+                            <p className="text-xs font-sans text-[var(--body)] leading-relaxed bg-[var(--card-bg)] p-3 rounded-lg border border-[var(--border)] max-h-40 overflow-y-auto whitespace-pre-wrap">
+                              {getTranscriptString(log.transcript) || 'No transcript generated for this call.'}
+                            </p>
+                          </div>
                         </div>
                       )}
                     </div>

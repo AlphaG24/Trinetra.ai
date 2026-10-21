@@ -11,6 +11,8 @@ interface LogObject {
   transcript?: any
   recording_url?: string | null
   caller_name?: string
+  agent_name?: string
+  agent?: { name?: string }
 }
 
 interface TranscriptModalProps {
@@ -22,6 +24,7 @@ interface TranscriptModalProps {
   transcript?: any
   recordingUrl?: string | null
   callerName?: string
+  agentName?: string
   autoPlay?: boolean
 }
 
@@ -32,6 +35,7 @@ export function TranscriptModal({
   transcript, 
   recordingUrl, 
   callerName = 'Customer',
+  agentName,
   autoPlay = false
 }: TranscriptModalProps) {
   const [copied, setCopied] = useState(false)
@@ -40,6 +44,7 @@ export function TranscriptModal({
   const resolvedTranscript = log ? log.transcript : transcript
   const resolvedRecordingUrl = log ? log.recording_url : recordingUrl
   const resolvedCallerName = log ? (log.caller_name || 'Customer') : (callerName || 'Customer')
+  const resolvedAgentName = log ? ((log as any).agent_name || (log as any).agent?.name || agentName || 'AI Assistant') : (agentName || 'AI Assistant')
   const resolvedDuration = log ? log.duration_seconds : undefined
 
   // Helper to format duration to a clean mm:ss format
@@ -277,7 +282,7 @@ export function TranscriptModal({
                       {/* Message Bubble Container */}
                       <div className="flex flex-col max-w-[75%]">
                         <span className={`text-[10px] font-bold text-[var(--muted)] mb-1 px-1 tracking-wider uppercase font-montserrat ${isAI ? 'text-left' : 'text-right'}`}>
-                          {isAI ? 'Trinetra AI' : 'User'}
+                          {isAI ? resolvedAgentName : resolvedCallerName}
                         </span>
                         
                         <div
