@@ -1,8 +1,9 @@
 'use client'
 
 import React from 'react'
-import { LivingGlobeCanvas } from './LivingGlobeCanvas'
+import { AuthArtSwitcher } from './AuthArtSwitcher'
 
 export function InteractivePixelArtwork() {
-  return <LivingGlobeCanvas />
+  return <AuthArtSwitcher />
 }
+export default InteractivePixelArtwork

@@ -7,7 +7,7 @@ import { Eye, EyeOff } from 'lucide-react'
 import { toast } from 'sonner'
 import { createClient } from '@/lib/client'
 import { VaakritiSymbolVector } from '@/components/ui/VaakritiSymbolVector'
-import { LivingGlobeCanvas } from '@/components/auth/LivingGlobeCanvas'
+import { AuthArtSwitcher } from '@/components/auth/AuthArtSwitcher'
 
 export default function ResetPasswordPage() {
   const router = useRouter()
@@ -114,7 +114,7 @@ export default function ResetPasswordPage() {
           100% crisp high-DPI pixels, NO blur, interactive hover animation
          ───────────────────────────────────────────────────────────── */}
       <section className="relative w-full lg:w-1/2 h-[340px] sm:h-[440px] lg:h-auto lg:min-h-[calc(100vh-1rem)] rounded-xl sm:rounded-2xl lg:rounded-[20px] overflow-hidden bg-[#030712] shrink-0 border border-slate-200/80 shadow-xs">
-        <LivingGlobeCanvas />
+        <AuthArtSwitcher />
       </section>
 
       {/* ─────────────────────────────────────────────────────────────

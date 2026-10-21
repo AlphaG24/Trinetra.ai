@@ -414,9 +414,20 @@ export function ParticleSphereCore({
 
 
 
-    // ── 6. ANIMATION & RENDER LOOP ──
+    // ── 6. ANIMATION & RENDER LOOP WITH VISIBILITY OBSERVER ──
     let animationFrameId: number;
     let clock = new THREE.Clock();
+    let isVisible = true;
+
+    const visibilityObserver = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          isVisible = entry.isIntersecting;
+        }
+      },
+      { threshold: 0.05 }
+    );
+    visibilityObserver.observe(container);
 
     let currentAudioLevel = 0;
     let currentHover = 0;
@@ -425,6 +436,9 @@ export function ParticleSphereCore({
 
     const animate = () => {
       animationFrameId = requestAnimationFrame(animate);
+
+      // Skip GPU render workload when hero is scrolled out of viewport
+      if (!isVisible) return;
 
       const delta = clock.getDelta();
       const elapsedTime = clock.getElapsedTime();
@@ -502,9 +516,9 @@ export function ParticleSphereCore({
       mouseRef.current.targetY = 0;
     };
 
-    container.addEventListener("mousemove", handleMouseMove);
-    container.addEventListener("mouseenter", handleMouseEnter);
-    container.addEventListener("mouseleave", handleMouseLeave);
+    container.addEventListener("mousemove", handleMouseMove, { passive: true });
+    container.addEventListener("mouseenter", handleMouseEnter, { passive: true });
+    container.addEventListener("mouseleave", handleMouseLeave, { passive: true });
 
     // ── 8. RESIZE OBSERVER ──
     const resizeObserver = new ResizeObserver((entries) => {
@@ -524,6 +538,7 @@ export function ParticleSphereCore({
 
     return () => {
       cancelAnimationFrame(animationFrameId);
+      visibilityObserver.disconnect();
       resizeObserver.disconnect();
       container.removeEventListener("mousemove", handleMouseMove);
       container.removeEventListener("mouseenter", handleMouseEnter);

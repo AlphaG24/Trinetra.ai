@@ -15,18 +15,27 @@ interface Pixel {
   isGold: boolean
 }
 
-export function LivingGlobeCanvas() {
+export interface LivingGlobeCanvasProps {
+  isActive?: boolean
+}
+
+export function LivingGlobeCanvas({ isActive = true }: LivingGlobeCanvasProps) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const mouseRef = useRef<{ x: number; y: number; active: boolean }>({ x: -1000, y: -1000, active: false })
   const pixelsRef = useRef<Pixel[]>([])
   const animationFrameRef = useRef<number | null>(null)
   const [imageLoaded, setImageLoaded] = useState(false)
+  const isActiveRef = useRef(isActive)
+
+  useEffect(() => {
+    isActiveRef.current = isActive
+  }, [isActive])
 
   // Initialize and sample the image into crisp, high-definition pixels
   const initPixels = useCallback((width: number, height: number, img: HTMLImageElement) => {
-    // Step size: 2.8px to 3.0px ensures crisp definition (no blur, not overly chunky)
-    const step = width < 500 ? 2.5 : 2.8
+    // Step size 3.0px - 3.2px provides ultra-crisp digital representation while ensuring butter-smooth 60+ FPS
+    const step = width < 500 ? 3.0 : 3.2
     
     // Create an offscreen canvas to sample the image with cover proportions
     const offscreen = document.createElement('canvas')
@@ -76,18 +85,8 @@ export function LivingGlobeCanvas() {
         const brightness = (r * 0.299 + g * 0.587 + b * 0.114)
         if (a < 15 || brightness < 10) continue
 
-        // Sanitize any residual yellow/amber artifact pixels to harmonious deep blue/indigo
-        let finalR = r
-        let finalG = g
-        let finalB = b
-        const isYellowHue = (r > 95 && g > 80 && b < 145 && (r > b * 1.15 || g > b * 1.15)) ||
-                            (r > 150 && g > 140 && b < 170 && (r + g > b * 2.1))
-        if (isYellowHue) {
-          finalR = 18
-          finalG = 32
-          finalB = 68
-        }
-
+        // Retain natural colors including India's radiant golden aura and glowing network flow
+        const isGold = (r > 140 && g > 100 && b < 100 && r > b * 1.35) || (r > 175 && g > 130 && b < 115)
         const isBright = brightness > 140
 
         // Use slightly expanded integer block to eliminate sub-pixel antialiasing gaps
@@ -100,10 +99,10 @@ export function LivingGlobeCanvas() {
           y: py,
           vx: 0,
           vy: 0,
-          color: `rgb(${finalR},${finalG},${finalB})`,
+          color: `rgb(${r},${g},${b})`,
           size: blockSize,
           isBright,
-          isGold: false,
+          isGold,
         })
       }
     }
@@ -119,13 +118,21 @@ export function LivingGlobeCanvas() {
     const ctx = canvas.getContext('2d', { alpha: false })
     if (!ctx) return
 
-    // Preload image with unique cache buster to force browsers to discard stale cached yellow pixels
-    const img = new Image()
-    img.src = '/images/auth-concept-globe.jpg?v=20261021_v3'
-    img.crossOrigin = 'anonymous'
-
-
     let isRunning = true
+    let isVisible = true
+
+    // Pause physics & rendering when scrolled away from viewport
+    const observer = new IntersectionObserver((entries) => {
+      for (const entry of entries) {
+        isVisible = entry.isIntersecting
+      }
+    }, { threshold: 0.05 })
+    observer.observe(container)
+
+    // Preload image with unique cache buster
+    const img = new Image()
+    img.src = '/images/auth-concept-globe.jpg?v=20261021_v4'
+    img.crossOrigin = 'anonymous'
 
     img.onload = () => {
       setImageLoaded(true)
@@ -159,8 +166,20 @@ export function LivingGlobeCanvas() {
 
     // Animation & Physics Loop
     let time = 0
-    const render = () => {
+    let lastTime = performance.now()
+
+    const render = (now: number) => {
       if (!isRunning) return
+      animationFrameRef.current = requestAnimationFrame(render)
+
+      // Skip render work if component is inactive in switcher or offscreen
+      if (!isActiveRef.current || !isVisible) {
+        lastTime = now
+        return
+      }
+
+      const dt = Math.min((now - lastTime) / 1000, 0.05)
+      lastTime = now
       time += 0.025
 
       const rect = container.getBoundingClientRect()
@@ -201,24 +220,35 @@ export function LivingGlobeCanvas() {
           }
         }
 
-        // Spring physics returning pixel to origin
-        const homeDx = p.originX - p.x
-        const homeDy = p.originY - p.y
-        p.vx += homeDx * 0.12
-        p.vy += homeDy * 0.12
+        // Fast spring physics returning pixel to origin
+        const isDisplaced = p.x !== p.originX || p.y !== p.originY || p.vx !== 0 || p.vy !== 0
+        if (isDisplaced) {
+          const homeDx = p.originX - p.x
+          const homeDy = p.originY - p.y
+          p.vx += homeDx * 0.12
+          p.vy += homeDy * 0.12
 
-        // Damping / Friction
-        p.vx *= 0.78
-        p.vy *= 0.78
+          // Damping / Friction
+          p.vx *= 0.78
+          p.vy *= 0.78
 
-        p.x += p.vx
-        p.y += p.vy
+          p.x += p.vx
+          p.y += p.vy
+
+          // Snap to resting state when velocity is infinitesimal to stop CPU cycles
+          if (Math.abs(p.vx) < 0.01 && Math.abs(p.vy) < 0.01 && Math.abs(homeDx) < 0.05 && Math.abs(homeDy) < 0.05) {
+            p.x = p.originX
+            p.y = p.originY
+            p.vx = 0
+            p.vy = 0
+          }
+        }
 
         // Subtle celestial micro-float when resting
         let drawX = p.x
         let drawY = p.y
         if (!mouseActive && p.isBright) {
-          const wave = Math.sin(time + p.originX * 0.04 + p.originY * 0.04) * 0.4
+          const wave = Math.sin(time + p.originX * 0.04 + p.originY * 0.04) * 0.35
           drawY += wave
         }
 
@@ -226,20 +256,19 @@ export function LivingGlobeCanvas() {
         ctx.fillStyle = p.color
         ctx.fillRect(Math.floor(drawX), Math.floor(drawY), p.size, p.size)
       }
-
-      animationFrameRef.current = requestAnimationFrame(render)
     }
 
-    render()
+    animationFrameRef.current = requestAnimationFrame(render)
 
     return () => {
       isRunning = false
       if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current)
+      observer.disconnect()
       resizeObserver.disconnect()
     }
   }, [initPixels])
 
-  // Mouse / Pointer Event Listeners
+  // Mouse / Pointer Event Listeners with passive performance
   const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!containerRef.current) return
     const rect = containerRef.current.getBoundingClientRect()

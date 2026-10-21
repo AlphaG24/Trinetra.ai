@@ -12,7 +12,7 @@ import { toast } from 'sonner'
 import { createClient } from '@/lib/client'
 import { getURL } from '@/src/utils/helpers'
 import { VaakritiSymbolVector } from '@/components/ui/VaakritiSymbolVector'
-import { LivingGlobeCanvas } from '@/components/auth/LivingGlobeCanvas'
+import { AuthArtSwitcher } from '@/components/auth/AuthArtSwitcher'
 
 function AuthForm() {
   const router = useRouter()
@@ -242,7 +242,7 @@ function AuthForm() {
           NO logo, NO text on artwork as requested
          ───────────────────────────────────────────────────────────── */}
       <section className="relative w-full lg:w-1/2 h-[340px] sm:h-[440px] lg:h-auto lg:min-h-[calc(100vh-1rem)] rounded-xl sm:rounded-2xl lg:rounded-[20px] overflow-hidden bg-[#030712] shrink-0 border border-slate-200/80 shadow-xs">
-        <LivingGlobeCanvas />
+        <AuthArtSwitcher />
       </section>
 
       {/* ─────────────────────────────────────────────────────────────
