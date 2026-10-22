@@ -1,11 +1,12 @@
 'use client'
 
 import React, { useEffect, useState } from 'react'
-import { Megaphone, Plus, Play, Pause, ExternalLink, RefreshCw, Loader2, Users, BarChart3, Trash2 } from 'lucide-react'
+import { Megaphone, Plus, Play, Pause, ExternalLink, RefreshCw, Loader2, Users, BarChart3, Trash2, PhoneCall } from 'lucide-react'
 import { useDashboardStore } from '@/store/dashboardStore'
 import { useAuth } from '@/src/components/providers/AuthProvider'
 import UpgradePrompt from '@/src/components/shared/UpgradePrompt'
 import { NewCampaignModal } from '@/src/components/campaigns/NewCampaignModal'
+import { InstantDemoCallModal } from '@/src/components/campaigns/InstantDemoCallModal'
 import toast from 'react-hot-toast'
 import Link from 'next/link'
 
@@ -29,6 +30,7 @@ interface Campaign {
 
 export default function CampaignsPage() {
   const { profile: authProfile } = useAuth()
+  const { profile: storeProfile } = useDashboardStore()
   const [cachedProfile, setCachedProfile] = useState<any>(() => {
     if (typeof window !== 'undefined') {
       try {
@@ -44,6 +46,7 @@ export default function CampaignsPage() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([])
   const [loading, setLoading] = useState(true)
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [isInstantModalOpen, setIsInstantModalOpen] = useState(false)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
 
   useEffect(() => {
@@ -206,6 +209,15 @@ export default function CampaignsPage() {
             <BarChart3 className="w-4 h-4" />
             Compare
           </Link>
+
+          <button
+            onClick={() => setIsInstantModalOpen(true)}
+            className="px-4 py-2.5 bg-gradient-to-r from-violet-600 via-indigo-600 to-purple-600 hover:brightness-110 text-white text-xs font-bold uppercase rounded-xl tracking-wider transition-all flex items-center gap-2 shadow-md shadow-violet-600/25 cursor-pointer active:scale-[0.98]"
+            title="Launch an instant real-time live outbound demo call"
+          >
+            <PhoneCall className="w-4 h-4" />
+            Direct Live Dial
+          </button>
 
           <button
             onClick={() => setIsModalOpen(true)}
@@ -391,6 +403,13 @@ export default function CampaignsPage() {
       <NewCampaignModal 
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
+        onSuccess={fetchCampaigns}
+      />
+
+      {/* Instant Direct Live Dial Modal */}
+      <InstantDemoCallModal
+        isOpen={isInstantModalOpen}
+        onClose={() => setIsInstantModalOpen(false)}
         onSuccess={fetchCampaigns}
       />
     </div>

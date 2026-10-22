@@ -734,8 +734,13 @@ class CampaignService:
         twilio_token = ConfigService.get("TWILIO_AUTH_TOKEN") or os.getenv("TWILIO_AUTH_TOKEN")
         has_twilio = bool(twilio_sid and twilio_token)
 
-        agent_provider = (agent.get("telephony_provider") or "").lower().strip()
-        if agent_provider == "exotel" and has_exotel:
+        agent_provider = (agent.get("telephony_provider") or agent.get("voice_provider") or "").lower().strip()
+        agent_phone_clean = (agent.get("phone_number") or "").replace(" ", "").replace("-", "")
+        is_sarvam_agent = agent_provider == "sarvam" or agent_phone_clean == "+917965481258" or agent_phone_clean == "917965481258"
+
+        if is_sarvam_agent:
+            chosen_provider = "sarvam"
+        elif agent_provider == "exotel" and has_exotel:
             chosen_provider = "exotel"
         elif agent_provider == "twilio" and has_twilio:
             chosen_provider = "twilio"
@@ -749,7 +754,7 @@ class CampaignService:
             chosen_provider = "simulated"
 
         is_simulated = chosen_provider == "simulated"
-        provider = get_provider(chosen_provider)
+        provider = get_provider(chosen_provider) if chosen_provider != "sarvam" else None
 
         unique_room = f"{chosen_provider}--{agent_id}--{contact_id}--{uuid.uuid4().hex[:8]}" if agent_id else f"{chosen_provider}--noagent--{contact_id}--{uuid.uuid4().hex[:8]}"
         webhook_base = ConfigService.get("TRINETRA_WEBHOOK_BASE_URL") or os.getenv("TRINETRA_WEBHOOK_BASE_URL") or "http://localhost:8000"
@@ -794,9 +799,22 @@ class CampaignService:
         agent_name = agent.get("name") or "Agent"
         business_name = campaign_data.get("name") or "Trinetra AI"
 
-        # Place the outbound call via Twilio or Simulated fallback
+        # Place the outbound call via Sarvam, Twilio, or Simulated fallback
         try:
-            if not is_simulated:
+            if chosen_provider == "sarvam":
+                from app.services.sarvam_outbound_service import SarvamOutboundService
+                sarvam_svc = SarvamOutboundService()
+                sarvam_webhook = f"{webhook_base}/webhooks/voice/sarvam/{organization_id}?agent_id={agent_id}&contact_id={contact_id}"
+                call_res = await sarvam_svc.trigger_instant_call(
+                    target_phone=contact_phone,
+                    contact_name=contact_name,
+                    webhook_url=sarvam_webhook
+                )
+                call_sid = call_res.get("attempt_id") or f"srv-{uuid.uuid4()}"
+                room_name = f"sarvam-{call_sid}"
+                outcome = "connected" if call_res.get("success") else "failed"
+                logger.info(f"[Campaign Outbound] Sarvam call placed: ID={call_sid} to {contact_phone}")
+            elif not is_simulated:
                 call_res = await provider.make_outbound_call(
                     contact_phone, 
                     agent_phone, 

@@ -312,3 +312,152 @@ async def trigger_campaign_report(id: str):
         logger.error(f"Error dispatching report for campaign {id}: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
+
+from pydantic import BaseModel
+from datetime import datetime, timezone
+
+class InstantCallRequest(BaseModel):
+    name: str
+    phone: str
+    agent_id: Optional[str] = None
+    organization_id: Optional[str] = None
+    notes: Optional[str] = None
+
+@router.post("/instant-call")
+async def trigger_instant_demo_call(req: InstantCallRequest):
+    """
+    Direct Live Dial: Triggers an instant real-time outbound call to a prospect's phone
+    via Sarvam Outbound Service while logging campaign & contact in Trinetra DB.
+    """
+    try:
+        if not req.phone or not req.name:
+            raise HTTPException(status_code=400, detail="Name and phone number are required")
+
+        # 1. Resolve agent
+        agent = None
+        if req.agent_id:
+            a_res = await asyncio.to_thread(
+                supabase_admin.table("agents").select("*").eq("id", req.agent_id).maybe_single().execute
+            )
+            agent = a_res.data
+        if not agent:
+            # Fallback to Shubh or first active agent
+            a_res = await asyncio.to_thread(
+                supabase_admin.table("agents").select("*").ilike("name", "%shubh%").neq("status", "deleted").limit(1).execute
+            )
+            if a_res.data:
+                agent = a_res.data[0]
+            else:
+                any_res = await asyncio.to_thread(
+                    supabase_admin.table("agents").select("*").neq("status", "deleted").limit(1).execute
+                )
+                agent = any_res.data[0] if any_res.data else None
+
+        if not agent:
+            raise HTTPException(status_code=404, detail="No active agent found to place the call")
+
+        agent_id = agent["id"]
+        org_id = req.organization_id or agent.get("organization_id")
+
+        # 2. Normalize phone
+        target_phone = req.phone.strip().replace(" ", "").replace("-", "")
+        if not target_phone.startswith("+"):
+            if len(target_phone) == 10:
+                target_phone = f"+91{target_phone}"
+            elif len(target_phone) == 12 and target_phone.startswith("91"):
+                target_phone = f"+{target_phone}"
+            else:
+                target_phone = f"+{target_phone}"
+
+        # 3. Create campaign record
+        now_iso = datetime.now(timezone.utc).isoformat()
+        camp_res = await asyncio.to_thread(
+            supabase_admin.table("campaigns").insert({
+                "organization_id": org_id,
+                "agent_id": agent_id,
+                "name": f"Live Demo - {req.name}",
+                "status": "running",
+                "purpose": "service",
+                "total_contacts": 1,
+                "contacts_called": 1,
+                "contacts_connected": 0,
+                "leads_generated": 0,
+                "calling_hours_start": "00:00",
+                "calling_hours_end": "23:59",
+                "timezone": "Asia/Kolkata",
+                "scheduled_start": now_iso
+            }).execute
+        )
+        if not camp_res.data:
+            raise HTTPException(status_code=500, detail="Failed to initialize campaign record")
+
+        campaign_id = camp_res.data[0]["id"]
+
+        # 4. Create campaign contact
+        contact_res = await asyncio.to_thread(
+            supabase_admin.table("campaign_contacts").insert({
+                "campaign_id": campaign_id,
+                "full_name": req.name,
+                "phone": target_phone,
+                "call_status": "dialing",
+                "call_attempts": 1,
+                "last_attempt_at": now_iso,
+                "notes": req.notes or "Instant Live Dial Trigger",
+                "consent_flag": True,
+                "consent_source": "live_dashboard_demo"
+            }).execute
+        )
+        contact_id = contact_res.data[0]["id"] if contact_res.data else None
+
+        # 5. Place outbound call via SarvamOutboundService
+        from app.services.sarvam_outbound_service import SarvamOutboundService
+        sarvam = SarvamOutboundService()
+        call_res = await sarvam.trigger_instant_call(
+            target_phone=target_phone,
+            contact_name=req.name
+        )
+
+        if not call_res.get("success"):
+            err_msg = call_res.get("error") or "Unknown error calling Sarvam API"
+            logger.error(f"[Instant Call Error] {err_msg}")
+            # Update contact to failed
+            if contact_id:
+                await asyncio.to_thread(
+                    supabase_admin.table("campaign_contacts").update({
+                        "call_status": "failed",
+                        "notes": f"Dial error: {err_msg[:200]}"
+                    }).eq("id", contact_id).execute
+                )
+            return {
+                "success": False,
+                "campaign_id": campaign_id,
+                "contact_id": contact_id,
+                "error": err_msg,
+                "phone": target_phone
+            }
+
+        attempt_id = call_res.get("attempt_id")
+        if contact_id:
+            await asyncio.to_thread(
+                supabase_admin.table("campaign_contacts").update({
+                    "notes": f"Attempt ID: {attempt_id}"
+                }).eq("id", contact_id).execute
+            )
+
+        return {
+            "success": True,
+            "campaign_id": campaign_id,
+            "contact_id": contact_id,
+            "attempt_id": attempt_id,
+            "status": "dialing",
+            "phone": target_phone,
+            "agent_name": agent.get("name", "Shubh"),
+            "message": f"Calling {target_phone} via {agent.get('name', 'Shubh')}"
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error in instant demo call: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
