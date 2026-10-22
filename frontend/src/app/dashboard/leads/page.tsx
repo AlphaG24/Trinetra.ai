@@ -59,14 +59,18 @@ export default async function LeadsPage() {
     .order('created_at', { ascending: false })
 
   if (!isPrivileged) {
-    if (orgId) {
-      leadQuery = leadQuery.or(`user_id.eq.${user.id},organization_id.eq.${orgId}`)
+    const agentIds = (dbAgents || []).map((a: any) => a.id).filter(Boolean)
+    if (agentIds.length > 0) {
+      leadQuery = leadQuery.or(`user_id.eq.${user.id},agent_id.in.(${agentIds.join(',')})`)
     } else {
       leadQuery = leadQuery.eq('user_id', user.id)
     }
   }
 
-  const { data: leads } = await leadQuery
+  const { data: leads, error: leadError } = await leadQuery
+  if (leadError) {
+    console.error('[LeadsPage] Error fetching leads on server:', leadError)
+  }
 
   // Fetch revenue events
   let revQuery = supabase

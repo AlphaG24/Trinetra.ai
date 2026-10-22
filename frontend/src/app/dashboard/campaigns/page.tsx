@@ -63,6 +63,9 @@ export default function CampaignsPage() {
   const fetchCampaigns = async () => {
     try {
       setLoading(true)
+      // Background sync of any completed calls
+      fetch('/api/campaigns/sync-calls', { method: 'POST' }).catch(() => {})
+
       const res = await fetch('/api/campaigns')
       const data = await res.json()
       if (res.ok) {
@@ -212,11 +215,11 @@ export default function CampaignsPage() {
 
           <button
             onClick={() => setIsInstantModalOpen(true)}
-            className="px-4 py-2.5 bg-gradient-to-r from-violet-600 via-indigo-600 to-purple-600 hover:brightness-110 text-white text-xs font-bold uppercase rounded-xl tracking-wider transition-all flex items-center gap-2 shadow-md shadow-violet-600/25 cursor-pointer active:scale-[0.98]"
-            title="Launch an instant real-time live outbound demo call"
+            className="px-4 py-2.5 border border-[var(--border)] bg-[var(--card-bg)] hover:bg-[var(--hover-bg)] text-[var(--heading)] text-xs font-bold uppercase rounded-xl tracking-wider transition-all flex items-center gap-2 shadow-xs cursor-pointer active:scale-[0.98]"
+            title="Place a direct call"
           >
-            <PhoneCall className="w-4 h-4" />
-            Direct Live Dial
+            <PhoneCall className="w-4 h-4 text-emerald-500" />
+            Direct Call
           </button>
 
           <button

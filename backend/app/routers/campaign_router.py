@@ -460,4 +460,19 @@ async def trigger_instant_demo_call(req: InstantCallRequest):
         logger.error(f"Error in instant demo call: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
+@router.post("/sync-calls")
+async def sync_sarvam_calls_endpoint(hours_back: int = 24):
+    """
+    Synchronizes completed calls, audio recordings, transcripts, and leads from Sarvam to Trinetra.
+    """
+    try:
+        from app.services.sarvam_outbound_service import SarvamOutboundService
+        sarvam = SarvamOutboundService()
+        count = await sarvam.sync_recent_calls(hours_back=hours_back)
+        return {"success": True, "synced_calls": count}
+    except Exception as e:
+        logger.error(f"Error syncing calls from Sarvam: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 

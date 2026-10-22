@@ -82,6 +82,9 @@ export function LeadsPageClient({ initialLeads, agents = [], services = [], init
   // Sync state if initial props update
   useEffect(() => {
     setLeads(initialLeads)
+    if (!initialLeads || initialLeads.length === 0) {
+      handleRefresh()
+    }
   }, [initialLeads])
 
   useEffect(() => {

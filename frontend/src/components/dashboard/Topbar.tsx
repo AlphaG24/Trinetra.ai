@@ -89,7 +89,14 @@ export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
         if (res.ok) {
           const data = await res.json()
           if (!isMounted) return
-          const list = data.notifications || []
+          const rawList = data.notifications || []
+          const seen = new Set()
+          const list = rawList.filter((n: any) => {
+            const key = `${n.title || ''}-${(n.message || n.body || '').slice(0, 40)}`
+            if (seen.has(key)) return false
+            seen.add(key)
+            return true
+          })
           const count = data.unreadCount ?? list.filter((n: any) => !n.is_read).length
           setNotifications(list.slice(0, 5))
           setUnreadCount(count)
@@ -117,10 +124,17 @@ export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
           .select('*')
           .eq('user_id', currentUser.id)
           .order('created_at', { ascending: false })
-          .limit(10)
+          .limit(15)
         
         if (notifs && isMounted) {
-          setNotifications(notifs.slice(0, 5))
+          const seen = new Set()
+          const deduped = notifs.filter((n: any) => {
+            const key = `${n.title || ''}-${(n.message || n.body || '').slice(0, 40)}`
+            if (seen.has(key)) return false
+            seen.add(key)
+            return true
+          })
+          setNotifications(deduped.slice(0, 5))
         }
       } catch (err) {
         console.error('Error fetching notifications:', err)

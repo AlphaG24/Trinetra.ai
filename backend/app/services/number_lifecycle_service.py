@@ -526,8 +526,19 @@ class NumberLifecycleService:
                     f"Renewal is scheduled for {num.get('renewal_date') or 'the end of cycle'}."
                 )
 
+                cutoff_24h = (now - timedelta(hours=24)).isoformat()
                 for uid in target_user_ids:
                     try:
+                        # Prevent duplicate milestone notifications within 24 hours
+                        existing = self.supabase.table("notifications").select("id")\
+                            .eq("user_id", uid)\
+                            .eq("title", reminder_title)\
+                            .gte("created_at", cutoff_24h)\
+                            .limit(1)\
+                            .execute()
+                        if existing.data and len(existing.data) > 0:
+                            continue
+
                         self.supabase.table("notifications").insert({
                             "user_id": uid,
                             "title": reminder_title,
@@ -579,8 +590,19 @@ class NumberLifecycleService:
                 f"{available_count} < {threshold}. Triggering automatic expansion alert."
             )
             try:
+                cutoff_24h = (datetime.now(timezone.utc) - timedelta(hours=24)).isoformat()
                 admin_res = self.supabase.table("profiles").select("id").in_("role", ["super_admin", "admin"]).execute()
                 for admin in (admin_res.data or []):
+                    # Prevent duplicate alerts within 24 hours
+                    existing = self.supabase.table("notifications").select("id")\
+                        .eq("user_id", admin["id"])\
+                        .eq("title", "Auto-Pool Expansion Triggered")\
+                        .gte("created_at", cutoff_24h)\
+                        .limit(1)\
+                        .execute()
+                    if existing.data and len(existing.data) > 0:
+                        continue
+
                     self.supabase.table("notifications").insert({
                         "user_id": admin["id"],
                         "title": "Auto-Pool Expansion Triggered",
