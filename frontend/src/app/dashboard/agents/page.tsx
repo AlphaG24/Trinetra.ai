@@ -74,15 +74,12 @@ export default function AgentsDashboardPage() {
         .eq('id', effectiveUser.id)
         .maybeSingle()
 
-      let query = supabase.from('agents').select('*')
-      const orgId = profile?.organization_id || authProfile?.organization_id
-      if (orgId) {
-        query = query.or(`user_id.eq.${effectiveUser.id},organization_id.eq.${orgId}`)
-      } else {
-        query = query.eq('user_id', effectiveUser.id)
-      }
-
-      const { data: agentsData, error: agentsErr } = await query.order('created_at', { ascending: false })
+      const { data: agentsData, error: agentsErr } = await supabase
+        .from('agents')
+        .select('*')
+        .eq('user_id', effectiveUser.id)
+        .neq('status', 'deleted')
+        .order('created_at', { ascending: false })
       if (!agentsErr && agentsData) {
         const mappedAgents = agentsData.map((agent: any) => {
           const rawName = agent.name || ''
@@ -230,13 +227,21 @@ export default function AgentsDashboardPage() {
                       </div>
 
                       <div className="mt-3 pt-2.5 border-t border-[var(--border)] relative z-10">
-                        <PlanValidityTimer
-                          createdAt={agent.created_at}
-                          expiresAt={(agent as any).subscription_expires_at}
-                          validityDays={(agent as any).validity_days || 30}
-                          size="xs"
-                          showProgress={true}
-                        />
+                        {(() => {
+                          const paidLimit = authProfile?.paid_minutes_limit ?? (agent as any).minutes_limit ?? 100
+                          const paidUsed = authProfile?.paid_minutes_used ?? (agent as any).minutes_used ?? 0
+                          const hasPaidQuota = (paidLimit > paidUsed) || authProfile?.plan_tier === 'enterprise'
+                          return (
+                            <PlanValidityTimer
+                              createdAt={agent.created_at}
+                              expiresAt={(agent as any).subscription_expires_at}
+                              validityDays={(agent as any).validity_days || 30}
+                              size="xs"
+                              showProgress={true}
+                              hasRemainingQuota={hasPaidQuota}
+                            />
+                          )
+                        })()}
                       </div>
 
                       <div className="flex items-center justify-between border-t border-[var(--border)] pt-3 mt-3 relative z-10">
@@ -287,13 +292,24 @@ export default function AgentsDashboardPage() {
                       </div>
 
                       <div className="mt-3 pt-2.5 border-t border-[var(--border)] relative z-10">
-                        <PlanValidityTimer
-                          createdAt={agent.created_at}
-                          expiresAt={(agent as any).subscription_expires_at}
-                          validityDays={(agent as any).validity_days || 30}
-                          size="xs"
-                          showProgress={true}
-                        />
+                        {(() => {
+                          const limit = authProfile?.demo_minutes_limit ?? (agent as any).minutes_limit ?? 10
+                          const used = authProfile?.demo_minutes_used ?? (agent as any).minutes_used ?? 0
+                          const remaining = Math.max(0, limit - used)
+                          return (
+                            <PlanValidityTimer
+                              createdAt={agent.created_at}
+                              expiresAt={(agent as any).subscription_expires_at}
+                              validityDays={(agent as any).validity_days || 30}
+                              size="xs"
+                              showProgress={true}
+                              isDemo={true}
+                              demoMinutesLeft={remaining}
+                              demoMinutesLimit={limit}
+                              hasRemainingQuota={remaining > 0}
+                            />
+                          )
+                        })()}
                       </div>
 
                       <div className="flex items-center justify-between border-t border-[var(--border)] pt-3 mt-3 relative z-10">

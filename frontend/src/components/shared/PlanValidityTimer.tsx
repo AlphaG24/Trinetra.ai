@@ -12,6 +12,9 @@ export interface PlanValidityTimerProps {
   showProgress?: boolean;
   className?: string;
   hasRemainingQuota?: boolean;
+  isDemo?: boolean;
+  demoMinutesLeft?: number;
+  demoMinutesLimit?: number;
 }
 
 export function PlanValidityTimer({
@@ -22,7 +25,10 @@ export function PlanValidityTimer({
   size = "sm",
   showProgress = true,
   className = "",
-  hasRemainingQuota = false
+  hasRemainingQuota = false,
+  isDemo = false,
+  demoMinutesLeft,
+  demoMinutesLimit = 10
 }: PlanValidityTimerProps) {
   const [timeLeft, setTimeLeft] = useState<{
     days: number;
@@ -39,6 +45,53 @@ export function PlanValidityTimer({
     percentPassed: 0,
     isExpired: false
   });
+
+  // Handle Demo Agents separately based on demo minutes quota
+  if (isDemo) {
+    const limit = demoMinutesLimit || 10;
+    const remaining = demoMinutesLeft !== undefined ? Math.max(0, demoMinutesLeft) : limit;
+    const isExpired = remaining <= 0;
+    const percentRemain = Math.max(0, Math.min(100, Math.round((remaining / limit) * 100)));
+
+    const badgeBg = isExpired
+      ? "bg-rose-500/10 border-rose-500/25 text-rose-400"
+      : "bg-emerald-500/10 border-emerald-500/25 text-emerald-400";
+
+    const progressBg = isExpired
+      ? "bg-rose-500"
+      : "bg-gradient-to-r from-emerald-500 to-teal-500";
+
+    return (
+      <div className={`flex flex-col gap-1.5 ${className}`}>
+        <div className="flex items-center justify-between gap-2 text-left">
+          <div className="flex items-center gap-1.5">
+            <Clock className={`shrink-0 ${size === "xs" ? "w-3 h-3" : "w-3.5 h-3.5"} ${isExpired ? "text-rose-400" : "text-emerald-400"}`} />
+            <span className={`${size === "xs" ? "text-[10px]" : "text-[11px]"} font-medium text-[var(--muted)] font-mono`}>
+              {isExpired ? (
+                <span className="text-rose-400 font-bold">Demo Expired</span>
+              ) : (
+                <span className="text-emerald-500 font-bold">{remaining}m Demo Left</span>
+              )}
+            </span>
+          </div>
+
+          <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider border ${badgeBg}`}>
+            {isExpired ? "Expired" : "Active"}
+          </span>
+        </div>
+
+        {showProgress && (
+          <div className="w-full h-1.5 bg-zinc-800/60 rounded-full overflow-hidden border border-white/5">
+            <div
+              className={`h-full transition-all duration-500 rounded-full ${progressBg}`}
+              style={{ width: `${percentRemain}%` }}
+              title={`${remaining} of ${limit} demo minutes remaining`}
+            />
+          </div>
+        )}
+      </div>
+    );
+  }
 
   useEffect(() => {
     const calculateTime = () => {

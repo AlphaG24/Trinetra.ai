@@ -18,16 +18,12 @@ export const GET = safeApiHandler(async () => {
     .maybeSingle()
 
   const admin = createAdminClient()
-  let query = admin.from('agents').select('*')
 
-  // In the workspace dashboard, always scope to the user's organization or user ID
-  if (profile?.organization_id) {
-    query = query.or(`user_id.eq.${user.id},organization_id.eq.${profile.organization_id}`)
-  } else {
-    query = query.eq('user_id', user.id)
-  }
-
-  const { data: agents, error: queryError } = await query
+  // Strict User ID scoping: only show agents created by this account ID
+  const { data: agents, error: queryError } = await admin
+    .from('agents')
+    .select('*')
+    .eq('user_id', user.id)
     .neq('status', 'deleted')
     .order('created_at', { ascending: false })
 
