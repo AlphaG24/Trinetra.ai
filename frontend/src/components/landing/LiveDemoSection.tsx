@@ -41,7 +41,7 @@ export interface VoiceProductItem {
 // Exactly the real agents managed and configured in the developer account
 const DEFAULT_DEVELOPER_AGENTS: VoiceProductItem[] = [
   {
-    id: "b8133eed-19f2-48f0-876a-6f6946899fc6",
+    id: "dd4da4c1-9deb-4047-8927-5e12402e6b1f",
     name: "Shubh",
     category: "Appointment Booking",
     tag: "Auto-Calendar",
@@ -57,12 +57,12 @@ const DEFAULT_DEVELOPER_AGENTS: VoiceProductItem[] = [
     ],
   },
   {
-    id: "f3f5d985-ceef-4263-a29c-dffe5ef26d21",
-    name: "Vaamika",
+    id: "35398818-24de-4b55-999e-8d317141a3e2",
+    name: "Anika",
     category: "Customer Support",
     tag: "Helpdesk",
     description: "Handles incoming customer queries, troubleshoots service requests, and guides callers patiently.",
-    voice_id: "anushka",
+    voice_id: "ritu",
     language: "Hindi & English",
     gender: "female",
     accent: "#2563EB",

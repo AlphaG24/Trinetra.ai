@@ -82,7 +82,11 @@ async function generateLiveKitToken({
         let resolvedUserId = userId;
         let resolvedOrgId = organizationId;
 
-        if (!resolvedUserId) {
+        const isAnonymousPublicDemo = !userId || participant_name === 'StudioGuest';
+        if (isAnonymousPublicDemo) {
+          resolvedUserId = null;
+          resolvedOrgId = 'd3300000-0000-0000-0000-000000000001'; // Dedicated Vaakriti Demo Sandbox organization
+        } else if (!resolvedUserId) {
           const { data: ag } = await adminClient
             .from('agents')
             .select('user_id, organization_id')

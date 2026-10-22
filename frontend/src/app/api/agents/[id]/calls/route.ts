@@ -1,4 +1,5 @@
 import { createClient } from "@/utils/supabase/server";
+import { createAdminClient } from "@/utils/supabase/admin";
 import { NextResponse } from "next/server";
 
 export async function GET(
@@ -26,21 +27,24 @@ export async function GET(
       return NextResponse.json({ error: "Organization not found" }, { status: 404 });
     }
 
-    // 3. Verify agent belongs to user or user's organization
-    const { data: agentRecord } = await supabase
+    const isPrivileged = ['developer_tester', 'admin', 'super_admin'].includes(profile?.role || '');
+
+    // 3. Verify agent belongs to user or user's organization (or user is privileged)
+    const admin = createAdminClient();
+    const { data: agentRecord } = await admin
       .from("agents")
       .select("id, organization_id, user_id")
       .eq("id", agentId)
       .maybeSingle();
 
-    if (agentRecord && agentRecord.organization_id !== profile.organization_id && agentRecord.user_id !== user.id) {
+    if (!isPrivileged && agentRecord && agentRecord.organization_id !== profile.organization_id && agentRecord.user_id !== user.id) {
       return NextResponse.json({ error: "Unauthorized access to agent calls" }, { status: 403 });
     }
 
     // 4. Query voice_calls WHERE agent_id = requested agent
-    const { data: calls, error: queryError } = await supabase
+    const { data: calls, error: queryError } = await admin
       .from("voice_calls")
-      .select("id, created_at, duration_seconds, sentiment, outcome, caller_phone, transcript, status, recording_url")
+      .select("id, created_at, duration_seconds, sentiment, outcome, caller_phone, caller_name, transcript, status, recording_url")
       .eq("agent_id", agentId)
       .order("created_at", { ascending: false })
       .limit(50);

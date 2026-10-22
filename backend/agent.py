@@ -3436,14 +3436,8 @@ async def entrypoint(ctx: JobContext):
                 raw_name = agent_data.get('name', 'Agent') if agent_data else 'Agent'
                 clean_name = re.sub(r'^\[[^\]]+\]\s*', '', raw_name)
                 clean_name = re.sub(r'\s*-\s*(Demo|Trial)\s*$', '', clean_name, flags=re.IGNORECASE).strip()
-                if clean_name.lower() in ('multi agent', 'multi-agent', 'agent', 'sales agent', 'appointment agent', 'appointment booker', 'appointment booking agent', 'appointment booking', 'support agent', 'lead qualifier', 'lead qualifier agent', 'sales executive', ''):
-                    v_str = str(voice_id).strip().lower()
-                    if v_str in SARVAM_FEMALE_VOICES or v_str in SARVAM_MALE_VOICES:
-                        clean_name = v_str.capitalize()
-                    elif gender_tag == 'female':
-                        clean_name = "Aditi"
-                    else:
-                        clean_name = "Vikram"
+                if clean_name.lower() in ('agent', 'ai assistant', ''):
+                    clean_name = "Vikram" if gender_tag == 'male' else "Arika"
                 bot_name = clean_name
 
                 # 2. Fetch User Profile & Business Info
@@ -4425,14 +4419,8 @@ async def run_agent(room_name: str, agent_id: str | None = None, contact_id: str
                 raw_name = agent_data.get('name', 'Agent')
                 clean_name = re.sub(r'^\[[^\]]+\]\s*', '', raw_name)
                 clean_name = re.sub(r'\s*-\s*(Demo|Trial)\s*$', '', clean_name, flags=re.IGNORECASE).strip()
-                if clean_name.lower() in ('multi agent', 'multi-agent', 'agent', 'sales agent', 'appointment agent', 'appointment booker', 'appointment booking agent', 'appointment booking', 'support agent', 'lead qualifier', 'lead qualifier agent', 'sales executive', ''):
-                    v_str = str(voice_id).strip().lower()
-                    if v_str in SARVAM_FEMALE_VOICES or v_str in SARVAM_MALE_VOICES:
-                        clean_name = v_str.capitalize()
-                    elif str(agent_data.get("gender")).lower() == 'male':
-                        clean_name = "Vikram"
-                    else:
-                        clean_name = "Aditi"
+                if clean_name.lower() in ('agent', 'ai assistant', ''):
+                    clean_name = "Vikram" if str(agent_data.get("gender")).lower() == 'male' else "Arika"
                 bot_name = clean_name
 
                 explicit_gender = agent_data.get("gender")

@@ -17,18 +17,14 @@ export const GET = safeApiHandler(async () => {
     .eq('id', user.id)
     .maybeSingle()
 
-  const isPrivileged = ['developer_tester', 'admin', 'super_admin'].includes(profile?.role || '')
-
-  // Use admin client to reliably retrieve user agents without client-side RLS friction
   const admin = createAdminClient()
   let query = admin.from('agents').select('*')
 
-  if (!isPrivileged) {
-    if (profile?.organization_id) {
-      query = query.or(`user_id.eq.${user.id},organization_id.eq.${profile.organization_id}`)
-    } else {
-      query = query.eq('user_id', user.id)
-    }
+  // In the workspace dashboard, always scope to the user's organization or user ID
+  if (profile?.organization_id) {
+    query = query.or(`user_id.eq.${user.id},organization_id.eq.${profile.organization_id}`)
+  } else {
+    query = query.eq('user_id', user.id)
   }
 
   const { data: agents, error: queryError } = await query

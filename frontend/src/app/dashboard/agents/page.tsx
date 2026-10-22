@@ -74,16 +74,12 @@ export default function AgentsDashboardPage() {
         .eq('id', effectiveUser.id)
         .maybeSingle()
 
-      const isPrivileged = ['developer_tester', 'admin', 'super_admin'].includes(profile?.role || authProfile?.role || '')
-
       let query = supabase.from('agents').select('*')
-      if (!isPrivileged) {
-        const orgId = profile?.organization_id || authProfile?.organization_id
-        if (orgId) {
-          query = query.or(`user_id.eq.${effectiveUser.id},organization_id.eq.${orgId}`)
-        } else {
-          query = query.eq('user_id', effectiveUser.id)
-        }
+      const orgId = profile?.organization_id || authProfile?.organization_id
+      if (orgId) {
+        query = query.or(`user_id.eq.${effectiveUser.id},organization_id.eq.${orgId}`)
+      } else {
+        query = query.eq('user_id', effectiveUser.id)
       }
 
       const { data: agentsData, error: agentsErr } = await query.order('created_at', { ascending: false })

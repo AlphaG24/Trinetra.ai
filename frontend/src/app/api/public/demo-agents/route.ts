@@ -62,11 +62,11 @@ const DEFAULT_DEMO_PERSONAS: DemoAgentItem[] = [
     is_managed_by_dev: true,
   },
   {
-    id: '15db1c28-7773-483b-be11-56fc383a0801', // Real DB Agent: Lead Qualifier
+    id: '35398818-24de-4b55-999e-8d317141a3e2', // Real DB Agent: Anika
     name: 'Anika',
     personality: 'Empathetic & Methodical',
     archetype: 'Appointment & Operations Specialist',
-    voice_id: 'anushka',
+    voice_id: 'ritu',
     language: 'Hinglish & Regional Dialects',
     gender: 'female',
     description: 'Expertly coordinates calendar schedules, verifies user intent, and handles logistical workflows without fatigue.',
@@ -81,15 +81,15 @@ const DEFAULT_DEMO_PERSONAS: DemoAgentItem[] = [
     is_managed_by_dev: true,
   },
   {
-    id: '35398818-24de-4b55-999e-8d317141a3e2',
-    name: 'Dr. Aarav',
-    personality: 'Intellectual & Guiding',
-    archetype: 'Vaakriti Solutions Architect',
+    id: 'dd4da4c1-9deb-4047-8927-5e12402e6b1f', // Real DB Agent: Shubh
+    name: 'Shubh',
+    personality: 'Direct & Pragmatic',
+    archetype: 'AI Sales & Operations Strategist',
     voice_id: 'shubh',
-    language: 'English & Hindi',
+    language: 'Hinglish & English',
     gender: 'male',
-    description: 'Demonstrates enterprise telephony pipelines, sub-second latency streaming, and scalable voice automations.',
-    greeting_message: 'Greetings! I am Dr. Aarav from Vaakriti, an AI enterprise specialist. This session may be recorded for learning quality. How can I assist with your voice deployment today?',
+    description: 'Specializes in high-intent conversations, answering business inquiries, and onboarding enterprise teams.',
+    greeting_message: 'Hello, main Shubh bol raha hoon Vaakriti se, an AI assistant. Call quality ke liye record ki ja sakti hai. Kaise help kar sakta hoon?',
     accent_color: '#D97706', // Golden Saffron
     badge_color: 'bg-[#D97706]/10 text-[#D97706] border-[#D97706]/20',
     suggested_prompts: [
