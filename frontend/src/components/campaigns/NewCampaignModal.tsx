@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
+import Link from 'next/link'
 import { X, Upload, Megaphone, Loader2, Download, ShieldCheck } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { createClient } from '@/utils/supabase/client'
@@ -9,6 +10,7 @@ interface Agent {
   id: string
   name: string
   status: string
+  phone_number?: string
 }
 
 interface NewCampaignModalProps {
@@ -49,14 +51,64 @@ export function NewCampaignModal({ isOpen, onClose, onSuccess }: NewCampaignModa
         return
       }
 
-      const { data: agentsData, error: agentsErr } = await supabase
+      // Check user profile for organization_id
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('organization_id')
+        .eq('id', user.id)
+        .maybeSingle()
+
+      let query = supabase
         .from('agents')
-        .select('id, name, status, is_demo, agent_type')
-        .eq('user_id', user.id)
+        .select('id, name, status, is_demo, agent_type, phone_number, organization_id')
+
+      if (profile?.organization_id) {
+        query = query.or(`user_id.eq.${user.id},organization_id.eq.${profile.organization_id}`)
+      } else {
+        query = query.eq('user_id', user.id)
+      }
+
+      const { data: agentsData, error: agentsErr } = await query
+        .neq('status', 'deleted')
         .order('created_at', { ascending: false })
 
       if (agentsErr) throw agentsErr
 
+      // Fetch active phone numbers and assignments to verify outbound capability
+      const { data: phoneNumbersData } = await supabase
+        .from('phone_numbers')
+        .select('phone_number, assigned_agent_id, status')
+        .eq('status', 'active')
+        .not('assigned_agent_id', 'is', null)
+
+      const { data: agentPhoneData } = await supabase
+        .from('agent_phone_numbers')
+        .select('agent_id, phone_number_id, phone_numbers(phone_number, status)')
+
+      // Map assigned numbers to agent IDs
+      const agentNumberMap = new Map<string, string>()
+
+      phoneNumbersData?.forEach((p: any) => {
+        if (p.assigned_agent_id && p.phone_number) {
+          agentNumberMap.set(p.assigned_agent_id, p.phone_number)
+        }
+      })
+
+      agentPhoneData?.forEach((ap: any) => {
+        const num = ap.phone_numbers?.phone_number
+        if (ap.agent_id && num) {
+          agentNumberMap.set(ap.agent_id, num)
+        }
+      })
+
+      // Also check direct agents.phone_number column
+      agentsData?.forEach((agent: any) => {
+        if (agent.phone_number && !agentNumberMap.has(agent.id)) {
+          agentNumberMap.set(agent.id, agent.phone_number)
+        }
+      })
+
+      // Strictly include ONLY agents that have an assigned phone number (required for outbound dialer)
       const filteredAgents = (agentsData || []).filter((agent: any) => {
         const rawName = agent.name || ''
         const cleanName = rawName.replace(/^\[[^\]]+\]\s*/, '').trim().toLowerCase()
@@ -64,7 +116,10 @@ export function NewCampaignModal({ isOpen, onClose, onSuccess }: NewCampaignModa
         const isFreeDemo = agent.is_demo === true || 
                            agent.agent_type === 'free_demo' || 
                            isNameDemo
-        return !isFreeDemo
+        if (isFreeDemo) return false
+
+        // Must have an assigned phone number
+        return agentNumberMap.has(agent.id)
       })
 
       const mappedAgents = filteredAgents.map((agent: any) => {
@@ -73,16 +128,20 @@ export function NewCampaignModal({ isOpen, onClose, onSuccess }: NewCampaignModa
           .replace(/^\[[^\]]+\]\s*/, '')           // remove [slug] prefix
           .replace(/\s*-\s*Demo\s*$/i, ' (Demo)')  // prettify " - Demo" suffix
           .replace(/\s*-\s*Trial\s*$/i, ' (Trial)') // prettify " - Trial" suffix
+        const assignedPhone = agentNumberMap.get(agent.id) || ''
         return {
           id: agent.id,
-          name: displayName || 'Unnamed Agent',
-          status: agent.status
+          name: `${displayName || 'Unnamed Agent'} (${assignedPhone})`,
+          status: agent.status,
+          phone_number: assignedPhone
         }
       })
 
       setAgents(mappedAgents)
       if (mappedAgents.length > 0) {
         setAgentId(mappedAgents[0].id)
+      } else {
+        setAgentId('')
       }
     } catch (err: any) {
       console.error(err)
@@ -209,16 +268,29 @@ export function NewCampaignModal({ isOpen, onClose, onSuccess }: NewCampaignModa
 
           {/* Agent Selection */}
           <div className="space-y-1.5">
-            <label className="text-xs font-bold uppercase tracking-wider text-[var(--heading)]">
-              Assign AI Voice Agent
+            <label className="text-xs font-bold uppercase tracking-wider text-[var(--heading)] flex items-center justify-between">
+              <span>Assign AI Voice Agent</span>
+              <span className="text-[10px] text-emerald-400 font-normal">Active Caller ID Required</span>
             </label>
             {loadingAgents ? (
               <div className="flex items-center gap-2 py-2 text-xs text-[var(--muted)]">
                 <Loader2 className="w-4 h-4 animate-spin text-violet-500" />
-                Loading agents...
+                Loading agents with assigned phone numbers...
               </div>
             ) : agents.length === 0 ? (
-              <p className="text-xs text-rose-500 font-medium">No agents available. Please create a voice agent first.</p>
+              <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-200">
+                <p className="font-semibold text-amber-300">No agents with assigned phone numbers found</p>
+                <p className="mt-1 text-amber-300/80">
+                  Outbound campaigns require an agent with an active caller ID phone number assigned.
+                </p>
+                <Link 
+                  href="/dashboard/phone-numbers" 
+                  onClick={onClose}
+                  className="inline-block mt-2 font-bold text-violet-400 hover:text-violet-300 hover:underline"
+                >
+                  Assign a Phone Number to an Agent →
+                </Link>
+              </div>
             ) : (
               <select
                 required

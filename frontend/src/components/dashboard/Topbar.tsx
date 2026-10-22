@@ -198,9 +198,14 @@ export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
     router.refresh()
   }
 
-  // Instant hydration fallback from client storage
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  // Instant hydration fallback from client storage only after mount to prevent SSR mismatch
   let cachedDisplayName = ''
-  if (typeof window !== 'undefined') {
+  if (mounted && typeof window !== 'undefined') {
     try {
       const cached = sessionStorage.getItem('trinetra_auth_profile_cache') || localStorage.getItem('trinetra_auth_profile_cache')
       if (cached) {
@@ -341,14 +346,14 @@ export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
               onClick={() => setIsDropdownOpen(!isDropdownOpen)}
               className="flex items-center gap-2.5 p-1.5 hover:bg-[var(--hover-bg)] rounded-xl transition-colors"
             >
-              <div className="w-8 h-8 rounded-full overflow-hidden bg-zinc-100 dark:bg-white/10 text-zinc-800 dark:text-white border border-[var(--border)] flex items-center justify-center font-bold text-sm shrink-0">
+              <div suppressHydrationWarning className="w-8 h-8 rounded-full overflow-hidden bg-zinc-100 dark:bg-white/10 text-zinc-800 dark:text-white border border-[var(--border)] flex items-center justify-center font-bold text-sm shrink-0">
                 {avatarUrl ? (
                   <img src={avatarUrl} alt={displayName} className="w-full h-full object-cover" />
                 ) : (
                   displayName[0]?.toUpperCase()
                 )}
               </div>
-              <span className="text-sm font-bold text-gray-400 hidden sm:block max-w-[120px] truncate font-playfair">
+              <span suppressHydrationWarning className="text-sm font-bold text-gray-400 hidden sm:block max-w-[120px] truncate font-playfair">
                 {displayName}
               </span>
             </button>
