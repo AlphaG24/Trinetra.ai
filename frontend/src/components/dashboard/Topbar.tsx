@@ -72,112 +72,122 @@ export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
   const fetchNotifsRef = useRef<() => void>(() => {})
 
   useEffect(() => {
+    let isMounted = true
     const supabase = createClient()
-    let channel: any = null
+    let activeChannel: any = null
     let pollInterval: any = null
-    let cleanupHandler: (() => void) | null = null
+
+    const handleCallCompleted = () => {
+      fetchNotifsRef.current?.()
+    }
+    window.addEventListener('trinetra:call_completed', handleCallCompleted)
+
+    const fetchNotifs = async () => {
+      if (!isMounted) return
+      try {
+        const res = await fetch('/api/notifications')
+        if (res.ok) {
+          const data = await res.json()
+          if (!isMounted) return
+          const list = data.notifications || []
+          const count = data.unreadCount ?? list.filter((n: any) => !n.is_read).length
+          setNotifications(list.slice(0, 5))
+          setUnreadCount(count)
+          return
+        }
+      } catch {
+        // Fallback to client Supabase below
+      }
+
+      if (!isMounted) return
+      try {
+        const { data: { user: currentUser } } = await supabase.auth.getUser()
+        if (!currentUser || !isMounted) return
+
+        const { count } = await supabase
+          .from('notifications')
+          .select('*', { count: 'exact', head: true })
+          .eq('user_id', currentUser.id)
+          .eq('is_read', false)
+        if (!isMounted) return
+        setUnreadCount(count || 0)
+
+        const { data: notifs } = await supabase
+          .from('notifications')
+          .select('*')
+          .eq('user_id', currentUser.id)
+          .order('created_at', { ascending: false })
+          .limit(10)
+        
+        if (notifs && isMounted) {
+          setNotifications(notifs.slice(0, 5))
+        }
+      } catch (err) {
+        console.error('Error fetching notifications:', err)
+      }
+    }
+
+    fetchNotifsRef.current = fetchNotifs
 
     async function loadUserAndSubscribe() {
       try {
         const currentUser = authUser || (await supabase.auth.getUser()).data?.user
-        if (currentUser) {
-          if (!user) setUser(currentUser)
-          if (authProfile) {
-            setProfile(authProfile)
-          } else if (!profile) {
-            const { data } = await supabase
-              .from('profiles')
-              .select('full_name, avatar_url')
-              .eq('id', currentUser.id)
-              .maybeSingle()
-            if (data) setProfile(data as unknown as UserProfile)
-          }
+        if (!currentUser || !isMounted) return
 
-          const fetchNotifs = async () => {
-            try {
-              const res = await fetch('/api/notifications')
-              if (res.ok) {
-                const data = await res.json()
-                const list = data.notifications || []
-                const count = data.unreadCount ?? list.filter((n: any) => !n.is_read).length
-                setNotifications(list.slice(0, 5))
-                setUnreadCount(count)
-                return
-              }
-            } catch {
-              // Fallback to client Supabase below
-            }
-
-            try {
-              const { count } = await supabase
-                .from('notifications')
-                .select('*', { count: 'exact', head: true })
-                .eq('user_id', currentUser.id)
-                .eq('is_read', false)
-              setUnreadCount(count || 0)
-
-              const { data: notifs } = await supabase
-                .from('notifications')
-                .select('*')
-                .eq('user_id', currentUser.id)
-                .order('created_at', { ascending: false })
-                .limit(10)
-              
-              if (notifs) {
-                setNotifications(notifs.slice(0, 5))
-              }
-            } catch (err) {
-              console.error('Error fetching notifications:', err)
-            }
-          }
-
-          fetchNotifsRef.current = fetchNotifs
-          await fetchNotifs()
-
-          // Subscribe to Postgres changes on notifications table with unique channel instance
-          if (channel) {
-            try {
-              supabase.removeChannel(channel)
-            } catch {}
-          }
-
-          const uniqueChannelName = `topbar-notifs-${currentUser.id}-${Date.now()}`
-          channel = supabase
-            .channel(uniqueChannelName)
-            .on(
-              'postgres_changes',
-              {
-                event: '*',
-                schema: 'public',
-                table: 'notifications',
-                filter: `user_id=eq.${currentUser.id}`
-              },
-              () => {
-                fetchNotifs()
-              }
-            )
-            .subscribe()
-
-          const handleCallCompleted = () => {
-            fetchNotifs()
-          }
-          window.addEventListener('trinetra:call_completed', handleCallCompleted)
-
-          // Fallback background heartbeat poll every 60s (Realtime handles instant pushes)
-          pollInterval = setInterval(fetchNotifs, 60000)
-
-          cleanupHandler = () => {
-            if (channel) {
-              try {
-                supabase.removeChannel(channel)
-              } catch {}
-            }
-            if (pollInterval) {
-              clearInterval(pollInterval)
-            }
-            window.removeEventListener('trinetra:call_completed', handleCallCompleted)
-          }
+        if (!user) setUser(currentUser)
+        if (authProfile) {
+          setProfile(authProfile)
+        } else if (!profile) {
+          const { data } = await supabase
+            .from('profiles')
+            .select('full_name, avatar_url')
+            .eq('id', currentUser.id)
+            .maybeSingle()
+          if (data && isMounted) setProfile(data as unknown as UserProfile)
         }
+
+        if (!isMounted) return
+        await fetchNotifs()
+
+        // Clean up any existing topbar notification channels for this user to avoid duplicate subscription errors
+        try {
+          const existingChannels = supabase.getChannels().filter((c: any) => c.topic?.includes(`topbar-notifs-${currentUser.id}`))
+          for (const ch of existingChannels) {
+            supabase.removeChannel(ch)
+          }
+        } catch {}
+
+        if (!isMounted) return
+
+        // Unique channel name with timestamp and random suffix to guarantee uniqueness
+        const uniqueChannelName = `topbar-notifs-${currentUser.id}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
+        try {
+          const ch = supabase.channel(uniqueChannelName)
+          activeChannel = ch
+          ch.on(
+            'postgres_changes',
+            {
+              event: '*',
+              schema: 'public',
+              table: 'notifications',
+              filter: `user_id=eq.${currentUser.id}`
+            },
+            () => {
+              if (isMounted) fetchNotifsRef.current?.()
+            }
+          ).subscribe((status: string) => {
+            if (status === 'CHANNEL_ERROR') {
+              console.warn('[Topbar Realtime] Realtime notification channel error')
+            }
+          })
+        } catch (realtimeErr) {
+          console.warn('[Topbar Realtime] Error initializing realtime notification channel:', realtimeErr)
+        }
+
+        // Heartbeat fallback poll every 60s
+        pollInterval = setInterval(() => {
+          if (isMounted) fetchNotifsRef.current?.()
+        }, 60000)
       } catch (err) {
         console.error('Error loading user profile or subscribing to notifications in Topbar:', err)
       }
@@ -186,8 +196,14 @@ export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
     loadUserAndSubscribe()
 
     return () => {
-      if (cleanupHandler) cleanupHandler()
+      isMounted = false
+      window.removeEventListener('trinetra:call_completed', handleCallCompleted)
       if (pollInterval) clearInterval(pollInterval)
+      if (activeChannel) {
+        try {
+          supabase.removeChannel(activeChannel)
+        } catch {}
+      }
     }
   }, [authUser?.id, authProfile?.id])
 
