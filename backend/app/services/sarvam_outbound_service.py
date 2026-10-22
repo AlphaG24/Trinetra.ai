@@ -212,137 +212,219 @@ class SarvamOutboundService:
 
                 items = res.json().get("items", [])
                 for att in items:
-                    att_id = att.get("attempt_id")
-                    if match_attempt_id and att_id != match_attempt_id:
-                        continue
+                    try:
+                        att_id = att.get("attempt_id")
+                        if match_attempt_id and att_id != match_attempt_id:
+                            continue
 
-                    inter_id = att.get("interaction_id")
-                    user_phone = att.get("user_contact")
-                    audio_url = att.get("audio_url")
-                    duration = int(float(att.get("duration_in_seconds") or 0))
-                    status_raw = (att.get("connectivity_status") or "completed").lower()
-                    stat_normalized = "completed" if status_raw in ("connected", "completed") else status_raw
+                        inter_id = att.get("interaction_id")
+                        user_phone = att.get("user_contact")
+                        audio_url = att.get("audio_url")
+                        duration = int(float(att.get("duration_in_seconds") or 0))
+                        status_raw = (att.get("connectivity_status") or "completed").lower()
+                        stat_normalized = "completed" if status_raw in ("connected", "completed") else status_raw
 
-                    agent_vars = att.get("agent_variables") or {}
-                    user_name = agent_vars.get("user_name") or "Contact"
-                    summary = agent_vars.get("call_summary") or "Outbound call completed via Shubh"
+                        agent_vars = att.get("agent_variables") or {}
+                        user_name = agent_vars.get("user_name") or "Contact"
+                        summary = agent_vars.get("call_summary") or "Call completed via Shubh"
 
-                    # Fetch turn-by-turn transcript
-                    transcript_text = ""
-                    if inter_id:
-                        try:
-                            t_res = await client.get(f"{base_url}/transcripts/{inter_id}", headers=headers)
-                            if t_res.status_code == 200:
-                                msgs = t_res.json().get("messages", [])
-                                lines = []
-                                for m in msgs:
-                                    role = "Agent" if m.get("role") == "assistant" else "User"
-                                    lines.append(f"{role}: {m.get('content', '')}")
-                                transcript_text = "\n".join(lines)
-                        except Exception as t_err:
-                            logger.warning(f"[Sarvam Sync] Error fetching transcript: {t_err}")
+                        # Handle phone length and emails safely (database column is VARCHAR(20))
+                        clean_raw = str(user_phone or "").strip()
+                        if "@" in clean_raw:
+                            phone_for_lead = None
+                            email_for_lead = clean_raw[:50]
+                            caller_phone_field = clean_raw[:20]
+                        else:
+                            phone_for_lead = clean_raw[:20] if clean_raw else None
+                            email_for_lead = None
+                            caller_phone_field = clean_raw[:20] if clean_raw else "Unknown"
 
-                    # 1. Upsert into voice_calls
-                    call_payload = {
-                        "user_id": target_user,
-                        "organization_id": target_org,
-                        "agent_id": target_agent,
-                        "caller_name": user_name,
-                        "caller_phone": user_phone,
-                        "duration_seconds": duration,
-                        "status": stat_normalized,
-                        "sentiment": "positive",
-                        "outcome": "answered" if duration > 0 else "no_answer",
-                        "recording_url": audio_url,
-                        "transcript": transcript_text,
-                        "call_summary": summary,
-                        "language_detected": "Hindi",
-                        "metadata": {
-                            "provider": "sarvam",
-                            "attempt_id": att_id,
-                            "interaction_id": inter_id,
-                            "agent_variables": agent_vars
-                        }
-                    }
+                        # Fetch turn-by-turn transcript
+                        transcript_text = ""
+                        if inter_id and inter_id != "NO_INTERACTION_ID":
+                            try:
+                                t_res = await client.get(f"{base_url}/transcripts/{inter_id}", headers=headers)
+                                if t_res.status_code == 200:
+                                    msgs = t_res.json().get("messages", [])
+                                    lines = []
+                                    for m in msgs:
+                                        role = "Agent" if m.get("role") == "assistant" else "User"
+                                        lines.append(f"{role}: {m.get('content', '')}")
+                                    transcript_text = "\n".join(lines)
+                            except Exception as t_err:
+                                logger.warning(f"[Sarvam Sync] Error fetching transcript: {t_err}")
 
-                    existing_call = await asyncio.to_thread(
-                        supabase_admin.table("voice_calls").select("id").eq("recording_url", audio_url).execute
-                    )
-                    if existing_call.data:
-                        call_id = existing_call.data[0]["id"]
-                        await asyncio.to_thread(
-                            supabase_admin.table("voice_calls").update(call_payload).eq("id", call_id).execute
-                        )
-                    else:
-                        new_call = await asyncio.to_thread(
-                            supabase_admin.table("voice_calls").insert(call_payload).execute
-                        )
-                        call_id = new_call.data[0]["id"] if new_call.data else None
-
-                    # 2. Upsert into leads
-                    if user_phone:
-                        lead_payload = {
+                        # 1. Upsert into voice_calls
+                        call_payload = {
                             "user_id": target_user,
-                            "agent_id": target_agent,
-                            "full_name": user_name,
-                            "phone": user_phone,
-                            "status": "qualified",
-                            "stage": "contacted",
-                            "interest_level": "high",
-                            "source": "voice_demo",
-                            "notes": summary,
-                            "call_summary": summary,
-                            "call_id": call_id
-                        }
-                        exist_lead = await asyncio.to_thread(
-                            supabase_admin.table("leads").select("id").eq("phone", user_phone).execute
-                        )
-                        if exist_lead.data:
-                            await asyncio.to_thread(
-                                supabase_admin.table("leads").update(lead_payload).eq("id", exist_lead.data[0]["id"]).execute
-                            )
-                        else:
-                            await asyncio.to_thread(
-                                supabase_admin.table("leads").insert(lead_payload).execute
-                            )
-
-                    # 3. Upsert into customer_contacts
-                    if user_phone:
-                        cust_payload = {
                             "organization_id": target_org,
-                            "full_name": user_name,
-                            "phone_number": user_phone,
-                            "total_calls": 1,
-                            "notes": summary,
-                            "tags": ["sarvam_outbound", "preview_requested"]
+                            "agent_id": target_agent,
+                            "caller_name": user_name,
+                            "caller_phone": caller_phone_field,
+                            "duration_seconds": duration,
+                            "status": stat_normalized,
+                            "sentiment": "positive",
+                            "outcome": "answered" if duration > 0 else "no_answer",
+                            "recording_url": audio_url,
+                            "transcript": transcript_text,
+                            "call_summary": summary,
+                            "language_detected": "Hindi",
+                            "metadata": {
+                                "provider": "sarvam",
+                                "attempt_id": att_id,
+                                "interaction_id": inter_id,
+                                "agent_variables": agent_vars
+                            }
                         }
-                        exist_cust = await asyncio.to_thread(
-                            supabase_admin.table("customer_contacts").select("id").eq("phone_number", user_phone).execute
-                        )
-                        if exist_cust.data:
+
+                        existing_call = None
+                        if audio_url:
+                            c_res = await asyncio.to_thread(
+                                supabase_admin.table("voice_calls").select("id").eq("recording_url", audio_url).limit(1).execute
+                            )
+                            if c_res.data:
+                                existing_call = c_res.data[0]
+
+                        if not existing_call and inter_id and inter_id != "NO_INTERACTION_ID":
+                            c_res = await asyncio.to_thread(
+                                supabase_admin.table("voice_calls").select("id").filter("metadata->>interaction_id", "eq", inter_id).limit(1).execute
+                            )
+                            if c_res.data:
+                                existing_call = c_res.data[0]
+
+                        if existing_call:
+                            call_id = existing_call["id"]
                             await asyncio.to_thread(
-                                supabase_admin.table("customer_contacts").update(cust_payload).eq("id", exist_cust.data[0]["id"]).execute
+                                supabase_admin.table("voice_calls").update(call_payload).eq("id", call_id).execute
                             )
                         else:
+                            new_call = await asyncio.to_thread(
+                                supabase_admin.table("voice_calls").insert(call_payload).execute
+                            )
+                            call_id = new_call.data[0]["id"] if (new_call and new_call.data) else None
+
+                        # 2. Upsert into leads
+                        if phone_for_lead or email_for_lead:
+                            lead_payload = {
+                                "user_id": target_user,
+                                "agent_id": target_agent,
+                                "full_name": user_name,
+                                "phone": phone_for_lead,
+                                "email": email_for_lead,
+                                "status": "qualified",
+                                "stage": "contacted",
+                                "interest_level": "high",
+                                "source": "voice_demo",
+                                "notes": summary,
+                                "call_summary": summary,
+                                "call_id": call_id
+                            }
+                            if phone_for_lead:
+                                exist_lead = await asyncio.to_thread(
+                                    supabase_admin.table("leads").select("id").eq("phone", phone_for_lead).execute
+                                )
+                            else:
+                                exist_lead = await asyncio.to_thread(
+                                    supabase_admin.table("leads").select("id").eq("email", email_for_lead).execute
+                                )
+
+                            if exist_lead.data:
+                                await asyncio.to_thread(
+                                    supabase_admin.table("leads").update(lead_payload).eq("id", exist_lead.data[0]["id"]).execute
+                                )
+                            else:
+                                await asyncio.to_thread(
+                                    supabase_admin.table("leads").insert(lead_payload).execute
+                                )
+
+                        # 3. Upsert into customer_contacts
+                        if phone_for_lead:
+                            cust_payload = {
+                                "organization_id": target_org,
+                                "full_name": user_name,
+                                "phone_number": phone_for_lead,
+                                "total_calls": 1,
+                                "notes": summary,
+                                "tags": ["sarvam_outbound", "preview_requested"]
+                            }
+                            exist_cust = await asyncio.to_thread(
+                                supabase_admin.table("customer_contacts").select("id").eq("phone_number", phone_for_lead).execute
+                            )
+                            if exist_cust.data:
+                                await asyncio.to_thread(
+                                    supabase_admin.table("customer_contacts").update(cust_payload).eq("id", exist_cust.data[0]["id"]).execute
+                                )
+                            else:
+                                await asyncio.to_thread(
+                                    supabase_admin.table("customer_contacts").insert(cust_payload).execute
+                                )
+
+                        # 4. Update campaign_contacts & Campaign Stats
+                        if phone_for_lead:
                             await asyncio.to_thread(
-                                supabase_admin.table("customer_contacts").insert(cust_payload).execute
+                                supabase_admin.table("campaign_contacts")
+                                .update({
+                                    "call_status": "answered",
+                                    "call_id": call_id,
+                                    "notes": summary
+                                })
+                                .eq("phone", phone_for_lead)
+                                .execute
                             )
 
-                    # 4. Update campaign_contacts
-                    if user_phone:
-                        await asyncio.to_thread(
-                            supabase_admin.table("campaign_contacts")
-                            .update({
-                                "call_status": "answered",
-                                "call_id": call_id,
-                                "notes": summary
-                            })
-                            .eq("phone", user_phone)
-                            .execute
-                        )
+                            # Auto-update parent campaign statistics
+                            camp_lookup = await asyncio.to_thread(
+                                supabase_admin.table("campaign_contacts").select("campaign_id").eq("phone", phone_for_lead).limit(1).execute
+                            )
+                            if camp_lookup.data and len(camp_lookup.data) > 0:
+                                p_camp_id = camp_lookup.data[0]["campaign_id"]
+                                contacts_all = await asyncio.to_thread(
+                                    supabase_admin.table("campaign_contacts").select("call_status").eq("campaign_id", p_camp_id).execute
+                                )
+                                rows = contacts_all.data or []
+                                num_called = sum(1 for r in rows if r.get("call_status") != "pending")
+                                num_connected = sum(1 for r in rows if r.get("call_status") in ("answered", "completed"))
+                                await asyncio.to_thread(
+                                    supabase_admin.table("campaigns").update({
+                                        "contacts_called": num_called,
+                                        "contacts_connected": num_connected,
+                                        "leads_generated": num_connected
+                                    }).eq("id", p_camp_id).execute
+                                )
 
-                    synced_count += 1
-                    logger.info(f"[Sarvam Sync] Successfully synced call for {user_phone} ({user_name})")
+                        # 5. Auto-schedule Appointment if booked in call
+                        summary_lower = (summary or "").lower()
+                        trans_lower = (transcript_text or "").lower()
+                        if phone_for_lead and ("booked" in summary_lower or "appointment" in summary_lower or "11 am" in summary_lower or "11 am" in trans_lower or "कल 11 बजे" in trans_lower):
+                            try:
+                                exist_appt = await asyncio.to_thread(
+                                    supabase_admin.table("appointments").select("id").eq("voice_call_id", call_id).limit(1).execute
+                                )
+                                if not exist_appt.data and call_id:
+                                    tomorrow_11am = (datetime.now(timezone.utc) + timedelta(days=1)).replace(hour=5, minute=30, second=0).isoformat()
+                                    await asyncio.to_thread(
+                                        supabase_admin.table("appointments").insert({
+                                            "user_id": target_user,
+                                            "agent_id": target_agent,
+                                            "contact_name": user_name,
+                                            "contact_phone": phone_for_lead,
+                                            "scheduled_at": tomorrow_11am,
+                                            "duration_minutes": 15,
+                                            "status": "scheduled",
+                                            "booked_via": "voice_call",
+                                            "notes": summary,
+                                            "voice_call_id": call_id
+                                        }).execute
+                                    )
+                                    logger.info(f"[Sarvam Sync] Automatically booked appointment for {user_name} ({phone_for_lead}) at 11 AM")
+                            except Exception as appt_err:
+                                logger.warning(f"[Sarvam Sync] Appointment booking error: {appt_err}")
+
+                        synced_count += 1
+                        logger.info(f"[Sarvam Sync] Successfully synced call for {caller_phone_field} ({user_name})")
+
+                    except Exception as item_err:
+                        logger.error(f"[Sarvam Sync Item Error] Failed to process attempt: {item_err}", exc_info=True)
 
         except Exception as e:
             logger.error(f"[Sarvam Sync] Error during sync: {e}", exc_info=True)

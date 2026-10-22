@@ -86,19 +86,28 @@ export async function PATCH(
       return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
     }
 
-    // Determine the new stage
-    const newStage = payload.stage || payload.status;
-    if (!newStage) {
-      return NextResponse.json({ error: "Missing stage or status field" }, { status: 400 });
-    }
+    // Determine and normalize status to allowed values: ('new', 'contacted', 'qualified', 'converted', 'lost')
+    const rawStatus = (payload.status || payload.stage || 'new').toLowerCase().trim();
+    const statusMap: Record<string, string> = {
+      'new': 'new',
+      'contacted': 'contacted',
+      'qualified': 'qualified',
+      'converted': 'converted',
+      'won': 'converted',
+      'closed': 'converted',
+      'lost': 'lost',
+      'deal_won': 'converted',
+      'deal_lost': 'lost'
+    };
+    const validStatus = statusMap[rawStatus] || 'qualified';
 
     const updateData: Record<string, any> = {
-      stage: newStage,
-      status: newStage,
+      stage: validStatus,
+      status: validStatus,
       updated_at: new Date().toISOString(),
     };
 
-    if (newStage.toLowerCase() === "converted") {
+    if (validStatus === "converted") {
       updateData.converted_at = new Date().toISOString();
     }
 

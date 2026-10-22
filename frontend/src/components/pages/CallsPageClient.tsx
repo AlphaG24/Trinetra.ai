@@ -33,6 +33,9 @@ export function CallsPageClient({ agents }: { agents: any[] }) {
     const fetchCalls = async () => {
       setIsLoading(true)
       try {
+        // Trigger background sync with Sarvam
+        fetch('/api/campaigns/sync-calls', { method: 'POST' }).catch(() => {})
+
         const params = new URLSearchParams({
           page: String(page),
           per_page: String(perPage),
