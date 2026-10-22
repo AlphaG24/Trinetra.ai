@@ -63,7 +63,12 @@ class SarvamOutboundService:
         }
 
         user_config: Dict[str, Any] = {
-            "user_phone_number": cleaned_phone
+            "user_phone_number": cleaned_phone,
+            "customer_phone": cleaned_phone,
+            "user_phone": cleaned_phone,
+            "phone": cleaned_phone,
+            "phone_number": cleaned_phone,
+            "contact_phone": cleaned_phone
         }
         if contact_name and contact_name.strip():
             user_config["user_name"] = contact_name.strip()

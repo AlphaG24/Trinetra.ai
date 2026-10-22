@@ -72,7 +72,7 @@ async function sendAppointmentCustomerNotification({
   const firstName = contactName.split(" ")[0];
   const meetingType = appointment.meeting_type || "AI Voice Demo Consultation";
   const contactPhone = normalizePhone(appointment.contact_phone || "");
-  const contactEmail = appointment.contact_email || "raghav00424@gmail.com";
+  const contactEmail = appointment.contact_email ? String(appointment.contact_email).trim() : null;
 
   let scheduledDateStr = "Scheduled Session";
   try {
