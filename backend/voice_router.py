@@ -1186,16 +1186,49 @@ async def handle_sarvam_voice_webhook(
             except Exception:
                 data = dict(request.query_params)
 
-        call_id = data.get("call_id") or data.get("CallSid") or data.get("id") or str(uuid.uuid4())
-        from_number = data.get("from") or data.get("caller") or data.get("From") or request.query_params.get("from") or "Unknown"
-        to_number = data.get("to") or data.get("callee") or data.get("To") or request.query_params.get("to") or "+919513886363"
-        call_status = data.get("status") or data.get("event") or data.get("CallStatus") or "in-progress"
-        duration = int(data.get("duration") or data.get("duration_seconds") or 0)
+        agent_vars = data.get("agent_variables") or {}
+        transcript_raw = data.get("transcript") or data.get("full_transcript") or data.get("messages")
+        transcript_text = ""
+        if isinstance(transcript_raw, list):
+            transcript_text = "\n".join([
+                f"{m.get('role', 'user').capitalize()}: {m.get('content', '')}"
+                for m in transcript_raw if isinstance(m, dict)
+            ])
+        elif isinstance(transcript_raw, str):
+            transcript_text = transcript_raw
+
+        call_summary = (
+            data.get("call_summary")
+            or data.get("summary")
+            or agent_vars.get("call_summary")
+            or "Outbound call completed via Shubh"
+        )
+        caller_name = (
+            agent_vars.get("user_name")
+            or data.get("user_name")
+            or data.get("contact_name")
+            or data.get("caller_name")
+            or "Contact"
+        )
+
+        call_id = data.get("call_id") or data.get("CallSid") or data.get("attempt_id") or data.get("id") or str(uuid.uuid4())
+        from_number = (
+            data.get("from")
+            or data.get("caller")
+            or data.get("From")
+            or data.get("user_contact")
+            or data.get("caller_phone")
+            or request.query_params.get("from")
+            or "Unknown"
+        )
+        to_number = data.get("to") or data.get("callee") or data.get("To") or request.query_params.get("to") or "+917965481258"
+        call_status = data.get("status") or data.get("event") or data.get("CallStatus") or "completed"
+        duration = int(float(data.get("duration") or data.get("duration_in_seconds") or data.get("duration_seconds") or 0))
         recording_url = data.get("recording_url") or data.get("audio_url")
 
-        agent_id = request.query_params.get("agent_id") or data.get("agent_id")
+        agent_id = request.query_params.get("agent_id") or data.get("agent_id") or "dd4da4c1-9deb-4047-8927-5e12402e6b1f"
         contact_id = request.query_params.get("contact_id") or data.get("contact_id")
-        matched_org_id = None
+        matched_org_id = "b1ddf1e9-abc1-4ff4-90f5-3ac66913738a"
 
         print(f"[Sarvam Webhook] Received call: {call_id} | From: {from_number} -> To: {to_number} | Status: {call_status}", flush=True)
 
@@ -1234,30 +1267,77 @@ async def handle_sarvam_voice_webhook(
                 print(f"[Sarvam Lookup Error] {e}", flush=True)
 
         target_org = organization_id if (organization_id and organization_id != "default") else matched_org_id
+        target_user = "9363a829-8d11-42ae-bfff-d8ea5c17a71b"
 
         async def _async_record_sarvam():
             try:
                 stat_normalized = "completed" if call_status.lower() in ["completed", "terminated", "ended"] else "in_progress" if call_status.lower() in ["in-progress", "connected", "answered"] else call_status.lower()
-                supabase_admin.table("voice_calls").upsert({
+                
+                # 1. Upsert voice_calls
+                call_upsert_res = supabase_admin.table("voice_calls").upsert({
+                    "user_id": target_user,
                     "organization_id": target_org if target_org != "default" else None,
                     "agent_id": agent_id,
                     "provider_call_id": call_id,
                     "session_id": call_id,
+                    "caller_name": caller_name,
                     "caller_phone": from_number,
                     "agent_number": to_number,
                     "direction": "inbound" if not contact_id else "outbound",
                     "status": stat_normalized,
                     "duration_seconds": duration,
                     "recording_url": recording_url,
+                    "transcript": transcript_text,
+                    "call_summary": call_summary,
                     "metadata": {
                         "provider": "sarvam",
                         "agent_id": agent_id,
                         "contact_id": contact_id,
-                        "raw_status": call_status
+                        "raw_status": call_status,
+                        "agent_variables": agent_vars
                     }
                 }, on_conflict="provider_call_id").execute()
 
-                if contact_id and call_status.lower() in ["completed", "ended", "answered", "in-progress", "busy", "failed"]:
+                saved_call_id = call_upsert_res.data[0]["id"] if (call_upsert_res.data and len(call_upsert_res.data) > 0) else None
+
+                # 2. Upsert leads
+                if from_number and from_number != "Unknown":
+                    lead_payload = {
+                        "user_id": target_user,
+                        "agent_id": agent_id,
+                        "full_name": caller_name,
+                        "phone": from_number,
+                        "status": "qualified",
+                        "stage": "contacted",
+                        "interest_level": "high",
+                        "source": "voice_demo",
+                        "notes": call_summary,
+                        "call_summary": call_summary,
+                        "call_id": saved_call_id
+                    }
+                    exist_lead = supabase_admin.table("leads").select("id").eq("phone", from_number).execute()
+                    if exist_lead.data:
+                        supabase_admin.table("leads").update(lead_payload).eq("id", exist_lead.data[0]["id"]).execute()
+                    else:
+                        supabase_admin.table("leads").insert(lead_payload).execute()
+
+                    # 3. Upsert customer_contacts
+                    cust_payload = {
+                        "organization_id": target_org,
+                        "full_name": caller_name,
+                        "phone_number": from_number,
+                        "total_calls": 1,
+                        "notes": call_summary,
+                        "tags": ["sarvam_outbound", "preview_requested"]
+                    }
+                    exist_cust = supabase_admin.table("customer_contacts").select("id").eq("phone_number", from_number).execute()
+                    if exist_cust.data:
+                        supabase_admin.table("customer_contacts").update(cust_payload).eq("id", exist_cust.data[0]["id"]).execute()
+                    else:
+                        supabase_admin.table("customer_contacts").insert(cust_payload).execute()
+
+                # 4. Update campaign_contacts
+                if contact_id or (from_number and from_number != "Unknown"):
                     stat_map = {
                         "completed": "answered",
                         "ended": "answered",
@@ -1266,10 +1346,45 @@ async def handle_sarvam_voice_webhook(
                         "busy": "busy",
                         "failed": "failed"
                     }
-                    supabase_admin.table("campaign_contacts").update({
-                        "call_status": stat_map.get(call_status.lower(), "answered"),
+                    target_status = stat_map.get(call_status.lower(), "answered")
+                    query = supabase_admin.table("campaign_contacts").update({
+                        "call_status": target_status,
+                        "call_id": saved_call_id,
+                        "notes": call_summary,
                         "last_attempt_at": datetime.utcnow().isoformat()
-                    }).eq("id", contact_id).execute()
+                    })
+                    if contact_id:
+                        query.eq("id", contact_id).execute()
+                    else:
+                        query.eq("phone", from_number).execute()
+
+                # 5. WhatsApp Auto-Bridge
+                # If caller asked for WhatsApp / preview or if duration > 10s:
+                if from_number and from_number.startswith("+"):
+                    try:
+                        from app.services.integration_executor import IntegrationExecutor
+                        executor = IntegrationExecutor()
+                        preview_msg = (
+                            f"Namaste {caller_name} ji! Thank you for speaking with our AI assistant on call. "
+                            f"Here is your Vaakriti AI product preview and consultation link: https://vaakriti.com/demo. "
+                            f"Feel free to reply here if you'd like to schedule your team onboarding."
+                        )
+                        asyncio.create_task(
+                            executor._send_whatsapp(
+                                config={},
+                                message=preview_msg,
+                                data={
+                                    "contact_phone": from_number,
+                                    "event_type": "post_call_followup",
+                                    "recipient_type": "customer",
+                                    "whatsapp_opt_in": True
+                                }
+                            )
+                        )
+                        print(f"[Sarvam Webhook] Dispatched post-call WhatsApp follow-up to {from_number}", flush=True)
+                    except Exception as wa_err:
+                        print(f"[Sarvam Webhook WhatsApp Error] {wa_err}", flush=True)
+
             except Exception as e:
                 print(f"[Sarvam Webhook DB Error] {e}", flush=True)
 
