@@ -220,7 +220,7 @@ export async function GET(request: Request) {
     const date = searchParams.get("date"); // YYYY-MM-DD
 
     const userEmail = (profile.email || '').toLowerCase().trim();
-    const isSuperAdmin = userEmail === 'raghav00424@gmail.com' || userEmail === 'raghav@trinetra.ai' || userEmail === 'nexus.ai.ops@gmail.com' || userEmail === '23bcs015@gmail.com';
+    const isSuperAdmin = userEmail === 'raghav00424@gmail.com' || userEmail === 'raghav@trinetra.ai';
     const isPrivileged = isSuperAdmin || ['developer_tester', 'admin', 'super_admin'].includes(profile.role || '');
 
     let query = supabase

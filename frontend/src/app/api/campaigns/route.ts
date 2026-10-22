@@ -22,7 +22,7 @@ export async function GET(request: Request) {
     const admin = getAdminClient();
 
     const isPrivileged = ['developer_tester', 'admin', 'super_admin'].includes(profile.role || '') ||
-      ['raghav00424@gmail.com', 'raghav@trinetra.ai', 'nexus.ai.ops@gmail.com', '23bcs015@gmail.com'].includes((profile.email || '').toLowerCase().trim());
+      ['raghav00424@gmail.com', 'raghav@trinetra.ai'].includes((profile.email || '').toLowerCase().trim());
 
     try {
       let query = admin

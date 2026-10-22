@@ -34,7 +34,7 @@ export async function GET() {
       const orgId = profile?.organization_id
 
       const userEmail = (user.email || '').toLowerCase().trim()
-      const isSuperAdmin = userEmail === 'raghav00424@gmail.com' || userEmail === 'raghav@trinetra.ai' || userEmail === 'nexus.ai.ops@gmail.com' || userEmail === '23bcs015@gmail.com'
+      const isSuperAdmin = userEmail === 'raghav00424@gmail.com' || userEmail === 'raghav@trinetra.ai'
       const effectiveOrgId = orgId || (isSuperAdmin ? 'b1ddf1e9-abc1-4ff4-90f5-3ac66913738a' : null)
 
       let agentQuery = supabase

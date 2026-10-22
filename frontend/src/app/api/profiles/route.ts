@@ -68,9 +68,9 @@ export async function GET() {
     }
 
     const userEmail = (user.email || '').toLowerCase().trim()
-    const isSuperAdminByEmail = userEmail === 'raghav00424@gmail.com' || userEmail === 'raghav@trinetra.ai' || userEmail === 'nexus.ai.ops@gmail.com' || userEmail === '23bcs015@gmail.com' || (process.env.NEXT_PUBLIC_ADMIN_EMAILS || '').includes(userEmail)
+    const isSuperAdminByEmail = userEmail === 'raghav00424@gmail.com' || userEmail === 'raghav@trinetra.ai' || (process.env.NEXT_PUBLIC_ADMIN_EMAILS || '').includes(userEmail)
     const metaRole = (user.app_metadata?.role || user.user_metadata?.role || '').toLowerCase().trim()
-    const isSuperAdmin = isSuperAdminByEmail || metaRole === 'admin' || metaRole === 'super_admin'
+    const isSuperAdmin = profile?.role === 'super_admin' || isSuperAdminByEmail || metaRole === 'super_admin'
 
     const resolvedEmail = profile?.email || user.email || ''
     let resolvedFullName = (profile?.full_name || '').trim()
@@ -131,8 +131,8 @@ export async function GET() {
       return NextResponse.json({ profile: fallbackProfile, user })
     }
 
-    // Auto-heal in database if user is superadmin but database profile has client
-    if (isSuperAdmin && profile.role !== 'super_admin' && profile.role !== 'admin') {
+    // Auto-heal only for primary founder owner email if needed
+    if (isSuperAdminByEmail && profile.role !== 'super_admin' && profile.role !== 'admin') {
       try {
         await admin.from('profiles').update({ role: 'super_admin', organization_id: effectiveOrgId }).eq('id', user.id)
         profile.role = 'super_admin'
@@ -155,8 +155,8 @@ export async function GET() {
       organization_id: effectiveOrgId || profile.organization_id,
       email: resolvedEmail,
       full_name: resolvedFullName || 'User',
-      role: isSuperAdmin ? 'super_admin' : (profile.role || 'client'),
-      plan_tier: isSuperAdmin ? 'enterprise' : (profile.plan_tier || 'trial'),
+      role: isSuperAdminByEmail ? 'super_admin' : (profile.role || 'client'),
+      plan_tier: isSuperAdminByEmail ? 'enterprise' : (profile.plan_tier || 'trial'),
       region: profile.state || '',
       theme: profile.theme || 'light',
       theme_preference: profile.theme || 'light',

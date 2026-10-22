@@ -101,15 +101,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const { profile: data, user: serverUser } = await res.json()
         if (data) {
           const userEmail = (data.email || '').toLowerCase().trim()
-          const isSuperAdmin = userEmail === 'raghav00424@gmail.com' || userEmail === 'raghav@trinetra.ai' || userEmail === 'nexus.ai.ops@gmail.com' || userEmail === '23bcs015@gmail.com' || (process.env.NEXT_PUBLIC_ADMIN_EMAILS || '').includes(userEmail)
-          const resolvedRole = isSuperAdmin ? 'super_admin' : (data.role || null)
+          const isSuperAdminEmail = userEmail === 'raghav00424@gmail.com' || userEmail === 'raghav@trinetra.ai' || (process.env.NEXT_PUBLIC_ADMIN_EMAILS || '').includes(userEmail)
+          const resolvedRole = data.role || (isSuperAdminEmail ? 'super_admin' : null)
           const activeUser = userObj || serverUser
-          const resolvedFullName = resolveFullName(data, activeUser) || (isSuperAdmin ? 'Raghav Thakur' : 'User')
+          const resolvedFullName = resolveFullName(data, activeUser) || (isSuperAdminEmail ? 'Raghav Thakur' : 'User')
           const enrichedProfile = { ...data, full_name: resolvedFullName, role: resolvedRole }
           setProfile(enrichedProfile)
           setRole(resolvedRole)
-          if (!user && activeUser) {
-            setUser(activeUser)
+          if (activeUser) {
+            setUser((prev: any) => prev || activeUser)
           }
           try {
             sessionStorage.setItem(CACHE_KEY, JSON.stringify({ profile: enrichedProfile, user: activeUser }))
@@ -135,9 +135,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (!error && data) {
         const userEmail = (data.email || '').toLowerCase().trim()
-        const isSuperAdmin = userEmail === 'raghav00424@gmail.com' || userEmail === 'raghav@trinetra.ai' || userEmail === 'nexus.ai.ops@gmail.com' || userEmail === '23bcs015@gmail.com' || (process.env.NEXT_PUBLIC_ADMIN_EMAILS || '').includes(userEmail)
-        const resolvedRole = isSuperAdmin ? 'super_admin' : (data.role || null)
-        const resolvedFullName = resolveFullName(data, userObj) || (isSuperAdmin ? 'Raghav Thakur' : 'User')
+        const isSuperAdminEmail = userEmail === 'raghav00424@gmail.com' || userEmail === 'raghav@trinetra.ai' || (process.env.NEXT_PUBLIC_ADMIN_EMAILS || '').includes(userEmail)
+        const resolvedRole = data.role || (isSuperAdminEmail ? 'super_admin' : null)
+        const resolvedFullName = resolveFullName(data, userObj) || (isSuperAdminEmail ? 'Raghav Thakur' : 'User')
         const enrichedProfile = { ...data, full_name: resolvedFullName, role: resolvedRole }
         setProfile(enrichedProfile)
         setRole(resolvedRole)
@@ -153,7 +153,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (err) {
       console.warn('[AuthProvider] Profile fetch error:', err)
     }
-  }, [supabase, user])
+  }, [supabase])
 
   const loadUser = useCallback(async () => {
     try {
@@ -252,8 +252,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
 
         const userEmail = (currentUser.email || '').toLowerCase().trim()
-        const isSuperAdmin = userEmail === 'raghav00424@gmail.com' || userEmail === 'raghav@trinetra.ai' || userEmail === 'nexus.ai.ops@gmail.com' || userEmail === '23bcs015@gmail.com' || currentUser.user_metadata?.role === 'super_admin' || currentUser.app_metadata?.role === 'super_admin'
-        if (isSuperAdmin) {
+        const isSuperAdminEmail = userEmail === 'raghav00424@gmail.com' || userEmail === 'raghav@trinetra.ai' || currentUser.user_metadata?.role === 'super_admin' || currentUser.app_metadata?.role === 'super_admin'
+        if (isSuperAdminEmail) {
           setRole('super_admin')
         }
 
@@ -301,7 +301,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       isMounted = false
       subscription.unsubscribe()
     }
-  }, [supabase, fetchProfile, router])
+  }, [supabase, router])
 
   const refreshProfile = useCallback(async () => {
     if (user?.id) {

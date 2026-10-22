@@ -41,7 +41,7 @@ export async function GET() {
     let orgId = profile?.organization_id
     if (!orgId) {
       const userEmail = (user.email || '').toLowerCase().trim()
-      const isSuperAdmin = userEmail === 'raghav00424@gmail.com' || userEmail === 'raghav@trinetra.ai' || userEmail === 'nexus.ai.ops@gmail.com' || userEmail === '23bcs015@gmail.com'
+      const isSuperAdmin = userEmail === 'raghav00424@gmail.com' || userEmail === 'raghav@trinetra.ai' || profile?.role === 'super_admin'
       if (isSuperAdmin) {
         orgId = PRIMARY_TRINETRA_ORG
       } else {

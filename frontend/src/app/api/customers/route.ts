@@ -24,7 +24,7 @@ export async function GET(request: Request) {
     const tag = searchParams.get("tag");
 
     const userEmail = (profile.email || '').toLowerCase().trim();
-    const isSuperAdmin = profile.role === "super_admin" || profile.role === "admin" || ['raghav00424@gmail.com', 'raghav@trinetra.ai', 'nexus.ai.ops@gmail.com', '23bcs015@gmail.com'].includes(userEmail);
+    const isSuperAdmin = profile.role === "super_admin" || profile.role === "admin" || ['raghav00424@gmail.com', 'raghav@trinetra.ai'].includes(userEmail);
     const orgId = profile.organization_id || (isSuperAdmin ? 'b1ddf1e9-abc1-4ff4-90f5-3ac66913738a' : null);
     const forceRefresh = searchParams.get("refresh") === "true" || searchParams.get("nocache") === "true";
 
