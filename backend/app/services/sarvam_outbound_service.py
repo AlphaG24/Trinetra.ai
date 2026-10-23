@@ -16,7 +16,6 @@ DEFAULT_CALLER_NUMBER = "+917965481258"
 DEFAULT_USER_ID = "9363a829-8d11-42ae-bfff-d8ea5c17a71b"
 DEFAULT_ORGANIZATION_ID = "b1ddf1e9-abc1-4ff4-90f5-3ac66913738a"
 DEFAULT_AGENT_ID = "dd4da4c1-9deb-4047-8927-5e12402e6b1f"
-DEFAULT_SARVAM_WORKSPACE_API_KEY = "sk_samvaad_werdeggz_BnUoezMCwoT5iHjhMKEVNipM"
 
 
 class SarvamOutboundService:
@@ -36,7 +35,7 @@ class SarvamOutboundService:
                 break
 
         if not selected_key:
-            selected_key = raw_ws or raw_voice or DEFAULT_SARVAM_WORKSPACE_API_KEY
+            selected_key = raw_ws or raw_voice or raw_general
 
         self.api_key = selected_key
         self.org_id = os.getenv("SARVAM_ORG_ID", DEFAULT_ORG_ID).strip()
