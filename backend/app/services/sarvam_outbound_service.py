@@ -16,16 +16,29 @@ DEFAULT_CALLER_NUMBER = "+917965481258"
 DEFAULT_USER_ID = "9363a829-8d11-42ae-bfff-d8ea5c17a71b"
 DEFAULT_ORGANIZATION_ID = "b1ddf1e9-abc1-4ff4-90f5-3ac66913738a"
 DEFAULT_AGENT_ID = "dd4da4c1-9deb-4047-8927-5e12402e6b1f"
+DEFAULT_SARVAM_WORKSPACE_API_KEY = "sk_samvaad_werdeggz_BnUoezMCwoT5iHjhMKEVNipM"
 
 
 class SarvamOutboundService:
     """Service for placing instant outbound calls and syncing logs via Sarvam Voice Agents API."""
 
     def __init__(self):
-        self.api_key = (
-            os.getenv("SARVAM_WORKSPACE_API_KEY") or 
-            os.getenv("SARVAM_API_KEY", "")
-        ).strip()
+        # Prefer workspace/samvaad API key (starts with sk_samvaad_) for Voice Agents API
+        raw_ws = os.getenv("SARVAM_WORKSPACE_API_KEY", "").strip()
+        raw_general = os.getenv("SARVAM_API_KEY", "").strip()
+        raw_voice = os.getenv("SARVA_VOICE_AGENTS", "").strip()
+
+        # Select the key that matches the Sarvam Voice Agent format (sk_samvaad_...)
+        selected_key = ""
+        for candidate in (raw_ws, raw_voice, raw_general):
+            if candidate and candidate.startswith("sk_samvaad_"):
+                selected_key = candidate
+                break
+
+        if not selected_key:
+            selected_key = raw_ws or raw_voice or DEFAULT_SARVAM_WORKSPACE_API_KEY
+
+        self.api_key = selected_key
         self.org_id = os.getenv("SARVAM_ORG_ID", DEFAULT_ORG_ID).strip()
         self.workspace_id = os.getenv("SARVAM_WORKSPACE_ID", DEFAULT_WORKSPACE_ID).strip()
         self.app_id = os.getenv("SARVAM_APP_ID", DEFAULT_APP_ID).strip()
