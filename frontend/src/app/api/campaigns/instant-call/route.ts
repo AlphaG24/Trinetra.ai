@@ -15,7 +15,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Name and phone number are required" }, { status: 400 });
     }
 
-    const backendUrl = process.env.INTERNAL_BACKEND_URL || process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+    const backendUrl = 
+      process.env.INTERNAL_BACKEND_URL || 
+      process.env.NEXT_PUBLIC_API_URL || 
+      process.env.NEXT_PUBLIC_BACKEND_URL || 
+      (process.env.NODE_ENV === "production" ? "https://trinetra-ai-1-6f2n.onrender.com" : "http://localhost:8000");
 
     const payload = {
       name,

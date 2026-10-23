@@ -1,4 +1,4 @@
-import { createClient } from "@/utils/supabase/server"
+import { createClient } from "@/lib/server"
 import { cookies } from "next/headers"
 import { cached, invalidateCache } from "./redis"
 import { createClient as createSupabaseClient } from '@supabase/supabase-js'

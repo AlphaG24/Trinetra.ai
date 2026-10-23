@@ -8,7 +8,11 @@ export async function POST() {
       return NextResponse.json({ error: error || "Unauthorized" }, { status: 401 });
     }
 
-    const backendUrl = process.env.INTERNAL_BACKEND_URL || process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+    const backendUrl = 
+      process.env.INTERNAL_BACKEND_URL || 
+      process.env.NEXT_PUBLIC_API_URL || 
+      process.env.NEXT_PUBLIC_BACKEND_URL || 
+      (process.env.NODE_ENV === "production" ? "https://trinetra-ai-1-6f2n.onrender.com" : "http://localhost:8000");
 
     const res = await fetch(`${backendUrl}/api/campaigns/sync-calls`, {
       method: "POST",

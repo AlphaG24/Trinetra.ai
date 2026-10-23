@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/server'
+import { createAdminClient } from '@/utils/supabase/admin'
 import { cached } from '@/lib/redis'
 
 export async function GET() {
@@ -21,11 +22,12 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const admin = createAdminClient()
     const cacheKey = `dashboard:overview:${user.id}`
 
     const result = await cached(cacheKey, async () => {
       // 1. Profile & Agents
-      const { data: profile } = await supabase
+      const { data: profile } = await admin
         .from('profiles')
         .select('organization_id')
         .eq('id', user.id)
@@ -37,7 +39,7 @@ export async function GET() {
       const isSuperAdmin = userEmail === 'raghav00424@gmail.com' || userEmail === 'raghav@trinetra.ai'
       const effectiveOrgId = orgId || (isSuperAdmin ? 'b1ddf1e9-abc1-4ff4-90f5-3ac66913738a' : null)
 
-      let agentQuery = supabase
+      let agentQuery = admin
         .from('agents')
         .select('id, name, agent_type, status, last_active_at, updated_at, health_score')
       if (effectiveOrgId) {
@@ -64,7 +66,7 @@ export async function GET() {
       )
 
       // Build Queries
-      let callsQuery = supabase
+      let callsQuery = admin
         .from('voice_calls')
         .select('id', { count: 'estimated', head: true })
         .gte('created_at', startOfMonth.toISOString())
@@ -77,7 +79,7 @@ export async function GET() {
 
       let interactionsQuery: any = null
       if (effectiveOrgId || agentIds.length > 0) {
-        interactionsQuery = supabase
+        interactionsQuery = admin
           .from('interactions')
           .select('id', { count: 'estimated', head: true })
           .gte('created_at', startOfMonth.toISOString())
@@ -89,7 +91,7 @@ export async function GET() {
         }
       }
 
-      let activeToolsQuery = supabase
+      let activeToolsQuery = admin
         .from('agents')
         .select('id', { count: 'estimated', head: true })
         .in('status', ['live', 'active'])
@@ -100,7 +102,7 @@ export async function GET() {
         activeToolsQuery = activeToolsQuery.eq('user_id', user.id)
       }
 
-      let totalLeadsQuery = supabase
+      let totalLeadsQuery = admin
         .from('leads')
         .select('id', { count: 'estimated', head: true })
       if (effectiveOrgId) {
@@ -109,7 +111,7 @@ export async function GET() {
         totalLeadsQuery = totalLeadsQuery.eq('user_id', user.id)
       }
         
-      let convertedLeadsQuery = supabase
+      let convertedLeadsQuery = admin
         .from('leads')
         .select('id', { count: 'estimated', head: true })
         .or('status.in.(converted,won,qualified),stage.in.(converted,won,qualified)')
@@ -121,7 +123,7 @@ export async function GET() {
 
       // 2. Activity Query (Strictly live activities from the last 6 hours, max 10)
       const sixHoursAgo = new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString()
-      const activityQuery = supabase
+      const activityQuery = admin
         .from('activity_log')
         .select('id, activity_type, channel, title, description, reference_id, reference_type, metadata, created_at')
         .eq('user_id', user.id)
@@ -130,7 +132,7 @@ export async function GET() {
         .limit(10)
 
       // 3. Tools calls for today
-      let toolsCallsQuery = supabase
+      let toolsCallsQuery = admin
         .from('voice_calls')
         .select('agent_id')
         .gte('created_at', today.toISOString())
