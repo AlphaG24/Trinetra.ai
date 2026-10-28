@@ -42,7 +42,7 @@ export function UsagePanel({ subscription }: UsagePanelProps) {
         ) : (
           usage.map((item, idx) => {
             const percent = Math.min(100, Math.round((item.used / item.limit) * 100)) || 0
-            let colorClass = 'from-purple-500 to-purple-600'
+            let colorClass = 'from-blue-600 to-sky-600'
             if (percent > 70) colorClass = 'from-amber-500 to-amber-600'
             if (percent > 90) colorClass = 'from-red-500 to-red-600'
 

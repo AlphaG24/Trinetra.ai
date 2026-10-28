@@ -56,18 +56,18 @@ canvas {
   --body: #4A5268;
   --muted: #8E96A4;
   --border: rgba(0, 0, 0, 0.08);
-  --primary-bg: rgba(124, 58, 237, 0.08);
+  --primary-bg: rgba(37, 99, 235, 0.08);
   --hover-bg: rgba(0, 0, 0, 0.03);
   --secondary: #E2E8F0;
-  --accent: #7C3AED;
-  --accent-light: #8B5CF6;
+  --accent: #2563EB;
+  --accent-light: #3B82F6;
 
-  /* Accents & borders */
-  --violet-300: #C4B5FD;
-  --violet-400: #A78BFA;
-  --violet-500: #8B5CF6;
-  --violet-600: #7C3AED;
-  --violet-700: #6D28D9;
+  /* Accents & borders - Aligned to Blue + Slate Palette */
+  --violet-300: #93C5FD;
+  --violet-400: #60A5FA;
+  --violet-500: #3B82F6;
+  --violet-600: #2563EB;
+  --violet-700: #1D4ED8;
   --gold-300: #FDE68A;
   --gold-400: #FBBF24;
   --gold-500: #F59E0B;
@@ -83,7 +83,7 @@ canvas {
   --mint-700: #1D8A74;
   --mint-glow: rgba(137, 212, 194, 0.16);
   --mint-border: rgba(137, 212, 194, 0.35);
-  --text-accent: #7C3AED;
+  --text-accent: #2563EB;
   --border-subtle: rgba(0, 0, 0, 0.06);
   --border-medium: rgba(0, 0, 0, 0.12);
   --font-heading-fallback: var(--font-playfair), "Playfair Display", Georgia, serif;
@@ -154,12 +154,12 @@ html.light,
   --body: #4A5268;
   --muted: #8E96A4;
   --border: rgba(0, 0, 0, 0.05);
-  --primary-bg: rgba(124, 58, 237, 0.08);
-  /* Transparent light violet */
+  --primary-bg: rgba(37, 99, 235, 0.08);
+  /* Transparent light blue */
   --hover-bg: rgba(0, 0, 0, 0.03);
   --secondary: #F8FAFC;
-  --accent: #18181B;
-  --accent-light: #27272A;
+  --accent: #2563EB;
+  --accent-light: #3B82F6;
 }
 
 :root[data-theme='light'] body,
@@ -174,17 +174,17 @@ html.light body {
 html[data-theme='dark'],
 html.dark,
 .dark {
-  --background: #080010;
-  --card-bg: #120E22;
-  --primary-bg: #1C1530;
-  --hover-bg: #261D41;
-  --secondary: #3B2E60;
-  --border: rgba(255, 255, 255, 0.06);
-  --heading: #FFFFFF;
-  --body: #E2E0FD;
-  --muted: #9E99E0;
-  --accent: #7C3AED;
-  --accent-light: #8B5CF6;
+  --background: #0B0F17;
+  --card-bg: #111827;
+  --primary-bg: rgba(37, 99, 235, 0.12);
+  --hover-bg: rgba(255, 255, 255, 0.05);
+  --secondary: #1E293B;
+  --border: rgba(255, 255, 255, 0.08);
+  --heading: #F8FAFC;
+  --body: #CBD5E1;
+  --muted: #94A3B8;
+  --accent: #2563EB;
+  --accent-light: #3B82F6;
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -301,11 +301,11 @@ html.dark .dashboard-theme-root.admin-portal,
   border-color: var(--border) !important;
 }
 
-/* Sidebar Nav Item: Signature White & Black on click */
+/* Sidebar Nav Item: Signature Sleek Obsidian in light mode, crisp white in dark mode */
 .sidebar-item-active {
   background-color: #18181b !important;
   color: #ffffff !important;
-  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1) !important;
 }
 .sidebar-item-active svg,
 .sidebar-item-active span {
@@ -393,6 +393,7 @@ html.dark .sidebar-item-active,
 .dark .sidebar-item-active {
   background-color: #ffffff !important;
   color: #09090b !important;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.2) !important;
 }
 :root[data-theme='dark'] .sidebar-item-active svg,
 :root[data-theme='dark'] .sidebar-item-active span,
@@ -1074,4 +1075,105 @@ html.light .navbar__link:hover {
   content: '';
   display: none;
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   HIGH-CONTRAST RANGE SLIDER TRACKS
+   Guarantees visible, tactile lines for pitch & speed sliders
+   ═══════════════════════════════════════════════════════════════ */
+input[type="range"].visible-slider-track {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 24px;
+  background: transparent;
+  cursor: pointer;
+}
+
+input[type="range"].visible-slider-track:focus {
+  outline: none;
+}
+
+/* Chrome, Edge, Safari Track */
+input[type="range"].visible-slider-track::-webkit-slider-runnable-track {
+  width: 100%;
+  height: 8px;
+  cursor: pointer;
+  background-color: #e4e4e7; /* zinc-200 */
+  border: 1.5px solid #a1a1aa; /* zinc-400 */
+  border-radius: 9999px;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+:where(.dark, .dark *) input[type="range"].visible-slider-track::-webkit-slider-runnable-track {
+  background-color: #27272a; /* zinc-800 */
+  border: 1.5px solid #52525b; /* zinc-600 */
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+
+/* Firefox Track */
+input[type="range"].visible-slider-track::-moz-range-track {
+  width: 100%;
+  height: 8px;
+  cursor: pointer;
+  background-color: #e4e4e7;
+  border: 1.5px solid #a1a1aa;
+  border-radius: 9999px;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+:where(.dark, .dark *) input[type="range"].visible-slider-track::-moz-range-track {
+  background-color: #27272a;
+  border: 1.5px solid #52525b;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+
+/* Chrome, Edge, Safari Thumb */
+input[type="range"].visible-slider-track::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 20px;
+  width: 20px;
+  border-radius: 50%;
+  background: #09090b;
+  border: 2.5px solid #ffffff;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+  margin-top: -6px;
+  cursor: pointer;
+  transition: transform 0.1s ease, box-shadow 0.1s ease;
+}
+
+input[type="range"].visible-slider-track::-webkit-slider-thumb:hover {
+  transform: scale(1.15);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.45);
+}
+
+:where(.dark, .dark *) input[type="range"].visible-slider-track::-webkit-slider-thumb {
+  background: #ffffff;
+  border: 2.5px solid #09090b;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.6);
+}
+
+/* Firefox Thumb */
+input[type="range"].visible-slider-track::-moz-range-thumb {
+  height: 20px;
+  width: 20px;
+  border-radius: 50%;
+  background: #09090b;
+  border: 2.5px solid #ffffff;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+  transition: transform 0.1s ease, box-shadow 0.1s ease;
+}
+
+input[type="range"].visible-slider-track::-moz-range-thumb:hover {
+  transform: scale(1.15);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.45);
+}
+
+:where(.dark, .dark *) input[type="range"].visible-slider-track::-moz-range-thumb {
+  background: #ffffff;
+  border: 2.5px solid #09090b;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.6);
+}
+
 

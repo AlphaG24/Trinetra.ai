@@ -427,13 +427,20 @@ async function fetchBlogPostsInternal() {
     .filter((item: any): item is BlogPostRecord => item !== null);
 }
 
+function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> {
+  return Promise.race([
+    promise.catch(() => fallback),
+    new Promise<T>((resolve) => setTimeout(() => resolve(fallback), ms))
+  ]);
+}
+
 export async function loadSiteConfig() {
   if (siteConfigCache) {
     return siteConfigCache;
   }
 
   if (!siteConfigPromise) {
-    siteConfigPromise = fetchSiteConfigInternal()
+    siteConfigPromise = withTimeout(fetchSiteConfigInternal(), 1200, DEFAULT_SITE_CONFIG)
       .then((config) => {
         siteConfigCache = config;
         return config;
@@ -452,7 +459,7 @@ export async function loadVisibleProducts() {
   }
 
   if (!productsPromise) {
-    productsPromise = fetchProductsInternal()
+    productsPromise = withTimeout(fetchProductsInternal(), 1200, [] as ProductRecord[])
       .then((products) => {
         productsCache = products;
         return products;
@@ -471,7 +478,7 @@ export async function loadActivePlans() {
   }
 
   if (!plansPromise) {
-    plansPromise = fetchPlansInternal()
+    plansPromise = withTimeout(fetchPlansInternal(), 1200, [] as PlanRecord[])
       .then((plans) => {
         plansCache = plans;
         return plans;

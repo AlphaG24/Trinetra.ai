@@ -17,6 +17,8 @@ interface CallLog {
   sentiment: string | null
   transcript: string | null
   recording_url: string | null
+  caller_name?: string | null
+  caller_phone?: string | null
   created_at: string
 }
 
@@ -551,7 +553,7 @@ export function AgentOverviewTab({
         <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-5 shadow-sm space-y-3 text-left">
           <div className="flex justify-between items-center text-[var(--muted)]">
             <span className="text-xs font-sans font-medium">Calls Today</span>
-            <PhoneIncoming className="w-4 h-4 text-violet-400" />
+            <PhoneIncoming className="w-4 h-4 text-[var(--heading)]" />
           </div>
           <div className="text-2xl font-bold font-display text-[var(--heading)]">
             {statsLoading ? <Loader2 className="w-5 h-5 animate-spin inline" /> : stats.callsToday}
@@ -562,7 +564,7 @@ export function AgentOverviewTab({
         <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-5 shadow-sm space-y-3 text-left">
           <div className="flex justify-between items-center text-[var(--muted)]">
             <span className="text-xs font-sans font-medium">Minutes Used (Month)</span>
-            <Clock className="w-4 h-4 text-amber-400" />
+            <Clock className="w-4 h-4 text-amber-500" />
           </div>
           <div className="text-2xl font-bold font-display text-[var(--heading)]">
             {statsLoading ? <Loader2 className="w-5 h-5 animate-spin inline" /> : `${stats.minutesUsed} min`}
@@ -573,7 +575,7 @@ export function AgentOverviewTab({
         <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-5 shadow-sm space-y-3 text-left">
           <div className="flex justify-between items-center text-[var(--muted)]">
             <span className="text-xs font-sans font-medium">Leads Generated</span>
-            <Users className="w-4 h-4 text-green-400" />
+            <Users className="w-4 h-4 text-emerald-500" />
           </div>
           <div className="text-2xl font-bold font-display text-[var(--heading)]">
             {statsLoading ? <Loader2 className="w-5 h-5 animate-spin inline" /> : stats.leadsGenerated}
@@ -584,7 +586,7 @@ export function AgentOverviewTab({
         <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-5 shadow-sm space-y-3 text-left">
           <div className="flex justify-between items-center text-[var(--muted)]">
             <span className="text-xs font-sans font-medium">Avg Call Duration</span>
-            <Zap className="w-4 h-4 text-cyan-400" />
+            <Zap className="w-4 h-4 text-indigo-400" />
           </div>
           <div className="text-2xl font-bold font-display text-[var(--heading)]">
             {statsLoading ? <Loader2 className="w-5 h-5 animate-spin inline" /> : `${stats.avgDuration} min`}
@@ -601,7 +603,7 @@ export function AgentOverviewTab({
             <h2 className="text-lg font-bold font-display text-[var(--heading)] text-left">Recent Conversations</h2>
             <button 
               onClick={() => onTabChange('calls')} 
-              className="text-xs font-montserrat font-bold text-violet-500 hover:text-violet-600 transition-colors"
+              className="text-xs font-montserrat font-bold uppercase tracking-wider text-[var(--heading)] hover:opacity-70 transition-opacity"
             >
               View All
             </button>
@@ -657,6 +659,7 @@ export function AgentOverviewTab({
                                 recordingUrl={log.recording_url} 
                                 callId={log.id} 
                                 durationSeconds={log.duration_seconds} 
+                                callerName={log.caller_name || 'Customer'}
                               />
                             </div>
                           )}
@@ -745,7 +748,7 @@ export function AgentOverviewTab({
                         <div 
                           className={`h-full rounded-full transition-all duration-500 ${
                             agentUsage.status === 'exceeded' && availableEmergency === 0 ? 'bg-red-500' :
-                            agentUsage.status === 'warning' ? 'bg-amber-500' : 'bg-violet-500'
+                            agentUsage.status === 'warning' ? 'bg-amber-500' : 'bg-blue-600'
                           }`}
                           style={{ width: `${Math.min(100, agentUsage.percent || 0)}%` }}
                         />
@@ -778,7 +781,7 @@ export function AgentOverviewTab({
                             type="button"
                             disabled={claimingEmergency || walletInfo.reliability_score <= 80}
                             onClick={handleClaimEmergency}
-                            className="px-2.5 py-1 bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 font-bold text-[10px] uppercase tracking-wider rounded-lg transition-all shadow-sm cursor-pointer disabled:opacity-40 shrink-0 active:scale-[0.98]"
+                            className="px-2.5 py-1 bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-200 dark:text-zinc-950 font-bold text-[10px] uppercase tracking-wider rounded-lg transition-all shadow-sm cursor-pointer disabled:opacity-40 shrink-0 active:scale-[0.98]"
                           >
                             {claimingEmergency ? 'Claiming...' : 'Claim 50m'}
                           </button>
@@ -805,7 +808,7 @@ export function AgentOverviewTab({
               className="w-full flex items-center justify-between p-4 rounded-xl border border-[var(--border)] bg-[var(--background)]/40 hover:bg-[var(--hover-bg)]/20 transition-all font-montserrat font-bold text-xs uppercase tracking-wider text-[var(--heading)] cursor-pointer"
             >
               <span className="flex items-center gap-2">
-                <Play className="w-4 h-4 text-violet-400" /> 
+                <Play className="w-4 h-4 text-emerald-500" /> 
                 {agent.phone_number && agent.telephony_provider && agent.telephony_provider !== 'simulated' && agent.telephony_provider !== 'sandbox' 
                   ? 'Make Call' 
                   : 'Test Call (Simulated)'}
@@ -838,10 +841,10 @@ export function AgentOverviewTab({
               <button 
                 onClick={handleRequestHomepagePlacement}
                 disabled={submittingRequest}
-                className="w-full flex items-center justify-between p-4 rounded-xl border border-violet-500/20 bg-violet-500/5 hover:bg-violet-500/10 transition-all font-montserrat font-bold text-xs uppercase tracking-wider text-violet-400 cursor-pointer animate-pulse"
+                className="w-full flex items-center justify-between p-4 rounded-xl border border-[var(--border)] bg-[var(--card-bg)] hover:bg-[var(--hover-bg)]/20 transition-all font-montserrat font-bold text-xs uppercase tracking-wider text-[var(--heading)] cursor-pointer"
               >
                 <span className="flex items-center gap-2">
-                  {submittingRequest ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />} Request Homepage Demo Placement
+                  {submittingRequest ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4 text-emerald-500" />} Request Homepage Demo Placement
                 </span>
               </button>
             )}
@@ -877,7 +880,7 @@ export function AgentOverviewTab({
             <div className="space-y-6">
               <div>
                 <h3 className="text-lg font-bold text-[var(--heading)] font-display flex items-center gap-2">
-                  <PhoneCall className="w-5 h-5 text-violet-400" />
+                  <PhoneCall className="w-5 h-5 text-blue-600 dark:text-blue-400" />
                   Browser Call Sandbox: {agent.agent_name}
                 </h3>
                 <p className="text-xs text-[var(--muted)] mt-1">
@@ -897,7 +900,7 @@ export function AgentOverviewTab({
                   )}
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className={`text-xs font-mono font-bold ${remainingSeconds < 120 ? 'text-amber-500 animate-pulse' : 'text-violet-500'}`}>
+                  <span className={`text-xs font-mono font-bold ${remainingSeconds < 120 ? 'text-amber-500 animate-pulse' : 'text-blue-600 dark:text-blue-400'}`}>
                     {formatTime(remainingSeconds)}
                   </span>
                   <span className="text-[10px] text-[var(--muted)] font-mono">
@@ -935,7 +938,7 @@ export function AgentOverviewTab({
 
                   {connectionState === 'connecting' && (
                     <>
-                      <div className="w-16 h-16 rounded-full border-4 border-[var(--border)] border-t-violet-405 animate-spin flex items-center justify-center">
+                      <div className="w-16 h-16 rounded-full border-4 border-[var(--border)] border-t-blue-600 animate-spin flex items-center justify-center">
                         <Loader2 className="w-5 h-5 text-[var(--muted)] animate-pulse" />
                       </div>
                       <div>
@@ -1012,13 +1015,13 @@ export function AgentOverviewTab({
                 {/* Live Transcripts (Right 3 cols) */}
                 <div className="md:col-span-3 bg-[var(--background)]/20 border border-[var(--border)] rounded-2xl p-5 flex flex-col gap-3 h-[200px]">
                   <h4 className="text-[10px] uppercase tracking-widest font-montserrat font-bold text-[var(--heading)] flex items-center gap-1.5 border-b border-[var(--border)] pb-2">
-                    <MessageSquare className="w-3.5 h-3.5 text-violet-400" />
+                    <MessageSquare className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
                     Live Conversation Feed
                   </h4>
                   <div className="flex-1 overflow-y-auto space-y-2 pr-1 scrollbar-thin scrollbar-thumb-zinc-800 scrollbar-track-transparent">
                     {connectionState === 'active' && transcripts.length === 0 ? (
                       <div className="flex flex-col items-center justify-center py-10 gap-3 text-center">
-                        <Loader2 className="w-5 h-5 animate-spin text-violet-400" />
+                        <Loader2 className="w-5 h-5 animate-spin text-blue-600 dark:text-blue-400" />
                         <span className="text-[10px] font-mono text-[var(--muted)] animate-pulse">
                           Connecting to AI agent...
                         </span>

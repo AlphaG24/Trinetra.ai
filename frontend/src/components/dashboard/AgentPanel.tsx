@@ -15,7 +15,7 @@ export function AgentPanel({ agents }: AgentPanelProps) {
     switch (type) {
       case 'voice': return <Phone className="w-5 h-5 text-blue-400" />
       case 'chat': return <MessageCircle className="w-5 h-5 text-emerald-400" />
-      default: return <Cpu className="w-5 h-5 text-purple-400" />
+      default: return <Cpu className="w-5 h-5 text-sky-400" />
     }
   }
 
@@ -23,7 +23,7 @@ export function AgentPanel({ agents }: AgentPanelProps) {
     switch (status) {
       case 'active': return 'bg-emerald-500'
       case 'error': return 'bg-red-500'
-      case 'setting_up': return 'bg-purple-500'
+      case 'setting_up': return 'bg-blue-600'
       default: return 'bg-gray-500'
     }
   }

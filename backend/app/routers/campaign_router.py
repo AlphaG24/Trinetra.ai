@@ -334,27 +334,17 @@ async def trigger_instant_demo_call(req: InstantCallRequest):
             raise HTTPException(status_code=400, detail="Name and phone number are required")
 
         # 1. Resolve agent
-        agent = None
-        if req.agent_id:
-            a_res = await asyncio.to_thread(
-                supabase_admin.table("agents").select("*").eq("id", req.agent_id).maybe_single().execute
-            )
-            agent = a_res.data
-        if not agent:
-            # Fallback to Shubh or first active agent
-            a_res = await asyncio.to_thread(
-                supabase_admin.table("agents").select("*").ilike("name", "%shubh%").neq("status", "deleted").limit(1).execute
-            )
-            if a_res.data:
-                agent = a_res.data[0]
-            else:
-                any_res = await asyncio.to_thread(
-                    supabase_admin.table("agents").select("*").neq("status", "deleted").limit(1).execute
+        agent = {"id": req.agent_id or "dd4da4c1-9deb-4047-8927-5e12402e6b1f", "name": "Shubh", "organization_id": req.organization_id or "b1ddf1e9-abc1-4ff4-90f5-3ac66913738a"}
+        try:
+            if req.agent_id:
+                a_res = await asyncio.wait_for(
+                    asyncio.to_thread(supabase_admin.table("agents").select("*").eq("id", req.agent_id).maybe_single().execute),
+                    timeout=1.5
                 )
-                agent = any_res.data[0] if any_res.data else None
-
-        if not agent:
-            raise HTTPException(status_code=404, detail="No active agent found to place the call")
+                if a_res.data:
+                    agent = a_res.data
+        except Exception:
+            pass
 
         agent_id = agent["id"]
         org_id = req.organization_id or agent.get("organization_id")
@@ -369,47 +359,26 @@ async def trigger_instant_demo_call(req: InstantCallRequest):
             else:
                 target_phone = f"+{target_phone}"
 
-        # 3. Create campaign record
-        now_iso = datetime.now(timezone.utc).isoformat()
-        camp_res = await asyncio.to_thread(
-            supabase_admin.table("campaigns").insert({
-                "organization_id": org_id,
-                "agent_id": agent_id,
-                "name": f"Live Demo - {req.name}",
-                "status": "running",
-                "purpose": "service",
-                "total_contacts": 1,
-                "contacts_called": 1,
-                "contacts_connected": 0,
-                "leads_generated": 0,
-                "calling_hours_start": "00:00",
-                "calling_hours_end": "23:59",
-                "timezone": "Asia/Kolkata",
-                "scheduled_start": now_iso
-            }).execute
-        )
-        if not camp_res.data:
-            raise HTTPException(status_code=500, detail="Failed to initialize campaign record")
+        # Check single-use limit for direct test calls (bypass for developer tester)
+        try:
+            demo_calls = await asyncio.to_thread(
+                supabase_admin.table("campaign_contacts")
+                .select("id")
+                .eq("consent_source", "live_dashboard_demo")
+                .eq("phone", target_phone)
+                .limit(1)
+                .execute
+            )
+            if demo_calls.data and len(demo_calls.data) >= 1 and not target_phone.endswith("9580619562"):
+                return {
+                    "success": False,
+                    "error": "Single-use trial limit reached. Direct test call is limited to 1 call per number. Launch a campaign to dial multiple contacts.",
+                    "phone": target_phone
+                }
+        except Exception as lim_err:
+            logger.warning(f"[Instant Call Limit Check] {lim_err}")
 
-        campaign_id = camp_res.data[0]["id"]
-
-        # 4. Create campaign contact
-        contact_res = await asyncio.to_thread(
-            supabase_admin.table("campaign_contacts").insert({
-                "campaign_id": campaign_id,
-                "full_name": req.name,
-                "phone": target_phone,
-                "call_status": "dialing",
-                "call_attempts": 1,
-                "last_attempt_at": now_iso,
-                "notes": req.notes or "Instant Live Dial Trigger",
-                "consent_flag": True,
-                "consent_source": "live_dashboard_demo"
-            }).execute
-        )
-        contact_id = contact_res.data[0]["id"] if contact_res.data else None
-
-        # 5. Place outbound call via SarvamOutboundService
+        # Place outbound call via SarvamOutboundService IMMEDIATELY
         from app.services.sarvam_outbound_service import SarvamOutboundService
         sarvam = SarvamOutboundService()
         call_res = await sarvam.trigger_instant_call(
@@ -417,37 +386,55 @@ async def trigger_instant_demo_call(req: InstantCallRequest):
             contact_name=req.name
         )
 
+        # Asynchronously log campaign and contact to DB in background so Supabase delays never block the call
+        def _log_db_in_background():
+            try:
+                camp_res = supabase_admin.table("campaigns").insert({
+                    "organization_id": org_id,
+                    "agent_id": agent_id,
+                    "name": f"Live Demo - {req.name}",
+                    "status": "running",
+                    "purpose": "service",
+                    "total_contacts": 1,
+                    "contacts_called": 1,
+                    "contacts_connected": 0,
+                    "leads_generated": 0,
+                    "calling_hours_start": "00:00",
+                    "calling_hours_end": "23:59",
+                    "timezone": "Asia/Kolkata",
+                    "scheduled_start": now_iso
+                }).execute()
+                if camp_res.data:
+                    cid = camp_res.data[0]["id"]
+                    supabase_admin.table("campaign_contacts").insert({
+                        "campaign_id": cid,
+                        "full_name": req.name,
+                        "phone": target_phone,
+                        "call_status": "dialing" if call_res.get("success") else "failed",
+                        "call_attempts": 1,
+                        "last_attempt_at": now_iso,
+                        "notes": f"Attempt ID: {call_res.get('attempt_id', '')}",
+                        "consent_flag": True,
+                        "consent_source": "live_dashboard_demo"
+                    }).execute()
+            except Exception as db_err:
+                logger.warning(f"Background DB campaign log notice: {db_err}")
+
+        asyncio.create_task(asyncio.to_thread(_log_db_in_background))
+
         if not call_res.get("success"):
             err_msg = call_res.get("error") or "Unknown error calling Sarvam API"
             logger.error(f"[Instant Call Error] {err_msg}")
-            # Update contact to failed
-            if contact_id:
-                await asyncio.to_thread(
-                    supabase_admin.table("campaign_contacts").update({
-                        "call_status": "failed",
-                        "notes": f"Dial error: {err_msg[:200]}"
-                    }).eq("id", contact_id).execute
-                )
             return {
                 "success": False,
-                "campaign_id": campaign_id,
-                "contact_id": contact_id,
                 "error": err_msg,
                 "phone": target_phone
             }
 
         attempt_id = call_res.get("attempt_id")
-        if contact_id:
-            await asyncio.to_thread(
-                supabase_admin.table("campaign_contacts").update({
-                    "notes": f"Attempt ID: {attempt_id}"
-                }).eq("id", contact_id).execute
-            )
 
         return {
             "success": True,
-            "campaign_id": campaign_id,
-            "contact_id": contact_id,
             "attempt_id": attempt_id,
             "status": "dialing",
             "phone": target_phone,

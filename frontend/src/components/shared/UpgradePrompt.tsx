@@ -22,7 +22,7 @@ export default function UpgradePrompt({ title, message, upgradeLink }: UpgradePr
         </p>
         <Link 
           href={upgradeLink} 
-          className="inline-block w-full sm:w-auto px-8 py-3.5 bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 font-bold text-xs uppercase tracking-wider rounded-xl transition-all shadow-sm active:scale-[0.98]"
+          className="inline-block w-full sm:w-auto px-8 py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs uppercase tracking-wider rounded-xl transition-all shadow-sm active:scale-[0.98]"
         >
           Upgrade Now
         </Link>

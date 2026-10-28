@@ -33,7 +33,7 @@ export async function GET() {
     try {
       const authPromise = supabase.auth.getUser().catch(() => ({ data: { user: null } }))
       const timeoutPromise = new Promise<any>((_, reject) =>
-        setTimeout(() => reject(new Error('Auth timeout')), 15000)
+        setTimeout(() => reject(new Error('Auth timeout')), 3000)
       )
       const authRes = await Promise.race([authPromise, timeoutPromise])
       user = authRes?.data?.user ?? null
@@ -55,7 +55,7 @@ export async function GET() {
         .eq('id', user.id)
         .maybeSingle()
       const timeoutPromise = new Promise<any>((_, reject) =>
-        setTimeout(() => reject(new Error('DB timeout')), 15000)
+        setTimeout(() => reject(new Error('DB timeout')), 3000)
       )
       const { data, error: dbError } = await Promise.race([dbPromise, timeoutPromise])
       if (!dbError && data) {
@@ -72,17 +72,27 @@ export async function GET() {
     const metaRole = (user.app_metadata?.role || user.user_metadata?.role || '').toLowerCase().trim()
     const isSuperAdmin = profile?.role === 'super_admin' || isSuperAdminByEmail || metaRole === 'super_admin'
 
+    const isPlaceholder = (val?: string | null) => {
+      if (!val) return true
+      const l = val.toLowerCase().trim()
+      return l === 'partner' || l === 'nexus' || l === 'nexus.ai.ops' || l === 'user'
+    }
+
     const resolvedEmail = profile?.email || user.email || ''
     let resolvedFullName = (profile?.full_name || '').trim()
-    if (!resolvedFullName || resolvedFullName.toLowerCase() === 'partner') {
-      resolvedFullName = (
+    if (!resolvedFullName || isPlaceholder(resolvedFullName)) {
+      const metaName = (
         user.user_metadata?.full_name ||
         user.user_metadata?.name ||
         user.raw_user_meta_data?.full_name ||
         user.raw_user_meta_data?.name ||
-        (user.email ? user.email.split('@')[0] : '') ||
-        (isSuperAdmin ? 'Raghav Thakur' : 'User')
+        ''
       ).trim()
+      if (metaName && !isPlaceholder(metaName)) {
+        resolvedFullName = metaName
+      } else {
+        resolvedFullName = 'Raghav'
+      }
     }
 
     // Default primary org for founder / super admin fleet

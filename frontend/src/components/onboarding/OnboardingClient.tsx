@@ -101,11 +101,17 @@ export function OnboardingClient() {
     loadUser()
   }, [])
 
-  // Poll profiles table for telegram_chat_id
+  // Poll profiles table for telegram_chat_id (capped to 20 attempts / 60 seconds)
   useEffect(() => {
     let intervalId: any
+    let attempts = 0
     if (step === 3 && !isTelegramConnected && userId) {
       intervalId = setInterval(async () => {
+        attempts++
+        if (attempts > 20) {
+          clearInterval(intervalId)
+          return
+        }
         const { data } = await supabase
           .from('profiles')
           .select('telegram_chat_id')

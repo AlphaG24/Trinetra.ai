@@ -165,11 +165,24 @@ class WalletService:
 
         wallet = self.get_or_create_wallet(organization_id)
         current_balance = wallet.get("balance_paisa", 0)
+        current_spend = wallet.get("current_spend_paisa", 0)
+        default_limit = self._get_system_config("default_spend_limit_paisa", DEFAULT_SPEND_LIMIT_PAISA)
+        spend_limit = wallet.get("spend_limit_paisa") or default_limit
+
+        # Enforce Monthly Spend Cap (Default ₹2,500 / 250,000 paisa)
+        if (current_spend + amount_paisa) > spend_limit:
+            logger.warning(f"[WalletService] Debit of {amount_paisa} paisa rejected: monthly spend cap exceeded ({current_spend + amount_paisa} > {spend_limit} paisa)")
+            return False, "SPEND_LIMIT_EXCEEDED", wallet
+
+        if current_balance < amount_paisa:
+            logger.warning(f"[WalletService] Debit of {amount_paisa} paisa rejected: insufficient balance ({current_balance} paisa)")
+            return False, "INSUFFICIENT_BALANCE", wallet
+
         new_balance = current_balance - amount_paisa
         now_iso = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
 
         # Update wallet balance and increment current spend
-        new_spend = wallet.get("current_spend_paisa", 0) + amount_paisa
+        new_spend = current_spend + amount_paisa
         self.supabase.table("wallets").update({
             "balance_paisa": new_balance,
             "current_spend_paisa": new_spend,

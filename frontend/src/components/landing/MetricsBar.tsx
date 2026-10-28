@@ -18,29 +18,40 @@ const FALLBACK_SERVICES = [
   { name: "Appointment Booker", subdomain_url: "/dashboard" },
 ];
 
+let cachedServices: { data: any[]; timestamp: number } | null = null;
+
 export async function MetricsBar() {
-  // Fetch tools dynamically from database bypassing RLS using service role key
+  const now = Date.now();
   let services: any[] = [];
-  try {
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+  if (cachedServices && now - cachedServices.timestamp < 600000) {
+    services = cachedServices.data;
+  } else {
+    try {
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+      const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
-    if (supabaseUrl && supabaseServiceKey) {
-      const supabase = createClient(supabaseUrl, supabaseServiceKey);
-      const { data } = await supabase
-        .from("platform_services")
-        .select("name, subdomain_url")
-        .eq("is_active", true)
-        .order("name", { ascending: true });
-
-      if (data && data.length > 0) {
-        services = data.filter(
-          (s) => !s.name?.toLowerCase().includes("shiksha")
+      if (supabaseUrl && supabaseServiceKey) {
+        const supabase = createClient(supabaseUrl, supabaseServiceKey);
+        const queryPromise = supabase
+          .from("platform_services")
+          .select("name, subdomain_url")
+          .eq("is_active", true)
+          .order("name", { ascending: true });
+        const timeoutPromise = new Promise<{ data: any[] | null }>((resolve) =>
+          setTimeout(() => resolve({ data: null }), 800)
         );
+        const { data } = await Promise.race([queryPromise, timeoutPromise]);
+
+        if (data && data.length > 0) {
+          services = data.filter(
+            (s: any) => !s.name?.toLowerCase().includes("shiksha")
+          );
+          cachedServices = { data: services, timestamp: now };
+        }
       }
+    } catch (err) {
+      console.error("Failed to fetch platform services in MetricsBar:", err);
     }
-  } catch (err) {
-    console.error("Failed to fetch platform services in MetricsBar:", err);
   }
 
   const activeItems =

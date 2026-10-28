@@ -5,7 +5,7 @@ import { CallsPageClient } from '@/src/components/pages/CallsPageClient'
 import { cleanAgentName } from '@/src/utils/formatAgentName'
 
 export const metadata = {
-  title: 'Voice Calls — Trinetra AI',
+  title: 'Voice Calls — Vaakriti AI',
   description: 'Full history of all voice calls handled by your AI agents.',
 }
 

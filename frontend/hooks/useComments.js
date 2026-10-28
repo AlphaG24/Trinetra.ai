@@ -75,7 +75,7 @@ export default function useComments(postId) {
     if (!stablePostId) return undefined;
 
     const channel = supabase
-      .channel(`blog_comments_${stablePostId}_${sortBy}`)
+      .channel(`blog_comments_${stablePostId}`)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "blog_comments", filter: `post_id=eq.${stablePostId}` },
@@ -92,7 +92,7 @@ export default function useComments(postId) {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [stablePostId, fetchComments, sortBy]);
+  }, [stablePostId, fetchComments]);
 
   const addComment = useCallback(
     async ({ postId: pid, parentId, userName, userEmail, content }) => {

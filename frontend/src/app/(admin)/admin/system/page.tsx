@@ -45,6 +45,7 @@ export default function SystemConfigPage() {
     inbound_number_cost_paisa: '49900',
     overage_per_minute_paisa: '1100', // P6: ₹11/min (range ₹10–₹12/min)
     maintenance_mode: 'false',
+    TELEPHONY_ROUTING_MODE: 'sarvam_managed', // 'sarvam_managed' (Sarvam AI Cloud) or 'custom_pipeline' (LiveKit / In-House)
 
     // P3: Credit-based plans (Admin-editable pricing; prepaid wallet)
     credit_per_minute_paisa: '150',   // ₹1.50/min
@@ -122,7 +123,7 @@ export default function SystemConfigPage() {
     // Setup Supabase Realtime subscription for system_config updates
     const supabase = createClient()
     const channel = supabase
-      .channel(`system_config_realtime_${Math.random().toString(36).substring(7)}`)
+      .channel('system_config_realtime_admin')
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'system_config' },
@@ -175,8 +176,38 @@ export default function SystemConfigPage() {
       // Revert on failure
       setConfigs((prev) => ({ ...prev, maintenance_mode: newValue === 'true' ? 'false' : 'true' }))
       toast.error(err.message || 'Failed to toggle maintenance mode')
+  }
+  }
+
+  // Telephony Voice Pipeline Toggle — Instant switch between Sarvam Cloud and In-House Custom Pipeline
+  const [pipelineRoutingSaving, setPipelineRoutingSaving] = useState(false)
+
+  const handleRoutingModeToggle = async () => {
+    const isSarvamNow = (configs.TELEPHONY_ROUTING_MODE || 'sarvam_managed') === 'sarvam_managed'
+    const newMode = isSarvamNow ? 'custom_pipeline' : 'sarvam_managed'
+    setConfigs((prev) => ({ ...prev, TELEPHONY_ROUTING_MODE: newMode }))
+    try {
+      setPipelineRoutingSaving(true)
+      const res = await fetch('/api/admin/system-config', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ configs: { TELEPHONY_ROUTING_MODE: newMode } }),
+      })
+      if (!res.ok) {
+        const json = await res.json()
+        throw new Error(json.error || 'Failed to update telephony routing mode')
+      }
+      toast.success(
+        newMode === 'sarvam_managed'
+          ? '🇮🇳 Sarvam AI Cloud Pipeline is now ACTIVE'
+          : '⚡ In-House Custom Voice Pipeline (LiveKit / STT / LLM / TTS) is now ACTIVE'
+      )
+    } catch (err: any) {
+      // Revert on failure
+      setConfigs((prev) => ({ ...prev, TELEPHONY_ROUTING_MODE: isSarvamNow ? 'sarvam_managed' : 'custom_pipeline' }))
+      toast.error(err.message || 'Failed to toggle voice pipeline mode')
     } finally {
-      setMaintenanceSaving(false)
+      setPipelineRoutingSaving(false)
     }
   }
 
@@ -396,6 +427,59 @@ export default function SystemConfigPage() {
             />
           )}
         </button>
+      </div>
+
+      {/* Voice Telephony Pipeline Controller (Sarvam Managed vs Custom In-House LiveKit Pipeline) */}
+      <div className="bg-zinc-900/60 border border-zinc-800 rounded-2xl p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-6 shadow-sm">
+        <div className="flex items-start gap-3.5">
+          <div className="p-2.5 bg-blue-600/15 border border-blue-500/20 rounded-xl text-blue-400 shrink-0 mt-0.5">
+            <Activity className="w-5 h-5" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h2 className="text-sm font-bold text-white font-montserrat tracking-wide">
+                Voice Telephony Pipeline Routing
+              </h2>
+              <span className={`px-2 py-0.5 text-[10px] font-mono font-bold uppercase rounded-md tracking-wider ${
+                (configs.TELEPHONY_ROUTING_MODE || 'sarvam_managed') === 'sarvam_managed'
+                  ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30'
+                  : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+              }`}>
+                {(configs.TELEPHONY_ROUTING_MODE || 'sarvam_managed') === 'sarvam_managed' ? 'Sarvam Cloud Managed' : 'Custom In-House Pipeline'}
+              </span>
+            </div>
+            <p className="text-xs text-zinc-400 mt-1 max-w-2xl leading-relaxed">
+              {(configs.TELEPHONY_ROUTING_MODE || 'sarvam_managed') === 'sarvam_managed'
+                ? 'Outbound & inbound voice calls route directly through Sarvam AI Indic cloud agent infrastructure. Turn OFF to switch to your custom in-house telephony stack.'
+                : 'Calls route through your custom in-house stack (Twilio / Exotel + LiveKit room + local STT/LLM/TTS orchestration). Turn ON to resume Sarvam cloud routing.'}
+            </p>
+          </div>
+        </div>
+
+        {/* Action Toggle Button */}
+        <div className="flex items-center gap-3 shrink-0 self-end md:self-center">
+          <button
+            type="button"
+            onClick={handleRoutingModeToggle}
+            disabled={pipelineRoutingSaving}
+            className={`px-4 py-2.5 rounded-xl text-xs font-montserrat font-bold uppercase tracking-wider transition-all cursor-pointer flex items-center gap-2 border shadow-sm ${
+              (configs.TELEPHONY_ROUTING_MODE || 'sarvam_managed') === 'sarvam_managed'
+                ? 'bg-zinc-900 hover:bg-zinc-800 text-white border-zinc-700 hover:border-zinc-600'
+                : 'bg-white hover:bg-zinc-100 text-zinc-950 border-white shadow-md'
+            }`}
+          >
+            {pipelineRoutingSaving ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            ) : (
+              <Cpu className="w-3.5 h-3.5" />
+            )}
+            <span>
+              {(configs.TELEPHONY_ROUTING_MODE || 'sarvam_managed') === 'sarvam_managed'
+                ? 'Turn Off Sarvam (Switch to Custom)'
+                : 'Turn On Sarvam (Switch to Cloud)'}
+            </span>
+          </button>
+        </div>
       </div>
 
       {/* Pricing Settings Centralized in /admin/plans */}

@@ -530,7 +530,7 @@ export default function AppointmentsPage() {
                                   }
                                 }}
                                 disabled={actionLoading}
-                                className="px-2.5 py-1 rounded-lg bg-blue-500/10 text-blue-700 dark:text-blue-400 border border-blue-500/25 text-xs font-bold hover:bg-blue-500/20 transition-all cursor-pointer disabled:opacity-50"
+                                className="px-2.5 py-1 rounded-lg bg-zinc-900/10 text-zinc-900 dark:bg-white/10 dark:text-white border border-zinc-300 dark:border-zinc-700 text-xs font-bold hover:bg-zinc-900/20 dark:hover:bg-white/20 transition-all cursor-pointer disabled:opacity-50"
                                 title="Reschedule date/time and notify user"
                               >
                                 Reschedule
@@ -571,7 +571,7 @@ export default function AppointmentsPage() {
           <div className="bg-white dark:bg-[#120E22] border border-zinc-200 dark:border-white/10 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-5 text-zinc-900 dark:text-zinc-100">
             <div className="flex items-center justify-between border-b border-zinc-200 dark:border-white/10 pb-3">
               <div className="flex items-center gap-2.5">
-                <div className="p-2 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
+                <div className="p-2 rounded-xl bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white border border-zinc-200 dark:border-white/10">
                   <CalendarClock className="w-5 h-5" />
                 </div>
                 <div>
@@ -636,7 +636,7 @@ export default function AppointmentsPage() {
                 <button
                   type="submit"
                   disabled={actionLoading}
-                  className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold transition-all cursor-pointer shadow-xs disabled:opacity-50"
+                  className="px-4 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-100 font-bold transition-all cursor-pointer shadow-xs disabled:opacity-50"
                 >
                   {actionLoading ? "Dispatching..." : "Confirm & Send Notice"}
                 </button>

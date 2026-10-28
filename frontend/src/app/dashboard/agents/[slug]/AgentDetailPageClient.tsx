@@ -6,7 +6,7 @@ import Link from 'next/link'
 import { 
   Bot, ArrowLeft, Copy, Check, LayoutDashboard, Mic, BookOpen, Brain, 
   PhoneIncoming, Users, BarChart3, Lock, AlertCircle, RefreshCw, Clock, Phone,
-  CalendarClock, Settings2, Pencil, X, Loader2
+  CalendarClock, Settings2, Pencil, X, Loader2, ChevronLeft, ChevronRight
 } from 'lucide-react'
 import { createClient } from '@/lib/client'
 import { AgentCallbacksTab } from '../../../../components/agents/AgentCallbacksTab'
@@ -620,13 +620,13 @@ export function AgentDetailPageClient({
           <div className="flex flex-col gap-3 pt-2">
             <Link
               href={upgradeUrl}
-              className="w-full py-3 bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 font-bold text-xs uppercase rounded-xl tracking-wider shadow-sm transition-all block text-center cursor-pointer font-montserrat active:scale-[0.99]"
+              className="w-full py-3 bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:text-zinc-950 font-bold text-xs uppercase rounded-xl tracking-wider shadow-sm transition-all block text-center cursor-pointer font-montserrat active:scale-[0.99]"
             >
               Upgrade Plan
             </Link>
             <Link
               href="/dashboard"
-              className="w-full py-3 border border-[var(--border)] hover:bg-[var(--hover-bg)] text-[var(--heading)] font-bold text-xs uppercase rounded-xl tracking-wider transition-all block text-center cursor-pointer font-montserrat"
+              className="w-full py-3 border border-[var(--border)] bg-[var(--card-bg)] hover:bg-[var(--hover-bg)] text-[var(--heading)] font-bold text-xs uppercase rounded-xl tracking-wider transition-all block text-center cursor-pointer font-montserrat"
             >
               Back to Dashboard
             </Link>
@@ -637,7 +637,7 @@ export function AgentDetailPageClient({
   }
 
   return (
-    <div className="space-y-6 p-4 md:p-6 min-h-screen text-left">
+    <div className="space-y-4 min-h-screen text-left">
       
       {/* Back Link */}
       <div className="flex items-center justify-between">
@@ -670,8 +670,8 @@ export function AgentDetailPageClient({
         </div>
       )}
 
-      {/* Top Bar (Sticky, always visible below fixed dashboard header) */}
-      <div className="sticky top-16 z-20 bg-[var(--card-bg)] border border-[var(--border)] p-5 rounded-2xl shadow-md flex flex-wrap items-center justify-between gap-4 transition-all">
+      {/* Top Bar (Relative so it scrolls away on scroll, making way for sticky subtabs) */}
+      <div className="relative bg-[var(--card-bg)] border border-[var(--border)] p-5 rounded-2xl shadow-xs flex flex-wrap items-center justify-between gap-4 transition-all">
         <div className="flex items-center gap-4">
           <div className="w-12 h-12 rounded-xl bg-[var(--background)] border border-[var(--border)] flex items-center justify-center text-[var(--heading)] shadow-inner">
             <Bot className="w-6 h-6" />
@@ -689,13 +689,13 @@ export function AgentDetailPageClient({
                   }}
                   autoFocus
                   disabled={savingName}
-                  className="px-3 py-1 bg-[var(--background)] border border-zinc-900 dark:border-white rounded-lg text-lg font-bold text-[var(--heading)] font-display focus:outline-none focus:ring-2 focus:ring-zinc-900/20 dark:focus:ring-white/20 min-w-[200px]"
+                  className="px-3.5 py-1.5 bg-[var(--background)] border border-zinc-900 dark:border-white rounded-xl text-lg font-bold text-[var(--heading)] font-display focus:outline-none min-w-[200px]"
                   placeholder="Enter agent name..."
                 />
                 <button
                   onClick={handleSaveName}
                   disabled={savingName}
-                  className="p-1.5 bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 rounded-lg transition-colors shadow-sm cursor-pointer"
+                  className="p-2 bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:text-zinc-950 rounded-xl transition-colors shadow-sm cursor-pointer"
                   title="Save Name (Enter)"
                 >
                   {savingName ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
@@ -703,7 +703,7 @@ export function AgentDetailPageClient({
                 <button
                   onClick={handleCancelEditName}
                   disabled={savingName}
-                  className="p-1.5 hover:bg-[var(--hover-bg)] text-[var(--muted)] hover:text-[var(--heading)] rounded-lg transition-colors cursor-pointer"
+                  className="p-2 hover:bg-[var(--hover-bg)] text-[var(--muted)] hover:text-[var(--heading)] rounded-xl transition-colors cursor-pointer"
                   title="Cancel (Esc)"
                 >
                   <X className="w-4 h-4" />
@@ -790,7 +790,7 @@ export function AgentDetailPageClient({
           {(tier === 'free_demo' || tier === 'trial') && (
             <Link
               href={upgradeUrl}
-              className="px-4 py-2 rounded-xl bg-[var(--primary-bg)] text-[var(--heading)] hover:bg-[var(--hover-bg)] border border-[var(--border)] font-montserrat font-bold text-xs uppercase tracking-wider transition-all shadow-md"
+              className="px-4 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:text-zinc-950 font-montserrat font-bold text-xs uppercase tracking-wider transition-all shadow-sm"
             >
               Upgrade
             </Link>
@@ -828,42 +828,79 @@ export function AgentDetailPageClient({
         </div>
       ) : (
         <>
-          {/* Tab Bar (Sticky below agent header card) */}
-          <div className="sticky top-36 z-10 bg-[var(--card-bg)] border border-[var(--border)] p-1 rounded-xl shadow-sm flex flex-wrap gap-1">
-            {tabs.map((tab) => {
-              const Icon = tab.icon
-              const unlocked = isFeatureUnlocked(tab.id)
-              const isTabLocked = (tab as any).locked
-              const isActive = activeTab === tab.id
+          {/* Subtab Navigation Bar — Sticky at top-16 beneath Dashboard Topbar with clear visibility & scroll controls */}
+          <div className="sticky top-16 z-30 pt-1 pb-1 bg-[var(--background)]/90 backdrop-blur-md">
+            <div className="relative flex items-center bg-[var(--card-bg)] border border-[var(--border)] p-1 rounded-2xl shadow-sm">
+              
+              {/* Left Scroll Chevron Button (Always accessible) */}
+              <button
+                type="button"
+                onClick={() => {
+                  const el = document.getElementById('agent-subtabs-scroll')
+                  if (el) el.scrollBy({ left: -220, behavior: 'smooth' })
+                }}
+                className="shrink-0 w-7 h-7 ml-0.5 rounded-xl bg-[var(--background)] hover:bg-zinc-200 dark:hover:bg-zinc-800 text-[var(--heading)] border border-[var(--border)] flex items-center justify-center transition-all cursor-pointer shadow-xs active:scale-95"
+                title="Scroll left"
+                aria-label="Scroll subtabs left"
+              >
+                <ChevronLeft className="w-3.5 h-3.5" />
+              </button>
 
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => {
-                    if (isTabLocked) {
-                      toast.error((tab as any).lockedMessage || 'Upgrade to a paid plan to access this feature')
-                      return
-                    }
-                    if (!unlocked) {
-                      toast.error('This feature is locked for Free Demo agents. Please upgrade to a paid plan to access it.')
-                      return
-                    }
-                    setActiveTab(tab.id)
-                  }}
-                  title={isTabLocked ? (tab as any).lockedMessage : (!unlocked ? 'Locked for Free Demo agents' : undefined)}
-                  className={`flex items-center gap-1.5 px-4 py-2.5 rounded-lg text-xs font-montserrat font-bold uppercase tracking-wider transition-all cursor-pointer ${
-                    isActive
-                      ? 'bg-[var(--background)] text-[var(--heading)] border border-[var(--border)] shadow-inner'
-                      : 'text-[var(--muted)] hover:text-[var(--heading)] hover:bg-[var(--hover-bg)]/10'
-                  } ${(!unlocked || isTabLocked) ? 'opacity-50' : ''}`}
-                >
-                  <Icon className="w-3.5 h-3.5" />
-                  <span>{tab.label}</span>
-                  {isTabLocked && <Lock className="w-3 h-3 text-amber-500 ml-0.5" />}
-                  {!isTabLocked && !unlocked && <Lock className="w-3 h-3 text-[var(--muted)] ml-0.5" />}
-                </button>
-              )
-            })}
+              {/* Scrollable Subtabs Container */}
+              <div 
+                id="agent-subtabs-scroll"
+                className="flex-1 overflow-x-auto scroll-smooth flex items-center gap-1 px-1.5 py-0.5 custom-scrollbar"
+              >
+                {tabs.map((tab) => {
+                  const Icon = tab.icon
+                  const unlocked = isFeatureUnlocked(tab.id)
+                  const isTabLocked = (tab as any).locked
+                  const isActive = activeTab === tab.id
+
+                  return (
+                    <button
+                      key={tab.id}
+                      onClick={() => {
+                        if (isTabLocked) {
+                          toast.error((tab as any).lockedMessage || 'Upgrade to a paid plan to access this feature')
+                          return
+                        }
+                        if (!unlocked) {
+                          toast.error('This feature is locked for Free Demo agents. Please upgrade to a paid plan to access it.')
+                          return
+                        }
+                        setActiveTab(tab.id)
+                      }}
+                      title={isTabLocked ? (tab as any).lockedMessage : (!unlocked ? 'Locked for Free Demo agents' : undefined)}
+                      className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-montserrat font-bold uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap shrink-0 ${
+                        isActive
+                          ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-950 shadow-sm'
+                          : 'text-[var(--muted)] hover:text-black dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/5'
+                      } ${(!unlocked || isTabLocked) ? 'opacity-50' : ''}`}
+                    >
+                      <Icon className="w-3.5 h-3.5 shrink-0" />
+                      <span>{tab.label}</span>
+                      {isTabLocked && <Lock className="w-3 h-3 text-amber-500 ml-0.5" />}
+                      {!isTabLocked && !unlocked && <Lock className="w-3 h-3 text-[var(--muted)] ml-0.5" />}
+                    </button>
+                  )
+                })}
+              </div>
+
+              {/* Right Scroll Chevron Button (Always accessible) */}
+              <button
+                type="button"
+                onClick={() => {
+                  const el = document.getElementById('agent-subtabs-scroll')
+                  if (el) el.scrollBy({ left: 220, behavior: 'smooth' })
+                }}
+                className="shrink-0 w-7 h-7 mr-0.5 rounded-xl bg-[var(--background)] hover:bg-zinc-200 dark:hover:bg-zinc-800 text-[var(--heading)] border border-[var(--border)] flex items-center justify-center transition-all cursor-pointer shadow-xs active:scale-95"
+                title="Scroll right"
+                aria-label="Scroll subtabs right"
+              >
+                <ChevronRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
           </div>
 
       {/* Tab Content Body */}
@@ -885,7 +922,7 @@ export function AgentDetailPageClient({
             </p>
             <Link 
               href={upgradeUrl}
-              className="px-6 py-2.5 bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 font-bold text-[10px] uppercase tracking-wider rounded-xl transition-all shadow-sm active:scale-[0.98]"
+              className="px-6 py-2.5 bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-200 dark:text-zinc-950 font-bold text-[10px] uppercase tracking-wider rounded-xl transition-all shadow-sm active:scale-[0.98]"
             >
               Upgrade Now
             </Link>

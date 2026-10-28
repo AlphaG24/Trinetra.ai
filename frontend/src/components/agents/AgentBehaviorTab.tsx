@@ -173,7 +173,7 @@ export function AgentBehaviorTab({ agent, unlocked, upgradeUrl }: AgentBehaviorT
           <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-6 md:p-8 shadow-sm space-y-6">
             <div className="flex justify-between items-center">
               <h2 className="text-xl font-bold font-display text-[var(--heading)] flex items-center gap-2">
-                <Brain className="w-5 h-5 text-violet-400" /> Behavioral Instructions
+                <Brain className="w-5 h-5 text-[var(--heading)]" /> Behavioral Instructions
               </h2>
               <span className="text-[10px] text-[var(--muted)] font-mono">
                 {additionalInstructions.length} chars
@@ -201,7 +201,7 @@ export function AgentBehaviorTab({ agent, unlocked, upgradeUrl }: AgentBehaviorT
                   type="button"
                   onClick={handleEnhancePrompt}
                   disabled={enhancing || resetting}
-                  className="text-[10px] bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all disabled:opacity-50 font-bold uppercase tracking-wider cursor-pointer shadow-sm active:scale-[0.98]"
+                  className="text-[10px] bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-100 px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all disabled:opacity-50 font-bold uppercase tracking-wider cursor-pointer shadow-sm active:scale-[0.98]"
                 >
                   {enhancing ? <Loader2 className="w-3 h-3 animate-spin" /> : <Brain className="w-3 h-3" />}
                   Enhance with AI
@@ -212,7 +212,7 @@ export function AgentBehaviorTab({ agent, unlocked, upgradeUrl }: AgentBehaviorT
                 onChange={(e) => setAdditionalInstructions(e.target.value)}
                 placeholder="e.g. Always offer a 10% discount if the caller objects to the price. Or: If they want to meet Dr. Gupta, specify he only visits on Wednesdays."
                 rows={12}
-                className="w-full bg-[var(--background)] border border-[var(--border)] rounded-xl px-4 py-3 text-xs focus:outline-none focus:ring-1 focus:ring-[var(--heading)]/25 text-[var(--heading)] font-mono leading-relaxed resize-none"
+                className="w-full bg-[var(--background)] border border-[var(--border)] rounded-xl px-4 py-3 text-xs focus:outline-none focus:ring-1 focus:ring-zinc-400 dark:focus:ring-zinc-600 text-[var(--heading)] font-mono leading-relaxed resize-none"
               />
               <p className="text-[10px] text-[var(--muted)] font-sans">
                 Define specific business logic, custom FAQs, schedules, or instructions for handling caller objections.
@@ -224,7 +224,7 @@ export function AgentBehaviorTab({ agent, unlocked, upgradeUrl }: AgentBehaviorT
               <button
                 type="submit"
                 disabled={saving || resetting}
-                className="px-6 py-3.5 rounded-xl bg-[var(--primary-bg)] text-[var(--heading)] hover:bg-[var(--hover-bg)] border border-[var(--border)] font-montserrat font-bold text-xs uppercase tracking-wider transition-all disabled:opacity-50 hover:scale-[1.01] shadow-md cursor-pointer flex items-center justify-center gap-2"
+                className="px-6 py-3.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-100 font-montserrat font-bold text-xs uppercase tracking-wider transition-all disabled:opacity-50 hover:scale-[1.01] shadow-md cursor-pointer flex items-center justify-center gap-2"
               >
                 {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save Core Logic'}
               </button>
@@ -247,7 +247,7 @@ export function AgentBehaviorTab({ agent, unlocked, upgradeUrl }: AgentBehaviorT
           {/* Settings Card */}
           <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-6 md:p-8 shadow-sm space-y-6">
             <h3 className="text-lg font-bold font-display text-[var(--heading)] flex items-center gap-2">
-              <Sliders className="w-4 h-4 text-violet-400" /> Model Hyperparameters
+              <Sliders className="w-4 h-4 text-[var(--heading)]" /> Model Hyperparameters
             </h3>
             
             <p className="text-xs text-[var(--muted)] bg-[var(--background)] p-4 rounded-xl border border-[var(--border)]">
@@ -258,7 +258,7 @@ export function AgentBehaviorTab({ agent, unlocked, upgradeUrl }: AgentBehaviorT
           {/* Quick Sequences */}
           <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-6 md:p-8 shadow-sm space-y-6">
             <h3 className="text-lg font-bold font-display text-[var(--heading)] flex items-center gap-2">
-              <MessageSquare className="w-4 h-4 text-violet-400" /> Messaging Fallbacks
+              <MessageSquare className="w-4 h-4 text-[var(--heading)]" /> Messaging Fallbacks
             </h3>
 
             <div className="space-y-4">

@@ -1389,22 +1389,44 @@ def create_appointment_tools(
                     "notes": service_or_notes or "Booked via voice agent conversation.",
                     "voice_call_id": call_id,
                 }
+                if organization_id:
+                    apt_payload["organization_id"] = organization_id
                 res = await asyncio.to_thread(supabase_admin.table("appointments").insert(apt_payload).execute)
                 
                 # Move non-essential writes to background tasks
-                if organization_id and (cleaned or phone_number):
+                if (organization_id or user_id) and (cleaned or phone_number):
                     async def _bg_contact_upsert():
                         try:
-                            from app.services.caller_lookup import CallerLookupService
-                            c_svc = CallerLookupService(supabase_admin)
-                            await c_svc.upsert_from_call(
-                                organization_id=organization_id,
-                                phone_number=cleaned or phone_number,
-                                caller_name=caller_name,
-                                call_summary=f"Booked appointment for {scheduled_at}. {service_or_notes}",
-                                direction="inbound",
-                                tags=["appointment", "customer"]
-                            )
+                            if organization_id:
+                                from app.services.caller_lookup import CallerLookupService
+                                c_svc = CallerLookupService(supabase_admin)
+                                await c_svc.upsert_from_call(
+                                    organization_id=organization_id,
+                                    phone_number=cleaned or phone_number,
+                                    caller_name=caller_name,
+                                    call_summary=f"Booked appointment for {scheduled_at}. {service_or_notes}",
+                                    direction="inbound",
+                                    tags=["appointment", "customer"]
+                                )
+                            
+                            # Dispatch Notification to Dashboard & WhatsApp
+                            if user_id:
+                                from app.services.notification_service import NotificationService
+                                await NotificationService.dispatch(
+                                    user_id=user_id,
+                                    event_type="appointment_scheduled",
+                                    title="New Appointment Booked",
+                                    message=f"Appointment confirmed for {caller_name or 'Caller'} ({cleaned or phone_number}) at {scheduled_at}.",
+                                    payload={
+                                        "contact_name": caller_name,
+                                        "contact_phone": cleaned or phone_number,
+                                        "scheduled_at": str(scheduled_at),
+                                        "notes": service_or_notes,
+                                        "action_url": "/dashboard/appointments",
+                                        "action_label": "View Appointment",
+                                        "call_id": call_id
+                                    }
+                                )
                         except Exception as c_err:
                             logger.warning(f"[book_appointment_slot] Background sync error: {c_err}")
                     asyncio.create_task(_bg_contact_upsert())

@@ -138,9 +138,27 @@ export async function POST(
                 .from("agents")
                 .update({
                     phone_number: phoneNumberRecord.phone_number,
-                    telephony_provider: phoneNumberRecord.provider || "twilio"
+                    telephony_provider: phoneNumberRecord.provider || "sarvam"
                 })
                 .eq("id", agent_id);
+        }
+
+        // Bridge to Sarvam Voice Agents Platform: If provider is sarvam or default pool
+        if (phoneNumberRecord.provider === 'sarvam' || phoneNumberRecord.phone_number.startsWith('+91')) {
+            try {
+                const backendUrl = process.env.INTERNAL_BACKEND_URL || process.env.NEXT_PUBLIC_FASTAPI_URL || 'http://127.0.0.1:8000';
+                fetch(`${backendUrl}/api/sarvam/link-deployment`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        agent_id,
+                        phone_number: phoneNumberRecord.phone_number,
+                        name: `${agent.name} Line`
+                    })
+                }).catch(err => console.warn('[Sarvam Deployment Sync Notice]', err));
+            } catch (syncErr) {
+                console.warn('[Sarvam Deployment Sync Exception]', syncErr);
+            }
         }
 
         // Write to activity_log

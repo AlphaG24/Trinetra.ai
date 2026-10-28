@@ -52,7 +52,7 @@ export function AgentAnalyticsTab({ agent, unlocked, upgradeUrl }: AgentAnalytic
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-xl font-bold font-display text-[var(--heading)] flex items-center gap-2">
-            <BarChart3 className="w-5 h-5 text-violet-400" /> Performance Analytics
+            <BarChart3 className="w-5 h-5 text-blue-600 dark:text-blue-400" /> Performance Analytics
           </h2>
           <p className="text-xs text-[var(--muted)] font-sans">
             Monitor real-time call performance, user sentiment, and lead conversion trends.
@@ -94,8 +94,8 @@ export function AgentAnalyticsTab({ agent, unlocked, upgradeUrl }: AgentAnalytic
               }) || []} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                 <defs>
                   <linearGradient id="colorCalls" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#8B5CF6" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="#8B5CF6" stopOpacity={0}/>
+                    <stop offset="5%" stopColor="#2563EB" stopOpacity={0.3}/>
+                    <stop offset="95%" stopColor="#2563EB" stopOpacity={0}/>
                   </linearGradient>
                 </defs>
                 <XAxis dataKey="day" stroke="var(--muted)" fontSize={10} tickLine={false} axisLine={false} />
@@ -104,7 +104,7 @@ export function AgentAnalyticsTab({ agent, unlocked, upgradeUrl }: AgentAnalytic
                   contentStyle={{ backgroundColor: 'var(--card-bg)', borderColor: 'var(--border)', borderRadius: '12px' }}
                   labelStyle={{ fontSize: '10px', color: 'var(--heading)', fontWeight: 'bold' }}
                 />
-                <Area type="monotone" dataKey="calls" stroke="#8B5CF6" strokeWidth={2} fillOpacity={1} fill="url(#colorCalls)" />
+                <Area type="monotone" dataKey="calls" stroke="#2563EB" strokeWidth={2} fillOpacity={1} fill="url(#colorCalls)" />
               </AreaChart>
             </ResponsiveContainer>
           </div>

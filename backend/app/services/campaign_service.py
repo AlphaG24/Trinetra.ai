@@ -221,9 +221,26 @@ class CampaignService:
                     company_key = next((k for k in ["company", "companyname", "organization", "org"] if k in row_norm), None)
                     company = row_norm[company_key] if company_key else ""
                     
+                    # Find intent & business description
+                    intent_key = next((k for k in ["intent", "customerintent", "requirement", "goal", "interest", "service"] if k in row_norm), None)
+                    intent_val = str(row_norm[intent_key]).strip() if intent_key and row_norm[intent_key] else ""
+
+                    biz_key = next((k for k in ["businessdescription", "businessdetails", "businessinfo", "business", "industry", "companydetails", "description"] if k in row_norm), None)
+                    biz_val = str(row_norm[biz_key]).strip() if biz_key and row_norm[biz_key] else ""
+
                     # Find notes
-                    notes_key = next((k for k in ["notes", "note", "description", "remarks", "comment"] if k in row_norm), None)
-                    notes = row_norm[notes_key] if notes_key else ""
+                    notes_key = next((k for k in ["notes", "note", "remarks", "comment"] if k in row_norm), None)
+                    raw_notes = str(row_norm[notes_key]).strip() if notes_key and row_norm[notes_key] else ""
+
+                    # Synthesize rich conversational notes
+                    notes_parts = []
+                    if intent_val:
+                        notes_parts.append(f"Intent: {intent_val}")
+                    if biz_val:
+                        notes_parts.append(f"Business: {biz_val}")
+                    if raw_notes:
+                        notes_parts.append(raw_notes)
+                    notes = " | ".join(notes_parts) if notes_parts else ""
 
                     # Phase 3 Guard: Validate per-contact consent flag & source
                     is_consented, c_source, reject_reason = validate_contact_consent(row)
@@ -264,7 +281,9 @@ class CampaignService:
                     
                 name_idx = next((i for i, h in enumerate(headers) if h in ["name", "fullname", "contactname", "prospect"]), None)
                 company_idx = next((i for i, h in enumerate(headers) if h in ["company", "companyname", "organization", "org"]), None)
-                notes_idx = next((i for i, h in enumerate(headers) if h in ["notes", "note", "description", "remarks", "comment"]), None)
+                intent_idx = next((i for i, h in enumerate(headers) if h in ["intent", "customerintent", "requirement", "goal", "interest", "service"]), None)
+                biz_idx = next((i for i, h in enumerate(headers) if h in ["businessdescription", "businessdetails", "businessinfo", "business", "industry", "companydetails", "description"]), None)
+                notes_idx = next((i for i, h in enumerate(headers) if h in ["notes", "note", "remarks", "comment"]), None)
                 
                 # Read rows
                 for r_idx in range(2, sheet.max_row + 1):
@@ -278,7 +297,19 @@ class CampaignService:
                         
                     full_name = str(row_vals[name_idx]) if (name_idx is not None and len(row_vals) > name_idx and row_vals[name_idx]) else ""
                     company = str(row_vals[company_idx]) if (company_idx is not None and len(row_vals) > company_idx and row_vals[company_idx]) else ""
-                    notes = str(row_vals[notes_idx]) if (notes_idx is not None and len(row_vals) > notes_idx and row_vals[notes_idx]) else ""
+                    
+                    intent_val = str(row_vals[intent_idx]).strip() if (intent_idx is not None and len(row_vals) > intent_idx and row_vals[intent_idx]) else ""
+                    biz_val = str(row_vals[biz_idx]).strip() if (biz_idx is not None and len(row_vals) > biz_idx and row_vals[biz_idx]) else ""
+                    raw_notes = str(row_vals[notes_idx]).strip() if (notes_idx is not None and len(row_vals) > notes_idx and row_vals[notes_idx]) else ""
+                    
+                    notes_parts = []
+                    if intent_val:
+                        notes_parts.append(f"Intent: {intent_val}")
+                    if biz_val:
+                        notes_parts.append(f"Business: {biz_val}")
+                    if raw_notes:
+                        notes_parts.append(raw_notes)
+                    notes = " | ".join(notes_parts) if notes_parts else ""
 
                     # Build row dictionary for consent validation
                     row_dict = {headers[i]: row_vals[i] for i in range(len(headers)) if i < len(row_vals) and row_vals[i] is not None}
@@ -734,9 +765,15 @@ class CampaignService:
         twilio_token = ConfigService.get("TWILIO_AUTH_TOKEN") or os.getenv("TWILIO_AUTH_TOKEN")
         has_twilio = bool(twilio_sid and twilio_token)
 
+        routing_mode = (os.getenv("TELEPHONY_ROUTING_MODE") or ConfigService.get("TELEPHONY_ROUTING_MODE") or "sarvam_managed").lower().strip()
         agent_provider = (agent.get("telephony_provider") or agent.get("voice_provider") or "").lower().strip()
         agent_phone_clean = (agent.get("phone_number") or "").replace(" ", "").replace("-", "")
-        is_sarvam_agent = agent_provider == "sarvam" or agent_phone_clean == "+917965481258" or agent_phone_clean == "917965481258"
+        is_sarvam_agent = (
+            routing_mode == "sarvam_managed" or
+            agent_provider == "sarvam" or 
+            agent_phone_clean == "+917965481258" or 
+            agent_phone_clean == "917965481258"
+        )
 
         if is_sarvam_agent:
             chosen_provider = "sarvam"
@@ -760,7 +797,9 @@ class CampaignService:
         webhook_base = ConfigService.get("TRINETRA_WEBHOOK_BASE_URL") or os.getenv("TRINETRA_WEBHOOK_BASE_URL") or "http://localhost:8000"
         webhook_url = f"{webhook_base}/api/voice/webhooks/voice/{chosen_provider}/{organization_id}?agent_id={agent_id}&contact_id={contact_id}&room_name={unique_room}"
 
-        if chosen_provider == "exotel":
+        if chosen_provider == "sarvam":
+            agent_phone = agent.get("phone_number") or os.getenv("SARVAM_CALLER_NUMBER") or "+917965481258"
+        elif chosen_provider == "exotel":
             agent_phone = agent.get("phone_number") or ConfigService.get("EXOTEL_CALLER_ID") or os.getenv("EXOTEL_CALLER_ID") or "+918000000000"
         else:
             agent_phone = agent.get("phone_number") or os.getenv("TWILIO_PHONE_NUMBER") or "+12282950908"
@@ -808,7 +847,22 @@ class CampaignService:
                 call_res = await sarvam_svc.trigger_instant_call(
                     target_phone=contact_phone,
                     contact_name=contact_name,
-                    webhook_url=sarvam_webhook
+                    custom_metadata={
+                        "trinetra_org_id": organization_id,
+                        "trinetra_agent_id": agent_id,
+                        "campaign_id": campaign_id,
+                        "contact_id": contact_id,
+                        "company_name": company_name,
+                        "prospect_company": company_name,
+                        "customer_notes": notes,
+                        "business_description": notes,
+                        "call_purpose": campaign_data.get("purpose") or "consultation",
+                        "campaign_name": business_name
+                    },
+                    webhook_url=sarvam_webhook,
+                    user_id=agent.get("user_id"),
+                    org_id=organization_id,
+                    agent_id=agent_id
                 )
                 call_sid = call_res.get("attempt_id") or f"srv-{uuid.uuid4()}"
                 room_name = f"sarvam-{call_sid}"

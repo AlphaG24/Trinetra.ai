@@ -25,7 +25,7 @@ export function AgentSetupGuide({ agent }: { agent: any }) {
     <div className="space-y-6 text-left max-w-4xl animate-in fade-in duration-300">
       <div className="pb-4 border-b border-zinc-200 dark:border-white/5">
         <h2 className="text-xl font-bold font-display text-zinc-900 dark:text-white flex items-center gap-2">
-          <BookOpen className="w-5 h-5 text-violet-500" /> Agent Documentation & Setup Guide
+          <BookOpen className="w-5 h-5 text-blue-600 dark:text-blue-400" /> Agent Documentation & Setup Guide
         </h2>
         <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
           Learn how to connect phone numbers, configure forwarding, and launch automated campaigns.
@@ -36,9 +36,9 @@ export function AgentSetupGuide({ agent }: { agent: any }) {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         
         {/* Getting Started */}
-        <div className="bg-white dark:bg-[#0D0120] border border-zinc-200 dark:border-white/5 rounded-2xl p-5 space-y-3">
+        <div className="bg-white dark:bg-slate-900/60 border border-zinc-200 dark:border-white/5 rounded-2xl p-5 space-y-3">
           <h3 className="text-sm font-bold text-zinc-900 dark:text-white flex items-center gap-2">
-            <span className="w-6 h-6 rounded-lg bg-violet-500/10 flex items-center justify-center text-xs text-violet-500 font-bold">1</span>
+            <span className="w-6 h-6 rounded-lg bg-blue-600/10 flex items-center justify-center text-xs text-blue-600 dark:text-blue-400 font-bold">1</span>
             Getting Started
           </h3>
           <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed">
@@ -55,9 +55,9 @@ export function AgentSetupGuide({ agent }: { agent: any }) {
         </div>
 
         {/* Phone Numbers */}
-        <div className="bg-white dark:bg-[#0D0120] border border-zinc-200 dark:border-white/5 rounded-2xl p-5 space-y-3">
+        <div className="bg-white dark:bg-slate-900/60 border border-zinc-200 dark:border-white/5 rounded-2xl p-5 space-y-3">
           <h3 className="text-sm font-bold text-zinc-900 dark:text-white flex items-center gap-2">
-            <span className="w-6 h-6 rounded-lg bg-violet-500/10 flex items-center justify-center text-xs text-violet-500 font-bold">2</span>
+            <span className="w-6 h-6 rounded-lg bg-blue-600/10 flex items-center justify-center text-xs text-blue-600 dark:text-blue-400 font-bold">2</span>
             Phone Numbers Setup
           </h3>
           <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed">
@@ -75,12 +75,12 @@ export function AgentSetupGuide({ agent }: { agent: any }) {
       </div>
 
       {/* Call Forwarding Section */}
-      <div className="bg-white dark:bg-[#0D0120] border border-zinc-200 dark:border-white/5 rounded-2xl p-6 space-y-4">
+      <div className="bg-white dark:bg-slate-900/60 border border-zinc-200 dark:border-white/5 rounded-2xl p-6 space-y-4">
         <h3 className="text-sm font-bold text-zinc-900 dark:text-white flex items-center gap-2">
-          <PhoneCall className="w-4 h-4 text-violet-500" /> Call Forwarding Setup (Airtel, Jio, VI, BSNL)
+          <PhoneCall className="w-4 h-4 text-blue-600 dark:text-blue-400" /> Call Forwarding Setup (Airtel, Jio, VI, BSNL)
         </h3>
         <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed">
-          If you want your existing business mobile number to route calls directly to your Trinetra AI Voice Agent, set up call forwarding to the agent's virtual phone number: <strong>{agentNumber}</strong>.
+          If you want your existing business mobile number to route calls directly to your Vaakriti AI Voice Agent, set up call forwarding to the agent's virtual phone number: <strong>{agentNumber}</strong>.
         </p>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -97,8 +97,8 @@ export function AgentSetupGuide({ agent }: { agent: any }) {
                   <h4 className="text-xs font-bold text-zinc-800 dark:text-zinc-200">{item.provider}</h4>
                   <p className="text-[10px] text-zinc-500 mt-1">{item.notes}</p>
                 </div>
-                <div className="flex items-center justify-between bg-white dark:bg-[#12101A] border border-zinc-200 dark:border-white/10 rounded-lg p-2 mt-2">
-                  <code className="text-xs font-mono text-violet-600 dark:text-violet-400">{rawCode}</code>
+                <div className="flex items-center justify-between bg-white dark:bg-slate-950 border border-zinc-200 dark:border-white/10 rounded-lg p-2 mt-2">
+                  <code className="text-xs font-mono text-blue-600 dark:text-blue-400">{rawCode}</code>
                   <button
                     onClick={() => handleCopy(rawCode, `fwd-${idx}`)}
                     className="p-1 rounded text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition cursor-pointer"
@@ -116,9 +116,9 @@ export function AgentSetupGuide({ agent }: { agent: any }) {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         
         {/* Integrations */}
-        <div className="bg-white dark:bg-[#0D0120] border border-zinc-200 dark:border-white/5 rounded-2xl p-5 space-y-3">
+        <div className="bg-white dark:bg-slate-900/60 border border-zinc-200 dark:border-white/5 rounded-2xl p-5 space-y-3">
           <h3 className="text-sm font-bold text-zinc-900 dark:text-white flex items-center gap-2">
-            <Plug className="w-4 h-4 text-violet-500" /> Third-Party Integrations
+            <Plug className="w-4 h-4 text-blue-600 dark:text-blue-400" /> Third-Party Integrations
           </h3>
           <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed">
             Dispatch lead events and summaries to CRM platforms (Salesforce, Zoho), get instant alerts on Telegram/WhatsApp, or configure custom Webhooks to forward JSON call logs to your custom servers.
@@ -126,9 +126,9 @@ export function AgentSetupGuide({ agent }: { agent: any }) {
         </div>
 
         {/* Campaigns */}
-        <div className="bg-white dark:bg-[#0D0120] border border-zinc-200 dark:border-white/5 rounded-2xl p-5 space-y-3">
+        <div className="bg-white dark:bg-slate-900/60 border border-zinc-200 dark:border-white/5 rounded-2xl p-5 space-y-3">
           <h3 className="text-sm font-bold text-zinc-900 dark:text-white flex items-center gap-2">
-            <BarChart2 className="w-4 h-4 text-violet-500" /> Outbound Call Campaigns
+            <BarChart2 className="w-4 h-4 text-blue-600 dark:text-blue-400" /> Outbound Call Campaigns
           </h3>
           <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed">
             Configure automated batch calling under the <strong>Campaigns</strong> tab. Upload a contact spreadsheet (CSV), map phone columns, and set scheduling parameters. The agent will run calls automatically.
@@ -138,9 +138,9 @@ export function AgentSetupGuide({ agent }: { agent: any }) {
       </div>
 
       {/* FAQ Troubleshooting */}
-      <div className="bg-white dark:bg-[#0D0120] border border-zinc-200 dark:border-white/5 rounded-2xl p-5 space-y-3">
+      <div className="bg-white dark:bg-slate-900/60 border border-zinc-200 dark:border-white/5 rounded-2xl p-5 space-y-3">
         <h3 className="text-sm font-bold text-zinc-900 dark:text-white flex items-center gap-2">
-          <HelpCircle className="w-4 h-4 text-violet-500" /> Frequently Asked Questions (FAQ)
+          <HelpCircle className="w-4 h-4 text-blue-600 dark:text-blue-400" /> Frequently Asked Questions (FAQ)
         </h3>
         <div className="space-y-3 pt-2 text-xs text-zinc-600 dark:text-zinc-400">
           <div>

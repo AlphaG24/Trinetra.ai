@@ -162,19 +162,19 @@ export function PlanValidityTimer({
     ? "bg-rose-500/10 border-rose-500/25 text-rose-400"
     : isUrgent
     ? "bg-amber-500/10 border-amber-500/25 text-amber-400"
-    : "bg-violet-500/10 border-violet-500/20 text-violet-400";
+    : "bg-blue-500/10 border-blue-500/20 text-blue-600 dark:text-blue-400";
 
   const progressBg = timeLeft.isExpired
     ? "bg-rose-500"
     : isUrgent
     ? "bg-gradient-to-r from-amber-500 to-rose-500"
-    : "bg-gradient-to-r from-violet-500 to-indigo-500";
+    : "bg-blue-600";
 
   return (
     <div className={`flex flex-col gap-1.5 ${className}`}>
       <div className="flex items-center justify-between gap-2 text-left">
         <div className="flex items-center gap-1.5">
-          <Clock className={`shrink-0 ${size === "xs" ? "w-3 h-3" : "w-3.5 h-3.5"} ${timeLeft.isExpired ? "text-rose-400" : isUrgent ? "text-amber-400" : "text-violet-400"}`} />
+          <Clock className={`shrink-0 ${size === "xs" ? "w-3 h-3" : "w-3.5 h-3.5"} ${timeLeft.isExpired ? "text-rose-400" : isUrgent ? "text-amber-400" : "text-blue-600 dark:text-blue-400"}`} />
           <span className={`${size === "xs" ? "text-[10px]" : "text-[11px]"} font-medium text-[var(--muted)] font-mono`}>
             {timeLeft.isExpired ? (
               <span className="text-rose-400 font-bold">Pack Expired</span>

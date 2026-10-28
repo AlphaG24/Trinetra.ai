@@ -78,7 +78,7 @@ export default function SupportPage() {
 
     const supabase = createClient()
     const channel = supabase
-      .channel(`support_tickets_list_realtime_${Math.random().toString(36).substring(7)}`)
+      .channel('support_tickets_list_realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'support_tickets' }, () => {
         fetchTickets()
       })

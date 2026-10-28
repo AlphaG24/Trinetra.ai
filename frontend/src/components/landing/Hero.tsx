@@ -2,9 +2,8 @@
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Globe, Phone, X, Loader2 } from "lucide-react";
+import { Globe, Phone, X, Loader2, User } from "lucide-react";
 import { toast } from "sonner";
-import { VOICE_AGENT_NAME } from "@/lib/agent-branding";
 import { HeroOrb } from "./HeroOrb";
 
 export interface FloatingGreeting {
@@ -330,11 +329,33 @@ export function Hero() {
 
   // Exact Previously Built Telephony Callback Modal States
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [nameInput, setNameInput] = useState("");
   const [phoneInput, setPhoneInput] = useState("");
   const [language, setLanguage] = useState("hi");
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [countdown, setCountdown] = useState(6);
   const [error, setError] = useState<string | null>(null);
+
+  // Auto-dismiss modal after call is dispatched
+  useEffect(() => {
+    if (!success) {
+      setCountdown(6);
+      return;
+    }
+    const interval = setInterval(() => {
+      setCountdown((prev) => {
+        if (prev <= 1) {
+          clearInterval(interval);
+          setIsModalOpen(false);
+          setSuccess(false);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [success]);
 
   const activeAudioElRef = useRef<HTMLAudioElement | null>(null);
   const speechIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -365,6 +386,7 @@ export function Hero() {
       setIsModalOpen(true);
       setSuccess(false);
       setError(null);
+      setNameInput("");
       setPhoneInput("");
     };
     if (typeof window !== "undefined") {
@@ -553,6 +575,7 @@ export function Hero() {
     setIsModalOpen(true);
     setSuccess(false);
     setError(null);
+    setNameInput("");
     setPhoneInput("");
   };
 
@@ -584,6 +607,7 @@ export function Hero() {
         body: JSON.stringify({
           phone_number: formattedPhone,
           language,
+          name: nameInput.trim() || undefined,
         }),
       });
 
@@ -594,7 +618,15 @@ export function Hero() {
       }
 
       setSuccess(true);
-      toast.success("Call dispatched successfully!");
+      toast.success(data.message || "Call dispatched successfully via Sarvam!");
+
+      // Automatically sync call status, recording, and transcripts after call completion
+      setTimeout(() => {
+        fetch('/api/campaigns/sync-calls', { method: 'POST' }).catch(() => {})
+      }, 20000);
+      setTimeout(() => {
+        fetch('/api/campaigns/sync-calls', { method: 'POST' }).catch(() => {})
+      }, 45000);
     } catch (err: any) {
       console.error(err);
       setError(err.message || "Something went wrong. Please try again.");
@@ -739,7 +771,7 @@ export function Hero() {
                   Receive a Live Call
                 </h3>
                 <p className="text-xs text-slate-400 leading-relaxed font-sans">
-                  Experience {VOICE_AGENT_NAME}&apos;s real-time sales and service conversation directly on your phone.
+                  Experience real-time AI sales and service conversations directly on your phone.
                 </p>
               </div>
 
@@ -749,17 +781,23 @@ export function Hero() {
                     <Phone className="w-7 h-7 animate-bounce" />
                   </div>
                   <div className="space-y-1">
-                    <h4 className="text-base font-bold text-white">Calling you now!</h4>
+                    <h4 className="text-base font-bold text-white">Calling your phone now!</h4>
                     <p className="text-xs text-slate-400 max-w-xs mx-auto">
-                      Answer the incoming call on your phone to start the live interactive demonstration.
+                      Answer the incoming call to speak with the AI assistant.
+                    </p>
+                    <p className="text-[11px] text-[#60A5FA] font-medium pt-1">
+                      Closing window in {countdown}s...
                     </p>
                   </div>
                   <button
                     type="button"
-                    onClick={() => setIsModalOpen(false)}
+                    onClick={() => {
+                      setIsModalOpen(false);
+                      setSuccess(false);
+                    }}
                     className="mt-4 px-6 py-2.5 bg-white/10 hover:bg-white/15 border border-white/10 text-white text-xs font-bold rounded-xl transition cursor-pointer"
                   >
-                    Close Sandbox
+                    Close Window Now
                   </button>
                 </div>
               ) : (
@@ -769,6 +807,22 @@ export function Hero() {
                       {error}
                     </div>
                   )}
+
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] font-bold uppercase tracking-wider text-slate-300 font-sans">
+                      Your Name <span className="text-slate-500 font-normal lowercase">(optional)</span>
+                    </label>
+                    <div className="relative">
+                      <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                      <input
+                        type="text"
+                        value={nameInput}
+                        onChange={(e) => setNameInput(e.target.value)}
+                        placeholder="e.g. Ketan or Raghav"
+                        className="w-full pl-10 pr-4 py-3 bg-[#131926] border border-white/10 rounded-xl text-xs text-white placeholder-slate-500 focus:bg-[#182236] focus:outline-none focus:ring-2 focus:ring-[#2563EB]/40 focus:border-[#2563EB] transition font-sans"
+                      />
+                    </div>
+                  </div>
 
                   <div className="space-y-1.5">
                     <label className="text-[11px] font-bold uppercase tracking-wider text-slate-300 font-sans">

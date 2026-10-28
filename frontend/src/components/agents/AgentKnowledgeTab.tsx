@@ -162,7 +162,7 @@ export function AgentKnowledgeTab({ agent, unlocked, upgradeUrl }: AgentKnowledg
           <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-6 md:p-8 shadow-sm space-y-6">
             <div className="flex justify-between items-center">
               <h2 className="text-xl font-bold font-display text-[var(--heading)] flex items-center gap-2">
-                <BookOpen className="w-5 h-5 text-violet-400" /> Uploaded Training Materials
+                <BookOpen className="w-5 h-5 text-[var(--heading)]" /> Uploaded Training Materials
               </h2>
               <button
                 onClick={fetchDocuments}
@@ -187,7 +187,7 @@ export function AgentKnowledgeTab({ agent, unlocked, upgradeUrl }: AgentKnowledg
                 />
                 <label
                   htmlFor="kb-file-input"
-                  className="px-5 py-2.5 bg-[var(--primary-bg)] border border-[var(--border)] text-[var(--heading)] hover:bg-[var(--hover-bg)] text-xs font-bold uppercase tracking-wider rounded-xl cursor-pointer transition-all inline-block shadow-sm"
+                  className="px-5 py-2.5 bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-100 text-xs font-bold uppercase tracking-wider rounded-xl cursor-pointer transition-all inline-block shadow-sm"
                 >
                   {uploading ? 'Uploading...' : 'Upload Document'}
                 </label>
@@ -201,7 +201,7 @@ export function AgentKnowledgeTab({ agent, unlocked, upgradeUrl }: AgentKnowledg
             <div className="space-y-3">
               {loading ? (
                 <div className="py-12 text-center text-xs text-[var(--muted)] flex items-center justify-center gap-2">
-                  <Loader2 className="w-4 h-4 animate-spin text-violet-500" /> Loading documents...
+                  <Loader2 className="w-4 h-4 animate-spin text-[var(--heading)]" /> Loading documents...
                 </div>
               ) : docs.length === 0 ? (
                 <div className="py-12 text-center text-xs text-[var(--body)]">
@@ -261,7 +261,7 @@ export function AgentKnowledgeTab({ agent, unlocked, upgradeUrl }: AgentKnowledg
           <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-6 md:p-8 shadow-sm space-y-6 text-left">
             <div className="space-y-2">
               <h3 className="text-lg font-bold font-display text-[var(--heading)] flex items-center gap-1.5">
-                <HelpCircle className="w-4 h-4 text-violet-400" /> Q&A Playground
+                <HelpCircle className="w-4 h-4 text-[var(--heading)]" /> Q&A Playground
               </h3>
               <p className="text-xs text-[var(--muted)] font-sans leading-relaxed">
                 Test your agent's knowledge retrieval by asking questions. Responses are dynamically generated from your uploaded materials.
@@ -277,14 +277,14 @@ export function AgentKnowledgeTab({ agent, unlocked, upgradeUrl }: AgentKnowledg
                   rows={4}
                   required
                   disabled={docs.length === 0}
-                  className="w-full bg-[var(--background)] border border-[var(--border)] rounded-xl px-4 py-3 text-xs focus:outline-none focus:ring-1 focus:ring-[var(--heading)]/25 text-[var(--heading)] font-sans resize-none disabled:opacity-50"
+                  className="w-full bg-[var(--background)] border border-[var(--border)] rounded-xl px-4 py-3 text-xs focus:outline-none focus:ring-1 focus:ring-zinc-400 dark:focus:ring-zinc-600 text-[var(--heading)] font-sans resize-none disabled:opacity-50"
                 />
               </div>
 
               <button
                 type="submit"
                 disabled={isQuerying || docs.length === 0}
-                className="w-full py-3.5 rounded-xl bg-[var(--primary-bg)] text-[var(--heading)] hover:bg-[var(--hover-bg)] border border-[var(--border)] font-montserrat font-bold text-xs uppercase tracking-wider transition-all disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2"
+                className="w-full py-3.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-100 font-montserrat font-bold text-xs uppercase tracking-wider transition-all disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2 shadow-sm"
               >
                 {isQuerying ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Ask Assistant'}
               </button>

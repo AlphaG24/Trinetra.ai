@@ -150,7 +150,7 @@ export function AgentCallbacksTab({ agent }: { agent: any }) {
         </div>
         <Link 
           href="/dashboard/callbacks" 
-          className="inline-flex items-center gap-1.5 text-xs text-violet-500 hover:underline font-bold"
+          className="inline-flex items-center gap-1.5 text-xs text-blue-600 hover:text-blue-700 dark:text-blue-400 hover:underline font-bold"
         >
           View Central Dashboard <ExternalLink className="w-3.5 h-3.5" />
         </Link>

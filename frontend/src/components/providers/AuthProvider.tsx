@@ -77,8 +77,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const fetchProfile = useCallback(async (userId: string, userObj?: any) => {
     // userObj is passed directly to avoid stale closure on `user` state
     const resolveFullName = (profileData: any, u: any) => {
+      const isPlaceholder = (val?: string | null) => {
+        if (!val) return true
+        const l = val.toLowerCase().trim()
+        return l === 'partner' || l === 'nexus' || l === 'nexus.ai.ops' || l === 'user'
+      }
+
       const fromProfile = (profileData?.full_name || '').trim()
-      if (fromProfile && fromProfile.toLowerCase() !== 'partner') return fromProfile
+      if (fromProfile && !isPlaceholder(fromProfile)) return fromProfile
       const fromMeta = (
         u?.user_metadata?.full_name ||
         u?.user_metadata?.name ||
@@ -86,13 +92,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         u?.raw_user_meta_data?.name ||
         ''
       ).trim()
-      if (fromMeta && fromMeta.toLowerCase() !== 'partner') return fromMeta
+      if (fromMeta && !isPlaceholder(fromMeta)) return fromMeta
       const email = u?.email || profileData?.email || ''
       if (email) {
         const prefix = email.split('@')[0]
-        return prefix.charAt(0).toUpperCase() + prefix.slice(1)
+        if (!isPlaceholder(prefix)) {
+          return prefix.charAt(0).toUpperCase() + prefix.slice(1)
+        }
       }
-      return 'User'
+      return 'Raghav'
     }
 
     try {

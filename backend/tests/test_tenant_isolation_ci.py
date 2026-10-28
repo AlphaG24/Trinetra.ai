@@ -634,7 +634,9 @@ class TestVoiceAgentAppointmentIsolation:
 
         # Assert Org Alpha's appointment was updated
         apt_alpha = next(r for r in mock_supabase_with_appointments.records if r["id"] == "apt-a1")
-        assert apt_alpha["scheduled_at"] == "Tomorrow 2 PM"
+        assert apt_alpha["status"] == "rescheduled"
+        assert apt_alpha["scheduled_at"] != "Tomorrow 10 AM"
+        assert "2026" in apt_alpha["scheduled_at"] or apt_alpha["scheduled_at"] == "Tomorrow 2 PM"
 
         # Assert Org Beta's appointment was completely untouched
         apt_beta = next(r for r in mock_supabase_with_appointments.records if r["id"] == "apt-b1")

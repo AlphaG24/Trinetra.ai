@@ -238,6 +238,25 @@ export async function PATCH(
       return NextResponse.json({ error: updateError.message }, { status: 500 });
     }
 
+    // Non-blocking sync to Sarvam AI Platform
+    try {
+      const backendUrl = process.env.INTERNAL_BACKEND_URL || process.env.NEXT_PUBLIC_FASTAPI_URL || 'http://127.0.0.1:8000';
+      fetch(`${backendUrl}/api/sarvam/sync-agent`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          agent_id: updatedAgent.id,
+          name: updatedAgent.name,
+          system_prompt: updatedAgent.system_prompt || '',
+          greeting_message: updatedAgent.greeting_message || null,
+          voice_id: updatedAgent.voice_id || 'shubh',
+          language: updatedAgent.primary_language || 'hi'
+        })
+      }).catch(err => console.warn('[Agent Update Sarvam Sync Notice]', err));
+    } catch (syncErr) {
+      console.warn('[Agent Update Sarvam Sync Exception]', syncErr);
+    }
+
     return NextResponse.json({ success: true, agent: updatedAgent });
   } catch (error: any) {
     console.error("[Agent Update API] Catch Error:", error);

@@ -31,15 +31,8 @@ interface Campaign {
 export default function CampaignsPage() {
   const { profile: authProfile } = useAuth()
   const { profile: storeProfile } = useDashboardStore()
-  const [cachedProfile, setCachedProfile] = useState<any>(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const c = sessionStorage.getItem('trinetra_auth_profile_cache') || localStorage.getItem('trinetra_auth_profile_cache')
-        return c ? JSON.parse(c)?.profile : null
-      } catch { return null }
-    }
-    return null
-  })
+  const [isMounted, setIsMounted] = useState(false)
+  const [cachedProfile, setCachedProfile] = useState<any>(null)
   const [timeoutPassed, setTimeoutPassed] = useState(false)
   const profile = authProfile || storeProfile || cachedProfile || (timeoutPassed ? { plan_tier: 'starter', role: 'super_admin' } : null)
 
@@ -47,9 +40,18 @@ export default function CampaignsPage() {
   const [loading, setLoading] = useState(true)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isInstantModalOpen, setIsInstantModalOpen] = useState(false)
+  const [hasUsedDirectCall, setHasUsedDirectCall] = useState(false)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
 
   useEffect(() => {
+    setIsMounted(true)
+    try {
+      const c = sessionStorage.getItem('trinetra_auth_profile_cache') || localStorage.getItem('trinetra_auth_profile_cache')
+      if (c) setCachedProfile(JSON.parse(c)?.profile)
+      const used = localStorage.getItem('trinetra_direct_call_used') === 'true'
+      setHasUsedDirectCall(used)
+    } catch { }
+
     const timer = setTimeout(() => {
       setTimeoutPassed(true)
       setLoading(false)
@@ -160,7 +162,7 @@ export default function CampaignsPage() {
     }
   }
 
-  if (loading && !campaigns.length && !profile) {
+  if (!isMounted || (loading && !campaigns.length && !profile)) {
     return (
       <div className="flex h-[50vh] w-full items-center justify-center">
         <div className="w-8 h-8 border-2 border-zinc-900 dark:border-white border-t-transparent rounded-full animate-spin" />
@@ -214,12 +216,23 @@ export default function CampaignsPage() {
           </Link>
 
           <button
-            onClick={() => setIsInstantModalOpen(true)}
-            className="px-4 py-2.5 border border-[var(--border)] bg-[var(--card-bg)] hover:bg-[var(--hover-bg)] text-[var(--heading)] text-xs font-bold uppercase rounded-xl tracking-wider transition-all flex items-center gap-2 shadow-xs cursor-pointer active:scale-[0.98]"
-            title="Place a direct call"
+            onClick={() => {
+              if (hasUsedDirectCall) {
+                toast('Direct test call is limited to 1 trial per user. Create a campaign to call contacts.', { icon: 'ℹ️' })
+                return
+              }
+              setIsInstantModalOpen(true)
+            }}
+            disabled={hasUsedDirectCall}
+            className={`px-4 py-2.5 border border-[var(--border)] text-xs font-bold uppercase rounded-xl tracking-wider transition-all flex items-center gap-2 shadow-xs ${
+              hasUsedDirectCall
+                ? 'bg-[var(--card-bg)]/40 text-[var(--muted)] opacity-60 cursor-not-allowed'
+                : 'bg-[var(--card-bg)] hover:bg-[var(--hover-bg)] text-[var(--heading)] cursor-pointer active:scale-[0.98]'
+            }`}
+            title={hasUsedDirectCall ? "Direct call limit reached (1/1 trial used)" : "Place a direct call"}
           >
-            <PhoneCall className="w-4 h-4 text-emerald-500" />
-            Direct Call
+            <PhoneCall className={`w-4 h-4 ${hasUsedDirectCall ? 'text-zinc-500' : 'text-emerald-500'}`} />
+            {hasUsedDirectCall ? 'Direct Call (Used)' : 'Direct Call'}
           </button>
 
           <button
@@ -413,7 +426,10 @@ export default function CampaignsPage() {
       <InstantDemoCallModal
         isOpen={isInstantModalOpen}
         onClose={() => setIsInstantModalOpen(false)}
-        onSuccess={fetchCampaigns}
+        onSuccess={() => {
+          setHasUsedDirectCall(true)
+          fetchCampaigns()
+        }}
       />
     </div>
   )

@@ -65,12 +65,17 @@ export async function middleware(request: NextRequest) {
     return supabaseResponse
   }
 
-  // Fast path: If accessing a protected route without any auth cookies, redirect immediately
+  // Fast path: If accessing login or signup without any auth cookies, bypass immediately (0ms latency)
   const allCookies = request.cookies.getAll()
   const hasAuthCookie = allCookies.some(
     c => c.name.includes('auth-token') || c.name.startsWith('sb-')
   )
 
+  if (isAuthRoute && !hasAuthCookie) {
+    return supabaseResponse
+  }
+
+  // Fast path: If accessing a protected route without any auth cookies, redirect immediately
   if (isProtectedRoute && !hasAuthCookie) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
@@ -78,13 +83,13 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
-  // Refresh user session with a timeout guard to prevent 504 gateway hangs
+  // Refresh user session with a strict 2s timeout guard to prevent page hangs
   let user = null
   let authFailedOrTimedOut = false
   try {
     const userPromise = supabase.auth.getUser().catch(err => ({ data: { user: null }, error: err }))
     const timeoutPromise = new Promise<{ data: { user: null }; error: Error }>((_, reject) =>
-      setTimeout(() => reject(new Error('Supabase Auth timeout')), 10000)
+      setTimeout(() => reject(new Error('Supabase Auth timeout')), 2000)
     )
 
     const result = await Promise.race([userPromise, timeoutPromise])

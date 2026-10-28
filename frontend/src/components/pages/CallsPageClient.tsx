@@ -27,7 +27,12 @@ export function CallsPageClient({ agents }: { agents: any[] }) {
   const [total, setTotal] = useState(0)
   const [selectedCall, setSelectedCall] = useState<any | null>(null)
   const [autoPlayAudio, setAutoPlayAudio] = useState(false)
+  const [mounted, setMounted] = useState(false)
   const perPage = 25
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   useEffect(() => {
     const fetchCalls = async () => {
@@ -132,7 +137,8 @@ export function CallsPageClient({ agents }: { agents: any[] }) {
             placeholder="Search by caller name..."
             value={search}
             onChange={e => { setSearch(e.target.value); setPage(1) }}
-            className="w-full pl-10 pr-4 py-3 bg-[var(--card-bg)] border border-[var(--border)] rounded-xl text-[var(--heading)] text-sm focus:outline-none focus:border-violet-500/50 placeholder:text-[var(--muted)]"
+            suppressHydrationWarning
+            className="w-full pl-10 pr-4 py-3 bg-[var(--card-bg)] border border-[var(--border)] rounded-xl text-[var(--heading)] text-sm focus:outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-400/30 placeholder:text-[var(--muted)]"
           />
         </div>
         <div className="relative">
@@ -140,7 +146,8 @@ export function CallsPageClient({ agents }: { agents: any[] }) {
           <select
             value={sentimentFilter}
             onChange={e => { setSentimentFilter(e.target.value); setPage(1) }}
-            className="pl-10 pr-8 py-3 bg-[var(--card-bg)] border border-[var(--border)] rounded-xl text-[var(--heading)] text-sm focus:outline-none focus:border-violet-500/50 appearance-none cursor-pointer"
+            suppressHydrationWarning
+            className="pl-10 pr-8 py-3 bg-[var(--card-bg)] border border-[var(--border)] rounded-xl text-[var(--heading)] text-sm focus:outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-400/30 appearance-none cursor-pointer"
           >
             <option value="all">All Sentiments</option>
             <option value="positive">Positive</option>
@@ -182,8 +189,12 @@ export function CallsPageClient({ agents }: { agents: any[] }) {
                         <div className="font-medium text-[var(--heading)]">{call.caller_name || 'Unknown Caller'}</div>
                         <div className="text-xs text-[var(--muted)] mt-0.5">{call.caller_phone || '—'}</div>
                       </td>
-                      <td className="px-6 py-4 text-[var(--body)]">
-                        {call.created_at ? new Date(call.created_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }) : '—'}
+                      <td className="px-6 py-4 text-[var(--body)] font-mono text-xs" suppressHydrationWarning>
+                        {call.created_at
+                          ? mounted
+                            ? new Date(call.created_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })
+                            : call.created_at.slice(0, 19).replace('T', ' ')
+                          : '—'}
                       </td>
                       <td className="px-6 py-4 text-[var(--body)]">{formatDuration(call.duration_seconds || 0)}</td>
                       <td className="px-6 py-4">
@@ -196,10 +207,10 @@ export function CallsPageClient({ agents }: { agents: any[] }) {
                         <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                           <button 
                             onClick={() => handleOpenCall(call, true)}
-                            className="p-1.5 rounded transition-colors text-violet-500 hover:text-violet-400 hover:bg-violet-500/10 cursor-pointer"
+                            className="p-1.5 rounded transition-colors text-[var(--heading)] hover:bg-[var(--hover-bg)] cursor-pointer"
                             title="Listen to Call Audio"
                           >
-                            <Play className="w-4 h-4 fill-violet-500/20" />
+                            <Play className="w-4 h-4 fill-zinc-900/20 dark:fill-white/20" />
                           </button>
                           <button 
                             onClick={() => handleOpenCall(call, false)}

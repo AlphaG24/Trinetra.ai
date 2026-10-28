@@ -255,7 +255,7 @@ export function AgentLeadsTab({ agent, unlocked, upgradeUrl }: AgentLeadsTabProp
     <div className="space-y-6 animate-in fade-in duration-300 text-left">
       <div>
         <h2 className="text-xl font-bold font-display text-[var(--heading)] flex items-center gap-2">
-          <Users className="w-5 h-5 text-violet-400" /> Sales Leads Pipeline
+          <Users className="w-5 h-5 text-blue-600 dark:text-blue-400" /> Sales Leads Pipeline
         </h2>
         <p className="text-xs text-[var(--muted)] font-sans">
           Drag and drop lead cards across stages to organize follow-ups and conversions.
@@ -264,7 +264,7 @@ export function AgentLeadsTab({ agent, unlocked, upgradeUrl }: AgentLeadsTabProp
 
       {loading ? (
         <div className="py-24 flex flex-col items-center justify-center gap-2">
-          <Loader2 className="w-8 h-8 text-violet-500 animate-spin" />
+          <Loader2 className="w-8 h-8 text-blue-600 dark:text-blue-400 animate-spin" />
           <p className="text-xs text-[var(--muted)]">Loading pipeline...</p>
         </div>
       ) : (
@@ -295,7 +295,7 @@ export function AgentLeadsTab({ agent, unlocked, upgradeUrl }: AgentLeadsTabProp
                       draggable
                       onDragStart={(e) => handleDragStart(e, lead.id)}
                       onClick={() => openLeadModal(lead)}
-                      className="bg-[var(--background)]/40 border border-[var(--border)] hover:border-violet-500/30 rounded-xl p-3.5 hover:bg-[var(--hover-bg)]/20 transition-all cursor-pointer select-none space-y-3 relative group"
+                      className="bg-[var(--background)]/40 border border-[var(--border)] hover:border-blue-600/30 rounded-xl p-3.5 hover:bg-[var(--hover-bg)]/20 transition-all cursor-pointer select-none space-y-3 relative group"
                     >
                       <div className="space-y-1 pr-6">
                         <h4 className="text-xs font-bold text-[var(--heading)] font-sans truncate">{lead.full_name || 'Anonymous Lead'}</h4>
@@ -344,7 +344,7 @@ export function AgentLeadsTab({ agent, unlocked, upgradeUrl }: AgentLeadsTabProp
             {/* Sticky Header */}
             <div className="p-6 border-b border-[var(--border)] flex justify-between items-center bg-[var(--card-bg)] shrink-0">
               <div>
-                <span className="text-[9px] font-bold text-violet-500 uppercase tracking-widest bg-[var(--primary-bg)] px-2 py-0.5 rounded border border-[var(--border)]">
+                <span className="text-[9px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-widest bg-blue-50 dark:bg-blue-950/30 px-2 py-0.5 rounded border border-blue-200 dark:border-blue-900/40">
                   Lead Profiler
                 </span>
                 <span className="block text-[10px] font-mono text-[var(--muted)] mt-1">Lead ID: {selectedLead.id}</span>
@@ -376,7 +376,7 @@ export function AgentLeadsTab({ agent, unlocked, upgradeUrl }: AgentLeadsTabProp
                     <h4 className="text-[10px] font-bold text-[var(--muted)] uppercase tracking-wider border-b border-[var(--border)] pb-2">Contact Details</h4>
                     <div className="space-y-3">
                       <div className="flex items-center gap-3 text-xs text-[var(--body)]">
-                        <Phone className="w-4 h-4 text-violet-500 shrink-0" />
+                        <Phone className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
                         {selectedLead.phone ? (
                           <a href={`tel:${selectedLead.phone}`} className="hover:underline text-[var(--heading)] font-mono font-semibold">{selectedLead.phone}</a>
                         ) : (
@@ -385,7 +385,7 @@ export function AgentLeadsTab({ agent, unlocked, upgradeUrl }: AgentLeadsTabProp
                       </div>
 
                       <div className="flex items-center gap-3 text-xs text-[var(--body)]">
-                        <Mail className="w-4 h-4 text-violet-500 shrink-0" />
+                        <Mail className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
                         {selectedLead.email ? (
                           <a href={`mailto:${selectedLead.email}`} className="hover:underline text-[var(--heading)] font-semibold truncate">{selectedLead.email}</a>
                         ) : (
@@ -394,7 +394,7 @@ export function AgentLeadsTab({ agent, unlocked, upgradeUrl }: AgentLeadsTabProp
                       </div>
 
                       <div className="flex items-center gap-3 text-xs text-[var(--body)]">
-                        <Building className="w-4 h-4 text-violet-500 shrink-0" />
+                        <Building className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
                         <span className="truncate text-[var(--heading)] font-semibold">{selectedLead.company_name || 'Not provided'}</span>
                       </div>
                     </div>
@@ -457,7 +457,7 @@ export function AgentLeadsTab({ agent, unlocked, upgradeUrl }: AgentLeadsTabProp
 
                   <div className="bg-[var(--background)]/40 border border-[var(--border)] rounded-2xl p-5 space-y-2.5">
                     <h4 className="text-[10px] font-bold text-[var(--muted)] uppercase tracking-wider border-b border-[var(--border)] pb-2 flex items-center gap-1">
-                      <FileText className="w-3.5 h-3.5 text-violet-500" /> AI Call Summary
+                      <FileText className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" /> AI Call Summary
                     </h4>
                     <p className="text-xs text-[var(--body)] leading-relaxed whitespace-pre-wrap">
                       {selectedLead.call_summary || selectedLead.notes || 'No summary available.'}
@@ -488,7 +488,7 @@ export function AgentLeadsTab({ agent, unlocked, upgradeUrl }: AgentLeadsTabProp
               {/* Notes & Updates Form */}
               <div className="space-y-2">
                 <h4 className="text-[10px] uppercase tracking-wider font-montserrat font-bold text-[var(--muted)] flex items-center gap-1">
-                  <MessageSquare className="w-3.5 h-3.5 text-violet-400" /> Lead Interaction Notes
+                  <MessageSquare className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" /> Lead Interaction Notes
                 </h4>
                 <textarea
                   value={noteText}

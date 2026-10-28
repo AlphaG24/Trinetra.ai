@@ -579,6 +579,10 @@ def validate_outbound_cli(
     if exo_trunk:
         clean_exo = re.sub(r'[\s\-\(\)]', '', exo_trunk)
         verified_platform_trunks.update([clean_exo, clean_exo.lstrip("+"), f"+{clean_exo.lstrip('+')}"])
+    srv_trunk = os.getenv("SARVAM_CALLER_NUMBER")
+    if srv_trunk:
+        clean_srv = re.sub(r'[\s\-\(\)]', '', srv_trunk)
+        verified_platform_trunks.update([clean_srv, clean_srv.lstrip("+"), f"+{clean_srv.lstrip('+')}"])
 
     # If caller matches verified platform trunk, allow
     if any(c in verified_platform_trunks for c in candidates):

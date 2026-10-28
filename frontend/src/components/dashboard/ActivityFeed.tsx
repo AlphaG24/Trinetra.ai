@@ -111,9 +111,9 @@ export function ActivityFeed({
 
       setIsConnected(true)
 
-      const uniqueChannelName = `activity-feed-${user.id}-${Math.random().toString(36).slice(2, 9)}`
+      const channelName = `activity-feed-${user.id}`
       channel = supabase
-        .channel(uniqueChannelName)
+        .channel(channelName)
         .on(
           'postgres_changes',
           {

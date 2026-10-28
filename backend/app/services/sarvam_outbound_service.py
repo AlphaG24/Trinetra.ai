@@ -1,4 +1,6 @@
 import os
+import re
+import json
 import logging
 from typing import Optional, Dict, Any, List
 import httpx
@@ -43,6 +45,271 @@ class SarvamOutboundService:
         self.app_id = os.getenv("SARVAM_APP_ID", DEFAULT_APP_ID).strip()
         self.connection_id = os.getenv("SARVAM_CONNECTION_ID", DEFAULT_CONNECTION_ID).strip()
         self.caller_number = os.getenv("SARVAM_CALLER_NUMBER", DEFAULT_CALLER_NUMBER).strip()
+        self.gemini_key = os.getenv("GEMINI_API_KEY", "").strip() or os.getenv("GOOGLE_API_KEY", "").strip()
+        self._gemini_client = None
+
+    def _get_gemini_client(self):
+        if not self._gemini_client and self.gemini_key:
+            try:
+                from google import genai
+                self._gemini_client = genai.Client(api_key=self.gemini_key)
+            except Exception as e:
+                logger.warning(f"[Sarvam AI] Failed to initialize Gemini client: {e}")
+        return self._gemini_client
+
+    async def resolve_caller_name(
+        self,
+        phone: str,
+        template_name: str,
+        extracted_name: Optional[str] = None,
+        target_org: Optional[str] = None
+    ) -> str:
+        """
+        Resolves caller's display name accurately using:
+        1. Explicit template_name/provided contact name (from Homepage modal, Dashboard direct call, or Campaign contact)
+        2. Spoken self-introduction extracted by Gemini from transcript
+        3. Campaign contacts record by phone
+        4. Customer contacts record by phone
+        5. Leads record by phone
+        6. User profile record by phone
+        7. Clean fallback
+        """
+        GENERIC_PLACEHOLDERS = {"unknown", "contact", "customer", "prospect", "none", "client", "website visitor", "caller", "null", "undefined", ""}
+
+        # 1. If explicit contact name was provided at dial-time (from Modal, Dashboard, or Campaign)
+        if template_name and template_name.strip():
+            candidate = template_name.strip()
+            if candidate.lower() not in GENERIC_PLACEHOLDERS and len(candidate) >= 2:
+                return candidate.title()
+
+        # 2. If caller self-introduced in transcript and extracted by LLM
+        if extracted_name and extracted_name.strip():
+            candidate = extracted_name.strip()
+            if candidate.lower() not in GENERIC_PLACEHOLDERS and len(candidate) >= 2:
+                return candidate.title()
+
+        # 3. Clean phone digits for database lookup
+        clean_p = re.sub(r'[^\d+]', '', phone or '')
+        digits = re.sub(r'\D', '', clean_p)
+        last10 = digits[-10:] if len(digits) >= 10 else digits
+
+        # 4. Check campaign_contacts table (stores exact name entered when placing call)
+        if last10:
+            try:
+                camp_res = await asyncio.to_thread(
+                    supabase_admin.table("campaign_contacts")
+                    .select("full_name")
+                    .ilike("phone", f"%{last10}%")
+                    .order("created_at", desc=True)
+                    .limit(3)
+                    .execute
+                )
+                for row in (camp_res.data or []):
+                    fn = (row.get("full_name") or "").strip()
+                    if fn and fn.lower() not in GENERIC_PLACEHOLDERS and len(fn) >= 2:
+                        return fn.title()
+            except Exception as e:
+                logger.warning(f"[resolve_caller_name] campaign_contacts lookup error: {e}")
+
+        # 5. Check customer_contacts table
+        if last10:
+            try:
+                cust_res = await asyncio.to_thread(
+                    supabase_admin.table("customer_contacts")
+                    .select("full_name")
+                    .ilike("phone_number", f"%{last10}%")
+                    .order("created_at", desc=True)
+                    .limit(5)
+                    .execute
+                )
+                for row in (cust_res.data or []):
+                    fn = (row.get("full_name") or "").strip()
+                    if fn and fn.lower() not in GENERIC_PLACEHOLDERS and len(fn) >= 2:
+                        return fn.title()
+            except Exception as e:
+                logger.warning(f"[resolve_caller_name] customer_contacts lookup error: {e}")
+
+        # 6. Check leads table
+        if last10:
+            try:
+                leads_res = await asyncio.to_thread(
+                    supabase_admin.table("leads")
+                    .select("full_name")
+                    .ilike("phone", f"%{last10}%")
+                    .order("created_at", desc=True)
+                    .limit(5)
+                    .execute
+                )
+                for row in (leads_res.data or []):
+                    fn = (row.get("full_name") or "").strip()
+                    if fn and fn.lower() not in GENERIC_PLACEHOLDERS and len(fn) >= 2:
+                        return fn.title()
+            except Exception as e:
+                logger.warning(f"[resolve_caller_name] leads lookup error: {e}")
+
+        # 7. Check profiles table
+        if last10:
+            try:
+                prof_res = await asyncio.to_thread(
+                    supabase_admin.table("profiles")
+                    .select("full_name")
+                    .ilike("phone", f"%{last10}%")
+                    .limit(1)
+                    .execute
+                )
+                if prof_res.data:
+                    fn = (prof_res.data[0].get("full_name") or "").strip()
+                    if fn and fn.lower() not in GENERIC_PLACEHOLDERS and len(fn) >= 2:
+                        return fn.title()
+            except Exception as e:
+                logger.warning(f"[resolve_caller_name] profiles lookup error: {e}")
+
+        # 8. Clean default fallback
+        return "Website Visitor"
+
+    async def evaluate_call_intelligence(
+        self,
+        transcript_text: str,
+        summary: str,
+        duration: int,
+        caller_phone: str,
+        template_name: str,
+        target_user: str,
+        target_org: str
+    ) -> Dict[str, Any]:
+        """
+        Uses Gemini 2.5 Flash and robust heuristics to evaluate call sentiment,
+        specific business outcome (Appointment Booked, Lead Qualified, Not Interested, etc.),
+        appointment timing, and real caller identity.
+        """
+        t_clean = (transcript_text or "").strip()
+        lines = [l.strip() for l in t_clean.split("\n") if l.strip()]
+        user_lines = [l for l in lines if l.lower().startswith("user:") or l.lower().startswith("customer:")]
+        user_speech = " ".join([l.split(":", 1)[1].strip() for l in user_lines])
+        user_words = re.findall(r'\w+', user_speech)
+        user_word_count = len(user_words)
+
+        # 1. Immediate Silence / Hangup / Dropped detection
+        if duration <= 10 or user_word_count == 0:
+            resolved_name = await self.resolve_caller_name(caller_phone, template_name, target_org=target_org)
+            return {
+                "sentiment": "neutral",
+                "outcome": "Dropped / Silence" if duration > 0 else "No Answer",
+                "appointment_booked": False,
+                "appointment_time_iso": None,
+                "appointment_notes": None,
+                "caller_name": resolved_name,
+                "call_summary": summary or "Call connected briefly but caller did not speak.",
+                "is_lead": False
+            }
+
+        # 2. Extract with Gemini 2.5 Flash
+        llm_data = {}
+        g_client = self._get_gemini_client()
+        if g_client:
+            prompt = f"""You are an expert sales interaction intelligence analyzer for Vaakriti AI.
+Analyze this phone call transcript and summary to determine the exact outcome, sentiment, caller name, and whether an appointment/meeting/demo was scheduled.
+
+Caller Phone: {caller_phone}
+Candidate Name: {template_name}
+Duration: {duration} seconds
+Summary: {summary}
+
+Transcript:
+{transcript_text[:4000]}
+
+Rules:
+1. SENTIMENT: Must be strictly "positive", "neutral", or "negative".
+   - "positive": User was engaged, receptive, asked questions, requested samples/WhatsApp details, or agreed to an appointment/callback.
+   - "negative": User was annoyed, uninterested, asked to hang up, or rejected the pitch.
+   - "neutral": Non-committal or general statement.
+2. OUTCOME: Must be strictly one of:
+   - "Appointment Booked" (if demo, meeting, follow-up call, or appointment was agreed upon or scheduled for a specific day or time, e.g. tomorrow at 11 AM)
+   - "Callback Scheduled" (if user requested a callback later)
+   - "Lead Qualified" (if user expressed commercial interest or requested sample/info)
+   - "Deal Closed" (if closed transaction/purchase agreed)
+   - "Not Interested" (if user rejected, hung up, or asked to end the call)
+   - "Wrong Number" (if wrong person/mistake dial)
+   - "Inquiry Completed" (general conversation)
+   - "Dropped / Silence"
+3. APPOINTMENT_BOOKED: boolean (true ONLY if appointment/demo/consultation was scheduled)
+4. APPOINTMENT_TIME_ISO: ISO-8601 UTC datetime for appointment if booked. If tomorrow at 11 AM mentioned, use tomorrow at 05:30:00Z.
+5. APPOINTMENT_NOTES: Brief note of appointment agreement.
+6. EXTRACTED_NAME: Caller's name if stated by them in the transcript.
+7. CALL_SUMMARY: 2-sentence summary.
+
+Respond ONLY with valid JSON."""
+
+            try:
+                g_res = await asyncio.to_thread(
+                    g_client.models.generate_content,
+                    model="gemini-2.5-flash",
+                    contents=prompt,
+                    config={"response_mime_type": "application/json"}
+                )
+                if g_res and g_res.text:
+                    raw_json = json.loads(g_res.text)
+                    llm_data = {k.lower(): v for k, v in raw_json.items()}
+            except Exception as g_err:
+                logger.warning(f"[Sarvam AI Eval] Gemini error: {g_err}")
+
+        # 3. Deterministic Overrides & Heuristics
+        s_lower = (summary or "").lower()
+        t_lower = (t_clean or "").lower()
+
+        apt_in_summary = any(k in s_lower for k in ["tomorrow at 11 am", "11 am", "appointment", "demo", "follow-up call"])
+        apt_agreed_in_trans = any(k in t_lower for k in ["eleven am", "11 am", "11:00", "tomorrow", "kal", "5 pm", "paanch baje"]) and any(k in t_lower for k in ["no problem", "sure", "theek hai", "yes", "deal", "chalega", "sometime", "bhej do"])
+
+        appointment_booked = bool(llm_data.get("appointment_booked")) or (apt_in_summary and "scheduled" in s_lower) or apt_agreed_in_trans
+
+        if appointment_booked:
+            outcome = "Appointment Booked"
+            sentiment = "positive"
+        elif any(k in t_lower for k in ["गलती से गलत नंबर", "wrong number", "galti se lag gaya"]):
+            outcome = "Wrong Number"
+            sentiment = "neutral"
+        elif any(k in s_lower for k in ["declined to talk", "asked to end the call", "not interested", "declined"]) or any(k in t_lower for k in ["nahi chahiye", "phone rakho", "mat karo call", "not interested", "kick rocks"]):
+            outcome = "Not Interested"
+            sentiment = "negative"
+        elif any(k in s_lower for k in ["propose alternative times", "reschedule", "callback"]) or any(k in t_lower for k in ["baad me call karna", "call me later", "busy hoon"]):
+            outcome = "Callback Scheduled"
+            sentiment = "neutral"
+        elif any(k in s_lower for k in ["custom sample", "whatsapp", "expressed interest", "automate"]):
+            outcome = "Lead Qualified"
+            sentiment = "positive"
+        else:
+            raw_outcome = llm_data.get("outcome") or "Inquiry Completed"
+            outcome = raw_outcome if raw_outcome in ("Appointment Booked", "Callback Scheduled", "Lead Qualified", "Deal Closed", "Not Interested", "Wrong Number", "Inquiry Completed", "Dropped / Silence") else "Inquiry Completed"
+            raw_sent = str(llm_data.get("sentiment") or "neutral").lower()
+            sentiment = raw_sent if raw_sent in ("positive", "neutral", "negative") else "neutral"
+
+        # 4. Resolve real caller name
+        extracted_name = llm_data.get("extracted_name") or llm_data.get("caller_name")
+        resolved_name = await self.resolve_caller_name(
+            phone=caller_phone,
+            template_name=template_name,
+            extracted_name=extracted_name,
+            target_org=target_org
+        )
+
+        # 5. Appointment timestamp
+        scheduled_iso = llm_data.get("appointment_time_iso")
+        if not scheduled_iso and appointment_booked:
+            tomorrow = datetime.now(timezone.utc) + timedelta(days=1)
+            scheduled_iso = tomorrow.replace(hour=5, minute=30, second=0, microsecond=0).isoformat()
+
+        final_summary = llm_data.get("call_summary") or summary
+
+        return {
+            "sentiment": sentiment,
+            "outcome": outcome,
+            "appointment_booked": appointment_booked,
+            "appointment_time_iso": scheduled_iso,
+            "appointment_notes": llm_data.get("appointment_notes") or final_summary,
+            "caller_name": resolved_name,
+            "call_summary": final_summary,
+            "is_lead": outcome in ("Appointment Booked", "Lead Qualified", "Deal Closed", "Callback Scheduled")
+        }
 
     async def trigger_instant_call(
         self,
@@ -90,9 +357,20 @@ class SarvamOutboundService:
         if custom_metadata:
             user_config.update(custom_metadata)
 
+        target_app_id = self.app_id
+        if agent_id:
+            try:
+                a_row = await asyncio.to_thread(
+                    supabase_admin.table("agents").select("sarvam_app_id").eq("id", agent_id).maybe_single().execute
+                )
+                if a_row.data and a_row.data.get("sarvam_app_id"):
+                    target_app_id = a_row.data["sarvam_app_id"]
+            except Exception as a_err:
+                logger.warning(f"[SarvamOutboundService] Error checking agent sarvam_app_id: {a_err}")
+
         payload: Dict[str, Any] = {
             "app_config": {
-                "app_id": self.app_id,
+                "app_id": target_app_id,
                 "app_version": 1,
                 "connection_config": {
                     "connection_id": self.connection_id,
@@ -108,43 +386,53 @@ class SarvamOutboundService:
         logger.info(f"[SarvamOutboundService] Dialing {cleaned_phone} via agent {self.app_id}")
 
         try:
-            async with httpx.AsyncClient(timeout=15.0) as client:
-                res = await client.post(url, json=payload, headers=headers)
-                
-                if res.status_code in (200, 201):
-                    res_data = res.json()
-                    attempt_id = res_data.get("attempt_id") or f"att_{datetime.now(timezone.utc).timestamp()}"
-                    logger.info(f"[SarvamOutboundService] Call queued. Attempt ID: {attempt_id}")
+            import json
+            import urllib.request
 
-                    # Spawn automatic background poller to sync call as soon as completed
-                    asyncio.create_task(
-                        self.poll_and_sync_attempt(
-                            attempt_id=attempt_id,
-                            target_phone=cleaned_phone,
-                            contact_name=contact_name or "Customer",
-                            user_id=user_id or DEFAULT_USER_ID,
-                            org_id=org_id or DEFAULT_ORGANIZATION_ID,
-                            agent_id=agent_id or DEFAULT_AGENT_ID
-                        )
+            def _send_sarvam_request():
+                req_data = json.dumps(payload).encode('utf-8')
+                request = urllib.request.Request(
+                    url,
+                    data=req_data,
+                    headers=headers,
+                    method="POST"
+                )
+                with urllib.request.urlopen(request, timeout=12.0) as response:
+                    return response.status, json.loads(response.read().decode('utf-8'))
+
+            status_code, res_data = await asyncio.to_thread(_send_sarvam_request)
+
+            if status_code in (200, 201):
+                attempt_id = res_data.get("attempt_id") or f"att_{datetime.now(timezone.utc).timestamp()}"
+                logger.info(f"[SarvamOutboundService] Call queued. Attempt ID: {attempt_id}")
+
+                # Spawn automatic background poller to sync call as soon as completed
+                asyncio.create_task(
+                    self.poll_and_sync_attempt(
+                        attempt_id=attempt_id,
+                        target_phone=cleaned_phone,
+                        contact_name=contact_name or "Customer",
+                        user_id=user_id or DEFAULT_USER_ID,
+                        org_id=org_id or DEFAULT_ORGANIZATION_ID,
+                        agent_id=agent_id or DEFAULT_AGENT_ID
                     )
+                )
 
-                    return {
-                        "success": True,
-                        "attempt_id": attempt_id,
-                        "phone": cleaned_phone,
-                        "status": "dialing",
-                        "provider": "sarvam",
-                        "data": res_data
-                    }
-                else:
-                    err_text = res.text
-                    logger.error(f"[SarvamOutboundService] Dial Failed ({res.status_code}): {err_text}")
-                    return {
-                        "success": False,
-                        "status_code": res.status_code,
-                        "error": f"Sarvam API error: {err_text}",
-                        "phone": cleaned_phone
-                    }
+                return {
+                    "success": True,
+                    "attempt_id": attempt_id,
+                    "phone": cleaned_phone,
+                    "status": "dialing",
+                    "provider": "sarvam",
+                    "data": res_data
+                }
+            else:
+                logger.error(f"[SarvamOutboundService] Dial Failed ({status_code}): {res_data}")
+                return {
+                    "success": False,
+                    "error": f"Sarvam HTTP {status_code}: {res_data}",
+                    "phone": cleaned_phone
+                }
         except Exception as e:
             logger.error(f"[SarvamOutboundService] Exception triggering outbound call: {e}", exc_info=True)
             return {"success": False, "error": str(e), "phone": cleaned_phone}
@@ -175,7 +463,8 @@ class SarvamOutboundService:
                     match_attempt_id=attempt_id,
                     user_id=user_id,
                     org_id=org_id,
-                    agent_id=agent_id
+                    agent_id=agent_id,
+                    contact_name=contact_name
                 )
                 if synced > 0:
                     logger.info(f"[Sarvam Poller] Successfully synchronized attempt {attempt_id}")
@@ -190,7 +479,8 @@ class SarvamOutboundService:
         match_attempt_id: Optional[str] = None,
         user_id: Optional[str] = None,
         org_id: Optional[str] = None,
-        agent_id: Optional[str] = None
+        agent_id: Optional[str] = None,
+        contact_name: Optional[str] = None
     ) -> int:
         """
         Pulls completed call attempts from Sarvam Analytics API and syncs to Supabase.
@@ -242,7 +532,7 @@ class SarvamOutboundService:
                         stat_normalized = "completed" if status_raw in ("connected", "completed") else status_raw
 
                         agent_vars = att.get("agent_variables") or {}
-                        user_name = agent_vars.get("user_name") or "Contact"
+                        user_name = contact_name or agent_vars.get("user_name") or agent_vars.get("customer_name") or agent_vars.get("name") or "Contact"
                         summary = agent_vars.get("call_summary") or "Call completed via Shubh"
 
                         # Handle phone length and emails safely (database column is VARCHAR(20))
@@ -271,33 +561,58 @@ class SarvamOutboundService:
                             except Exception as t_err:
                                 logger.warning(f"[Sarvam Sync] Error fetching transcript: {t_err}")
 
+                        # Evaluate call intelligence using Gemini 2.5 Flash + robust heuristics
+                        intelligence = await self.evaluate_call_intelligence(
+                            transcript_text=transcript_text,
+                            summary=summary,
+                            duration=duration,
+                            caller_phone=caller_phone_field,
+                            template_name=user_name,
+                            target_user=target_user,
+                            target_org=target_org
+                        )
+
+                        resolved_name = intelligence["caller_name"]
+                        final_sentiment = intelligence["sentiment"]
+                        final_outcome = intelligence["outcome"]
+                        final_summary = intelligence["call_summary"]
+
                         # 1. Upsert into voice_calls
                         call_payload = {
                             "user_id": target_user,
                             "organization_id": target_org,
                             "agent_id": target_agent,
-                            "caller_name": user_name,
+                            "caller_name": resolved_name,
                             "caller_phone": caller_phone_field,
                             "duration_seconds": duration,
                             "status": stat_normalized,
-                            "sentiment": "positive",
-                            "outcome": "answered" if duration > 0 else "no_answer",
+                            "sentiment": final_sentiment,
+                            "outcome": final_outcome,
                             "recording_url": audio_url,
                             "transcript": transcript_text,
-                            "call_summary": summary,
+                            "call_summary": final_summary,
                             "language_detected": "Hindi",
                             "metadata": {
                                 "provider": "sarvam",
                                 "attempt_id": att_id,
                                 "interaction_id": inter_id,
-                                "agent_variables": agent_vars
+                                "agent_variables": agent_vars,
+                                "intelligence": intelligence
                             }
                         }
 
+                        # Use true historical timestamp from Sarvam instead of server insert time
+                        att_time = att.get("attempted_at") or att.get("start_datetime")
+                        if att_time:
+                            iso_time = att_time if (att_time.endswith("Z") or "+" in att_time) else f"{att_time}+00:00"
+                            call_payload["created_at"] = iso_time
+                            call_payload["started_at"] = iso_time
+
+                        # Strict deduplication check
                         existing_call = None
-                        if audio_url:
+                        if att_id and att_id != "NO_JOB_ID":
                             c_res = await asyncio.to_thread(
-                                supabase_admin.table("voice_calls").select("id").eq("recording_url", audio_url).limit(1).execute
+                                supabase_admin.table("voice_calls").select("id").filter("metadata->>attempt_id", "eq", att_id).limit(1).execute
                             )
                             if c_res.data:
                                 existing_call = c_res.data[0]
@@ -305,6 +620,13 @@ class SarvamOutboundService:
                         if not existing_call and inter_id and inter_id != "NO_INTERACTION_ID":
                             c_res = await asyncio.to_thread(
                                 supabase_admin.table("voice_calls").select("id").filter("metadata->>interaction_id", "eq", inter_id).limit(1).execute
+                            )
+                            if c_res.data:
+                                existing_call = c_res.data[0]
+
+                        if not existing_call and audio_url:
+                            c_res = await asyncio.to_thread(
+                                supabase_admin.table("voice_calls").select("id").eq("recording_url", audio_url).limit(1).execute
                             )
                             if c_res.data:
                                 existing_call = c_res.data[0]
@@ -325,24 +647,24 @@ class SarvamOutboundService:
                             lead_payload = {
                                 "user_id": target_user,
                                 "agent_id": target_agent,
-                                "full_name": user_name,
+                                "full_name": resolved_name,
                                 "phone": phone_for_lead,
                                 "email": email_for_lead,
-                                "status": "qualified",
+                                "status": "qualified" if intelligence.get("is_lead") else "contacted",
                                 "stage": "contacted",
-                                "interest_level": "high",
+                                "interest_level": "high" if final_sentiment == "positive" else ("low" if final_sentiment == "negative" else "medium"),
                                 "source": "voice_demo",
-                                "notes": summary,
-                                "call_summary": summary,
+                                "notes": final_summary,
+                                "call_summary": final_summary,
                                 "call_id": call_id
                             }
                             if phone_for_lead:
                                 exist_lead = await asyncio.to_thread(
-                                    supabase_admin.table("leads").select("id").eq("phone", phone_for_lead).execute
+                                    supabase_admin.table("leads").select("id").eq("phone", phone_for_lead).eq("user_id", target_user).execute
                                 )
                             else:
                                 exist_lead = await asyncio.to_thread(
-                                    supabase_admin.table("leads").select("id").eq("email", email_for_lead).execute
+                                    supabase_admin.table("leads").select("id").eq("email", email_for_lead).eq("user_id", target_user).execute
                                 )
 
                             if exist_lead.data:
@@ -358,14 +680,14 @@ class SarvamOutboundService:
                         if phone_for_lead:
                             cust_payload = {
                                 "organization_id": target_org,
-                                "full_name": user_name,
+                                "full_name": resolved_name,
                                 "phone_number": phone_for_lead,
                                 "total_calls": 1,
-                                "notes": summary,
+                                "notes": final_summary,
                                 "tags": ["sarvam_outbound", "preview_requested"]
                             }
                             exist_cust = await asyncio.to_thread(
-                                supabase_admin.table("customer_contacts").select("id").eq("phone_number", phone_for_lead).execute
+                                supabase_admin.table("customer_contacts").select("id").eq("phone_number", phone_for_lead).eq("organization_id", target_org).execute
                             )
                             if exist_cust.data:
                                 await asyncio.to_thread(
@@ -383,13 +705,12 @@ class SarvamOutboundService:
                                 .update({
                                     "call_status": "answered",
                                     "call_id": call_id,
-                                    "notes": summary
+                                    "notes": final_summary
                                 })
                                 .eq("phone", phone_for_lead)
                                 .execute
                             )
 
-                            # Auto-update parent campaign statistics
                             camp_lookup = await asyncio.to_thread(
                                 supabase_admin.table("campaign_contacts").select("campaign_id").eq("phone", phone_for_lead).limit(1).execute
                             )
@@ -410,35 +731,112 @@ class SarvamOutboundService:
                                 )
 
                         # 5. Auto-schedule Appointment if booked in call
-                        summary_lower = (summary or "").lower()
-                        trans_lower = (transcript_text or "").lower()
-                        if phone_for_lead and ("booked" in summary_lower or "appointment" in summary_lower or "11 am" in summary_lower or "11 am" in trans_lower or "कल 11 बजे" in trans_lower):
+                        if intelligence.get("appointment_booked") and phone_for_lead:
                             try:
                                 exist_appt = await asyncio.to_thread(
                                     supabase_admin.table("appointments").select("id").eq("voice_call_id", call_id).limit(1).execute
                                 )
                                 if not exist_appt.data and call_id:
-                                    tomorrow_11am = (datetime.now(timezone.utc) + timedelta(days=1)).replace(hour=5, minute=30, second=0).isoformat()
-                                    await asyncio.to_thread(
+                                    scheduled_iso = intelligence.get("appointment_time_iso")
+                                    if not scheduled_iso:
+                                        scheduled_iso = (datetime.now(timezone.utc) + timedelta(days=1)).replace(hour=5, minute=30, second=0, microsecond=0).isoformat()
+
+                                    ins_appt = await asyncio.to_thread(
                                         supabase_admin.table("appointments").insert({
                                             "user_id": target_user,
                                             "agent_id": target_agent,
-                                            "contact_name": user_name,
+                                            "contact_name": resolved_name,
                                             "contact_phone": phone_for_lead,
-                                            "scheduled_at": tomorrow_11am,
+                                            "scheduled_at": scheduled_iso,
                                             "duration_minutes": 15,
                                             "status": "scheduled",
                                             "booked_via": "voice_call",
-                                            "notes": summary,
+                                            "meeting_type": "Appointment / Demo",
+                                            "notes": intelligence.get("appointment_notes") or final_summary,
                                             "voice_call_id": call_id
                                         }).execute
                                     )
-                                    logger.info(f"[Sarvam Sync] Automatically booked appointment for {user_name} ({phone_for_lead}) at 11 AM")
+                                    if ins_appt.data and len(ins_appt.data) > 0:
+                                        appt_id = ins_appt.data[0]["id"]
+                                        await asyncio.to_thread(
+                                            supabase_admin.table("voice_calls").update({"appointment_id": appt_id}).eq("id", call_id).execute
+                                        )
+                                    logger.info(f"[Sarvam Sync] Automatically booked appointment for {resolved_name} ({phone_for_lead}) at {scheduled_iso}")
+
+                                    # Dispatch notification to Dashboard & WhatsApp
+                                    try:
+                                        from app.services.notification_service import NotificationService
+                                        await NotificationService.dispatch(
+                                            user_id=target_user,
+                                            event_type="appointment_scheduled",
+                                            title="New Appointment Booked",
+                                            message=f"Appointment booked for {resolved_name} ({phone_for_lead}) at {scheduled_iso}.",
+                                            payload={
+                                                "contact_name": resolved_name,
+                                                "contact_phone": phone_for_lead,
+                                                "scheduled_at": scheduled_iso,
+                                                "action_url": "/dashboard/appointments",
+                                                "action_label": "View Appointment",
+                                                "call_id": call_id
+                                            }
+                                        )
+                                    except Exception as notif_err:
+                                        logger.warning(f"[Sarvam Sync] Notification dispatch error: {notif_err}")
                             except Exception as appt_err:
                                 logger.warning(f"[Sarvam Sync] Appointment booking error: {appt_err}")
 
+                        # 6. Auto-schedule Callback if prospect requested callback or busy
+                        if (final_outcome == "Callback Scheduled" or "callback" in final_summary.lower()) and phone_for_lead:
+                            try:
+                                exist_cb = await asyncio.to_thread(
+                                    supabase_admin.table("callbacks").select("id").eq("original_call_id", call_id).limit(1).execute
+                                )
+                                if not exist_cb.data and call_id:
+                                    cb_time = (datetime.now(timezone.utc) + timedelta(hours=3)).replace(microsecond=0).isoformat()
+                                    await asyncio.to_thread(
+                                        supabase_admin.table("callbacks").insert({
+                                            "organization_id": target_org,
+                                            "agent_id": target_agent,
+                                            "original_call_id": call_id,
+                                            "prospect_name": resolved_name,
+                                            "prospect_phone": phone_for_lead,
+                                            "scheduled_at": cb_time,
+                                            "timezone": "Asia/Kolkata",
+                                            "notes": final_summary or "Scheduled callback requested by customer during call.",
+                                            "status": "scheduled",
+                                            "priority": "normal"
+                                        }).execute
+                                    )
+                                    logger.info(f"[Sarvam Sync] Auto-scheduled callback for {resolved_name} ({phone_for_lead}) at {cb_time}")
+                            except Exception as cb_err:
+                                logger.warning(f"[Sarvam Sync] Callback auto-scheduling error: {cb_err}")
+
+                        # 7. Token-to-Minute Safe Deduction
+                        # Benchmark Metrics for Conversational Hindi/Hinglish TTS:
+                        # - Avg Human speech rate: 130-150 words/min
+                        # - Avg characters per word (Hinglish/Hindi): 4.8 - 5.5 characters
+                        # - Actual Sarvam character consumption per minute of synthesized audio: ~750 - 850 characters
+                        # - Safe-space character ceiling: 850 characters = 1 billable minute
+                        try:
+                            from app.services.usage_service import UsageService
+                            total_chars = len(transcript_text or "")
+                            total_words = len((transcript_text or "").split())
+                            
+                            char_mins = (total_chars + 849) // 850 if total_chars > 0 else 0
+                            word_mins = (total_words + 179) // 180 if total_words > 0 else 0
+                            duration_mins = (duration + 59) // 60 if duration > 0 else 0
+                            
+                            # Billable minutes takes the highest of actual duration, character load, or conversational word count
+                            billable_minutes = max(1, duration_mins, word_mins, char_mins)
+
+                            u_svc = UsageService(supabase_admin)
+                            await u_svc.increment_minutes(target_agent, billable_minutes * 60)
+                            logger.info(f"[Sarvam Sync] Deducted {billable_minutes}m for call {call_id} (duration={duration}s, chars={total_chars}, words={total_words}, rate: 850 chars or 180 words/min)")
+                        except Exception as usage_err:
+                            logger.warning(f"[Sarvam Sync] Usage deduction error: {usage_err}")
+
                         synced_count += 1
-                        logger.info(f"[Sarvam Sync] Successfully synced call for {caller_phone_field} ({user_name})")
+                        logger.info(f"[Sarvam Sync] Synced call {call_id}: caller={resolved_name}, phone={caller_phone_field}, sentiment={final_sentiment}, outcome='{final_outcome}'")
 
                     except Exception as item_err:
                         logger.error(f"[Sarvam Sync Item Error] Failed to process attempt: {item_err}", exc_info=True)

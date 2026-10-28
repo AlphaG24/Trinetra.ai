@@ -495,7 +495,8 @@ class NumberLifecycleService:
         )
         active_numbers = res_active.data or []
 
-        REMINDER_DAYS = (1, 7, 14, 21, 28)
+        # Only alert for renewal approaching (Day 28 of 30-day cycle). No daily spam.
+        REMINDER_DAYS = (28,)
 
         for num in active_numbers:
             org_id = num.get("organization_id")
@@ -520,20 +521,18 @@ class NumberLifecycleService:
                 except Exception as e:
                     logger.warning(f"Error querying profiles for org {org_id}: {e}")
 
-                reminder_title = f"Virtual Number Active Milestone: Day {days_active}"
+                reminder_title = f"Virtual Number Renewal: Day {days_active} of 30"
                 reminder_msg = (
-                    f"Virtual number {num.get('phone_number')} is on Day {days_active} of its 30-day active validity. "
-                    f"Renewal is scheduled for {num.get('renewal_date') or 'the end of cycle'}."
+                    f"Virtual number {num.get('phone_number')} renewal is scheduled for {num.get('renewal_date') or 'the end of cycle'}. "
+                    "Ensure adequate wallet balance to maintain uninterrupted call routing."
                 )
 
-                cutoff_24h = (now - timedelta(hours=24)).isoformat()
                 for uid in target_user_ids:
                     try:
-                        # Prevent duplicate milestone notifications within 24 hours
+                        # Prevent duplicate milestone notifications permanently for this cycle
                         existing = self.supabase.table("notifications").select("id")\
                             .eq("user_id", uid)\
                             .eq("title", reminder_title)\
-                            .gte("created_at", cutoff_24h)\
                             .limit(1)\
                             .execute()
                         if existing.data and len(existing.data) > 0:

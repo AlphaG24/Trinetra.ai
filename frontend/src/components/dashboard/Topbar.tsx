@@ -173,10 +173,10 @@ export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
 
         if (!isMounted) return
 
-        // Unique channel name with timestamp and random suffix to guarantee uniqueness
-        const uniqueChannelName = `topbar-notifs-${currentUser.id}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
+        // Deterministic channel name to reuse existing connection and prevent replication slot leak
+        const channelName = `topbar-notifs-${currentUser.id}`
         try {
-          const ch = supabase.channel(uniqueChannelName)
+          const ch = supabase.channel(channelName)
           activeChannel = ch
           ch.on(
             'postgres_changes',
@@ -222,10 +222,16 @@ export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
   }, [authUser?.id, authProfile?.id])
 
   const handleSignOut = async () => {
-    const supabase = createClient()
-    await supabase.auth.signOut()
-    router.push('/')
-    router.refresh()
+    try {
+      const supabase = createClient()
+      await supabase.auth.signOut()
+    } catch {}
+    try {
+      sessionStorage.clear()
+      localStorage.removeItem('trinetra_auth_profile_cache')
+      localStorage.removeItem('trinetra_user_role')
+    } catch {}
+    window.location.href = '/'
   }
 
   const [mounted, setMounted] = useState(false)
@@ -245,19 +251,23 @@ export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
     } catch {}
   }
 
+  const isPlaceholderName = (val?: string | null) => {
+    if (!val) return true
+    const l = val.toLowerCase().trim()
+    return l === 'partner' || l === 'nexus' || l === 'nexus.ai.ops' || l === 'user'
+  }
+
   const rawDisplayName = (
-    profile?.full_name ||
-    authProfile?.full_name ||
-    cachedDisplayName ||
-    user?.user_metadata?.full_name ||
-    authUser?.user_metadata?.full_name ||
-    user?.user_metadata?.name ||
-    authUser?.user_metadata?.name ||
-    user?.email?.split('@')[0] ||
-    authUser?.email?.split('@')[0] ||
-    'Raghav'
+    (!isPlaceholderName(profile?.full_name) ? profile?.full_name : '') ||
+    (!isPlaceholderName(authProfile?.full_name) ? authProfile?.full_name : '') ||
+    (!isPlaceholderName(cachedDisplayName) ? cachedDisplayName : '') ||
+    (!isPlaceholderName(user?.user_metadata?.full_name) ? user?.user_metadata?.full_name : '') ||
+    (!isPlaceholderName(authUser?.user_metadata?.full_name) ? authUser?.user_metadata?.full_name : '') ||
+    (!isPlaceholderName(user?.user_metadata?.name) ? user?.user_metadata?.name : '') ||
+    (!isPlaceholderName(authUser?.user_metadata?.name) ? authUser?.user_metadata?.name : '') ||
+    (profile?.full_name || authProfile?.full_name || 'Raghav')
   ).trim()
-  const displayName = rawDisplayName.toLowerCase() === 'partner' ? (cachedDisplayName || 'Raghav') : rawDisplayName
+  const displayName = isPlaceholderName(rawDisplayName) ? 'Raghav' : rawDisplayName
   const avatarUrl = profile?.avatar_url || authProfile?.avatar_url
 
   return (

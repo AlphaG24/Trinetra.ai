@@ -1304,6 +1304,7 @@ async def handle_sarvam_voice_webhook(
                 if from_number and from_number != "Unknown":
                     lead_payload = {
                         "user_id": target_user,
+                        "organization_id": target_org if target_org != "default" else None,
                         "agent_id": agent_id,
                         "full_name": caller_name,
                         "phone": from_number,
@@ -1315,7 +1316,10 @@ async def handle_sarvam_voice_webhook(
                         "call_summary": call_summary,
                         "call_id": saved_call_id
                     }
-                    exist_lead = supabase_admin.table("leads").select("id").eq("phone", from_number).execute()
+                    lead_query = supabase_admin.table("leads").select("id").eq("phone", from_number)
+                    if target_user:
+                        lead_query = lead_query.eq("user_id", target_user)
+                    exist_lead = lead_query.execute()
                     if exist_lead.data:
                         supabase_admin.table("leads").update(lead_payload).eq("id", exist_lead.data[0]["id"]).execute()
                     else:
@@ -1330,7 +1334,10 @@ async def handle_sarvam_voice_webhook(
                         "notes": call_summary,
                         "tags": ["sarvam_outbound", "preview_requested"]
                     }
-                    exist_cust = supabase_admin.table("customer_contacts").select("id").eq("phone_number", from_number).execute()
+                    cust_query = supabase_admin.table("customer_contacts").select("id").eq("phone_number", from_number)
+                    if target_org and target_org != "default":
+                        cust_query = cust_query.eq("organization_id", target_org)
+                    exist_cust = cust_query.execute()
                     if exist_cust.data:
                         supabase_admin.table("customer_contacts").update(cust_payload).eq("id", exist_cust.data[0]["id"]).execute()
                     else:

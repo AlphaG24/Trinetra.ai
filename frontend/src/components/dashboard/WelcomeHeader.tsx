@@ -48,16 +48,21 @@ export function WelcomeHeader({
     } catch {}
   }
 
+  const isPlaceholderName = (val?: string | null) => {
+    if (!val) return true
+    const l = val.toLowerCase().trim()
+    return l === 'partner' || l === 'nexus' || l === 'nexus.ai.ops' || l === 'user'
+  }
+
   const rawEffective = (
-    fullName ||
-    authProfile?.full_name ||
-    authUser?.user_metadata?.full_name ||
-    authUser?.user_metadata?.name ||
-    cachedName ||
-    (authUser?.email ? authUser.email.split('@')[0] : '') ||
-    'Raghav'
+    (!isPlaceholderName(fullName) ? fullName : '') ||
+    (!isPlaceholderName(authProfile?.full_name) ? authProfile?.full_name : '') ||
+    (!isPlaceholderName(cachedName) ? cachedName : '') ||
+    (!isPlaceholderName(authUser?.user_metadata?.full_name) ? authUser?.user_metadata?.full_name : '') ||
+    (!isPlaceholderName(authUser?.user_metadata?.name) ? authUser?.user_metadata?.name : '') ||
+    (fullName || authProfile?.full_name || cachedName || 'Raghav')
   ).trim()
-  const effectiveName = rawEffective.toLowerCase() === 'partner' ? (cachedName || 'Raghav') : rawEffective
+  const effectiveName = isPlaceholderName(rawEffective) ? 'Raghav' : rawEffective
   const name = effectiveName ? effectiveName.split(' ')[0] : 'Raghav'
 
   return (

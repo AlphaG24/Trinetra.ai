@@ -106,11 +106,11 @@ export function PaidAgentDashboard({
         </div>
 
         {/* Card 3: Average Duration */}
-        <div className="bg-[#0f1117]/90 border border-purple-500/10 rounded-2xl p-5 relative overflow-hidden group hover:border-purple-500/20 transition-all duration-300 shadow-xl shadow-black/40">
-          <div className="absolute inset-0 bg-gradient-to-br from-purple-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
+        <div className="bg-[#0f1117]/90 border border-blue-500/10 rounded-2xl p-5 relative overflow-hidden group hover:border-blue-500/20 transition-all duration-300 shadow-xl shadow-black/40">
+          <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
           <div className="flex justify-between items-start">
             <span className="text-xs font-mono uppercase tracking-widest text-zinc-400">Average Duration</span>
-            <div className="p-2 bg-purple-500/10 rounded-xl text-purple-400">
+            <div className="p-2 bg-blue-500/10 rounded-xl text-blue-400">
               <Clock className="w-5 h-5" />
             </div>
           </div>

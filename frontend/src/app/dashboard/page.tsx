@@ -232,7 +232,7 @@ export default function DashboardPage() {
   }, [debouncedMutateOverview])
 
   return (
-    <div suppressHydrationWarning className="space-y-6 max-w-7xl mx-auto p-4 md:p-6">
+    <div suppressHydrationWarning className="space-y-6 max-w-7xl mx-auto">
       {/* 1. Welcome Header */}
       <WelcomeHeader
         fullName={profile?.full_name || authProfile?.full_name || authUser?.email?.split('@')[0] || 'Partner'}

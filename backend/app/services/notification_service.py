@@ -74,7 +74,7 @@ class NotificationService:
         try:
             # 1. Fetch user profile, telegram chat id, and notification preferences
             user_res = supabase.table("profiles").select(
-                "email, telegram_chat_id, timezone, notification_preferences"
+                "email, phone, telegram_chat_id, timezone, notification_preferences"
             ).eq("id", user_id).maybe_single().execute()
             
             if not user_res.data:
@@ -83,6 +83,7 @@ class NotificationService:
                 
             profile = user_res.data
             user_email = profile.get("email")
+            user_phone = profile.get("phone")
             telegram_chat_id = profile.get("telegram_chat_id")
             user_tz = profile.get("timezone") or "Asia/Kolkata"
             
@@ -95,7 +96,7 @@ class NotificationService:
                 "digest_mode": {**DEFAULT_PREFERENCES["digest_mode"], **db_prefs.get("digest_mode", {})}
             }
             
-            event_prefs = prefs["events"].get(event_type, { "email": True, "telegram": True, "dashboard": True })
+            event_prefs = prefs["events"].get(event_type, { "email": True, "telegram": True, "dashboard": True, "whatsapp": True })
             if user_wants_email and event_type in ("call_completed", "new_lead", "appointment_scheduled"):
                 event_prefs["email"] = True
             
@@ -107,6 +108,7 @@ class NotificationService:
                         "payment_confirmed": "success",
                         "call_completed": "info",
                         "callback_scheduled": "info",
+                        "appointment_scheduled": "success",
                         "usage_warning": "warning",
                         "plan_expired": "warning",
                         "agent_paused": "warning",
@@ -167,6 +169,14 @@ class NotificationService:
                     cls.queue_notification(user_id, event_type, "telegram", title, message, payload)
                 else:
                     await cls.send_telegram_notification(telegram_chat_id, f"🔔 *{title}*\n\n{message}")
+
+            # 7. Send WhatsApp Notification to User / Business Owner
+            target_wa_phone = user_phone or (payload.get("owner_phone") if payload else None)
+            if target_wa_phone and event_prefs.get("whatsapp", True):
+                if quiet_active or digest_active:
+                    cls.queue_notification(user_id, event_type, "whatsapp", title, message, payload)
+                else:
+                    await cls.send_whatsapp_notification(user_id, target_wa_phone, title, message, payload)
                     
         except Exception as e:
             print(f"[NotificationService] Error in dispatch: {str(e)}", flush=True)
@@ -215,7 +225,7 @@ class NotificationService:
                             "https://api.resend.com/emails",
                             headers={"Authorization": f"Bearer {resend_key}", "Content-Type": "application/json"},
                             json={
-                                "from": "Trinetra AI Alerts <alerts@trinetraedu-ai.com>",
+                                "from": "Vaakriti AI Alerts <alerts@trinetraedu-ai.com>",
                                 "to": [email_address],
                                 "subject": title,
                                 "text": message
@@ -232,7 +242,7 @@ class NotificationService:
                                 "https://api.resend.com/emails",
                                 headers={"Authorization": f"Bearer {resend_key}", "Content-Type": "application/json"},
                                 json={
-                                    "from": "Trinetra AI Alerts <alerts@trinetraedu-ai.com>",
+                                    "from": "Vaakriti AI Alerts <alerts@trinetraedu-ai.com>",
                                     "to": ["support@trinetraedu-ai.com"],
                                     "subject": f"[Target: {email_address}] {title}",
                                     "text": f"NOTE: Delivered to verified account owner because custom domain 'trinetraedu-ai.com' is not yet verified in Resend for direct delivery to {email_address}.\n\n" + message
@@ -289,6 +299,49 @@ class NotificationService:
                     print(f"[NotificationService] Telegram api error: {res.text}", flush=True)
         except Exception as e:
             print(f"[NotificationService] Telegram delivery network error: {str(e)}", flush=True)
+
+    @classmethod
+    async def send_whatsapp_notification(cls, user_id: str, phone_number: str, title: str, message: str, payload: dict = None):
+        """
+        Dispatches WhatsApp notification to user/owner using IntegrationExecutor.
+        """
+        try:
+            from app.services.integration_executor import IntegrationExecutor, decrypt_val
+            executor = IntegrationExecutor()
+            formatted_msg = (
+                f"🔔 *{title}*\n\n"
+                f"{message}\n\n"
+                f"_Vaakriti AI Operational Alert_"
+            )
+            data = {
+                "target_phone": phone_number,
+                "contact_phone": phone_number,
+                "notes": message,
+                "is_owner_notification": True,
+                "user_id": user_id
+            }
+            if payload and isinstance(payload, dict):
+                data.update(payload)
+                
+            # Fetch user's WhatsApp config from integrations table
+            wa_config = {}
+            if user_id:
+                try:
+                    intg_res = supabase.table("integrations").select("whatsapp_access_token").eq("user_id", user_id).limit(1).execute()
+                    if intg_res.data and intg_res.data[0].get("whatsapp_access_token"):
+                        raw_tok = decrypt_val(intg_res.data[0]["whatsapp_access_token"])
+                        if raw_tok and raw_tok.startswith("{"):
+                            wa_config = json.loads(raw_tok)
+                        elif raw_tok:
+                            wa_config = {"whatsapp_access_token": raw_tok}
+                except Exception as cf_err:
+                    print(f"[NotificationService] Could not load user WhatsApp config: {cf_err}", flush=True)
+
+            # Use IntegrationExecutor to dispatch via user's configured WhatsApp integration
+            await executor._dispatch("whatsapp", "send_to_owner", wa_config, data)
+            print(f"[NotificationService] Dispatched WhatsApp alert to {phone_number} for user {user_id}", flush=True)
+        except Exception as e:
+            print(f"[NotificationService] Failed to send WhatsApp alert to {phone_number}: {e}", flush=True)
 
     @classmethod
     async def process_queued_notifications(cls):

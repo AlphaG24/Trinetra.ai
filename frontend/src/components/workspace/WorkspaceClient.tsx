@@ -323,7 +323,7 @@ function ExternalDataWorkspace({ tool, quota, user, logs, router }: ExternalData
           </button>
           <Link
             href={`/dashboard/tools/${tool.slug}`}
-            className="bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 font-bold tracking-wider uppercase text-xs px-6 py-2.5 rounded-xl text-center transition-all duration-200 flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-[0.98]"
+            className="bg-blue-600 hover:bg-blue-700 text-white font-bold tracking-wider uppercase text-xs px-6 py-2.5 rounded-xl text-center transition-all duration-200 flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-[0.98]"
           >
             Launch Console ↗
           </Link>

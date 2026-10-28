@@ -107,7 +107,14 @@ function BillingContent() {
 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [userLimits, setUserLimits] = useState<UserLimits | null>(null)
+  const [userLimits, setUserLimits] = useState<UserLimits>({
+    plan_tier: (profile as any)?.plan_tier || 'free',
+    trial_ends_at: (profile as any)?.trial_ends_at || null,
+    paid_minutes_limit: (profile as any)?.paid_minutes_limit || 0,
+    paid_minutes_used: 0,
+    demo_minutes_limit: 15,
+    demo_minutes_used: 0,
+  })
   const [configs, setConfigs] = useState<Record<string, string>>({})
   const [updatingPlan, setUpdatingPlan] = useState<boolean>(false)
   const [invoices, setInvoices] = useState<Invoice[]>([])
@@ -240,10 +247,6 @@ function BillingContent() {
 
   useEffect(() => {
     fetchBillingData(true)
-    const timer = setTimeout(() => {
-      setLoading(false)
-    }, 2500)
-    return () => clearTimeout(timer)
   }, [])
 
   const handleQuickTopup = async (amount: number) => {
@@ -579,7 +582,7 @@ function BillingContent() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!isMounted || !user) return
 
-      channel = supabase.channel(`profile_plan_changes_${Date.now()}_${Math.random().toString(36).substring(7)}`)
+      channel = supabase.channel(`profile_plan_changes_${user.id}`)
 
       channel.on(
         'postgres_changes',
@@ -1065,7 +1068,7 @@ function BillingContent() {
     )
   }
 
-  if (error || !userLimits) {
+  if (error && !userLimits) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[400px] border border-red-500/20 bg-red-950/10 rounded-2xl p-8 text-center max-w-lg mx-auto my-12">
         <AlertCircle className="w-12 h-12 text-red-500 mb-4 animate-bounce" />
@@ -1167,7 +1170,7 @@ function BillingContent() {
                 ₹{(wallet?.balance_inr ?? 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </span>
             </div>
-            <div className="sm:border-l sm:border-[var(--border)] sm:pl-6 text-left min-w-[200px]">
+            <div className="sm:border-l sm:border-[var(--border)] sm:pl-6 text-left min-w-[220px]">
               <div className="flex items-center justify-between text-[10px] text-[var(--muted)] uppercase font-bold tracking-wider mb-1.5">
                 <span>Monthly Spend Cap</span>
                 <span className="font-mono text-[var(--heading)]">₹{(wallet?.current_spend_inr ?? 0).toLocaleString('en-IN')} / ₹{(wallet?.spend_limit_inr ?? 2500).toLocaleString('en-IN')}</span>
@@ -1179,41 +1182,46 @@ function BillingContent() {
                   style={{ width: `${Math.min(100, Math.round(((wallet?.current_spend_inr ?? 0) / (wallet?.spend_limit_inr || 2500)) * 100))}%` }}
                 />
               </div>
-              <span className="text-[9px] text-[var(--muted)] mt-1 block">Bill-shock protected (Admin adjustable)</span>
+              <span className="text-[10px] text-[var(--muted)] mt-1.5 flex items-center justify-between">
+                <span>Bill-shock protected</span>
+                <span className="font-mono text-zinc-500 text-[9px]">Max ₹{(wallet?.spend_limit_inr ?? 2500).toLocaleString('en-IN')}/mo</span>
+              </span>
             </div>
           </div>
         </div>
 
         {/* Quick Recharge Buttons */}
-        <div>
-          <label className="block text-[10px] font-bold font-montserrat text-[var(--muted)] uppercase tracking-wider mb-2.5">
+        <div className="pt-2">
+          <label className="block text-[10px] font-bold font-montserrat text-[var(--muted)] uppercase tracking-wider mb-3">
             Quick Wallet Top-Up (Instant UPI / Card)
           </label>
-          <div className="flex flex-wrap items-center gap-2.5">
-            {[500, 1000, 2500, 5000].map((amt) => (
-              <button
-                key={amt}
-                type="button"
-                disabled={topupLoading}
-                onClick={() => handleQuickTopup(amt)}
-                className="px-4 py-2 rounded-xl border border-[var(--border)] hover:border-zinc-400 bg-[var(--background)] hover:bg-[var(--hover-bg)] text-[var(--heading)] font-mono text-xs font-bold transition-all cursor-pointer disabled:opacity-50"
-              >
-                +₹{amt.toLocaleString('en-IN')}
-              </button>
-            ))}
-            <div className="flex items-center gap-2 ml-auto">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-2.5">
+              {[500, 1000, 2500, 5000].map((amt) => (
+                <button
+                  key={amt}
+                  type="button"
+                  disabled={topupLoading}
+                  onClick={() => handleQuickTopup(amt)}
+                  className="px-4 py-2 rounded-xl border border-[var(--border)] hover:border-zinc-400 bg-[var(--background)] hover:bg-[var(--hover-bg)] text-[var(--heading)] font-mono text-xs font-bold transition-all cursor-pointer disabled:opacity-50 active:scale-[0.98]"
+                >
+                  +₹{amt.toLocaleString('en-IN')}
+                </button>
+              ))}
+            </div>
+            <div className="flex items-center gap-2">
               <input
                 type="number"
                 value={customTopupAmount}
                 onChange={e => setCustomTopupAmount(e.target.value)}
                 placeholder="Custom ₹"
-                className="w-24 bg-[var(--background)] border border-[var(--border)] text-[var(--heading)] text-xs font-mono font-bold rounded-xl px-3 py-2 focus:outline-none focus:ring-1 focus:ring-zinc-400"
+                className="w-28 bg-[var(--background)] border border-[var(--border)] text-[var(--heading)] text-xs font-mono font-bold rounded-xl px-3 py-2 focus:outline-none focus:ring-1 focus:ring-zinc-400"
               />
               <button
                 type="button"
                 disabled={topupLoading || !customTopupAmount || Number(customTopupAmount) <= 0}
                 onClick={() => handleQuickTopup(Number(customTopupAmount))}
-                className="px-4 py-2 bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white border border-zinc-700/30 dark:border-zinc-300 font-bold text-xs uppercase tracking-wider rounded-xl transition-all cursor-pointer disabled:opacity-50 shadow-sm"
+                className="px-5 py-2 bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white border border-zinc-700/30 dark:border-zinc-300 font-bold text-xs uppercase tracking-wider rounded-xl transition-all cursor-pointer disabled:opacity-50 shadow-sm active:scale-[0.98]"
               >
                 {topupLoading ? 'Adding...' : 'Add Credits'}
               </button>
@@ -1413,61 +1421,93 @@ function BillingContent() {
             </div>
           </div>
 
-          {/* Special Bundles Pack */}
+          {/* Special Bundles Pack — Dynamically loaded from Admin Panel (product_bundles) */}
           {availableBundles.length > 0 && (
             <div>
-              <h2 className="text-sm uppercase font-bold text-[var(--heading)] tracking-wider mb-4 font-display">Special Product Bundles</h2>
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h2 className="text-sm uppercase font-bold text-[var(--heading)] tracking-wider font-display">Special Product Bundles</h2>
+                  <p className="text-[11px] text-[var(--muted)] mt-0.5">Pre-configured packages combining AI voice agents with dedicated virtual phone lines.</p>
+                </div>
+              </div>
               <div className={`grid grid-cols-1 ${cart.length > 0 ? 'sm:grid-cols-2' : 'sm:grid-cols-2 lg:grid-cols-3'} gap-6`}>
-                {availableBundles.map((b) => (
-                  <div key={b.id} className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-6 flex flex-col justify-between shadow-sm relative overflow-hidden">
-                    <div className="absolute top-3 right-3 px-2 py-0.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 text-[8px] font-bold uppercase tracking-wider rounded-full">
-                      Save {b.discount_percent}%
-                    </div>
-
-                    <div>
-                      <h3 className="font-bold text-sm text-[var(--heading)] font-display">{b.name}</h3>
-                      <p className="text-xs text-[var(--muted)] mt-1.5 min-h-[36px] line-clamp-2">{b.description}</p>
-
-                      <div className="mt-4 p-3 bg-[var(--background)] border border-[var(--border)] rounded-xl space-y-1.5 text-xs text-[var(--heading)]">
-                        <div className="text-[9px] uppercase font-bold text-[var(--muted)] tracking-wider mb-1">Items Included:</div>
-                        {(() => {
-                          const productsObj = b.products as any
-                          const items = Array.isArray(productsObj)
-                            ? productsObj
-                            : (productsObj?.items || [])
-                          return items.map((p: any, idx: number) => {
-                            let label = ''
-                            if (p.type === 'agent') {
-                              const agentLabel = p.agent_type ? `${p.agent_type.replace('_', ' ')} Agent` : `Agent (${p.tier || 'starter'})`
-                              label = agentLabel
-                            } else {
-                              label = 'Phone Number Slot'
-                            }
-                            return (
-                              <div key={idx} className="flex justify-between items-center capitalize">
-                                <span className="font-medium text-[var(--heading)]">{label}</span>
-                                <span className="font-mono font-bold text-[var(--heading)]">x{p.quantity}</span>
-                              </div>
-                            )
-                          })
-                        })()}
+                {availableBundles.map((b) => {
+                  const cartItem = cart.find(c => c.key === b.id)
+                  const isInCart = Boolean(cartItem)
+                  
+                  return (
+                    <div 
+                      key={b.id} 
+                      className="bg-[var(--card-bg)] border border-[var(--border)] hover:border-zinc-400 dark:hover:border-zinc-600 rounded-2xl p-6 flex flex-col justify-between shadow-xs hover:shadow-md transition-all duration-200 relative overflow-hidden group"
+                    >
+                      <div className="absolute top-3 right-3 px-2.5 py-0.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 text-[9px] font-bold uppercase tracking-wider rounded-full flex items-center gap-1 font-mono">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                        Save {b.discount_percent}%
                       </div>
-                    </div>
 
-                    <div className="mt-6 pt-4 border-t border-[var(--border)] flex items-center justify-between">
                       <div>
-                        <span className="text-[10px] text-[var(--muted)] line-through block">₹{b.individual_price_paisa / 100}</span>
-                        <span className="text-lg font-bold font-display text-[var(--heading)]">₹{b.bundle_price_paisa / 100}</span>
+                        <h3 className="font-bold text-base text-[var(--heading)] font-display tracking-tight group-hover:text-black dark:group-hover:text-white transition-colors">{b.name}</h3>
+                        <p className="text-xs text-[var(--muted)] mt-1.5 min-h-[36px] line-clamp-2 leading-relaxed">{b.description || 'All-inclusive pre-packaged bundle with instant provisioning.'}</p>
+
+                        <div className="mt-4 p-3 bg-[var(--background)] border border-[var(--border)] rounded-xl space-y-2 text-xs">
+                          <div className="text-[9px] uppercase font-bold text-[var(--muted)] tracking-wider">Inclusions:</div>
+                          {(() => {
+                            const productsObj = b.products as any
+                            const items = Array.isArray(productsObj)
+                              ? productsObj
+                              : (productsObj?.items || [])
+                            return items.map((p: any, idx: number) => {
+                              const isAgent = p.type === 'agent'
+                              let label = ''
+                              if (isAgent) {
+                                label = p.agent_type ? `${p.agent_type.replace('_', ' ')} Agent` : `Voice Agent (${p.tier || 'starter'})`
+                              } else {
+                                label = 'Dedicated Phone Number'
+                              }
+                              return (
+                                <div key={idx} className="flex justify-between items-center capitalize py-0.5">
+                                  <span className="font-medium text-[var(--heading)] flex items-center gap-1.5 text-xs">
+                                    {isAgent ? (
+                                      <Bot className="w-3.5 h-3.5 text-zinc-700 dark:text-zinc-300 shrink-0" />
+                                    ) : (
+                                      <PhoneCall className="w-3.5 h-3.5 text-zinc-700 dark:text-zinc-300 shrink-0" />
+                                    )}
+                                    <span>{label}</span>
+                                  </span>
+                                  <span className="font-mono font-bold text-[var(--heading)] bg-[var(--card-bg)] px-1.5 py-0.5 rounded border border-[var(--border)] text-[10px]">
+                                    x{p.quantity}
+                                  </span>
+                                </div>
+                              )
+                            })
+                          })()}
+                        </div>
                       </div>
-                      <button
-                        onClick={() => addToCart('bundle', b.id, b.name, b.bundle_price_paisa / 100)}
-                        className="px-3 py-1.5 bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white border border-zinc-700/30 dark:border-zinc-300 font-bold text-xs uppercase rounded-xl transition-all cursor-pointer shadow-sm"
-                      >
-                        Add Pack
-                      </button>
+
+                      <div className="mt-6 pt-4 border-t border-[var(--border)] flex items-center justify-between">
+                        <div>
+                          <span className="text-[11px] text-[var(--muted)] line-through block font-mono">
+                            ₹{(b.individual_price_paisa / 100).toLocaleString('en-IN')}
+                          </span>
+                          <span className="text-xl font-bold font-display text-[var(--heading)]">
+                            ₹{(b.bundle_price_paisa / 100).toLocaleString('en-IN')}
+                          </span>
+                        </div>
+                        <button
+                          onClick={() => addToCart('bundle', b.id, b.name, b.bundle_price_paisa / 100)}
+                          className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer shadow-sm active:scale-95 flex items-center gap-1.5 ${
+                            isInCart
+                              ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                              : 'bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-100'
+                          }`}
+                        >
+                          {isInCart && <Check className="w-3.5 h-3.5" />}
+                          <span>{isInCart ? `In Cart (${cartItem?.quantity})` : 'Add Pack'}</span>
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             </div>
           )}

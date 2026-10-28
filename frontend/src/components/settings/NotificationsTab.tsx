@@ -249,7 +249,7 @@ export function NotificationsTab() {
             <button
               onClick={saveSettings}
               disabled={saving}
-              className="w-full flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-zinc-900 hover:bg-zinc-800 disabled:bg-zinc-800/50 text-white dark:bg-white dark:hover:bg-zinc-100 dark:disabled:bg-white/50 dark:text-zinc-950 font-bold text-xs uppercase tracking-wider transition-all cursor-pointer shadow-sm active:scale-[0.99]"
+              className="w-full flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-100 disabled:opacity-50 font-bold text-xs uppercase tracking-wider transition-all cursor-pointer shadow-sm active:scale-[0.99]"
             >
               {saving ? (
                 <>

@@ -22,7 +22,7 @@ const PERSONALITY_OPTIONS = [
     key: 'sales' as const,
     label: 'Sales',
     icon: BriefcaseBusiness,
-    color: 'violet',
+    color: 'blue',
     description: 'Pitch products, handle objections, and close deals',
     keywords: ['pricing', 'buy', 'purchase', 'features', 'compare'],
   },
@@ -30,7 +30,7 @@ const PERSONALITY_OPTIONS = [
     key: 'support' as const,
     label: 'Support',
     icon: Headphones,
-    color: 'blue',
+    color: 'sky',
     description: 'Resolve issues, troubleshoot problems, and assist customers',
     keywords: ['problem', 'broken', 'help', 'complaint', 'refund'],
   },
@@ -53,17 +53,17 @@ const PERSONALITY_OPTIONS = [
 ]
 
 const COLOR_MAP: Record<string, Record<string, string>> = {
-  violet: {
-    activeBg: 'bg-violet-500/10 border-violet-500/40 ring-violet-500/30',
-    iconBg: 'bg-violet-500/20 text-violet-600 dark:text-violet-400',
-    badge: 'bg-violet-500/15 text-violet-700 dark:text-violet-300 border-violet-500/25',
-    dot: 'bg-violet-500',
+  sky: {
+    activeBg: 'bg-sky-500/10 border-sky-500/40 ring-sky-500/30',
+    iconBg: 'bg-sky-500/20 text-sky-600 dark:text-sky-400',
+    badge: 'bg-sky-500/15 text-sky-700 dark:text-sky-300 border-sky-500/25',
+    dot: 'bg-sky-500',
   },
   blue: {
-    activeBg: 'bg-blue-500/10 border-blue-500/40 ring-blue-500/30',
-    iconBg: 'bg-blue-500/20 text-blue-600 dark:text-blue-400',
-    badge: 'bg-blue-500/15 text-blue-700 dark:text-blue-300 border-blue-500/25',
-    dot: 'bg-blue-500',
+    activeBg: 'bg-blue-600/10 border-blue-600/40 ring-blue-600/30',
+    iconBg: 'bg-blue-600/20 text-blue-600 dark:text-blue-400',
+    badge: 'bg-blue-600/15 text-blue-700 dark:text-blue-300 border-blue-600/25',
+    dot: 'bg-blue-600',
   },
   emerald: {
     activeBg: 'bg-emerald-500/10 border-emerald-500/40 ring-emerald-500/30',
@@ -235,7 +235,7 @@ export function PersonalitySelector({
                   {/* Toggle Pill Indicator */}
                   <div
                     className={`absolute top-3.5 right-3.5 w-9 h-5 rounded-full transition-colors duration-200 flex items-center px-0.5 ${
-                      enabled ? 'bg-violet-600 dark:bg-violet-500' : 'bg-gray-300 dark:bg-zinc-700'
+                      enabled ? 'bg-blue-600 dark:bg-blue-500' : 'bg-gray-300 dark:bg-zinc-700'
                     }`}
                   >
                     <div
@@ -292,7 +292,7 @@ export function PersonalitySelector({
             <div className="flex items-center gap-2">
               <div
                 className={`w-2 h-2 rounded-full ${
-                  isMultiEnabled ? 'bg-emerald-500 animate-pulse' : 'bg-violet-500'
+                  isMultiEnabled ? 'bg-emerald-500 animate-pulse' : 'bg-blue-600'
                 }`}
               />
               <span className={`text-xs font-medium ${isMultiEnabled ? 'text-emerald-600 dark:text-emerald-400' : 'text-[var(--muted)]'}`}>

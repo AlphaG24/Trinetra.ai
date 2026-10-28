@@ -16,10 +16,10 @@ export async function GET(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // 2. Fetch User Profile to get organization_id
+    // 2. Fetch User Profile to get organization_id and role
     const { data: profile } = await supabase
       .from("profiles")
-      .select("organization_id")
+      .select("organization_id, role")
       .eq("id", user.id)
       .single();
 
@@ -27,7 +27,7 @@ export async function GET(
       return NextResponse.json({ error: "Organization not found" }, { status: 404 });
     }
 
-    const isPrivileged = ['developer_tester', 'admin', 'super_admin'].includes(profile?.role || '');
+    const isPrivileged = ['developer_tester', 'admin', 'super_admin'].includes((profile as any)?.role || '');
 
     // 3. Verify agent belongs to user or user's organization (or user is privileged)
     const admin = createAdminClient();

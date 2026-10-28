@@ -5,6 +5,7 @@ import { Play, Pause, RotateCcw, Download, AlertCircle, Volume2 } from 'lucide-r
 
 export interface CallAudioPlayerProps {
   recordingUrl?: string | null
+  callId?: string
   transcript?: any
   durationSeconds?: number | null
   autoPlay?: boolean
@@ -15,6 +16,7 @@ export interface CallAudioPlayerProps {
 
 export function CallAudioPlayer({
   recordingUrl,
+  callId,
   durationSeconds = 0,
   autoPlay = false,
   compact = false,
@@ -199,7 +201,7 @@ export function CallAudioPlayer({
             handleTogglePlay()
           }}
           disabled={isLoading}
-          className="w-7 h-7 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 flex items-center justify-center transition-all cursor-pointer shrink-0 shadow-xs active:scale-95"
+          className="w-7 h-7 rounded-lg bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center transition-all cursor-pointer shrink-0 shadow-xs active:scale-95"
           title={isPlaying ? 'Pause Recording' : 'Play Recording'}
         >
           {isPlaying ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5 ml-0.5" />}
@@ -211,7 +213,7 @@ export function CallAudioPlayer({
           {[40, 80, 50, 100, 60, 30].map((h, i) => (
             <span
               key={i}
-              className={`w-0.5 rounded-full transition-all ${isPlaying ? 'bg-zinc-900 dark:bg-white animate-pulse' : 'bg-[var(--muted)]/40'}`}
+              className={`w-0.5 rounded-full transition-all ${isPlaying ? 'bg-blue-600 dark:bg-blue-400 animate-pulse' : 'bg-[var(--muted)]/40'}`}
               style={{ height: isPlaying ? `${h}%` : '25%' }}
             />
           ))}
@@ -247,8 +249,8 @@ export function CallAudioPlayer({
             disabled={!hasAudio || isLoading}
             className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-sm transition-all shrink-0 ${
               hasAudio
-                ? 'bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 hover:scale-105 active:scale-95 cursor-pointer'
-                : 'bg-zinc-800 text-zinc-500 cursor-not-allowed border border-zinc-700'
+                ? 'bg-blue-600 hover:bg-blue-700 text-white hover:scale-105 active:scale-95 cursor-pointer shadow-blue-600/20 shadow-md'
+                : 'bg-slate-200 dark:bg-slate-800 text-slate-400 dark:text-slate-600 cursor-not-allowed border border-slate-300 dark:border-slate-700'
             }`}
             title={hasAudio ? (isPlaying ? 'Pause Recording' : 'Play Call Recording') : 'Recording unavailable'}
           >
@@ -273,7 +275,7 @@ export function CallAudioPlayer({
               <span
                 key={i}
                 className={`w-1 rounded-full transition-all duration-200 ${
-                  isPlaying ? 'bg-zinc-900 dark:bg-white animate-pulse' : 'bg-[var(--muted)]/30'
+                  isPlaying ? 'bg-blue-600 dark:bg-blue-400 animate-pulse' : 'bg-[var(--muted)]/30'
                 }`}
                 style={{
                   height: isPlaying ? `${Math.max(20, (height * ((i % 3) + 1)) % 100)}%` : '20%',
@@ -328,11 +330,11 @@ export function CallAudioPlayer({
         }`}
       >
         <div
-          className="h-full bg-zinc-900 dark:bg-white rounded-full transition-all duration-150 relative"
+          className="h-full bg-blue-600 dark:bg-blue-500 rounded-full transition-all duration-150 relative"
           style={{ width: `${progressPercent}%` }}
         >
           {hasAudio && (
-            <div className="absolute right-0 top-1/2 -translate-y-1/2 w-2.5 h-2.5 bg-zinc-900 dark:bg-white rounded-full shadow-sm opacity-0 group-hover:opacity-100 transition-opacity" />
+            <div className="absolute right-0 top-1/2 -translate-y-1/2 w-2.5 h-2.5 bg-blue-600 dark:bg-blue-400 rounded-full shadow-sm opacity-0 group-hover:opacity-100 transition-opacity" />
           )}
         </div>
       </div>

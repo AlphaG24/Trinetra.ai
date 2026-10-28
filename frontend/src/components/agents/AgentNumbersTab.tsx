@@ -174,7 +174,7 @@ export function AgentNumbersTab({ agentId, organizationId }: AgentNumbersTabProp
           <div className="flex items-center gap-3">
             <Link 
               href="/dashboard/phone-numbers"
-              className="bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 transition-all rounded-lg px-5 py-2.5 font-bold text-xs uppercase tracking-wider shadow-sm"
+              className="bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 transition-all rounded-xl px-5 py-2.5 font-bold text-xs uppercase tracking-wider shadow-sm"
             >
               Manage Phone Numbers
             </Link>
@@ -193,7 +193,7 @@ export function AgentNumbersTab({ agentId, organizationId }: AgentNumbersTabProp
         </div>
         <Link 
           href="/dashboard/phone-numbers"
-          className="text-xs font-bold text-violet-500 hover:opacity-80 transition-opacity"
+          className="text-xs font-bold font-montserrat uppercase tracking-wider text-[var(--heading)] hover:opacity-80 transition-opacity"
         >
           Manage All Numbers &rarr;
         </Link>
@@ -245,16 +245,16 @@ export function AgentNumbersTab({ agentId, organizationId }: AgentNumbersTabProp
         })}
       </div>
 
-      <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-lg p-4 flex items-start sm:items-center gap-3">
-        <Info className="w-5 h-5 text-[var(--heading)] shrink-0 mt-0.5 sm:mt-0" />
-        <div className="flex-1">
-          <p className="text-sm text-[var(--heading)] leading-relaxed">
+      <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">
+        <div className="flex items-start sm:items-center gap-3">
+          <Info className="w-5 h-5 text-[var(--heading)] shrink-0 mt-0.5 sm:mt-0" />
+          <p className="text-xs text-[var(--muted)] leading-relaxed">
             Phone numbers are managed centrally on the Phone Numbers console. You can assign and configure them for any agent there.
           </p>
         </div>
         <Link 
           href="/dashboard/phone-numbers"
-          className="shrink-0 bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 transition-all rounded-lg px-4 py-2.5 font-bold text-xs uppercase tracking-wider shadow-sm active:scale-[0.99]"
+          className="shrink-0 bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 transition-all rounded-xl px-5 py-2.5 font-montserrat font-bold text-xs uppercase tracking-wider shadow-sm active:scale-[0.99]"
         >
           Manage Numbers &rarr;
         </Link>

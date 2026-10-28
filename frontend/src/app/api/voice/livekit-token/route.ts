@@ -79,8 +79,8 @@ async function generateLiveKitToken({
     (async () => {
       try {
         const adminClient = createSupabaseClient(supabaseUrl, serviceKey);
-        let resolvedUserId = userId;
-        let resolvedOrgId = organizationId;
+        let resolvedUserId: string | null = userId;
+        let resolvedOrgId: string | null = organizationId;
 
         const isAnonymousPublicDemo = !userId || participant_name === 'StudioGuest';
         if (isAnonymousPublicDemo) {

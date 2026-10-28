@@ -22,6 +22,14 @@ export function InstantDemoCallModal({
   const [notes, setNotes] = useState('')
   const [selectedAgentId, setSelectedAgentId] = useState(agents[0]?.id || '')
   const [loading, setLoading] = useState(false)
+  const [alreadyUsed, setAlreadyUsed] = useState(false)
+
+  React.useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const used = localStorage.getItem('trinetra_direct_call_used') === 'true'
+      setAlreadyUsed(used)
+    }
+  }, [isOpen])
 
   if (!isOpen) return null
 
@@ -57,6 +65,10 @@ export function InstantDemoCallModal({
       }
 
       toast.success(data.message || `Calling ${cleanPhone}...`)
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('trinetra_direct_call_used', 'true')
+      }
+      setAlreadyUsed(true)
       onSuccess(data)
       onClose()
 
@@ -103,7 +115,31 @@ export function InstantDemoCallModal({
           </button>
         </div>
 
-        {/* Form */}
+        {alreadyUsed ? (
+          <div className="mt-5 space-y-4 text-center py-4">
+            <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-500 flex items-center justify-center mx-auto">
+              <PhoneCall className="w-6 h-6" />
+            </div>
+            <div className="space-y-1">
+              <h4 className="text-sm font-bold text-zinc-900 dark:text-white font-display">
+                Direct Call Trial Completed
+              </h4>
+              <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed max-w-sm mx-auto">
+                You have already used your 1 complimentary direct test call. To dial more prospects or bulk contact lists, please launch an Outbound Campaign.
+              </p>
+            </div>
+            <div className="pt-2">
+              <button
+                type="button"
+                onClick={onClose}
+                className="w-full py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 text-xs font-bold uppercase tracking-wider transition-all cursor-pointer"
+              >
+                Close & View Campaigns
+              </button>
+            </div>
+          </div>
+        ) : (
+        /* Form */
         <form onSubmit={handleSubmit} className="mt-5 space-y-4">
           {/* Contact Name */}
           <div>
@@ -195,6 +231,7 @@ export function InstantDemoCallModal({
             </button>
           </div>
         </form>
+        )}
       </div>
     </div>
   )

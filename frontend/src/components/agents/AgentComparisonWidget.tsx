@@ -89,27 +89,23 @@ export function AgentComparisonWidget({ agents: rawAgents, loading = false }: Ag
         <span className="mr-1">Sort By:</span>
         <button
           onClick={() => setSortBy('calls')}
-          className={`px-3.5 py-1.5 rounded-[10px] text-sm transition-all duration-150 cursor-pointer ${
+          className={`px-3.5 py-1.5 rounded-xl text-xs font-montserrat font-bold uppercase tracking-wider transition-all duration-150 cursor-pointer ${
             sortBy === 'calls'
-              ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-950 font-bold shadow-sm'
-              : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-white/5 hover:text-zinc-900 dark:hover:text-white'
+              ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-950 shadow-sm'
+              : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-white/5 hover:text-black dark:hover:text-white'
           }`}
         >
-          <span className={`font-playfair font-semibold text-[13px] ${sortBy === 'calls' ? '!text-white dark:!text-zinc-950' : ''}`}>
-            Calls Today
-          </span>
+          <span>Calls Today</span>
         </button>
         <button
           onClick={() => setSortBy('health')}
-          className={`px-3.5 py-1.5 rounded-[10px] text-sm transition-all duration-150 cursor-pointer ${
+          className={`px-3.5 py-1.5 rounded-xl text-xs font-montserrat font-bold uppercase tracking-wider transition-all duration-150 cursor-pointer ${
             sortBy === 'health'
-              ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-950 font-bold shadow-sm'
-              : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-white/5 hover:text-zinc-900 dark:hover:text-white'
+              ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-950 shadow-sm'
+              : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-white/5 hover:text-black dark:hover:text-white'
           }`}
         >
-          <span className={`font-playfair font-semibold text-[13px] ${sortBy === 'health' ? '!text-white dark:!text-zinc-950' : ''}`}>
-            Health Score
-          </span>
+          <span>Health Score</span>
         </button>
       </div>
 
@@ -134,7 +130,7 @@ export function AgentComparisonWidget({ agents: rawAgents, loading = false }: Ag
           sorted.slice(0, 5).map((item) => (
             <div
               key={item.id}
-              className="flex items-center justify-between gap-4 px-4 py-3 rounded-xl border border-zinc-200/90 dark:border-zinc-800 bg-white dark:bg-zinc-900/60 hover:border-violet-400/50 hover:shadow-xs transition duration-150"
+              className="flex items-center justify-between gap-4 px-4 py-3 rounded-xl border border-zinc-200/90 dark:border-zinc-800 bg-white dark:bg-zinc-900/60 hover:border-blue-500/50 hover:shadow-xs transition duration-150"
             >
               {/* Agent Identity */}
               <div className="flex-1 min-w-0">

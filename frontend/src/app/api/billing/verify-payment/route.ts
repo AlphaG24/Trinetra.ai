@@ -571,6 +571,10 @@ export async function POST(request: Request) {
             ? productsObj 
             : (productsObj?.items || [])
 
+          // Track newly created agent IDs for direct 1-to-1 phone number pairing in this bundle
+          const bundleCreatedAgentIds: string[] = []
+          let numberAgentIndex = 0
+
           for (const prod of productsList) {
             if (prod.type === 'agent') {
               additionalAgentsToAdd += prod.quantity * item.quantity
@@ -674,10 +678,12 @@ export async function POST(request: Request) {
                 if (insertAgentErr) {
                   console.error('[Verify Payment] Bundle Agent Instant Creation Error:', insertAgentErr)
                 } else if (newAgents && newAgents.length > 0) {
+                  const createdId = newAgents[0].id
+                  bundleCreatedAgentIds.push(createdId)
                   if (!firstAgentId) {
-                    firstAgentId = newAgents[0].id
+                    firstAgentId = createdId
                   }
-                  console.log('[Verify Payment] Instantly created and allotted bundle agent:', agentName)
+                  console.log('[Verify Payment] Instantly created and allotted bundle agent:', agentName, createdId)
                 }
               }
             } else if (prod.type === 'phone_number') {
@@ -712,7 +718,27 @@ export async function POST(request: Request) {
                   }
 
                   if (availableNumber) {
-                    // Claim and assign to this user's organization
+                    // Determine which agent to pair this number with:
+                    // 1st Priority: Corresponding agent created in this same bundle
+                    // 2nd Priority: Any existing unlinked agent owned by user/org
+                    let targetAgentId = bundleCreatedAgentIds[numberAgentIndex] || null
+                    if (targetAgentId) {
+                      numberAgentIndex++
+                    } else {
+                      // Fallback: look for an agent without a phone number
+                      const { data: fallbackAgent } = await adminClient
+                        .from('agents')
+                        .select('id')
+                        .eq('user_id', user.id)
+                        .neq('status', 'deleted')
+                        .limit(1)
+                        .maybeSingle()
+                      if (fallbackAgent) {
+                        targetAgentId = fallbackAgent.id
+                      }
+                    }
+
+                    // Claim and assign number to user, org, and target agent
                     await adminClient
                       .from('phone_numbers')
                       .update({
@@ -720,31 +746,22 @@ export async function POST(request: Request) {
                         status: 'active',
                         organization_id: profile.organization_id || null,
                         assigned_org_id: profile.organization_id || null,
+                        assigned_agent_id: targetAgentId || null,
                         assigned_at: new Date().toISOString()
                       })
                       .eq('id', availableNumber.id);
 
-                    // If user has an agent that has no assigned number yet, auto-link it
-                    if (profile.organization_id) {
-                      const { data: orgAgents } = await adminClient
-                        .from('agents')
-                        .select('id')
-                        .eq('organization_id', profile.organization_id)
-                        .neq('status', 'deleted')
-                        .limit(1);
-
-                      if (orgAgents && orgAgents.length > 0) {
-                        const agentId = orgAgents[0].id;
-                        try {
-                          await adminClient.from('agent_phone_numbers').insert({
-                            agent_id: agentId,
-                            phone_number_id: availableNumber.id,
-                            is_primary: true
-                          });
-                          await adminClient.from('phone_numbers').update({ assigned_agent_id: agentId }).eq('id', availableNumber.id);
-                        } catch (linkErr) {
-                          console.warn('[Verify Payment] Could not auto-link agent to claimed number:', linkErr);
-                        }
+                    // Insert or update agent_phone_numbers mapping table
+                    if (targetAgentId) {
+                      try {
+                        await adminClient.from('agent_phone_numbers').insert({
+                          agent_id: targetAgentId,
+                          phone_number_id: availableNumber.id,
+                          is_primary: true
+                        });
+                        console.log(`[Verify Payment] Successfully paired bundle phone number ${availableNumber.phone_number} to agent ${targetAgentId}`);
+                      } catch (linkErr) {
+                        console.warn('[Verify Payment] Could not insert into agent_phone_numbers:', linkErr);
                       }
                     }
 
@@ -754,10 +771,11 @@ export async function POST(request: Request) {
                         user_id: user.id,
                         activity_type: 'number_provisioned',
                         title: 'Pack Phone Number Assigned',
-                        description: `Assigned number ${availableNumber.phone_number} from purchased package`,
+                        description: `Assigned number ${availableNumber.phone_number} from purchased package${targetAgentId ? ' and linked to agent' : ''}`,
                         metadata: {
                           organization_id: profile.organization_id || null,
-                          phone_number: availableNumber.phone_number
+                          phone_number: availableNumber.phone_number,
+                          agent_id: targetAgentId || null
                         }
                       });
                     } catch (e) {}

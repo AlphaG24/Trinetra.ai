@@ -46,19 +46,19 @@ export function VolumeChart({ agents }: VolumeChartProps) {
         <div className="flex bg-white/5 rounded-lg p-1 border border-white/5">
           <button 
             onClick={() => setPeriod('7d')}
-            className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${period === '7d' ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg' : 'text-white/50 hover:text-white'}`}
+            className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${period === '7d' ? 'bg-gradient-to-r from-blue-600 to-sky-600 text-white shadow-lg' : 'text-white/50 hover:text-white'}`}
           >
             7 days
           </button>
           <button 
             onClick={() => setPeriod('30d')}
-            className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${period === '30d' ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg' : 'text-white/50 hover:text-white'}`}
+            className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${period === '30d' ? 'bg-gradient-to-r from-blue-600 to-sky-600 text-white shadow-lg' : 'text-white/50 hover:text-white'}`}
           >
             30 days
           </button>
           <button 
             onClick={() => setPeriod('3m')}
-            className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${period === '3m' ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg' : 'text-white/50 hover:text-white'}`}
+            className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${period === '3m' ? 'bg-gradient-to-r from-blue-600 to-sky-600 text-white shadow-lg' : 'text-white/50 hover:text-white'}`}
           >
             3 months
           </button>
@@ -79,12 +79,12 @@ export function VolumeChart({ agents }: VolumeChartProps) {
             <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
               <defs>
                 <linearGradient id="purpleGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#7c3aed" stopOpacity={0.3}/>
-                  <stop offset="95%" stopColor="#7c3aed" stopOpacity={0}/>
+                  <stop offset="5%" stopColor="#2563EB" stopOpacity={0.3}/>
+                  <stop offset="95%" stopColor="#2563EB" stopOpacity={0}/>
                 </linearGradient>
                 <linearGradient id="blueGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/>
-                  <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                  <stop offset="5%" stopColor="#0284C7" stopOpacity={0.3}/>
+                  <stop offset="95%" stopColor="#0284C7" stopOpacity={0}/>
                 </linearGradient>
                 <linearGradient id="greenGradient" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor="#10b981" stopOpacity={0.3}/>
@@ -120,7 +120,7 @@ export function VolumeChart({ agents }: VolumeChartProps) {
                   type="monotone" 
                   dataKey="voice" 
                   name="Voice Calls"
-                  stroke="#7c3aed" 
+                  stroke="#2563EB" 
                   strokeWidth={2}
                   fillOpacity={1} 
                   fill="url(#purpleGradient)" 

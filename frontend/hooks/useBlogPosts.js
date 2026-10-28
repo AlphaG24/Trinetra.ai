@@ -186,7 +186,7 @@ export default function useBlogPosts({ category, searchQuery, sortBy }) {
 
   useEffect(() => {
     const channel = supabase
-      .channel(`blog_posts_feed_${filterKey}`)
+      .channel("blog_posts_feed_global")
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "blog_posts" },
@@ -205,7 +205,7 @@ export default function useBlogPosts({ category, searchQuery, sortBy }) {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [filterKey, category, searchQuery, refetchLoaded]);
+  }, [category, searchQuery, refetchLoaded]);
 
   const hasMore = posts.length < totalCount;
 

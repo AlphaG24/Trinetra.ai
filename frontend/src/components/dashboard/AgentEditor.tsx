@@ -70,7 +70,7 @@ export function AgentEditor({ agent }: { agent: any }) {
 
                         <div className="bg-zinc-900/50 border border-white/5 rounded-xl p-6">
                             <div className="flex items-center gap-2 mb-6 border-b border-white/5 pb-4">
-                                <Mic className="text-purple-500" size={20} />
+                                <Mic className="text-blue-500" size={20} />
                                 <h2 className="text-lg font-bold text-white tracking-wide">VOICE SYNTHESIS</h2>
                             </div>
 
@@ -81,7 +81,7 @@ export function AgentEditor({ agent }: { agent: any }) {
                                         <select
                                             value={voiceId}
                                             onChange={(e) => setVoiceId(e.target.value)}
-                                            className="w-full bg-black border border-white/10 rounded-lg px-4 py-3 text-white focus:border-purple-500 outline-none appearance-none"
+                                            className="w-full bg-black border border-white/10 rounded-lg px-4 py-3 text-white focus:border-blue-500 outline-none appearance-none"
                                         >
                                             <option value="21m00Tcm4TlvDq8ikWAM">Rachel (American - Calm)</option>
                                             <option value="2EiwWnXFnvU5JabPnv8n">Clyde (Deep - Technical)</option>
@@ -90,7 +90,7 @@ export function AgentEditor({ agent }: { agent: any }) {
                                         </select>
                                         <button
                                             onClick={() => alert('Playing voice sample...')}
-                                            className="p-3 bg-white/5 border border-white/10 rounded-lg hover:bg-white/10 hover:text-purple-400 transition-colors shrink-0"
+                                            className="p-3 bg-white/5 border border-white/10 rounded-lg hover:bg-white/10 hover:text-blue-400 transition-colors shrink-0"
                                             title="Preview Voice"
                                         >
                                             <Sliders size={20} className="rotate-90" />
@@ -108,7 +108,7 @@ export function AgentEditor({ agent }: { agent: any }) {
                                             type="range" min="0.5" max="2.0" step="0.1"
                                             value={speed}
                                             onChange={(e) => setSpeed(parseFloat(e.target.value))}
-                                            className="w-full accent-purple-500 h-1 bg-zinc-800 rounded-lg appearance-none cursor-pointer"
+                                            className="w-full accent-blue-600 h-1 bg-zinc-800 rounded-lg appearance-none cursor-pointer"
                                         />
                                     </div>
 
@@ -121,7 +121,7 @@ export function AgentEditor({ agent }: { agent: any }) {
                                             type="range" min="0" max="1" step="0.05"
                                             value={stability}
                                             onChange={(e) => setStability(parseFloat(e.target.value))}
-                                            className="w-full accent-purple-500 h-1 bg-zinc-800 rounded-lg appearance-none cursor-pointer"
+                                            className="w-full accent-blue-600 h-1 bg-zinc-800 rounded-lg appearance-none cursor-pointer"
                                         />
                                     </div>
                                 </div>

@@ -75,7 +75,7 @@ export function AgentSettingsTab({ agent, onDelete }: AgentSettingsTabProps) {
       <div className="flex items-center justify-between pb-4 border-b border-zinc-200 dark:border-white/5">
         <div>
           <h2 className="text-xl font-bold font-display text-zinc-900 dark:text-white flex items-center gap-2">
-            <Settings2 className="w-5 h-5 text-violet-500" /> Agent Settings
+            <Settings2 className="w-5 h-5 text-zinc-900 dark:text-white" /> Agent Settings
           </h2>
           <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
             Manage agent identity, advanced settings, configuration resets, and agent deletion.
@@ -84,9 +84,9 @@ export function AgentSettingsTab({ agent, onDelete }: AgentSettingsTabProps) {
       </div>
 
       {/* Agent Identity & Name Card */}
-      <div className="bg-white dark:bg-[#0D0120] border border-zinc-200 dark:border-white/5 rounded-2xl p-6 shadow-sm space-y-4">
+      <div className="bg-white dark:bg-slate-900/60 border border-zinc-200 dark:border-white/5 rounded-2xl p-6 shadow-sm space-y-4">
         <div className="space-y-1">
-          <div className="flex items-center gap-2 text-violet-500">
+          <div className="flex items-center gap-2 text-zinc-900 dark:text-white">
             <UserCheck className="w-4 h-4" />
             <h3 className="text-sm font-bold">Agent Name & Identity</h3>
           </div>
@@ -109,7 +109,7 @@ export function AgentSettingsTab({ agent, onDelete }: AgentSettingsTabProps) {
           <button
             onClick={handleSaveName}
             disabled={savingName || !agentName.trim()}
-            className="flex items-center justify-center gap-1.5 px-5 py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 font-bold text-xs uppercase tracking-wider transition-all disabled:opacity-50 cursor-pointer shadow-sm active:scale-[0.99]"
+            className="flex items-center justify-center gap-1.5 px-5 py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-100 font-bold text-xs uppercase tracking-wider transition-all disabled:opacity-50 cursor-pointer shadow-sm active:scale-[0.99]"
           >
             {savingName ? (
               <>
@@ -127,7 +127,7 @@ export function AgentSettingsTab({ agent, onDelete }: AgentSettingsTabProps) {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         
         {/* Reset Configuration */}
-        <div className="bg-white dark:bg-[#0D0120] border border-zinc-200 dark:border-white/5 rounded-2xl p-6 space-y-4 shadow-sm flex flex-col justify-between">
+        <div className="bg-white dark:bg-slate-900/60 border border-zinc-200 dark:border-white/5 rounded-2xl p-6 space-y-4 shadow-sm flex flex-col justify-between">
           <div className="space-y-2">
             <div className="flex items-center gap-2 text-amber-500 dark:text-amber-400">
               <RefreshCw className="w-4 h-4 animate-spin-slow" />
@@ -159,7 +159,7 @@ export function AgentSettingsTab({ agent, onDelete }: AgentSettingsTabProps) {
         </div>
 
         {/* Delete Agent (Danger Zone) */}
-        <div className="bg-white dark:bg-[#0D0120] border border-zinc-200 dark:border-white/5 rounded-2xl p-6 space-y-4 shadow-sm flex flex-col justify-between border-rose-500/15 dark:border-rose-900/20">
+        <div className="bg-white dark:bg-slate-900/60 border border-zinc-200 dark:border-white/5 rounded-2xl p-6 space-y-4 shadow-sm flex flex-col justify-between border-rose-500/15 dark:border-rose-900/20">
           <div className="space-y-2">
             <div className="flex items-center gap-2 text-rose-500">
               <AlertTriangle className="w-4 h-4" />

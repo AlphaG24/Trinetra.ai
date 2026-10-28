@@ -130,17 +130,19 @@ export function AgentVoiceTab({ agent, isPaid, upgradeUrl }: AgentVoiceTabProps)
   }
 
   useEffect(() => {
-    if (provider === 'elevenlabs' && elevenLabsVoices.length === 0) {
+    // Load both catalogs on mount so voice selection works seamlessly without manual provider toggle
+    if (elevenLabsVoices.length === 0) {
       fetch('/api/elevenlabs/voices')
         .then(res => res.json())
         .then(data => {
-          if (data.voices) {
-            const freeTierIds = ['21m00Tcm4TlvDq8ikWAM','pNInz6obpgDQGcFmaJgB','ErXwobaYiN019PkySvjV','AZnzlk1XvdvUeBnXmlld','MF3mGyEYCl7XYWbV9V6O','TxGEqnHWrfWFTfGW9XjX','EXAVITQu4vr4xnSDxMaL']
-            setElevenLabsVoices(data.voices.filter((v: any) => freeTierIds.includes(v.voice_id)))
+          if (data.voices && Array.isArray(data.voices)) {
+            // Display all available studio voices from the ElevenLabs account
+            setElevenLabsVoices(data.voices)
           }
         })
         .catch(err => console.error("Error fetching ElevenLabs voices:", err))
-    } else if (provider === 'sarvam' && sarvamVoices.length === 0) {
+    }
+    if (sarvamVoices.length === 0) {
       fetch('/api/sarvam/voices')
         .then(res => res.json())
         .then(data => {
@@ -148,14 +150,22 @@ export function AgentVoiceTab({ agent, isPaid, upgradeUrl }: AgentVoiceTabProps)
         })
         .catch(err => console.error("Error fetching Sarvam voices:", err))
     }
-  }, [provider, elevenLabsVoices.length, sarvamVoices.length])
+  }, [elevenLabsVoices.length, sarvamVoices.length])
 
   const detectedVoiceGender = detectVoiceGender(selectedVoice, provider === 'elevenlabs' ? elevenLabsVoices : sarvamVoices)
   const isGenderUnresolved = gender === 'auto' && !detectedVoiceGender
 
   const handleVoiceChange = (newVoiceId: string) => {
     setSelectedVoice(newVoiceId)
-    const detected = detectVoiceGender(newVoiceId, provider === 'elevenlabs' ? elevenLabsVoices : sarvamVoices)
+    // Check if newVoiceId belongs to ElevenLabs or Sarvam to keep provider state aligned
+    const isEleven = elevenLabsVoices.some(v => v.voice_id === newVoiceId) || newVoiceId.startsWith('cloned-')
+    const activeCatalog = isEleven ? elevenLabsVoices : sarvamVoices
+    if (isEleven && provider !== 'elevenlabs') {
+      setProvider('elevenlabs')
+    } else if (!isEleven && provider !== 'sarvam') {
+      setProvider('sarvam')
+    }
+    const detected = detectVoiceGender(newVoiceId, activeCatalog)
     if (detected) {
       setGender(detected)
     }
@@ -163,21 +173,18 @@ export function AgentVoiceTab({ agent, isPaid, upgradeUrl }: AgentVoiceTabProps)
 
   const handleLanguageChange = (newLanguage: string) => {
     setLanguage(newLanguage)
-    if (provider === 'elevenlabs' && (newLanguage === 'hinglish' || newLanguage === 'hi-IN')) {
-      toast.warning("ElevenLabs does not support Hindi voices. Switch to Sarvam for Hindi/Hinglish.")
+    // Smart auto-routing: Indic languages (Hinglish, Hindi, en-IN) route to native Indic engine; US/UK/International route to Studio HD
+    const isIndic = newLanguage === 'hinglish' || newLanguage === 'hi-IN' || newLanguage === 'en-IN'
+    if (isIndic) {
       setProvider('sarvam')
       setSelectedVoice('shubh')
       setGender('male')
-    } else if (newLanguage === 'en-US' || newLanguage === 'en-GB' || newLanguage === 'en-IN') {
-      if (provider === 'elevenlabs') {
-        const v = newLanguage === 'en-GB' ? 'ErXwobaYiN019PkySvjV' : '21m00Tcm4TlvDq8ikWAM'
-        setSelectedVoice(v)
-        const d = detectVoiceGender(v, elevenLabsVoices)
-        if (d) setGender(d)
-      }
-    } else if (provider === 'sarvam' && (newLanguage === 'hinglish' || newLanguage === 'hi-IN')) {
-      setSelectedVoice('shubh')
-      setGender('male')
+    } else {
+      setProvider('elevenlabs')
+      const defaultGlobalVoice = newLanguage === 'en-GB' ? 'ErXwobaYiN019PkySvjV' : '21m00Tcm4TlvDq8ikWAM'
+      setSelectedVoice(defaultGlobalVoice)
+      const d = detectVoiceGender(defaultGlobalVoice, elevenLabsVoices)
+      if (d) setGender(d)
     }
   }
 
@@ -210,11 +217,11 @@ export function AgentVoiceTab({ agent, isPaid, upgradeUrl }: AgentVoiceTabProps)
     try {
       const isMale = sarvamVoices.find(v => v.id === voiceId)?.gender === 'Male' || ['pNInz6obpgDQGcFmaJgB', 'TxGEqnHWrfWFTfGW9XjX'].includes(voiceId)
       
-      let previewText = "Hello, I'm an AI assistant from Trinetra. How can I help you today?"
+      let previewText = "Hello, I'm an AI assistant from Vaakriti. How can I help you today?"
       if (language === 'hinglish' || language === 'hi-IN') {
         previewText = isMale 
-          ? "Namaste ji, main Trinetra AI se Vikram bol raha hoon. Kya main 30 second ke liye aapka time le sakta hoon?"
-          : "Namaste ji, main Trinetra AI se Anushka bol rahi hoon. Kya main 30 second ke liye aapka time le sakti hoon?"
+          ? "Namaste ji, main Vaakriti AI se Vikram bol raha hoon. Kya main 30 second ke liye aapka time le sakta hoon?"
+          : "Namaste ji, main Vaakriti AI se Anushka bol rahi hoon. Kya main 30 second ke liye aapka time le sakti hoon?"
       }
 
       const res = await fetch('/api/voice/tts-test', {
@@ -335,7 +342,7 @@ export function AgentVoiceTab({ agent, isPaid, upgradeUrl }: AgentVoiceTabProps)
         <div className="lg:col-span-3 space-y-6">
           <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-6 md:p-8 shadow-sm space-y-6">
             <h2 className="text-xl font-bold font-display text-[var(--heading)] flex items-center gap-2">
-              <Volume2 className="w-5 h-5 text-violet-400" /> Voice Synthesis Settings
+              <Volume2 className="w-5 h-5 text-blue-600 dark:text-blue-400" /> Voice Synthesis Settings
             </h2>
 
             {/* Language & Personality Selectors */}
@@ -345,7 +352,7 @@ export function AgentVoiceTab({ agent, isPaid, upgradeUrl }: AgentVoiceTabProps)
                 <select
                   value={language}
                   onChange={(e) => handleLanguageChange(e.target.value)}
-                  className="w-full bg-[var(--background)] border border-[var(--border)] rounded-xl px-4 py-3 text-xs focus:outline-none focus:ring-1 focus:ring-[var(--heading)]/25 text-[var(--heading)] font-montserrat font-bold uppercase tracking-wider cursor-pointer"
+                  className="w-full bg-[var(--background)] border border-[var(--border)] rounded-xl px-4 py-3 text-xs focus:outline-none focus:ring-1 focus:ring-blue-600/40 text-[var(--heading)] font-montserrat font-bold uppercase tracking-wider cursor-pointer"
                 >
                   <option value="hinglish">Hinglish (Hindi + English)</option>
                   <option value="hi-IN">Hindi (hi-IN)</option>
@@ -360,7 +367,7 @@ export function AgentVoiceTab({ agent, isPaid, upgradeUrl }: AgentVoiceTabProps)
                 <select
                   value={personality}
                   onChange={(e) => setPersonality(e.target.value)}
-                  className="w-full bg-[var(--background)] border border-[var(--border)] rounded-xl px-4 py-3 text-xs focus:outline-none focus:ring-1 focus:ring-[var(--heading)]/25 text-[var(--heading)] font-montserrat font-bold uppercase tracking-wider cursor-pointer"
+                  className="w-full bg-[var(--background)] border border-[var(--border)] rounded-xl px-4 py-3 text-xs focus:outline-none focus:ring-1 focus:ring-blue-600/40 text-[var(--heading)] font-montserrat font-bold uppercase tracking-wider cursor-pointer"
                 >
                   <option value="professional">Professional (Formal/Concise)</option>
                   <option value="friendly">Friendly (Warm/Conversational)</option>
@@ -370,99 +377,75 @@ export function AgentVoiceTab({ agent, isPaid, upgradeUrl }: AgentVoiceTabProps)
               </div>
             </div>
 
-            {/* Provider Radios */}
-            <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-wider font-montserrat text-[var(--muted)]">Voice Provider</label>
-              <div className="grid grid-cols-2 gap-3">
-                <label className={`flex items-center justify-between p-4 rounded-xl border cursor-pointer transition-all ${
-                  provider === 'elevenlabs' 
-                    ? 'border-[var(--primary-bg)] bg-[var(--primary-bg)]/5 text-[var(--heading)]' 
-                    : 'border-[var(--border)] bg-transparent text-[var(--body)] hover:bg-[var(--hover-bg)]/20'
-                }`}>
-                  <span className="text-xs font-montserrat font-bold uppercase tracking-wider">ElevenLabs (HD Voices)</span>
-                  <input 
-                    type="radio" 
-                    name="voice_provider" 
-                    checked={provider === 'elevenlabs'}
-                    onChange={() => handleProviderChange('elevenlabs')}
-                    className="sr-only"
-                  />
-                </label>
 
-                <label className={`flex items-center justify-between p-4 rounded-xl border cursor-pointer transition-all ${
-                  provider === 'sarvam' 
-                    ? 'border-[var(--primary-bg)] bg-[var(--primary-bg)]/5 text-[var(--heading)]' 
-                    : 'border-[var(--border)] bg-transparent text-[var(--body)] hover:bg-[var(--hover-bg)]/20'
-                }`}>
-                  <span className="text-xs font-montserrat font-bold uppercase tracking-wider">Sarvam AI (Indic Accents)</span>
-                  <input 
-                    type="radio" 
-                    name="voice_provider" 
-                    checked={provider === 'sarvam'}
-                    onChange={() => handleProviderChange('sarvam')}
-                    className="sr-only"
-                  />
-                </label>
-              </div>
-            </div>
 
             {/* Voice Picker Dropdown & Gender Selector */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="md:col-span-2 space-y-2">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2 min-w-0">
                 <label className="text-xs font-bold uppercase tracking-wider font-montserrat text-[var(--muted)]">Select Voice</label>
-                <div className="flex gap-3">
+                <div className="flex items-center gap-2">
                   <select
                     value={selectedVoice}
                     onChange={(e) => handleVoiceChange(e.target.value)}
-                    className="flex-grow bg-[var(--background)] border border-[var(--border)] rounded-xl px-4 py-3 text-xs focus:outline-none focus:ring-1 focus:ring-[var(--heading)]/25 text-[var(--heading)] font-montserrat font-bold uppercase tracking-wider cursor-pointer"
+                    className="flex-1 min-w-0 bg-[var(--background)] border border-[var(--border)] rounded-xl px-3.5 py-3 text-xs focus:outline-none focus:border-zinc-900 dark:focus:border-white text-[var(--heading)] font-montserrat font-bold uppercase tracking-wider cursor-pointer truncate"
                   >
-                    {provider === 'elevenlabs' ? (
-                      <>
-                        {elevenLabsVoices.length > 0 ? elevenLabsVoices.map(voice => (
-                          <option key={voice.voice_id} value={voice.voice_id}>
-                            {voice.name} ({voice.labels?.gender || 'Unknown'}, {voice.labels?.accent || 'Standard'})
-                          </option>
-                        )) : (
-                          <option value="EXAVITQu4vr4xnSDxMaL">Rachel (Female, Warm)</option>
-                        )}
-                        {selectedVoice.startsWith('cloned-') && (
-                          <option value={selectedVoice}>Cloned Custom Voice ({selectedVoice.slice(0, 11)})</option>
-                        )}
-                      </>
-                    ) : (
-                      <>
+                    {/* Show voices categorized cleanly by region/engine */}
+                    {language === 'hinglish' || language === 'hi-IN' || language === 'en-IN' ? (
+                      <optgroup label="Vaakriti Indic Voices">
                         {sarvamVoices.length > 0 ? sarvamVoices.map(voice => (
                           <option key={voice.id} value={voice.id}>
                             {voice.name} ({voice.gender})
                           </option>
                         )) : (
-                          <option value="aditi">Aditi (Female)</option>
+                          <>
+                            <option value="shubh">Shubh (Male)</option>
+                            <option value="aditi">Aditi (Female)</option>
+                          </>
                         )}
-                      </>
+                      </optgroup>
+                    ) : (
+                      <optgroup label="Studio International Voices">
+                        {elevenLabsVoices.length > 0 ? elevenLabsVoices.map(voice => (
+                          <option key={voice.voice_id} value={voice.voice_id}>
+                            {voice.name} ({voice.labels?.gender || 'Voice'}, {voice.labels?.accent || 'Studio'})
+                          </option>
+                        )) : (
+                          <>
+                            <option value="21m00Tcm4TlvDq8ikWAM">Rachel (Female, Natural & Calm)</option>
+                            <option value="pNInz6obpgDQGcFmaJgB">Adam (Male, Narration & Deep)</option>
+                            <option value="ErXwobaYiN019PkySvjV">Antoni (Male, Crisp & Energetic)</option>
+                            <option value="EXAVITQu4vr4xnSDxMaL">Bella (Female, Professional & Soft)</option>
+                            <option value="TxGEqnHWrfWFTfGW9XjX">Josh (Male, Friendly & Conversational)</option>
+                            <option value="MF3mGyEYCl7XYWbV9V6O">Ellie (Female, Expressive)</option>
+                            <option value="AZnzlk1XvdvUeBnXmlld">Domi (Female, Strong & Confident)</option>
+                          </>
+                        )}
+                        {selectedVoice.startsWith('cloned-') && (
+                          <option value={selectedVoice}>Custom Cloned Voice</option>
+                        )}
+                      </optgroup>
                     )}
                   </select>
                   <button
                     onClick={() => handlePlayPreview(selectedVoice)}
                     disabled={isPreviewing}
-                    className="px-5 rounded-xl bg-[var(--primary-bg)] text-[var(--heading)] hover:bg-[var(--hover-bg)] border border-[var(--border)] font-bold text-xs uppercase tracking-wider font-montserrat transition-all flex items-center justify-center shrink-0 cursor-pointer shadow-md disabled:opacity-50"
+                    className="w-11 h-11 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 font-bold text-xs uppercase tracking-wider font-montserrat transition-all flex items-center justify-center shrink-0 cursor-pointer shadow-sm active:scale-95 disabled:opacity-50"
+                    title={playingId === selectedVoice ? 'Pause Preview' : 'Play Voice Preview'}
                   >
-                    {isPreviewing ? <Loader2 className="w-4 h-4 animate-spin" /> : playingId === selectedVoice ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+                    {isPreviewing ? <Loader2 className="w-4 h-4 animate-spin" /> : playingId === selectedVoice ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 fill-current" />}
                   </button>
                 </div>
-                {provider === 'elevenlabs' && (
-                  <p className="text-[10px] text-[var(--muted)] font-sans mt-2">Want more voices? Upgrade to an ElevenLabs paid plan.</p>
-                )}
               </div>
 
-              <div className="space-y-2">
+              <div className="space-y-2 min-w-0">
                 <div className="flex items-center justify-between">
                   <label className="text-xs font-bold uppercase tracking-wider font-montserrat text-[var(--muted)]">Agent Gender</label>
                   {isGenderUnresolved ? (
-                    <span className="text-[10px] text-amber-400 font-semibold flex items-center gap-1">
+                    <span className="text-[10px] text-amber-500 font-semibold flex items-center gap-1">
                       <AlertCircle className="w-3 h-3" /> Unresolved
                     </span>
                   ) : (
-                    <span className="text-[10px] text-emerald-400 font-semibold flex items-center gap-1">
+                    <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1">
                       <CheckCircle2 className="w-3 h-3" /> Auto-set
                     </span>
                   )}
@@ -470,7 +453,7 @@ export function AgentVoiceTab({ agent, isPaid, upgradeUrl }: AgentVoiceTabProps)
                 <select
                   value={gender}
                   onChange={(e) => setGender(e.target.value as 'male' | 'female' | 'auto')}
-                  className={`w-full bg-[var(--background)] border ${isGenderUnresolved ? 'border-amber-500/60 ring-1 ring-amber-500/20' : 'border-[var(--border)]'} rounded-xl px-4 py-3 text-xs focus:outline-none focus:ring-1 focus:ring-[var(--heading)]/25 text-[var(--heading)] font-montserrat font-bold uppercase tracking-wider cursor-pointer`}
+                  className={`w-full bg-[var(--background)] border ${isGenderUnresolved ? 'border-amber-500/60 ring-1 ring-amber-500/20' : 'border-[var(--border)]'} rounded-xl px-4 py-3 text-xs focus:outline-none focus:ring-1 focus:ring-blue-600/40 text-[var(--heading)] font-montserrat font-bold uppercase tracking-wider cursor-pointer`}
                 >
                   <option value="female">Female (स्त्रीलिंग: रही / सकती)</option>
                   <option value="male">Male (पुल्लिंग: रहा / सकता)</option>
@@ -481,11 +464,11 @@ export function AgentVoiceTab({ agent, isPaid, upgradeUrl }: AgentVoiceTabProps)
 
             {/* Unresolved Gender Warning Alert */}
             {isGenderUnresolved && (
-              <div className="flex items-start gap-2.5 p-3.5 bg-amber-500/10 border border-amber-500/20 rounded-xl text-amber-400 text-xs">
-                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-amber-400" />
+              <div className="flex items-start gap-2.5 p-3.5 bg-amber-500/10 border border-amber-500/20 rounded-xl text-amber-500 text-xs">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-amber-500" />
                 <div>
-                  <p className="font-semibold text-amber-300">Gender is unresolved</p>
-                  <p className="text-[11px] text-amber-400/90 mt-0.5">
+                  <p className="font-semibold text-amber-600 dark:text-amber-300">Gender is unresolved</p>
+                  <p className="text-[11px] text-amber-600/90 dark:text-amber-400/90 mt-0.5">
                     This voice has no catalog gender tag. The agent will use neutral phrasing in Hindi/Hinglish where possible. Please select <strong>Female</strong> or <strong>Male</strong> to set it.
                   </p>
                 </div>
@@ -494,36 +477,52 @@ export function AgentVoiceTab({ agent, isPaid, upgradeUrl }: AgentVoiceTabProps)
 
             {/* Sliders */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-[var(--border)]">
-              <div className="space-y-2">
+              <div className="space-y-3">
                 <div className="flex justify-between text-xs font-montserrat font-bold uppercase tracking-wider text-[var(--muted)]">
                   <span>Speaking Speed</span>
-                  <span className="text-[var(--heading)] font-mono">{speed.toFixed(1)}x</span>
+                  <span className="text-[var(--heading)] font-mono font-bold bg-zinc-100 dark:bg-white/10 px-2 py-0.5 rounded border border-[var(--border)]">{speed.toFixed(1)}x</span>
                 </div>
-                <input
-                  type="range"
-                  min="0.5"
-                  max="2.0"
-                  step="0.1"
-                  value={speed}
-                  onChange={(e) => setSpeed(parseFloat(e.target.value))}
-                  className="w-full h-1.5 bg-[var(--border)] rounded-lg appearance-none cursor-pointer accent-violet-400"
-                />
+                <div className="relative flex items-center py-1">
+                  <input
+                    type="range"
+                    min="0.5"
+                    max="2.0"
+                    step="0.1"
+                    value={speed}
+                    onChange={(e) => setSpeed(parseFloat(e.target.value))}
+                    className="visible-slider-track"
+                    aria-label="Speaking Speed"
+                  />
+                </div>
+                <div className="flex justify-between text-[10px] text-slate-400 font-mono">
+                  <span>0.5x Slow</span>
+                  <span>1.0x Normal</span>
+                  <span>2.0x Fast</span>
+                </div>
               </div>
 
-              <div className="space-y-2">
+              <div className="space-y-3">
                 <div className="flex justify-between text-xs font-montserrat font-bold uppercase tracking-wider text-[var(--muted)]">
                   <span>Pitch Shift</span>
-                  <span className="text-[var(--heading)] font-mono">{pitch > 0 ? `+${pitch}` : pitch}</span>
+                  <span className="text-[var(--heading)] font-mono font-bold bg-zinc-100 dark:bg-white/10 px-2 py-0.5 rounded border border-[var(--border)]">{pitch > 0 ? `+${pitch}` : pitch}</span>
                 </div>
-                <input
-                  type="range"
-                  min="-12"
-                  max="12"
-                  step="1"
-                  value={pitch}
-                  onChange={(e) => setPitch(parseInt(e.target.value, 10))}
-                  className="w-full h-1.5 bg-[var(--border)] rounded-lg appearance-none cursor-pointer accent-violet-400"
-                />
+                <div className="relative flex items-center py-1">
+                  <input
+                    type="range"
+                    min="-12"
+                    max="12"
+                    step="1"
+                    value={pitch}
+                    onChange={(e) => setPitch(parseInt(e.target.value, 10))}
+                    className="visible-slider-track"
+                    aria-label="Pitch Shift"
+                  />
+                </div>
+                <div className="flex justify-between text-[10px] text-slate-400 font-mono">
+                  <span>-12 Deeper</span>
+                  <span>0 Default</span>
+                  <span>+12 Higher</span>
+                </div>
               </div>
             </div>
 
@@ -532,7 +531,7 @@ export function AgentVoiceTab({ agent, isPaid, upgradeUrl }: AgentVoiceTabProps)
               <button
                 onClick={handleSaveVoiceSettings}
                 disabled={saving || resetting}
-                className="px-6 py-3.5 rounded-xl bg-[var(--primary-bg)] text-[var(--heading)] hover:bg-[var(--hover-bg)] border border-[var(--border)] font-montserrat font-bold text-xs uppercase tracking-wider transition-all hover:scale-[1.01] shadow-md cursor-pointer flex items-center justify-center gap-2"
+                className="px-6 py-3.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 font-montserrat font-bold text-xs uppercase tracking-wider transition-all hover:scale-[1.01] shadow-sm hover:shadow cursor-pointer flex items-center justify-center gap-2"
               >
                 {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save Voice Settings'}
               </button>
@@ -541,7 +540,7 @@ export function AgentVoiceTab({ agent, isPaid, upgradeUrl }: AgentVoiceTabProps)
                 type="button"
                 onClick={handleResetVoice}
                 disabled={saving || resetting}
-                className="px-6 py-3.5 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/20 font-montserrat font-bold text-xs uppercase tracking-wider transition-all shadow-md cursor-pointer flex items-center justify-center gap-2"
+                className="px-6 py-3.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-red-50 dark:hover:bg-red-950/20 text-slate-700 dark:text-slate-300 hover:text-red-600 border border-slate-200 dark:border-slate-700 font-montserrat font-bold text-xs uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-2"
               >
                 {resetting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Reset Voice Settings'}
               </button>
@@ -569,13 +568,13 @@ export function AgentVoiceTab({ agent, isPaid, upgradeUrl }: AgentVoiceTabProps)
                     value={clonedName}
                     onChange={(e) => setClonedName(e.target.value)}
                     placeholder="e.g. My Custom Voice"
-                    className="w-full bg-[var(--background)] border border-[var(--border)] rounded-xl px-4 py-3 text-xs focus:outline-none focus:ring-1 focus:ring-[var(--heading)]/25 text-[var(--heading)] font-sans"
+                    className="w-full bg-[var(--background)] border border-[var(--border)] rounded-xl px-4 py-3 text-xs focus:outline-none focus:border-zinc-900 dark:focus:border-white text-[var(--heading)] font-sans"
                   />
                 </div>
 
                 <div className="space-y-2">
                   <label className="text-xs font-bold uppercase tracking-wider font-montserrat text-[var(--muted)]">Upload Reference Audio</label>
-                  <div className="border border-dashed border-[var(--border)] rounded-xl p-6 text-center cursor-pointer hover:bg-[var(--hover-bg)]/20 transition-all flex flex-col items-center justify-center gap-2">
+                  <div className="border border-dashed border-[var(--border)] rounded-xl p-6 text-center cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900/40 transition-all flex flex-col items-center justify-center gap-2">
                     <Upload className="w-6 h-6 text-[var(--muted)]" />
                     <input 
                       type="file" 
@@ -584,7 +583,7 @@ export function AgentVoiceTab({ agent, isPaid, upgradeUrl }: AgentVoiceTabProps)
                       className="sr-only"
                       id="voice-clone-upload"
                     />
-                    <label htmlFor="voice-clone-upload" className="text-xs font-montserrat font-bold uppercase tracking-wider text-violet-500 hover:text-violet-600 cursor-pointer">
+                    <label htmlFor="voice-clone-upload" className="text-xs font-montserrat font-bold uppercase tracking-wider text-[var(--heading)] hover:opacity-80 underline cursor-pointer">
                       {cloningFile ? cloningFile.name : 'Select Audio File'}
                     </label>
                     <span className="text-[10px] text-[var(--muted)] font-sans">WAV, MP3, or M4A up to 10MB</span>
@@ -594,7 +593,7 @@ export function AgentVoiceTab({ agent, isPaid, upgradeUrl }: AgentVoiceTabProps)
                 <button
                   type="submit"
                   disabled={isCloning}
-                  className="w-full py-3.5 rounded-xl bg-[var(--primary-bg)] text-[var(--heading)] hover:bg-[var(--hover-bg)] border border-[var(--border)] font-montserrat font-bold text-xs uppercase tracking-wider transition-all disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2"
+                  className="w-full py-3.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 font-montserrat font-bold text-xs uppercase tracking-wider transition-all disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2 shadow-sm"
                 >
                   {isCloning ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Clone voice reference'}
                 </button>

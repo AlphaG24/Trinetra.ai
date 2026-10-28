@@ -10,6 +10,8 @@ import { AuthProvider } from "@/src/components/providers/AuthProvider";
 // Client wrapper that applies ssr:false for MaintenanceWatcher
 import { MaintenanceWatcherLoader } from '@/src/components/dashboard/MaintenanceWatcherLoader';
 
+let globalMaintenanceCache: { value: boolean; timestamp: number } | null = null;
+
 const inter = Inter({
   subsets: ["latin"],
   variable: "--font-inter",
@@ -151,29 +153,35 @@ export default async function RootLayout({
   };
 
   let initialMaintenanceMode = false;
-  try {
-    const { createClient: createSupabaseClient } = await import('@supabase/supabase-js');
-    const supabaseAdmin = createSupabaseClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        auth: { persistSession: false, autoRefreshToken: false }
-      }
-    );
-    const queryPromise = supabaseAdmin
-      .from('system_config')
-      .select('config_value')
-      .eq('config_key', 'maintenance_mode')
-      .maybeSingle();
+  const now = Date.now();
+  if (globalMaintenanceCache && (now - globalMaintenanceCache.timestamp < 300000)) {
+    initialMaintenanceMode = globalMaintenanceCache.value;
+  } else {
+    try {
+      const { createClient: createSupabaseClient } = await import('@supabase/supabase-js');
+      const supabaseAdmin = createSupabaseClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+        {
+          auth: { persistSession: false, autoRefreshToken: false }
+        }
+      );
+      const queryPromise = supabaseAdmin
+        .from('system_config')
+        .select('config_value')
+        .eq('config_key', 'maintenance_mode')
+        .maybeSingle();
 
-    const timeoutPromise = new Promise<any>((_, reject) =>
-      setTimeout(() => reject(new Error('Supabase layout check timeout')), 1500)
-    );
+      const timeoutPromise = new Promise<any>((_, reject) =>
+        setTimeout(() => reject(new Error('Supabase layout check timeout')), 800)
+      );
 
-    const result = await Promise.race([queryPromise, timeoutPromise]);
-    initialMaintenanceMode = result?.data?.config_value === 'true';
-  } catch {
-    initialMaintenanceMode = false;
+      const result = await Promise.race([queryPromise, timeoutPromise]);
+      initialMaintenanceMode = result?.data?.config_value === 'true';
+      globalMaintenanceCache = { value: initialMaintenanceMode, timestamp: now };
+    } catch {
+      initialMaintenanceMode = false;
+    }
   }
 
   return (

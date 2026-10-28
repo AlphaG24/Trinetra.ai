@@ -46,6 +46,26 @@ async def trigger_outbound_call(req: OutboundCallRequest):
         from app.services.config_service import ConfigService
         import os
 
+        # Safe Routing Switch: If TELEPHONY_ROUTING_MODE is set to sarvam_managed or provider is sarvam,
+        # route call via Sarvam Voice Outbound while leaving custom Twilio/Exotel pipeline 100% intact.
+        routing_mode = (ConfigService.get("TELEPHONY_ROUTING_MODE") or os.getenv("TELEPHONY_ROUTING_MODE") or "sarvam_managed").lower().strip()
+        if routing_mode == "sarvam_managed":
+            try:
+                from app.services.sarvam_outbound_service import SarvamOutboundService
+                sarvam = SarvamOutboundService()
+                call_res = await sarvam.trigger_instant_call(
+                    target_phone=req.to_phone,
+                    user_id=req.organization_id,
+                    org_id=req.organization_id,
+                    agent_id=req.agent_id
+                )
+                if call_res.get("success"):
+                    return {"success": True, "data": call_res, "provider": "sarvam"}
+                else:
+                    logger.warning(f"[Telephony Router] Sarvam instant call notice: {call_res.get('error')}. Falling back to default provider.")
+            except Exception as sarvam_err:
+                logger.warning(f"[Telephony Router] Sarvam instant dial error: {sarvam_err}. Falling back to default provider.")
+
         provider = get_provider("twilio")
         webhook_base = ConfigService.get("TRINETRA_WEBHOOK_BASE_URL") or os.getenv("TRINETRA_WEBHOOK_BASE_URL") or "http://localhost:8000"
         unique_room = f"twilio--{req.agent_id}--nocontact--{uuid.uuid4().hex[:8]}" if req.agent_id else f"twilio--noagent--nocontact--{uuid.uuid4().hex[:8]}"
@@ -457,3 +477,84 @@ async def sync_numbers(organization_id: str, provider: str = "twilio"):
     except Exception as e:
         logger.error(f"Sync failed: {e}")
         raise HTTPException(status_code=500, detail="Sync failed")
+
+class LinkDeploymentRequest(BaseModel):
+    agent_id: str
+    phone_number: str
+    name: Optional[str] = "Customer Line"
+
+@router.post("/link-deployment")
+async def link_sarvam_inbound_deployment(req: LinkDeploymentRequest):
+    """
+    Connects a customer's Trinetra voice agent to their assigned phone number
+    on Sarvam's managed inbound telephony platform.
+    """
+    try:
+        from app.services.sarvam_agent_manager import SarvamAgentManager
+        mgr = SarvamAgentManager()
+
+        # Check existing active deployments
+        deps = await mgr.list_deployments()
+        target_num = req.phone_number.strip().replace(" ", "").replace("-", "")
+        if not target_num.startswith("+"):
+            target_num = f"+{target_num}"
+
+        # If already assigned to this number, update or return success
+        for dep in deps:
+            if target_num in dep.get("phone_numbers", []):
+                return {
+                    "success": True,
+                    "message": "Number already bound on Sarvam telephony",
+                    "deployment_id": dep.get("deployment_id")
+                }
+
+        # Resolve target app_id: check if agent has an authored sarvam_agent_id
+        target_app_id = "Shubhansh-2127e8ff-a55f"
+        try:
+            from database import supabase_admin
+            ag_row = supabase_admin.table("agents").select("sarvam_agent_id, name").eq("id", req.agent_id).maybe_single().execute()
+            if ag_row.data and ag_row.data.get("sarvam_agent_id"):
+                target_app_id = ag_row.data["sarvam_agent_id"]
+        except Exception as ag_err:
+            logger.warning(f"[Sarvam Link Deployment] Could not load agent sarvam_agent_id: {ag_err}")
+
+        # Deploy or re-assign inbound number to the resolved agent app
+        res = await mgr.deploy_inbound_agent(
+            app_id=target_app_id,
+            phone_numbers=[target_num],
+            deployment_name=req.name or f"Vaakriti Agent {req.agent_id[:8]}"
+        )
+        return res
+    except Exception as e:
+        logger.error(f"[Sarvam Link Deployment Exception] {e}")
+        return {"success": False, "error": str(e)}
+
+class SyncAgentRequest(BaseModel):
+    agent_id: str
+    name: str
+    system_prompt: str
+    greeting_message: Optional[str] = None
+    voice_id: Optional[str] = "shubh"
+    language: Optional[str] = "hi"
+
+@router.post("/sync-agent")
+async def sync_sarvam_agent_profile(req: SyncAgentRequest):
+    """
+    Syncs agent modifications made in Trinetra Dashboard directly into Sarvam App Authoring.
+    """
+    try:
+        from app.services.sarvam_agent_manager import SarvamAgentManager
+        mgr = SarvamAgentManager()
+        app_id = f"trinetra-{req.agent_id}"
+        res = await mgr.create_or_update_app(
+            app_id=app_id,
+            name=req.name,
+            prompt=req.system_prompt,
+            greeting=req.greeting_message,
+            voice_id=req.voice_id or "shubh",
+            language=req.language or "hi"
+        )
+        return res
+    except Exception as e:
+        logger.error(f"[Sarvam Sync Agent Exception] {e}")
+        return {"success": False, "error": str(e)}

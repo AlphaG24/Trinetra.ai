@@ -81,21 +81,22 @@ class UsageService:
             
             resolved_limit = max(profile.get("paid_minutes_limit", 0) or 0, tier_limit)
 
-        # 2. Check organization wallet for claimed emergency minutes buffer
+        # 2. Check organization wallet for claimed emergency minutes buffer AND prepaid balance
         emergency_minutes = 0
+        wallet_balance_paisa = 0
         if org_id:
             try:
                 wallet_res = await asyncio.to_thread(
                     self.supabase.table("wallets")
-                    .select("emergency_minutes_available")
+                    .select("emergency_minutes_available, balance_paisa")
                     .eq("organization_id", org_id).execute
                 )
                 if wallet_res.data:
-                    emergency_minutes = wallet_res.data[0].get("emergency_minutes_available", 0) or 0
+                    w_row = wallet_res.data[0]
+                    emergency_minutes = w_row.get("emergency_minutes_available", 0) or 0
+                    wallet_balance_paisa = w_row.get("balance_paisa", 0) or 0
             except Exception as we:
                 logger.warning(f"Error fetching wallet for org {org_id}: {we}")
-
-        effective_limit = resolved_limit + emergency_minutes
 
         # 3. Resolve Used minutes specific to this agent from call logs
         if is_demo:
@@ -114,6 +115,15 @@ class UsageService:
                 logger.warning(f"Error calculating call seconds for agent {agent_id}: {ce}")
                 used = a.get("minutes_used", 0) or 0
 
+        # Convert prepaid wallet balance into usable minutes (at ₹6.00/min or 600 paisa/min)
+        wallet_minutes_credit = max(0, wallet_balance_paisa // 600)
+
+        # 3-Tier Exhaustion Hierarchy:
+        # Tier 1: Plan minutes quota (resolved_limit)
+        # Tier 2: Emergency overdraft minutes buffer (emergency_minutes)
+        # Tier 3: Prepaid wallet balance (wallet_minutes_credit)
+        effective_limit = resolved_limit + emergency_minutes + wallet_minutes_credit
+
         if effective_limit == 0:
             return {
                 "status": "unlimited",
@@ -121,14 +131,22 @@ class UsageService:
                 "limit": resolved_limit,
                 "effective_limit": effective_limit,
                 "emergency_minutes_available": emergency_minutes,
+                "wallet_balance_paisa": wallet_balance_paisa,
+                "wallet_minutes_credit": wallet_minutes_credit,
                 "percent": 0,
                 "agent_name": a.get("name")
             }
         
         percent = round((used / effective_limit) * 100, 1)
         
-        # Determine status (emergency minutes protect agent from being paused)
-        if used >= effective_limit:
+        # AGENT PAUSE RULE:
+        # The agent must NEVER be paused if the user has plan minutes remaining,
+        # OR has claimed emergency buffer minutes, OR has a positive prepaid wallet balance.
+        # It ONLY pauses when all 3 resources are completely exhausted.
+        has_wallet_backing = wallet_balance_paisa > 0
+        has_quota_backing = used < (resolved_limit + emergency_minutes)
+
+        if not has_quota_backing and not has_wallet_backing:
             status = "exceeded"
             await self._pause_agent(agent_id)
         elif percent >= 80:
@@ -143,6 +161,8 @@ class UsageService:
             "limit": resolved_limit,
             "effective_limit": effective_limit,
             "emergency_minutes_available": emergency_minutes,
+            "wallet_balance_paisa": wallet_balance_paisa,
+            "wallet_minutes_credit": wallet_minutes_credit,
             "percent": percent,
             "agent_name": a.get("name")
         }
@@ -257,26 +277,51 @@ class UsageService:
         }
     
     async def increment_minutes(self, agent_id: str, duration_seconds: int):
-        """Add call duration to agent's minutes used"""
+        """Add call duration to agent's minutes used and debit wallet if plan quota is exceeded"""
         import math
         minutes = max(1, math.ceil(duration_seconds / 60))
         
         agent_res = await asyncio.to_thread(
-            self.supabase.table("agents").select("minutes_used").eq("id", agent_id).single().execute
+            self.supabase.table("agents").select("minutes_used, organization_id, minutes_limit").eq("id", agent_id).single().execute
         )
         
         current = 0
         if agent_res.data:
             current = agent_res.data.get("minutes_used", 0) or 0
             new_used = current + minutes
+            org_id = agent_res.data.get("organization_id")
+            db_limit = agent_res.data.get("minutes_limit", 0) or 0
+
             await asyncio.to_thread(
                 self.supabase.table("agents").update({
                     "minutes_used": new_used
                 }).eq("id", agent_id).execute
             )
             logger.info(f"[UsageService] Incremented agent {agent_id} minutes_used: raw_duration={duration_seconds}s -> ceil_minutes={minutes}m | previous={current}m -> new={new_used}m written to DB")
+
+            # Check if this consumption exceeded plan quota and should debit prepaid wallet
+            if org_id and db_limit > 0 and new_used > db_limit:
+                surplus_minutes = min(minutes, new_used - db_limit)
+                if surplus_minutes > 0:
+                    try:
+                        from app.services.wallet_service import WalletService
+                        w_svc = WalletService(self.supabase)
+                        # ₹6.00 per surplus minute = 600 paisa/min
+                        debit_amount_paisa = surplus_minutes * 600
+                        wallet = w_svc.get_or_create_wallet(org_id)
+                        if wallet.get("balance_paisa", 0) >= debit_amount_paisa:
+                            w_svc.debit_wallet(
+                                organization_id=org_id,
+                                amount_paisa=debit_amount_paisa,
+                                tx_type="overage_debit",
+                                reference_id=f"ovg_agent_{agent_id}_{int(duration_seconds)}",
+                                description=f"Plan overage deduction: {surplus_minutes} min(s) @ ₹6/min"
+                            )
+                            logger.info(f"[UsageService] Debited ₹{debit_amount_paisa/100:.2f} from prepaid wallet for {surplus_minutes} overage minute(s)")
+                    except Exception as deb_err:
+                        logger.warning(f"[UsageService] Wallet overage debit failed: {deb_err}")
         
-        # Check limits after increment
+        # Check limits after increment (auto-pause only if all 3 tiers exhausted)
         await self.check_agent_minutes(agent_id)
     
     async def _pause_agent(self, agent_id: str):

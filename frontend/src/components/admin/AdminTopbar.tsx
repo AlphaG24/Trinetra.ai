@@ -48,10 +48,16 @@ export function AdminTopbar({ onMenuClick, isMobileSidebarOpen }: AdminTopbarPro
   }, [authUser, authProfile])
 
   const handleSignOut = async () => {
-    const supabase = createClient()
-    await supabase.auth.signOut()
-    router.push('/login')
-    router.refresh()
+    try {
+      const supabase = createClient()
+      await supabase.auth.signOut()
+    } catch {}
+    try {
+      sessionStorage.clear()
+      localStorage.removeItem('trinetra_auth_profile_cache')
+      localStorage.removeItem('trinetra_user_role')
+    } catch {}
+    window.location.href = '/login'
   }
 
   const displayName = name || (email ? email.split('@')[0] : 'Administrator')

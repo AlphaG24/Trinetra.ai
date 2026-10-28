@@ -234,7 +234,7 @@ export function AgentIntegrationsTab({ agent, unlocked, upgradeUrl }: AgentInteg
   if (loading) {
     return (
       <div className="py-24 text-center text-xs text-zinc-500 flex items-center justify-center gap-2">
-        <Loader2 className="w-5 h-5 animate-spin text-violet-500" /> Loading integration configurations...
+        <Loader2 className="w-5 h-5 animate-spin text-blue-600 dark:text-blue-400" /> Loading integration configurations...
       </div>
     )
   }
@@ -244,7 +244,7 @@ export function AgentIntegrationsTab({ agent, unlocked, upgradeUrl }: AgentInteg
       <div className="flex justify-between items-center pb-4 border-b border-zinc-200 dark:border-white/5">
         <div>
           <h2 className="text-xl font-bold font-display text-zinc-900 dark:text-white flex items-center gap-2">
-            <Puzzle className="w-5 h-5 text-violet-500" /> Agent Integrations
+            <Puzzle className="w-5 h-5 text-blue-600 dark:text-blue-400" /> Agent Integrations
           </h2>
           <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
             Configure integration connections specific to this voice agent.
@@ -262,12 +262,12 @@ export function AgentIntegrationsTab({ agent, unlocked, upgradeUrl }: AgentInteg
           return (
             <div 
               key={type.id}
-              className="bg-white dark:bg-[#0D0120] border border-zinc-200 dark:border-white/5 rounded-2xl p-5 space-y-4 shadow-sm"
+              className="bg-white dark:bg-slate-900/60 border border-zinc-200 dark:border-white/5 rounded-2xl p-5 space-y-4 shadow-sm"
             >
               <div className="flex items-start justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-violet-500/5 dark:bg-violet-500/10 flex items-center justify-center">
-                    <Icon className="w-5 h-5 text-violet-500 dark:text-violet-400" />
+                  <div className="w-10 h-10 rounded-xl bg-blue-600/5 dark:bg-blue-600/10 flex items-center justify-center">
+                    <Icon className="w-5 h-5 text-blue-600 dark:text-blue-400" />
                   </div>
                   <div>
                     <h3 className="text-sm font-bold text-zinc-900 dark:text-white">{type.name}</h3>
@@ -318,7 +318,7 @@ export function AgentIntegrationsTab({ agent, unlocked, upgradeUrl }: AgentInteg
                           placeholder={`Enter ${formatFieldName(field)}`}
                           value={formConfig[field] || ''}
                           onChange={(e) => handleFieldChange(field, e.target.value)}
-                          className="w-full px-3 py-2 bg-zinc-50 dark:bg-[#12101A] border border-zinc-200 dark:border-white/10 rounded-xl text-xs focus:ring-1 focus:ring-violet-500 focus:outline-none"
+                          className="w-full px-3 py-2 bg-zinc-50 dark:bg-slate-950 border border-zinc-200 dark:border-white/10 rounded-xl text-xs focus:ring-1 focus:ring-blue-600 focus:outline-none"
                         />
                       </div>
                     ))}
@@ -337,7 +337,7 @@ export function AgentIntegrationsTab({ agent, unlocked, upgradeUrl }: AgentInteg
                             placeholder={`Enter ${field.label}`}
                             value={formConfig[field.name] || ''}
                             onChange={(e) => handleFieldChange(field.name, e.target.value)}
-                            className="w-full px-3 py-2 bg-zinc-50 dark:bg-[#12101A] border border-zinc-200 dark:border-white/10 rounded-xl text-xs focus:ring-1 focus:ring-violet-500 focus:outline-none"
+                            className="w-full px-3 py-2 bg-zinc-50 dark:bg-slate-950 border border-zinc-200 dark:border-white/10 rounded-xl text-xs focus:ring-1 focus:ring-blue-600 focus:outline-none"
                           />
                         </div>
                       ))}
@@ -359,7 +359,7 @@ export function AgentIntegrationsTab({ agent, unlocked, upgradeUrl }: AgentInteg
                                 type="checkbox"
                                 checked={isTriggerChecked}
                                 onChange={(e) => handleTriggerChange(trigger.event, e.target.checked)}
-                                className="w-3.5 h-3.5 rounded border-zinc-300 text-violet-600 focus:ring-violet-500"
+                                className="w-3.5 h-3.5 rounded border-zinc-300 text-blue-600 focus:ring-blue-600"
                               />
                               <span>{trigger.label}</span>
                             </label>
@@ -380,7 +380,7 @@ export function AgentIntegrationsTab({ agent, unlocked, upgradeUrl }: AgentInteg
                         placeholder="Enter message template notification text..."
                         value={formConfig.message_template || ''}
                         onChange={(e) => handleFieldChange('message_template', e.target.value)}
-                        className="w-full px-3 py-2 bg-zinc-50 dark:bg-[#12101A] border border-zinc-200 dark:border-white/10 rounded-xl text-xs focus:ring-1 focus:ring-violet-500 focus:outline-none font-mono"
+                        className="w-full px-3 py-2 bg-zinc-50 dark:bg-slate-950 border border-zinc-200 dark:border-white/10 rounded-xl text-xs focus:ring-1 focus:ring-blue-600 focus:outline-none font-mono"
                       />
                       <p className="text-[9px] text-zinc-500">
                         Supports placeholder tags: <code className="bg-zinc-100 dark:bg-white/5 px-1 py-0.5 rounded text-[8px] font-mono">&#123;&#123;contact_name&#125;&#125;</code>, <code className="bg-zinc-100 dark:bg-white/5 px-1 py-0.5 rounded text-[8px] font-mono">&#123;&#123;contact_phone&#125;&#125;</code>, <code className="bg-zinc-100 dark:bg-white/5 px-1 py-0.5 rounded text-[8px] font-mono">&#123;&#123;interest_level&#125;&#125;</code>, <code className="bg-zinc-100 dark:bg-white/5 px-1 py-0.5 rounded text-[8px] font-mono">&#123;&#123;call_summary&#125;&#125;</code>.
@@ -393,7 +393,7 @@ export function AgentIntegrationsTab({ agent, unlocked, upgradeUrl }: AgentInteg
                       type="button"
                       disabled={testingType === type.id}
                       onClick={() => handleTestConnection(type)}
-                      className="px-4 py-2 border border-violet-500/20 hover:border-violet-500 text-violet-500 hover:bg-violet-500/5 text-xs font-semibold rounded-xl transition cursor-pointer flex items-center gap-1.5"
+                      className="px-4 py-2 border border-blue-600/20 hover:border-blue-600 text-blue-600 dark:text-blue-400 hover:bg-blue-600/5 text-xs font-semibold rounded-xl transition cursor-pointer flex items-center gap-1.5"
                     >
                       {testingType === type.id ? (
                         <>
@@ -401,7 +401,7 @@ export function AgentIntegrationsTab({ agent, unlocked, upgradeUrl }: AgentInteg
                         </>
                       ) : (
                         <>
-                          <Zap className="w-3.5 h-3.5 fill-violet-500/10" /> Test Connection
+                          <Zap className="w-3.5 h-3.5 fill-blue-600/10 text-blue-600 dark:text-blue-400" /> Test Connection
                         </>
                       )}
                     </button>
@@ -410,7 +410,7 @@ export function AgentIntegrationsTab({ agent, unlocked, upgradeUrl }: AgentInteg
                       type="button"
                       disabled={savingType === type.id}
                       onClick={() => handleSaveConnection(type)}
-                      className="px-4 py-2 bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 disabled:opacity-50 text-xs font-semibold rounded-xl shadow-sm transition-all cursor-pointer flex items-center gap-1.5 active:scale-[0.99]"
+                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50 text-xs font-semibold rounded-xl shadow-sm transition-all cursor-pointer flex items-center gap-1.5 active:scale-[0.99]"
                     >
                       {savingType === type.id ? (
                         <>

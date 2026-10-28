@@ -19,7 +19,7 @@ class CallbackSchedulerService:
     """
     _running: bool = False
     _worker_task: Optional[asyncio.Task] = None
-    _poll_interval_seconds: int = int(os.getenv("CALLBACK_POLL_INTERVAL_SECONDS", "60"))
+    _poll_interval_seconds: int = int(os.getenv("CALLBACK_POLL_INTERVAL_SECONDS", "180"))
 
     @classmethod
     def start_worker(cls):
@@ -45,15 +45,19 @@ class CallbackSchedulerService:
     async def _worker_loop(cls):
         """Main polling loop for scheduled callbacks."""
         while cls._running:
+            delay = cls._poll_interval_seconds
             try:
-                await cls.process_due_callbacks()
+                has_error = await cls.process_due_callbacks()
+                if has_error:
+                    delay = max(cls._poll_interval_seconds, 180)
             except asyncio.CancelledError:
                 break
             except Exception as e:
                 logger.error(f"[CallbackScheduler] Unexpected error in worker loop: {e}", exc_info=True)
+                delay = 180
             
             try:
-                await asyncio.sleep(cls._poll_interval_seconds)
+                await asyncio.sleep(delay)
             except asyncio.CancelledError:
                 break
 
@@ -78,10 +82,10 @@ class CallbackSchedulerService:
             callbacks = res.data or []
         except Exception as e:
             logger.error(f"[CallbackScheduler] Failed to query due callbacks: {e}")
-            return
+            return True
 
         if not callbacks:
-            return
+            return False
 
         logger.info(f"[CallbackScheduler] Found {len(callbacks)} scheduled callback(s) due for auto-dialing.")
 

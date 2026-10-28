@@ -4,122 +4,53 @@ export const dynamic = 'force-dynamic'
 
 export async function POST(request: Request) {
   try {
-    const { createClient: createSupabaseClient } = await import('@supabase/supabase-js')
-    const supabaseAdmin = createSupabaseClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    )
-
     const body = await request.json().catch(() => null)
     if (!body || !body.phone_number) {
       return NextResponse.json({ error: 'Phone number is required.' }, { status: 400 })
     }
 
-    const { phone_number, language } = body
+    const { phone_number, language, name } = body
 
-    // 1. Resolve the demo agent ID and organization ID
-    // Check system_config table first
-    const { data: configData } = await supabaseAdmin
-      .from('system_config')
-      .select('config_value')
-      .eq('config_key', 'homepage_demo_agent_id')
-      .maybeSingle()
+    const agentId = 'dd4da4c1-9deb-4047-8927-5e12402e6b1f'
+    const organizationId = 'b1ddf1e9-abc1-4ff4-90f5-3ac66913738a'
 
-    let agentId = configData?.config_value
-    let organizationId = null
+    let callerName = (typeof name === 'string' ? name : '').trim()
 
-    if (agentId) {
-      // Fetch organization_id for this agent
-      const { data: agent } = await supabaseAdmin
-        .from('agents')
-        .select('organization_id')
-        .eq('id', agentId)
-        .maybeSingle()
-      organizationId = agent?.organization_id
-    }
+    // Call FastAPI Sarvam instant-call endpoint locally or via env
+    const backendUrl = 
+      process.env.INTERNAL_BACKEND_URL || 
+      process.env.NEXT_PUBLIC_BACKEND_URL || 
+      process.env.NEXT_PUBLIC_FASTAPI_URL || 
+      (process.env.NODE_ENV === "production" ? "https://trinetra-ai-1-6f2n.onrender.com" : "http://127.0.0.1:8000")
 
-    // Fallback: If not configured, fetch the first active agent owned by a 'developer_tester' user
-    if (!agentId || !organizationId) {
-      const { data: developerProfiles } = await supabaseAdmin
-        .from('profiles')
-        .select('id, organization_id')
-        .eq('role', 'developer_tester')
-        .limit(1)
-
-      if (developerProfiles && developerProfiles.length > 0) {
-        organizationId = developerProfiles[0].organization_id
-        
-        // Find the first agent of this developer
-        const { data: developerAgents } = await supabaseAdmin
-          .from('agents')
-          .select('id')
-          .eq('organization_id', organizationId)
-          .limit(1)
-        
-        if (developerAgents && developerAgents.length > 0) {
-          agentId = developerAgents[0].id
-        }
-      }
-    }
-
-    // Second Fallback: Query any demo agent in the database
-    if (!agentId || !organizationId) {
-      const { data: fallbackAgents } = await supabaseAdmin
-        .from('agents')
-        .select('id, organization_id')
-        .or('is_demo.eq.true,name.ilike.%demo%')
-        .limit(1)
-
-      if (fallbackAgents && fallbackAgents.length > 0) {
-        agentId = fallbackAgents[0].id
-        organizationId = fallbackAgents[0].organization_id
-      }
-    }
-
-    if (!agentId || !organizationId) {
-      return NextResponse.json({ 
-        error: 'Demo voice agent is currently offline. Please try again later.' 
-      }, { status: 503 })
-    }
-
-    // 2. Call FastAPI telephony backend to trigger outbound call
-    const fastApiUrl = process.env.NEXT_PUBLIC_FASTAPI_URL || 'http://127.0.0.1:8000'
-    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-
-    const backendResponse = await fetch(`${fastApiUrl}/api/telephony/outbound-call`, {
+    const backendResponse = await fetch(`${backendUrl}/api/campaigns/instant-call`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${serviceRoleKey}`
       },
       body: JSON.stringify({
-        to_phone: phone_number,
+        name: callerName || 'Website Visitor',
+        phone: phone_number,
         agent_id: agentId,
-        organization_id: organizationId
+        organization_id: organizationId,
+        notes: `Website Live Demo Dial (${language || 'hi'})`
       })
     })
 
     const backendData = await backendResponse.json().catch(() => ({ detail: 'Outbound trigger failed' }))
 
-    if (!backendResponse.ok) {
+    if (!backendResponse.ok || backendData.success === false) {
       console.error('[Public Callback Error] Backend failed:', backendData)
       return NextResponse.json({ 
-        error: backendData.detail || 'Failed to place callback connection.' 
-      }, { status: backendResponse.status })
+        error: backendData.error || backendData.detail || 'Failed to place callback connection via Sarvam.' 
+      }, { status: backendResponse.status >= 400 ? backendResponse.status : 500 })
     }
 
-    // Record public demo callback logs in a dedicated audit structure or callback table if necessary
-    try {
-      await supabaseAdmin.from('audit_logs').insert({
-        action: 'public.demo_callback_triggered',
-        resource_type: 'outbound_call',
-        new_values: { phone_number, language, agent_id: agentId }
-      })
-    } catch (logErr) {
-      console.warn('Non-critical: Failed to write public callback audit log:', logErr)
-    }
-
-    return NextResponse.json({ success: true, message: 'Callback dial session initiated.' })
+    return NextResponse.json({ 
+      success: true, 
+      message: 'Calling your phone now! Answer the incoming call.',
+      data: backendData
+    })
 
   } catch (error: any) {
     console.error('[Public Callback API Exception]:', error)

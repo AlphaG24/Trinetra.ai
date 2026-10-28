@@ -56,28 +56,13 @@ export default function MaintenanceWatcher({
     // Initial sync
     checkMaintenanceStatus()
 
-    // Realtime subscription on system_config maintenance_mode row
-    const channel = supabase
-      .channel('maintenance_mode_global_stream')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'system_config',
-          filter: 'config_key=eq.maintenance_mode',
-        },
-        (payload: any) => {
-          const newVal = payload.new?.config_value
-          setIsMaintenanceMode(newVal === 'true')
-        }
-      )
-      .subscribe()
+    // Lightweight 5-minute poll instead of persistent Postgres replication slot
+    const interval = setInterval(() => {
+      checkMaintenanceStatus()
+    }, 300000)
 
-    return () => {
-      supabase.removeChannel(channel)
-    }
-  }, [supabase, checkMaintenanceStatus])
+    return () => clearInterval(interval)
+  }, [checkMaintenanceStatus])
 
   // Admins and admin routes are never locked out
   if (isAdmin || isAdminRoute || isAdminLoginIntent) {

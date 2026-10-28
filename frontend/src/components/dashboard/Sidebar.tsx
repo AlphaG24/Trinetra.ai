@@ -6,7 +6,8 @@ import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, Bot, Users, Phone, Megaphone,
   BarChart3, IndianRupee, CreditCard, Settings, HelpCircle, Pencil,
-  ChevronLeft, ChevronRight, Calendar, Target, PhoneCall, ShieldCheck
+  ChevronLeft, ChevronRight, Calendar, Target, PhoneCall, ShieldCheck,
+  CalendarClock
 } from 'lucide-react'
 
 import { useAuth } from '@/src/components/providers/AuthProvider'
@@ -14,7 +15,7 @@ import { useDashboardStore } from '@/src/store/dashboardStore'
 
 /**
  * Navigation items matching the dashboard structure:
- * Upper section: Overview, Agents, Calls, Leads, Appointments, Customers, Campaigns, Phone Numbers, Analytics, Revenue, Billing
+ * Upper section: Overview, Agents, Calls, Leads, Appointments, Callbacks, Customers, Campaigns, Phone Numbers, Analytics, Revenue, Billing
  * Lower section: Custom Agent (Deploy), KYC Vault, Settings, Support
  */
 const topNavItems = [
@@ -23,6 +24,7 @@ const topNavItems = [
   { label: 'Calls', href: '/dashboard/calls', icon: PhoneCall },
   { label: 'Leads', href: '/dashboard/leads', icon: Target },
   { label: 'Appointments', href: '/dashboard/appointments', icon: Calendar },
+  { label: 'Callbacks', href: '/dashboard/callbacks', icon: CalendarClock },
   { label: 'Customers', href: '/dashboard/customers', icon: Users },
   { label: 'Campaigns', href: '/dashboard/campaigns', icon: Megaphone },
   { label: 'Phone Numbers', href: '/dashboard/phone-numbers', icon: Phone },
@@ -115,17 +117,17 @@ export function Sidebar({ isOpen, onClose }: { isOpen?: boolean; onClose?: () =>
         title={collapsed ? item.label : undefined}
         className={`group relative flex items-center ${
           collapsed ? 'justify-center px-2' : 'gap-3 px-4'
-        } py-2.5 rounded-[10px] text-sm font-medium transition-all duration-150 ${
+        } py-2.5 rounded-xl text-sm font-medium transition-all duration-150 ${
           active
             ? 'sidebar-item-active bg-zinc-900 text-white dark:bg-white dark:text-zinc-950 font-bold shadow-sm'
-            : 'sidebar-item-inactive text-zinc-900 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-white/5'
+            : 'sidebar-item-inactive text-slate-700 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-white/5'
         }`}
       >
         <item.icon
           className={`w-5 h-5 shrink-0 transition-colors ${
             active
               ? 'text-white dark:text-zinc-950'
-              : 'text-zinc-900 dark:text-zinc-400 group-hover:text-black dark:group-hover:text-white'
+              : 'text-slate-600 dark:text-zinc-400 group-hover:text-black dark:group-hover:text-white'
           }`}
         />
         {!collapsed && (
@@ -133,7 +135,7 @@ export function Sidebar({ isOpen, onClose }: { isOpen?: boolean; onClose?: () =>
             className={`font-playfair font-semibold text-[15px] transition-colors truncate ${
               active
                 ? '!text-white dark:!text-zinc-950'
-                : 'text-zinc-900 dark:text-zinc-300 group-hover:text-black dark:group-hover:text-white'
+                : 'text-slate-800 dark:text-zinc-200 group-hover:text-black dark:group-hover:text-white'
             }`}
           >
             {item.label}
@@ -197,7 +199,7 @@ export function Sidebar({ isOpen, onClose }: { isOpen?: boolean; onClose?: () =>
         )}
 
         {/* Main Navigation links */}
-        <div className="flex flex-col flex-1 min-h-0 pt-6">
+        <div className="flex flex-col flex-1 min-h-0 pt-1">
           <nav suppressHydrationWarning className="flex-1 px-2.5 space-y-1 overflow-y-auto custom-scrollbar">
             {navItemsToRender.map(renderLink)}
           </nav>

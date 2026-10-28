@@ -165,7 +165,7 @@ function getTranscriptString(transcript: any): string {
         Matched: &quot;
         {parts.map((part, i) => 
           part.toLowerCase() === query.toLowerCase() 
-            ? <mark key={i} className="bg-violet-500/40 text-white px-0.5 rounded not-italic font-bold">{part}</mark>
+            ? <mark key={i} className="bg-blue-600/30 text-blue-900 dark:text-blue-200 px-0.5 rounded not-italic font-bold">{part}</mark>
             : part
         )}
         &quot;
@@ -207,10 +207,11 @@ function getTranscriptString(transcript: any): string {
   return (
     <div className="space-y-6 animate-in fade-in duration-300 text-left">
       {/* Title block */}
+      {/* Header Bar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-xl font-bold font-display text-[var(--heading)] flex items-center gap-2">
-            <PhoneIncoming className="w-5 h-5 text-violet-400" /> Complete Call History
+            <PhoneIncoming className="w-5 h-5 text-blue-600 dark:text-blue-400" /> Complete Call History
           </h2>
           <p className="text-xs text-[var(--muted)] font-sans">
             Review detailed conversation logs, durations, sentiments, outcomes, and full voice recordings.
@@ -227,7 +228,7 @@ function getTranscriptString(transcript: any): string {
           </button>
           <button
             onClick={handleExportCSV}
-            className="px-4 py-2.5 rounded-xl bg-[var(--primary-bg)] text-[var(--heading)] hover:bg-[var(--hover-bg)] border border-[var(--border)] font-montserrat font-bold text-xs uppercase tracking-wider transition-all shadow-md cursor-pointer"
+            className="px-4 py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-200 dark:text-zinc-950 font-montserrat font-bold text-xs uppercase tracking-wider transition-all shadow-sm cursor-pointer active:scale-[0.98]"
           >
             Export CSV
           </button>
@@ -246,7 +247,7 @@ function getTranscriptString(transcript: any): string {
             placeholder="Search transcripts, phones, outcomes..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full px-3 py-2 rounded-xl bg-[var(--background)] border border-[var(--border)] text-xs text-[var(--heading)] placeholder-[var(--muted)] focus:outline-none focus:border-violet-500 transition font-sans"
+            className="w-full px-3 py-2 rounded-xl bg-[var(--background)] border border-[var(--border)] text-xs text-[var(--heading)] placeholder-[var(--muted)] focus:outline-none focus:border-blue-600 transition font-sans"
           />
         </div>
 
@@ -258,7 +259,7 @@ function getTranscriptString(transcript: any): string {
           <select
             value={sentimentFilter}
             onChange={(e) => setSentimentFilter(e.target.value)}
-            className="w-full px-3 py-2 rounded-xl bg-[var(--background)] border border-[var(--border)] text-xs text-[var(--heading)] focus:outline-none focus:border-violet-500 transition cursor-pointer font-sans"
+            className="w-full px-3 py-2 rounded-xl bg-[var(--background)] border border-[var(--border)] text-xs text-[var(--heading)] focus:outline-none focus:border-blue-600 transition cursor-pointer font-sans"
           >
             <option value="all" className="bg-[var(--card-bg)] text-[var(--heading)]">All Sentiments</option>
             <option value="positive" className="bg-[var(--card-bg)] text-[var(--heading)]">Positive</option>
@@ -276,7 +277,7 @@ function getTranscriptString(transcript: any): string {
             type="date"
             value={startDate}
             onChange={(e) => setStartDate(e.target.value)}
-            className="w-full px-3 py-2 rounded-xl bg-[var(--background)] border border-[var(--border)] text-xs text-[var(--heading)] [color-scheme:light] dark:[color-scheme:dark] focus:outline-none focus:border-violet-500 transition font-sans"
+            className="w-full px-3 py-2 rounded-xl bg-[var(--background)] border border-[var(--border)] text-xs text-[var(--heading)] [color-scheme:light] dark:[color-scheme:dark] focus:outline-none focus:border-blue-600 transition font-sans"
           />
         </div>
 
@@ -289,7 +290,7 @@ function getTranscriptString(transcript: any): string {
             type="date"
             value={endDate}
             onChange={(e) => setEndDate(e.target.value)}
-            className="w-full px-3 py-2 rounded-xl bg-[var(--background)] border border-[var(--border)] text-xs text-[var(--heading)] [color-scheme:light] dark:[color-scheme:dark] focus:outline-none focus:border-violet-500 transition font-sans"
+            className="w-full px-3 py-2 rounded-xl bg-[var(--background)] border border-[var(--border)] text-xs text-[var(--heading)] [color-scheme:light] dark:[color-scheme:dark] focus:outline-none focus:border-blue-600 transition font-sans"
           />
         </div>
       </div>
@@ -298,7 +299,7 @@ function getTranscriptString(transcript: any): string {
       <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl shadow-sm overflow-hidden">
         {loading ? (
           <div className="py-24 flex flex-col items-center justify-center gap-2">
-            <Loader2 className="w-8 h-8 text-violet-500 animate-spin" />
+            <Loader2 className="w-8 h-8 text-blue-600 dark:text-blue-400 animate-spin" />
             <p className="text-xs text-[var(--muted)]">Loading call history...</p>
           </div>
         ) : filteredCalls.length === 0 ? (
@@ -359,10 +360,10 @@ function getTranscriptString(transcript: any): string {
                           <div className="flex items-center justify-end gap-2" onClick={e => e.stopPropagation()}>
                             <button
                               onClick={() => setExpandedCallId(isExpanded ? null : call.id)}
-                              className="p-1.5 text-violet-500 hover:text-violet-400 border border-transparent hover:border-[var(--border)] rounded-lg transition-colors cursor-pointer"
+                              className="p-1.5 text-blue-600 hover:text-blue-700 dark:text-blue-400 border border-transparent hover:border-[var(--border)] rounded-lg transition-colors cursor-pointer"
                               title="Listen to Call Audio"
                             >
-                              <Play className="w-3.5 h-3.5 fill-violet-500/20" />
+                              <Play className="w-3.5 h-3.5 fill-blue-600/20" />
                             </button>
                             {call.recording_url && (
                               <a
