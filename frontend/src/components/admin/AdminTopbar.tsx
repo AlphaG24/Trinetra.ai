@@ -104,6 +104,7 @@ export function AdminTopbar({ onMenuClick, isMobileSidebarOpen }: AdminTopbarPro
               className="p-2 rounded-xl text-[var(--muted)] hover:text-[var(--heading)] hover:bg-[var(--hover-bg)] border border-[var(--border)] transition-all cursor-pointer"
               title={`Switch to ${theme === 'dark' ? 'Light' : 'Dark'} Mode`}
               aria-label="Toggle Color Theme"
+              suppressHydrationWarning
             >
               {theme === 'dark' ? (
                 <Sun className="w-4 h-4 text-amber-400" />
@@ -119,6 +120,7 @@ export function AdminTopbar({ onMenuClick, isMobileSidebarOpen }: AdminTopbarPro
               type="button"
               onClick={() => setIsDropdownOpen(!isDropdownOpen)}
               className="flex items-center gap-2 p-1.5 rounded-xl hover:bg-[var(--hover-bg)] border border-transparent hover:border-[var(--border)] transition-all cursor-pointer"
+              suppressHydrationWarning
             >
               <div className="w-8 h-8 rounded-full overflow-hidden bg-violet-600 text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-sm">
                 {displayName[0]?.toUpperCase() || 'A'}

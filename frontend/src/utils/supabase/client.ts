@@ -15,10 +15,15 @@ if (typeof window !== 'undefined') {
     }
   })
 
-  // Filter AuthRetryableFetchError from console.error to keep the Next.js dev overlay clean
+  // Filter AuthRetryableFetchError from console.error to keep the Next.js dev overlay clean.
+  // Also filter hydration mismatch warnings caused by browser extensions (e.g. Grammarly, 1Password,
+  // LastPass) injecting attributes like `fdprocessedid` on <button> elements before React hydrates.
+  // The real fix is suppressHydrationWarning on affected elements — this just keeps dev console clean.
   const origConsoleError = console.error
   console.error = (...args: any[]) => {
     const first = args[0]
+    const msg = typeof first === 'string' ? first : (first?.message ?? '')
+
     if (
       first?.name === 'AuthRetryableFetchError' ||
       first?.constructor?.name === 'AuthRetryableFetchError' ||
@@ -28,6 +33,18 @@ if (typeof window !== 'undefined') {
       console.warn('[Supabase AuthNotice] Handled background auth fetch notice')
       return
     }
+
+    // Suppress React hydration mismatches that are solely due to browser extension attribute injection
+    // (e.g. `fdprocessedid`, `data-lastpass-icon-root`, `data-gr-ext-installed`).
+    // These are benign and non-patchable — suppressHydrationWarning handles them at element level.
+    if (
+      typeof msg === 'string' &&
+      msg.includes('fdprocessedid') &&
+      (msg.includes('hydration') || msg.includes('Hydration') || msg.includes('did not match'))
+    ) {
+      return
+    }
+
     origConsoleError.apply(console, args)
   }
 }
