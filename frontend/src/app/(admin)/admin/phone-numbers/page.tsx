@@ -119,7 +119,10 @@ export default function AdminPhoneNumbersPage() {
     }
   };
 
+  const [mounted, setMounted] = useState(false);
+
   useEffect(() => {
+    setMounted(true);
     fetchPoolNumbers();
   }, []);
 
@@ -323,8 +326,32 @@ export default function AdminPhoneNumbersPage() {
     return matchesSearch;
   });
 
+  if (!mounted) {
+    return (
+      <div className="p-6 max-w-7xl mx-auto font-[family-name:var(--font-montserrat)] text-left animate-pulse space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+          <div>
+            <div className="h-8 w-72 bg-[var(--card-bg)] rounded-xl mb-2" />
+            <div className="h-4 w-96 bg-[var(--card-bg)] rounded-xl" />
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-32 bg-[var(--card-bg)] rounded-xl" />
+            <div className="h-10 w-36 bg-[var(--card-bg)] rounded-xl" />
+          </div>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5 mb-6">
+          {[...Array(5)].map((_, i) => (
+            <div key={i} className="h-20 bg-[var(--card-bg)] rounded-xl border border-[var(--border)]" />
+          ))}
+        </div>
+        <div className="h-14 bg-[var(--card-bg)] rounded-xl border border-[var(--border)]" />
+        <div className="h-96 bg-[var(--card-bg)] rounded-xl border border-[var(--border)]" />
+      </div>
+    );
+  }
+
   return (
-    <div className="p-6 max-w-7xl mx-auto font-[family-name:var(--font-montserrat)] text-left">
+    <div className="p-6 max-w-7xl mx-auto font-[family-name:var(--font-montserrat)] text-left" suppressHydrationWarning>
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
         <div>
@@ -339,14 +366,18 @@ export default function AdminPhoneNumbersPage() {
 
         <div className="flex items-center gap-3">
           <button
+            type="button"
+            suppressHydrationWarning
             onClick={() => setIsCsvModalOpen(true)}
-            className="px-4 py-2.5 rounded-xl border border-[var(--border)] bg-[var(--card-bg)] hover:bg-[var(--secondary)] text-[var(--heading)] text-xs font-bold uppercase tracking-wider flex items-center gap-2 transition-all"
+            className="px-4 py-2.5 rounded-xl border border-[var(--border)] bg-[var(--card-bg)] hover:bg-[var(--secondary)] text-[var(--heading)] text-xs font-bold uppercase tracking-wider flex items-center gap-2 transition-all cursor-pointer"
           >
             <Upload size={14} /> Import CSV
           </button>
           <button
+            type="button"
+            suppressHydrationWarning
             onClick={() => setIsAddModalOpen(true)}
-            className="px-4 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold uppercase tracking-wider flex items-center gap-2 shadow-lg shadow-violet-600/20 transition-all"
+            className="px-4 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold uppercase tracking-wider flex items-center gap-2 shadow-lg shadow-violet-600/20 transition-all cursor-pointer"
           >
             <Plus size={14} /> Add Number
           </button>
@@ -420,6 +451,7 @@ export default function AdminPhoneNumbersPage() {
           <Search className="w-4 h-4 text-[var(--muted)] absolute left-3 top-3" />
           <input
             type="text"
+            suppressHydrationWarning
             placeholder="Search by phone, city, or provider..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
@@ -429,8 +461,10 @@ export default function AdminPhoneNumbersPage() {
 
         <div className="flex items-center gap-2 w-full sm:w-auto flex-wrap">
           <button
+            type="button"
+            suppressHydrationWarning
             onClick={() => setFilterStatus("all")}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
               filterStatus === "all"
                 ? "bg-violet-600 text-white"
                 : "bg-[var(--secondary)] text-[var(--muted)] hover:text-[var(--heading)]"
@@ -439,8 +473,10 @@ export default function AdminPhoneNumbersPage() {
             All ({numbers.length})
           </button>
           <button
+            type="button"
+            suppressHydrationWarning
             onClick={() => setFilterStatus("available")}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
               filterStatus === "available"
                 ? "bg-emerald-600 text-white"
                 : "bg-[var(--secondary)] text-[var(--muted)] hover:text-[var(--heading)]"
@@ -449,8 +485,10 @@ export default function AdminPhoneNumbersPage() {
             Available ({numbers.filter(isAvailable).length})
           </button>
           <button
+            type="button"
+            suppressHydrationWarning
             onClick={() => setFilterStatus("assigned")}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
               filterStatus === "assigned"
                 ? "bg-blue-600 text-white"
                 : "bg-[var(--secondary)] text-[var(--muted)] hover:text-[var(--heading)]"
@@ -459,8 +497,10 @@ export default function AdminPhoneNumbersPage() {
             Assigned ({numbers.filter(isNumAssigned).length})
           </button>
           <button
+            type="button"
+            suppressHydrationWarning
             onClick={() => setFilterStatus("grace")}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
               filterStatus === "grace"
                 ? "bg-amber-600 text-white"
                 : "bg-[var(--secondary)] text-[var(--muted)] hover:text-[var(--heading)]"
@@ -469,8 +509,10 @@ export default function AdminPhoneNumbersPage() {
             Grace ({numbers.filter(isGrace).length})
           </button>
           <button
+            type="button"
+            suppressHydrationWarning
             onClick={() => setFilterStatus("hold")}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
               filterStatus === "hold"
                 ? "bg-rose-600 text-white"
                 : "bg-[var(--secondary)] text-[var(--muted)] hover:text-[var(--heading)]"
@@ -479,8 +521,10 @@ export default function AdminPhoneNumbersPage() {
             Hold ({numbers.filter(isHold).length})
           </button>
           <button
+            type="button"
+            suppressHydrationWarning
             onClick={fetchPoolNumbers}
-            className="p-2 rounded-lg bg-[var(--secondary)] text-[var(--muted)] hover:text-[var(--heading)] ml-auto"
+            className="p-2 rounded-lg bg-[var(--secondary)] text-[var(--muted)] hover:text-[var(--heading)] ml-auto cursor-pointer"
             title="Refresh Table"
           >
             <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
