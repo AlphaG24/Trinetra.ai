@@ -522,7 +522,7 @@ async def link_sarvam_inbound_deployment(req: LinkDeploymentRequest):
         res = await mgr.deploy_inbound_agent(
             app_id=target_app_id,
             phone_numbers=[target_num],
-            deployment_name=req.name or f"Vaakriti Agent {req.agent_id[:8]}"
+            deployment_name=req.name or f"Agent {req.agent_id[:8]}"
         )
         return res
     except Exception as e:
@@ -536,6 +536,7 @@ class SyncAgentRequest(BaseModel):
     greeting_message: Optional[str] = None
     voice_id: Optional[str] = "shubh"
     language: Optional[str] = "hi"
+    business_name: Optional[str] = None
 
 @router.post("/sync-agent")
 async def sync_sarvam_agent_profile(req: SyncAgentRequest):
@@ -552,7 +553,8 @@ async def sync_sarvam_agent_profile(req: SyncAgentRequest):
             prompt=req.system_prompt,
             greeting=req.greeting_message,
             voice_id=req.voice_id or "shubh",
-            language=req.language or "hi"
+            language=req.language or "hi",
+            business_name=req.business_name
         )
         return res
     except Exception as e:

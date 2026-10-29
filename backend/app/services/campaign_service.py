@@ -848,8 +848,18 @@ class CampaignService:
         contact_name = contact.get("full_name") or contact.get("name") or ""
         company_name = contact.get("company_name") or contact.get("company") or ""
         notes = contact.get("notes") or ""
-        agent_name = agent.get("name") or "Agent"
-        business_name = campaign_data.get("name") or "Trinetra AI"
+        # Resolve dynamic tenant business name for campaign dialer
+        tenant_biz = ""
+        try:
+            if organization_id:
+                org_row = await asyncio.to_thread(
+                    supabase_admin.table("organizations").select("name").eq("id", organization_id).maybe_single().execute
+                )
+                if org_row.data and org_row.data.get("name"):
+                    tenant_biz = org_row.data["name"]
+        except Exception:
+            pass
+        business_name = tenant_biz or agent.get("company_name") or campaign_data.get("name") or "Trinetra AI"
 
         # Place the outbound call via Sarvam, Twilio, or Simulated fallback
         try:

@@ -91,16 +91,23 @@ class SarvamAgentManager:
         """
         Links an Indian DID phone number to a specific Sarvam agent/app for live customer inbound calls.
         """
+        conn_id = os.getenv("SARVAM_CONNECTION_ID", "87852118-1f-fc7abbe6-a0dd").strip()
         payload = {
-            "app_id": app_id,
-            "phone_numbers": phone_numbers,
-            "channel_direction": "inbound",
             "name": deployment_name,
+            "app_id": app_id,
+            "app_version": 1,
+            "channel_direction": "inbound",
             "status": "active",
+            "connection_configs": [
+                {
+                    "connection_id": conn_id,
+                    "phone_numbers": phone_numbers
+                }
+            ],
             "inbound_config": {
                 "start_time": start_time,
                 "end_time": end_time,
-                "allowed_days": allowed_days or ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
+                "allowed_days": allowed_days or ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
                 "timezone": "Asia/Kolkata"
             }
         }
@@ -119,12 +126,29 @@ class SarvamAgentManager:
         prompt: str,
         greeting: Optional[str] = None,
         voice_id: str = "shubh",
-        language: str = "hi"
+        language: str = "hi",
+        business_name: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Creates or updates an agent app configuration in Sarvam App Authoring.
-        Ensures SEC-011 compliance (AI disclosure & recording notice).
+        Ensures SEC-011 compliance (AI disclosure & recording notice) with tenant branding.
         """
+        # Resolve dynamic tenant business name
+        resolved_biz = (business_name or "").strip()
+        if not resolved_biz:
+            try:
+                from database import supabase_admin
+                raw_agent_id = app_id.replace("trinetra-", "").strip()
+                ag_row = supabase_admin.table("agents").select("organization_id, name").eq("id", raw_agent_id).maybe_single().execute()
+                if ag_row.data and ag_row.data.get("organization_id"):
+                    org_row = supabase_admin.table("organizations").select("name").eq("id", ag_row.data["organization_id"]).maybe_single().execute()
+                    if org_row.data and org_row.data.get("name"):
+                        resolved_biz = org_row.data["name"]
+            except Exception as b_err:
+                logger.warning(f"Could not resolve dynamic business name for {app_id}: {b_err}")
+
+        final_business_name = (resolved_biz or name or "Trinetra AI").strip()
+
         # Enforce SEC-011 Compliance via canonical compose_single_opening_greeting
         try:
             from app.services.disclosure_service import compose_single_opening_greeting
@@ -132,7 +156,7 @@ class SarvamAgentManager:
             comp_greeting, _, _ = compose_single_opening_greeting(
                 dashboard_greeting=greeting,
                 agent_name=name or "Arika",
-                business_name="Vaakriti",
+                business_name=final_business_name,
                 direction="inbound",
                 language="hinglish" if "hi" in (language or "hi") else "en",
                 gender_tag="female" if is_female else "male",
@@ -142,7 +166,7 @@ class SarvamAgentManager:
             logger.warning(f"Error in compose_single_opening_greeting: {e}")
             comp_greeting = (greeting or "").strip()
             if "AI" not in comp_greeting:
-                comp_greeting = f"Namaste! Main {name} bol raha hoon, Vaakriti AI se. Service quality ke liye yeh call record ki ja sakti hai. {comp_greeting}".strip()
+                comp_greeting = f"Namaste! Main {name} bol raha hoon, {final_business_name} se, ek AI assistant. Service quality ke liye yeh call record ki ja sakti hai. {comp_greeting}".strip()
 
         # Voice Speaker mapping for Sarvam Bulbul v3/v4
         voice_map = {
@@ -187,7 +211,7 @@ class SarvamAgentManager:
 
         payload = {
             "name": name,
-            "description": f"Vaakriti Agent: {name}",
+            "description": f"{final_business_name} Agent: {name}",
             "prompt": final_prompt,
             "greeting": comp_greeting,
             "language": language or "hi-IN",

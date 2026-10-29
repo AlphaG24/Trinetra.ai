@@ -358,15 +358,84 @@ Respond ONLY with valid JSON."""
             user_config.update(custom_metadata)
 
         target_app_id = self.app_id
+        resolved_agent_phone = self.caller_number
+        resolved_agent_name = ""
+        resolved_biz_name = ""
+        resolved_user_id = user_id
+        resolved_org_id = org_id
+
         if agent_id:
             try:
                 a_row = await asyncio.to_thread(
-                    supabase_admin.table("agents").select("sarvam_app_id").eq("id", agent_id).maybe_single().execute
+                    supabase_admin.table("agents")
+                    .select("id, name, sarvam_agent_id, phone_number, organization_id, user_id, greeting_message")
+                    .eq("id", agent_id)
+                    .maybe_single()
+                    .execute
                 )
-                if a_row.data and a_row.data.get("sarvam_app_id"):
-                    target_app_id = a_row.data["sarvam_app_id"]
+                if a_row.data:
+                    ag_data = a_row.data
+                    if ag_data.get("sarvam_agent_id"):
+                        target_app_id = ag_data["sarvam_agent_id"]
+                    resolved_agent_name = ag_data.get("name") or ""
+                    resolved_user_id = resolved_user_id or ag_data.get("user_id")
+                    resolved_org_id = resolved_org_id or ag_data.get("organization_id")
+                    if ag_data.get("phone_number"):
+                        p_raw = str(ag_data["phone_number"]).strip()
+                        resolved_agent_phone = f"+{p_raw}" if not p_raw.startswith("+") else p_raw
             except Exception as a_err:
-                logger.warning(f"[SarvamOutboundService] Error checking agent sarvam_app_id: {a_err}")
+                logger.warning(f"[SarvamOutboundService] Error checking agent sarvam_agent_id: {a_err}")
+
+            # Check phone_numbers table if agent phone not set on agents record
+            if resolved_agent_phone == self.caller_number:
+                try:
+                    p_lookup = await asyncio.to_thread(
+                        supabase_admin.table("phone_numbers")
+                        .select("phone_number")
+                        .eq("assigned_agent_id", agent_id)
+                        .limit(1)
+                        .execute
+                    )
+                    if p_lookup.data and p_lookup.data[0].get("phone_number"):
+                        p_raw = str(p_lookup.data[0]["phone_number"]).strip()
+                        resolved_agent_phone = f"+{p_raw}" if not p_raw.startswith("+") else p_raw
+                except Exception as p_err:
+                    logger.warning(f"[SarvamOutboundService] Error checking phone_numbers: {p_err}")
+
+        # Resolve organization/company name for tenant
+        if resolved_org_id:
+            try:
+                org_row = await asyncio.to_thread(
+                    supabase_admin.table("organizations")
+                    .select("name")
+                    .eq("id", resolved_org_id)
+                    .maybe_single()
+                    .execute
+                )
+                if org_row.data and org_row.data.get("name"):
+                    resolved_biz_name = org_row.data["name"]
+            except Exception:
+                pass
+
+        if not resolved_biz_name and resolved_user_id:
+            try:
+                prof_row = await asyncio.to_thread(
+                    supabase_admin.table("profiles")
+                    .select("company_name, full_name")
+                    .eq("id", resolved_user_id)
+                    .maybe_single()
+                    .execute
+                )
+                if prof_row.data:
+                    resolved_biz_name = prof_row.data.get("company_name") or prof_row.data.get("full_name") or ""
+            except Exception:
+                pass
+
+        final_business_name = resolved_biz_name or "Trinetra AI"
+        if resolved_agent_name:
+            user_config["agent_name"] = resolved_agent_name
+        user_config["company_name"] = final_business_name
+        user_config["business_name"] = final_business_name
 
         payload: Dict[str, Any] = {
             "app_config": {
@@ -374,7 +443,7 @@ Respond ONLY with valid JSON."""
                 "app_version": 1,
                 "connection_config": {
                     "connection_id": self.connection_id,
-                    "agent_phone_number": self.caller_number
+                    "agent_phone_number": resolved_agent_phone
                 }
             },
             "user_config": user_config
@@ -383,7 +452,7 @@ Respond ONLY with valid JSON."""
         if webhook_url:
             payload["webhook_config"] = {"url": webhook_url}
 
-        logger.info(f"[SarvamOutboundService] Dialing {cleaned_phone} via agent {self.app_id}")
+        logger.info(f"[SarvamOutboundService] Dialing {cleaned_phone} via agent {target_app_id} (CLI: {resolved_agent_phone})")
 
         try:
             import json
@@ -412,8 +481,8 @@ Respond ONLY with valid JSON."""
                         attempt_id=attempt_id,
                         target_phone=cleaned_phone,
                         contact_name=contact_name or "Customer",
-                        user_id=user_id or DEFAULT_USER_ID,
-                        org_id=org_id or DEFAULT_ORGANIZATION_ID,
+                        user_id=resolved_user_id or user_id or DEFAULT_USER_ID,
+                        org_id=resolved_org_id or org_id or DEFAULT_ORGANIZATION_ID,
                         agent_id=agent_id or DEFAULT_AGENT_ID
                     )
                 )

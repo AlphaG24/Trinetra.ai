@@ -1226,48 +1226,92 @@ async def handle_sarvam_voice_webhook(
         duration = int(float(data.get("duration") or data.get("duration_in_seconds") or data.get("duration_seconds") or 0))
         recording_url = data.get("recording_url") or data.get("audio_url")
 
-        agent_id = request.query_params.get("agent_id") or data.get("agent_id") or "dd4da4c1-9deb-4047-8927-5e12402e6b1f"
+        agent_id = request.query_params.get("agent_id") or data.get("agent_id")
         contact_id = request.query_params.get("contact_id") or data.get("contact_id")
-        matched_org_id = "b1ddf1e9-abc1-4ff4-90f5-3ac66913738a"
+        matched_org_id = None
+        matched_user_id = None
 
         print(f"[Sarvam Webhook] Received call: {call_id} | From: {from_number} -> To: {to_number} | Status: {call_status}", flush=True)
 
         clean_to = to_number.replace("+", "").strip()
+        last10_to = clean_to[-10:] if len(clean_to) >= 10 else clean_to
+        clean_from = from_number.replace("+", "").strip()
+        last10_from = clean_from[-10:] if len(clean_from) >= 10 else clean_from
+
         if not agent_id:
             try:
                 def _find_sarvam_agent():
+                    # 1. Match inbound destination number
                     p_res = supabase_admin.table("phone_numbers")\
-                        .select("id, assigned_agent_id, organization_id, assigned_org_id")\
-                        .or_(f"phone_number.eq.{to_number},phone_number.eq.+{clean_to},phone_number.eq.{clean_to}")\
+                        .select("id, assigned_agent_id, organization_id, assigned_org_id, phone_number")\
+                        .or_(f"phone_number.eq.{to_number},phone_number.eq.+{clean_to},phone_number.eq.{clean_to},phone_number.eq.{last10_to}")\
                         .limit(1)\
                         .execute()
                     if p_res.data and len(p_res.data) > 0:
                         row = p_res.data[0]
                         f_org = row.get("assigned_org_id") or row.get("organization_id")
                         if row.get("assigned_agent_id"):
-                            a_res = supabase_admin.table("agents").select("*").eq("id", row["assigned_agent_id"]).maybe_single().execute()
+                            a_res = supabase_admin.table("agents").select("id, organization_id, user_id, name").eq("id", row["assigned_agent_id"]).maybe_single().execute()
                             if a_res.data:
-                                return a_res.data, f_org
+                                return a_res.data, f_org, a_res.data.get("user_id")
                         m_res = supabase_admin.table("agent_phone_numbers").select("agent_id").eq("phone_number_id", row["id"]).limit(1).execute()
                         if m_res.data and len(m_res.data) > 0:
-                            a_res = supabase_admin.table("agents").select("*").eq("id", m_res.data[0]["agent_id"]).maybe_single().execute()
+                            a_res = supabase_admin.table("agents").select("id, organization_id, user_id, name").eq("id", m_res.data[0]["agent_id"]).maybe_single().execute()
                             if a_res.data:
-                                return a_res.data, f_org
-                    lookup = supabase_admin.table("agents").select("*").or_(f"phone_number.eq.{to_number},phone_number.eq.+{clean_to},phone_number.eq.{clean_to}").limit(1).execute()
-                    if lookup.data and len(lookup.data) > 0:
-                        return lookup.data[0], lookup.data[0].get("organization_id")
-                    any_agent = supabase_admin.table("agents").select("*").limit(1).execute()
-                    return (any_agent.data[0], any_agent.data[0].get("organization_id")) if any_agent.data else (None, None)
+                                return a_res.data, f_org, a_res.data.get("user_id")
 
-                srv_agent, matched_org = await asyncio.to_thread(_find_sarvam_agent)
+                    # 2. Check agents table phone_number column
+                    lookup = supabase_admin.table("agents").select("id, organization_id, user_id, name").or_(f"phone_number.eq.{to_number},phone_number.eq.+{clean_to},phone_number.eq.{clean_to},phone_number.eq.{last10_to}").limit(1).execute()
+                    if lookup.data and len(lookup.data) > 0:
+                        return lookup.data[0], lookup.data[0].get("organization_id"), lookup.data[0].get("user_id")
+
+                    # 3. If outbound call, match from_number
+                    if from_number and from_number != "Unknown":
+                        p_from = supabase_admin.table("phone_numbers")\
+                            .select("id, assigned_agent_id, organization_id, assigned_org_id, phone_number")\
+                            .or_(f"phone_number.eq.{from_number},phone_number.eq.+{clean_from},phone_number.eq.{clean_from},phone_number.eq.{last10_from}")\
+                            .limit(1)\
+                            .execute()
+                        if p_from.data and len(p_from.data) > 0:
+                            f_row = p_from.data[0]
+                            f_org = f_row.get("assigned_org_id") or f_row.get("organization_id")
+                            if f_row.get("assigned_agent_id"):
+                                a_res = supabase_admin.table("agents").select("id, organization_id, user_id, name").eq("id", f_row["assigned_agent_id"]).maybe_single().execute()
+                                if a_res.data:
+                                    return a_res.data, f_org, a_res.data.get("user_id")
+
+                    return None, None, None
+
+                srv_agent, matched_org, matched_user = await asyncio.to_thread(_find_sarvam_agent)
                 if srv_agent:
                     agent_id = srv_agent.get("id")
-                    matched_org_id = matched_org
+                    matched_org_id = matched_org or srv_agent.get("organization_id")
+                    matched_user_id = matched_user or srv_agent.get("user_id")
             except Exception as e:
                 print(f"[Sarvam Lookup Error] {e}", flush=True)
+        else:
+            # agent_id is provided, resolve organization and user directly from agent
+            try:
+                def _get_agent_info():
+                    res = supabase_admin.table("agents").select("id, organization_id, user_id, name").eq("id", agent_id).maybe_single().execute()
+                    return res.data if res else None
+                a_info = await asyncio.to_thread(_get_agent_info)
+                if a_info:
+                    matched_org_id = a_info.get("organization_id")
+                    matched_user_id = a_info.get("user_id")
+            except Exception as e:
+                print(f"[Sarvam Agent Lookup Error] {e}", flush=True)
 
-        target_org = organization_id if (organization_id and organization_id != "default") else matched_org_id
-        target_user = "9363a829-8d11-42ae-bfff-d8ea5c17a71b"
+        target_org = (organization_id if (organization_id and organization_id != "default") else None) or matched_org_id
+        target_user = matched_user_id
+        if not target_user and target_org:
+            try:
+                def _get_org_owner():
+                    u_res = supabase_admin.table("profiles").select("id").eq("organization_id", target_org).limit(1).execute()
+                    return u_res.data[0]["id"] if (u_res.data and len(u_res.data) > 0) else None
+                target_user = await asyncio.to_thread(_get_org_owner)
+            except Exception:
+                pass
 
         async def _async_record_sarvam():
             try:
