@@ -4,7 +4,6 @@ import React, { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { X, Upload, Megaphone, Loader2, Download, ShieldCheck } from 'lucide-react'
 import toast from 'react-hot-toast'
-import { createClient } from '@/utils/supabase/client'
 
 interface Agent {
   id: string
@@ -44,108 +43,35 @@ export function NewCampaignModal({ isOpen, onClose, onSuccess }: NewCampaignModa
   const fetchAgents = async () => {
     try {
       setLoadingAgents(true)
-      const supabase = createClient()
-      const { data: { user }, error: authErr } = await supabase.auth.getUser()
-      if (authErr || !user) {
-        toast.error('Authentication session missing!')
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 6000)
+
+      const res = await fetch('/api/campaigns/agents', {
+        signal: controller.signal,
+        headers: { 'Cache-Control': 'no-cache' }
+      })
+      clearTimeout(timeoutId)
+
+      if (res.ok) {
+        const data = await res.json()
+        const mapped = data.agents || []
+        setAgents(mapped)
+        if (mapped.length > 0) {
+          setAgentId(mapped[0].id)
+        } else {
+          setAgentId('')
+        }
         return
       }
 
-      // Check user profile for organization_id
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('organization_id')
-        .eq('id', user.id)
-        .maybeSingle()
-
-      let query = supabase
-        .from('agents')
-        .select('id, name, status, is_demo, agent_type, phone_number, organization_id')
-
-      if (profile?.organization_id) {
-        query = query.or(`user_id.eq.${user.id},organization_id.eq.${profile.organization_id}`)
-      } else {
-        query = query.eq('user_id', user.id)
-      }
-
-      const { data: agentsData, error: agentsErr } = await query
-        .neq('status', 'deleted')
-        .order('created_at', { ascending: false })
-
-      if (agentsErr) throw agentsErr
-
-      // Fetch active phone numbers and assignments to verify outbound capability
-      const { data: phoneNumbersData } = await supabase
-        .from('phone_numbers')
-        .select('phone_number, assigned_agent_id, status')
-        .eq('status', 'active')
-        .not('assigned_agent_id', 'is', null)
-
-      const { data: agentPhoneData } = await supabase
-        .from('agent_phone_numbers')
-        .select('agent_id, phone_number_id, phone_numbers(phone_number, status)')
-
-      // Map assigned numbers to agent IDs
-      const agentNumberMap = new Map<string, string>()
-
-      phoneNumbersData?.forEach((p: any) => {
-        if (p.assigned_agent_id && p.phone_number) {
-          agentNumberMap.set(p.assigned_agent_id, p.phone_number)
-        }
-      })
-
-      agentPhoneData?.forEach((ap: any) => {
-        const num = ap.phone_numbers?.phone_number
-        if (ap.agent_id && num) {
-          agentNumberMap.set(ap.agent_id, num)
-        }
-      })
-
-      // Also check direct agents.phone_number column
-      agentsData?.forEach((agent: any) => {
-        if (agent.phone_number && !agentNumberMap.has(agent.id)) {
-          agentNumberMap.set(agent.id, agent.phone_number)
-        }
-      })
-
-      // Strictly include ONLY agents that have an assigned phone number (required for outbound dialer)
-      const filteredAgents = (agentsData || []).filter((agent: any) => {
-        const rawName = agent.name || ''
-        const cleanName = rawName.replace(/^\[[^\]]+\]\s*/, '').trim().toLowerCase()
-        const isNameDemo = cleanName === 'demo' || cleanName.startsWith('demo')
-        const isFreeDemo = agent.is_demo === true || 
-                           agent.agent_type === 'free_demo' || 
-                           isNameDemo
-        if (isFreeDemo) return false
-
-        // Must have an assigned phone number
-        return agentNumberMap.has(agent.id)
-      })
-
-      const mappedAgents = filteredAgents.map((agent: any) => {
-        const rawName = agent.name || ''
-        const displayName = rawName
-          .replace(/^\[[^\]]+\]\s*/, '')           // remove [slug] prefix
-          .replace(/\s*-\s*Demo\s*$/i, ' (Demo)')  // prettify " - Demo" suffix
-          .replace(/\s*-\s*Trial\s*$/i, ' (Trial)') // prettify " - Trial" suffix
-        const assignedPhone = agentNumberMap.get(agent.id) || ''
-        return {
-          id: agent.id,
-          name: `${displayName || 'Unnamed Agent'} (${assignedPhone})`,
-          status: agent.status,
-          phone_number: assignedPhone
-        }
-      })
-
-      setAgents(mappedAgents)
-      if (mappedAgents.length > 0) {
-        setAgentId(mappedAgents[0].id)
-      } else {
-        setAgentId('')
-      }
+      const errData = await res.json().catch(() => ({}))
+      console.warn('[/api/campaigns/agents] Notice:', errData)
+      setAgents([])
+      setAgentId('')
     } catch (err: any) {
-      console.error(err)
-      toast.error('Failed to load agents: ' + (err.message || err))
+      console.warn('Failed to load campaign agents:', err?.message || err)
+      setAgents([])
+      setAgentId('')
     } finally {
       setLoadingAgents(false)
     }
