@@ -105,7 +105,21 @@ export async function POST(req: Request) {
     let verified = false
 
     if (credential_type === 'password') {
-      verified = Boolean(credential && credential === expectedPassword)
+      if (credential && credential === expectedPassword) {
+        verified = true
+      } else if (credential && user.email) {
+        try {
+          const { error: authErr } = await adminClient.auth.signInWithPassword({
+            email: user.email,
+            password: credential,
+          })
+          if (!authErr) {
+            verified = true
+          }
+        } catch (err) {
+          console.warn('[/api/admin/step-up] Re-auth check notice:', err)
+        }
+      }
     } else if (credential_type === 'totp') {
       // In production, verify against Supabase MFA or TOTP secret
       verified = Boolean(credential && credential.length === 6 && /^\d+$/.test(credential))

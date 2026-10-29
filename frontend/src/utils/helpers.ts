@@ -1,14 +1,20 @@
 export const getURL = (path: string = '') => {
-  let url =
-    process?.env?.NEXT_PUBLIC_APP_URL && process.env.NEXT_PUBLIC_APP_URL !== ''
-      ? process.env.NEXT_PUBLIC_APP_URL
-      : process?.env?.NEXT_PUBLIC_VERCEL_URL && process.env.NEXT_PUBLIC_VERCEL_URL !== ''
-      ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}`
-      : process?.env?.NEXT_PUBLIC_SITE_URL && process.env.NEXT_PUBLIC_SITE_URL !== ''
-      ? process.env.NEXT_PUBLIC_SITE_URL
-      : typeof window !== 'undefined'
-      ? window.location.origin
-      : 'https://vaakriti.com';
+  // In the browser, always use the current origin — this guarantees localhost:3000 in local dev
+  // and the correct domain in production without any env var confusion.
+  let url: string;
+  if (typeof window !== 'undefined') {
+    url = window.location.origin;
+  } else {
+    // Server-side: use explicit env vars in priority order
+    url =
+      process?.env?.NEXT_PUBLIC_APP_URL && process.env.NEXT_PUBLIC_APP_URL !== ''
+        ? process.env.NEXT_PUBLIC_APP_URL
+        : process?.env?.NEXT_PUBLIC_SITE_URL && process.env.NEXT_PUBLIC_SITE_URL !== ''
+        ? process.env.NEXT_PUBLIC_SITE_URL
+        : process?.env?.NEXT_PUBLIC_VERCEL_URL && process.env.NEXT_PUBLIC_VERCEL_URL !== ''
+        ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}`
+        : 'https://trinetraedu-ai.com';
+  }
 
   // Include web protocol if missing
   url = url.includes('http') ? url : `https://${url}`;

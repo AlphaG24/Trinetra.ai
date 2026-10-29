@@ -42,8 +42,13 @@ function AuthForm() {
     setIsMounted(true)
   }, [])
 
-  // Expired session notification
+  // Clean up URL hash errors from stale OAuth callbacks and expired sessions
   useEffect(() => {
+    if (typeof window !== 'undefined' && window.location.hash.includes('error=')) {
+      const cleanUrl = window.location.pathname + window.location.search
+      window.history.replaceState({}, '', cleanUrl)
+    }
+
     if (searchParams?.get('expired') === 'true') {
       toast.error('Your session has expired. Please sign in again.')
       const url = new URL(window.location.href)
@@ -67,54 +72,96 @@ function AuthForm() {
     setIsLoading(true)
 
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: email.trim(),
-        password,
-      })
+      // 1. First attempt reliable server-side login via /api/auth/login
+      // This eliminates browser-to-Supabase CORS/network drops and AuthRetryableFetchError
+      let authUser: any = null
+      let authSession: any = null
 
-      if (error) {
-        if (error.message.includes('Email not confirmed')) {
-          toast.error('Please check your email and verify your account before signing in.')
-        } else if (error.message.includes('Failed to fetch')) {
-          toast.error('Connection failed. Please check your internet connection.')
-        } else {
-          toast.error('Invalid email or password.')
+      try {
+        const serverRes = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: email.trim(), password }),
+        })
+        const serverData = await serverRes.json()
+
+        if (serverRes.ok && serverData.success && serverData.user) {
+          authUser = serverData.user
+          authSession = serverData.session
+          // Synchronize client instance with new session
+          if (authSession?.access_token) {
+            await supabase.auth.setSession({
+              access_token: authSession.access_token,
+              refresh_token: serverData.session?.refresh_token || '',
+            }).catch(() => {})
+          }
+        } else if (!serverRes.ok && serverData.error && !serverData.error.includes('temporarily unavailable')) {
+          toast.error(serverData.error)
+          setIsLoading(false)
+          return
         }
-        console.error('Sign-in failed:', error)
-        return
+      } catch (serverErr) {
+        console.warn('Server auth fallback notice:', serverErr)
       }
 
-      if (data.user) {
+      // 2. Client-side fallback if server-side login returned temporary unavailable
+      if (!authUser) {
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email: email.trim(),
+          password,
+        }).catch((clientErr: any) => ({
+          data: { user: null, session: null },
+          error: clientErr,
+        }))
+
+        if (error) {
+          const msg = error.message || ''
+          if (msg.includes('Email not confirmed')) {
+            toast.error('Please check your email and verify your account before signing in.')
+          } else if (msg.includes('Failed to fetch') || msg.includes('network')) {
+            toast.error('Connection failed. Please check your internet connection.')
+          } else {
+            toast.error('Invalid email or password.')
+          }
+          setIsLoading(false)
+          return
+        }
+        authUser = data?.user
+      }
+
+      if (authUser) {
         toast.success('Welcome back!')
         
         const redirectParam = searchParams ? searchParams.get('redirect') : null
-        const userEmail = (data.user.email || '').toLowerCase().trim()
+        const userEmail = (authUser.email || '').toLowerCase().trim()
         const isSuperAdminByEmail = userEmail === 'raghav00424@gmail.com' || userEmail === 'raghav@trinetra.ai' || (process.env.NEXT_PUBLIC_ADMIN_EMAILS || '').includes(userEmail)
-        const metaRole = (data.user.app_metadata?.role || data.user.user_metadata?.role || '').toLowerCase().trim()
+        const metaRole = (authUser.app_metadata?.role || authUser.user_metadata?.role || '').toLowerCase().trim()
         const isMetaAdmin = metaRole === 'admin' || metaRole === 'super_admin'
 
-        if (redirectParam && redirectParam.startsWith('/') && redirectParam !== '/' && !redirectParam.startsWith('/login')) {
-          if ((isSuperAdminByEmail || isMetaAdmin) && (redirectParam === '/dashboard' || redirectParam === '/dashboard/')) {
-            window.location.href = '/admin'
-            return
-          }
-          window.location.href = redirectParam
-          return
-        }
-
-        if (redirectParam && redirectParam.toLowerCase().includes('trinetraedu-ai.com')) {
-          let target = redirectParam.trim()
-          if (!target.startsWith('http://') && !target.startsWith('https://')) {
-            target = 'https://' + target
-          }
+        if (redirectParam) {
           try {
-            const parsed = new URL(target)
-            if (parsed.hostname.endsWith('trinetraedu-ai.com')) {
-              window.location.href = target
+            let targetPath = redirectParam
+            if (redirectParam.startsWith('http://') || redirectParam.startsWith('https://')) {
+              const parsed = new URL(redirectParam)
+              // If currently on localhost, keep user on localhost by extracting path
+              if (window.location.hostname === 'localhost' || window.location.hostname.includes('127.0.0.1')) {
+                targetPath = parsed.pathname + parsed.search
+              } else if (parsed.hostname.endsWith('trinetraedu-ai.com') || parsed.hostname.endsWith('trinetra.ai')) {
+                window.location.href = redirectParam
+                return
+              }
+            }
+
+            if (targetPath.startsWith('/') && targetPath !== '/' && !targetPath.startsWith('/login')) {
+              if ((isSuperAdminByEmail || isMetaAdmin) && (targetPath === '/dashboard' || targetPath === '/dashboard/')) {
+                window.location.href = '/admin'
+                return
+              }
+              window.location.href = targetPath
               return
             }
           } catch (err) {
-            console.error('Malformed redirectParam:', err)
+            console.error('Redirect parse notice:', err)
           }
         }
 
@@ -127,7 +174,7 @@ function AuthForm() {
           const profilePromise = supabase
             .from('profiles')
             .select('role')
-            .eq('id', data.user.id)
+            .eq('id', authUser.id)
             .single()
           const timeoutPromise = new Promise<{ data: any }>((resolve) => 
             setTimeout(() => resolve({ data: null }), 1500)
@@ -142,8 +189,10 @@ function AuthForm() {
           window.location.href = isSuperAdminByEmail ? '/admin' : '/dashboard'
         }
       }
-    } catch (err) {
-      console.error('Sign-in error:', err)
+    } catch (err: any) {
+      if (err?.name !== 'AuthRetryableFetchError') {
+        console.warn('Sign-in notice:', err?.message || err)
+      }
       toast.error('An unexpected error occurred. Please try again.')
     } finally {
       setIsLoading(false)
@@ -211,7 +260,10 @@ function AuthForm() {
   // ── GOOGLE OAUTH ──
   const handleGoogleOAuth = async () => {
     try {
-      const redirectURL = getURL('/auth/callback')
+      // Always use the current window origin to ensure OAuth redirects back to the right host
+      // (localhost:3000 in dev, trinetraedu-ai.com in production)
+      const redirectURL = `${window.location.origin}/auth/callback`
+
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
@@ -222,12 +274,24 @@ function AuthForm() {
           },
         },
       })
-      if (error) throw error
+      if (error) {
+        // Check if this is a network/server-down error
+        if (error.message?.includes('fetch') || error.message?.includes('network') || error.status === 0) {
+          toast.error('Authentication service is temporarily unavailable. Please try email login or try again in a few minutes.')
+        } else {
+          toast.error(error.message || 'Failed to authenticate with Google')
+        }
+      }
     } catch (err: any) {
       console.error('Google OAuth error:', err)
-      toast.error(err.message || 'Failed to authenticate with Google')
+      if (err?.message?.includes('fetch') || err?.message?.includes('network') || err?.name === 'TypeError') {
+        toast.error('Authentication service is temporarily unavailable. Please try email login or try again in a few minutes.')
+      } else {
+        toast.error(err.message || 'Failed to authenticate with Google')
+      }
     }
   }
+
 
   if (!isMounted) {
     return <div className="min-h-screen w-full bg-white" />

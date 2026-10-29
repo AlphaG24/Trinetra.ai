@@ -302,10 +302,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       async (event: any, session: any) => {
         if (!isMounted) return
 
-        if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
+        if (event === 'SIGNED_IN' || event === 'USER_UPDATED') {
           if (session?.user) {
             setUser(session.user)
             await fetchProfile(session.user.id, session.user)
+          }
+        } else if (event === 'TOKEN_REFRESHED') {
+          if (session?.user) {
+            setUser(session.user)
+            // Note: Token refresh only updates JWT validity; do not invoke fetchProfile
+            // here to prevent infinite loop hitting Supabase with 429 Too Many Requests.
           }
         }
         if (event === 'SIGNED_OUT') {

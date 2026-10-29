@@ -99,40 +99,35 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
-  // Refresh user session with a 3.5s timeout guard to prevent page hangs
-  let user = null
-  let authFailedOrTimedOut = false
-  try {
-    const userPromise = supabase.auth.getUser()
-    const timeoutPromise = new Promise<{ data: { user: null }; error: Error }>((_, reject) =>
-      setTimeout(() => reject(new Error('Supabase Auth timeout')), 3500)
-    )
-
-    const result = await Promise.race([userPromise, timeoutPromise])
-    user = result?.data?.user ?? null
-    if (result?.error) {
-      authFailedOrTimedOut = true
-    }
-  } catch (err) {
-    authFailedOrTimedOut = true
-    console.warn('[Middleware] Auth check timed out or failed:', err instanceof Error ? err.message : err)
+  // KEY OPTIMIZATION: If the user has valid auth cookies, trust them in middleware.
+  // The layout server components do a full authoritative getUser() check anyway.
+  // This avoids making a Supabase network request on EVERY page navigation,
+  // which was causing 4000+ /auth/v1/token requests per hour overwhelming the free tier.
+  
+  // For protected routes: if cookies present, defer auth to layout (avoids getUser() call here)
+  if (isProtectedRoute && hasAuthCookie) {
+    // Layout will do the authoritative check and redirect if session is invalid
+    return supabaseResponse
   }
 
-  // Unauthenticated user trying to access protected area
-  // If user has auth cookies, do not trigger a premature redirect storm during navigation or soft errors
-  if (!user && isProtectedRoute) {
-    if (hasAuthCookie) {
-      console.warn('[Middleware] Allowing protected request through with active auth cookies (auth deferred to layout)')
+  // For auth routes (login/signup): Only call getUser() if cookies are present (to redirect already-logged-in users)
+  let user = null
+  if (isAuthRoute && hasAuthCookie) {
+    try {
+      const userPromise = supabase.auth.getUser()
+      const timeoutPromise = new Promise<{ data: { user: null }; error: Error }>((_, reject) =>
+        setTimeout(() => reject(new Error('Supabase Auth timeout')), 2000)
+      )
+      const result = await Promise.race([userPromise, timeoutPromise])
+      user = result?.data?.user ?? null
+    } catch (err) {
+      // Auth service unreachable — let user access login page
+      console.warn('[Middleware] Auth check failed during login route, allowing access:', err instanceof Error ? err.message : err)
       return supabaseResponse
     }
-    const url = request.nextUrl.clone()
-    url.pathname = '/login'
-    url.searchParams.set('redirect', currentPath)
-    return NextResponse.redirect(url)
   }
 
-
-  // Authenticated user trying to access login/signup
+  // Authenticated user trying to access login/signup — redirect them to their dashboard
   if (user && isAuthRoute) {
     const userEmail = (user.email || '').toLowerCase().trim()
     const metaRole = (user.app_metadata?.role || user.user_metadata?.role || '').toLowerCase().trim()

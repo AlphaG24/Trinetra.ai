@@ -84,18 +84,13 @@ export function ObservabilityWidgets() {
     setMounted(true)
   }, [])
 
-  // Auto-poll interval
+  // Auto-poll: fetch once on mount, then every 5 minutes (not every 15s).
+  // Manual refresh is always available via the refresh button.
   useEffect(() => {
     fetchObservability()
     const timer = setInterval(() => {
-      setPollCountdown((prev) => {
-        if (prev <= 1) {
-          fetchObservability()
-          return 15
-        }
-        return prev - 1
-      })
-    }, 1000)
+      fetchObservability()
+    }, 300000) // 5 minutes — was 15 seconds (reduced ~95% of DB hits)
 
     return () => clearInterval(timer)
   }, [fetchObservability])

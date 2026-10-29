@@ -81,7 +81,17 @@ export const GET = safeApiHandler(async (request: Request) => {
       if (type === 'recovery') {
         targetUrl = `${origin}/reset-password`
       } else if (next.includes('trinetraedu-ai.com')) {
-        targetUrl = next.startsWith('http') ? next : `https://${next}`
+        const isLocal = origin.includes('localhost') || origin.includes('127.0.0.1')
+        if (isLocal) {
+          try {
+            const parsedNext = new URL(next.startsWith('http') ? next : `https://${next}`)
+            targetUrl = `${origin}${parsedNext.pathname}${parsedNext.search}`
+          } catch {
+            targetUrl = `${origin}/dashboard`
+          }
+        } else {
+          targetUrl = next.startsWith('http') ? next : `https://${next}`
+        }
       }
 
       // THE NUCLEAR FIX: 

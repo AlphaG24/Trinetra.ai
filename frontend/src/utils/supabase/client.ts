@@ -32,23 +32,56 @@ if (typeof window !== 'undefined') {
   }
 }
 
+let inFlightRefreshPromise: Promise<Response> | null = null
+
 const resilientFetch: typeof fetch = async (input, init) => {
-  try {
-    return await fetch(input, init)
-  } catch (err: any) {
-    console.warn('[Supabase Client] Network fetch notice:', err?.message || err)
-    return new Response(
-      JSON.stringify({
-        error: 'network_unavailable',
-        message: 'Network service temporarily unavailable.',
-      }),
-      {
-        status: 503,
-        statusText: 'Service Unavailable',
-        headers: { 'Content-Type': 'application/json' },
-      }
-    )
+  const urlStr = typeof input === 'string' ? input : (input instanceof Request ? input.url : String(input))
+  const isRefreshToken = urlStr.includes('grant_type=refresh_token')
+
+  // If a token refresh is already in-flight, reuse it to prevent concurrent token rotation conflicts & 429s
+  if (isRefreshToken && inFlightRefreshPromise) {
+    try {
+      const existingRes = await inFlightRefreshPromise
+      return existingRes.clone()
+    } catch {}
   }
+
+  const executeFetch = async (): Promise<Response> => {
+    try {
+      const res = await fetch(input, init)
+      if (res.status === 429 && isRefreshToken) {
+        console.warn('[Supabase Client] Token refresh throttled (429). Applying backoff cooldown...')
+        await new Promise((r) => setTimeout(r, 2000))
+        return await fetch(input, init)
+      }
+      return res
+    } catch (err: any) {
+      console.warn('[Supabase Client] Network fetch notice:', err?.message || err)
+      return new Response(
+        JSON.stringify({
+          error: 'network_unavailable',
+          message: 'Network service temporarily unavailable.',
+        }),
+        {
+          status: 503,
+          statusText: 'Service Unavailable',
+          headers: { 'Content-Type': 'application/json' },
+        }
+      )
+    }
+  }
+
+  if (isRefreshToken) {
+    inFlightRefreshPromise = executeFetch()
+    try {
+      const response = await inFlightRefreshPromise
+      return response.clone()
+    } finally {
+      inFlightRefreshPromise = null
+    }
+  }
+
+  return await executeFetch()
 }
 
 export function createClient(): any {
