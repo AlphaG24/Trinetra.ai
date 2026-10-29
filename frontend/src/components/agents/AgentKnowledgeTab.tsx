@@ -48,10 +48,10 @@ export function AgentKnowledgeTab({ agent, unlocked, upgradeUrl }: AgentKnowledg
   }
 
   useEffect(() => {
-    if (unlocked && agentId) {
+    if (agentId) {
       fetchDocuments()
     }
-  }, [unlocked, agentId])
+  }, [agentId])
 
   useEffect(() => {
     const hasProcessing = docs.some(d => d.status === 'processing')

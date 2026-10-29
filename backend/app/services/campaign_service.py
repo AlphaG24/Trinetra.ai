@@ -592,6 +592,19 @@ class CampaignService:
                         continue
 
                     if not has_more:
+                        # Check if any contacts are still pending (e.g. waiting for calling window to open)
+                        pending_check = await asyncio.to_thread(
+                            supabase_admin.table("campaign_contacts")
+                            .select("id", count="exact")
+                            .eq("campaign_id", campaign_id)
+                            .eq("call_status", "pending")
+                            .execute
+                        )
+                        if pending_check.count and pending_check.count > 0:
+                            logger.info(f"Campaign {campaign_id}: {pending_check.count} contact(s) still pending (outside calling window or rate limit). Waiting 60s...")
+                            await asyncio.sleep(60.0)
+                            continue
+
                         # Check if there are any lingering contacts in "dialing"
                         dialing_contacts = await asyncio.to_thread(
                             supabase_admin.table("campaign_contacts")

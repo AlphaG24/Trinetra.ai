@@ -31,32 +31,46 @@ export async function POST(request: Request) {
         // TXT file — read directly
         extractedText = fileBuffer.toString('utf-8');
       } else if (fileName.endsWith('.pdf')) {
-        // PDF file — proxy to FastAPI backend for extraction
-        const backendForm = new FormData();
-        backendForm.append('file', new Blob([fileBuffer]), file.name);
-        const backendRes = await fetch('http://127.0.0.1:8000/api/knowledge/extract-pdf', {
-          method: 'POST',
-          body: backendForm
-        });
-        if (backendRes.ok) {
-          const data = await backendRes.json();
-          extractedText = data.text || "";
-        } else {
-          throw new Error("PDF extraction failed");
+        // PDF file — parse directly in Node.js using pdf-parse or fallback to backend
+        try {
+          const pdfParse = require('pdf-parse');
+          const pdfData = await pdfParse(fileBuffer);
+          extractedText = pdfData.text || "";
+        } catch (localPdfErr) {
+          const backendUrl = process.env.INTERNAL_BACKEND_URL || process.env.NEXT_PUBLIC_FASTAPI_URL || 'http://127.0.0.1:8000';
+          const backendForm = new FormData();
+          backendForm.append('file', new Blob([fileBuffer]), file.name);
+          const backendRes = await fetch(`${backendUrl}/api/knowledge/extract-pdf`, {
+            method: 'POST',
+            body: backendForm
+          });
+          if (backendRes.ok) {
+            const data = await backendRes.json();
+            extractedText = data.text || "";
+          } else {
+            throw new Error(`PDF extraction failed: ${localPdfErr}`);
+          }
         }
       } else if (fileName.endsWith('.docx')) {
-        // DOCX — proxy to FastAPI backend
-        const backendForm = new FormData();
-        backendForm.append('file', new Blob([fileBuffer]), file.name);
-        const backendRes = await fetch('http://127.0.0.1:8000/api/knowledge/extract-docx', {
-          method: 'POST',
-          body: backendForm
-        });
-        if (backendRes.ok) {
-          const data = await backendRes.json();
-          extractedText = data.text || "";
-        } else {
-          throw new Error("DOCX extraction failed");
+        // DOCX — parse directly using mammoth or fallback to backend
+        try {
+          const mammoth = require('mammoth');
+          const result = await mammoth.extractRawText({ buffer: fileBuffer });
+          extractedText = result.value || "";
+        } catch (localDocxErr) {
+          const backendUrl = process.env.INTERNAL_BACKEND_URL || process.env.NEXT_PUBLIC_FASTAPI_URL || 'http://127.0.0.1:8000';
+          const backendForm = new FormData();
+          backendForm.append('file', new Blob([fileBuffer]), file.name);
+          const backendRes = await fetch(`${backendUrl}/api/knowledge/extract-docx`, {
+            method: 'POST',
+            body: backendForm
+          });
+          if (backendRes.ok) {
+            const data = await backendRes.json();
+            extractedText = data.text || "";
+          } else {
+            throw new Error(`DOCX extraction failed: ${localDocxErr}`);
+          }
         }
       } else {
         // Unsupported format — try reading as text
@@ -91,10 +105,50 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: insertError.message }, { status: 500 });
     }
 
+    // STEP 3: Automatically train/update agent system prompt with knowledge
+    if (finalStatus === "ready" && extractedText && extractedText.trim()) {
+      try {
+        const { data: currentAgent } = await supabase
+          .from("agents")
+          .select("system_prompt, name, voice_id, primary_language")
+          .eq("id", agentId)
+          .maybeSingle();
+
+        if (currentAgent) {
+          const oldPrompt = currentAgent.system_prompt || "";
+          const knowledgeBlock = `\n\n=== VERIFIED BUSINESS KNOWLEDGE: ${file.name} ===\n${extractedText.slice(0, 4000)}\n========================================\n`;
+          
+          if (!oldPrompt.includes(file.name)) {
+            const newPrompt = `${oldPrompt.trim()}${knowledgeBlock}`;
+            await supabase
+              .from("agents")
+              .update({ system_prompt: newPrompt })
+              .eq("id", agentId);
+
+            // Sync to backend engine
+            const backendUrl = process.env.INTERNAL_BACKEND_URL || process.env.NEXT_PUBLIC_FASTAPI_URL || 'http://127.0.0.1:8000';
+            fetch(`${backendUrl}/api/sarvam/sync-agent`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                agent_id: agentId,
+                name: currentAgent.name,
+                system_prompt: newPrompt,
+                voice_id: currentAgent.voice_id || 'shubh',
+                language: currentAgent.primary_language || 'hi'
+              })
+            }).catch(() => {});
+          }
+        }
+      } catch (promptErr) {
+        console.warn("[Knowledge Upload] Could not append knowledge to agent prompt:", promptErr);
+      }
+    }
+
     return NextResponse.json({
       success: true,
       document: newDoc,
-      message: finalStatus === "ready" ? "Document uploaded and extracted successfully." : "Document uploaded but extraction failed."
+      message: finalStatus === "ready" ? "Document uploaded and agent trained successfully." : "Document uploaded but extraction failed."
     });
 
   } catch (error: any) {

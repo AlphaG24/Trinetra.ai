@@ -95,21 +95,22 @@ export async function GET(request: Request) {
       }
     }
 
-    // 3. Calculate amount paid by business to Trinetra
+    // 3. Calculate amount paid by business to the platform (from invoices table)
     let totalPaidToTrinetra = 0
-    const { data: txs } = await supabase
-      .from('transactions')
-      .select('amount')
-      .eq('user_id', user.id)
-      .eq('status', 'success')
-      .gte('created_at', startDate.toISOString())
-      .lte('created_at', endDate.toISOString())
+    if (orgId) {
+      const { data: invs } = await supabase
+        .from('invoices')
+        .select('total_amount, status, created_at')
+        .eq('organization_id', orgId)
+        .eq('status', 'paid')
+        .gte('created_at', startDate.toISOString())
+        .lte('created_at', endDate.toISOString())
 
-    if (txs && txs.length > 0) {
-      totalPaidToTrinetra = txs.reduce((sum: number, tx: any) => sum + (Number(tx.amount) || 0), 0)
-    } else {
-      // If no transactions have occurred, real amount paid is 0
-      totalPaidToTrinetra = 0
+      if (invs && invs.length > 0) {
+        // total_amount is stored in paisa (e.g. 932082 paisa = 9320.82 rupees)
+        const totalPaisa = invs.reduce((sum: number, inv: any) => sum + (Number(inv.total_amount) || 0), 0)
+        totalPaidToTrinetra = Math.round(totalPaisa / 100)
+      }
     }
 
     const roiMultiplier = totalPaidToTrinetra > 0
