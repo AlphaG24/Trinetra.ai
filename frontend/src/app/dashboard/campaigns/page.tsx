@@ -217,7 +217,7 @@ export default function CampaignsPage() {
         </div>
         <div className="flex items-center gap-2">
           <button
-            onClick={fetchCampaigns}
+            onClick={() => fetchCampaigns()}
             className="p-2.5 rounded-xl border border-[var(--border)] bg-[var(--card-bg)] text-[var(--body)] hover:text-[var(--heading)] hover:bg-[var(--hover-bg)] transition-all cursor-pointer"
             title="Refresh Campaigns"
           >
