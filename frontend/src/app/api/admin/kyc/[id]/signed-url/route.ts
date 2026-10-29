@@ -38,21 +38,42 @@ export async function POST(
 ) {
   try {
     const { id: documentId } = await params
-    const supabase = await createClient()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    const authHeader = req.headers.get('authorization')
+    const bearerToken = authHeader?.startsWith('Bearer ') ? authHeader.substring(7) : null
 
-    if (authError || !user) {
+    const admin = getAdminClient()
+    let user: any = null
+
+    if (bearerToken) {
+      try {
+        const { data: tokenData, error: tokenErr } = await admin.auth.getUser(bearerToken)
+        if (!tokenErr && tokenData?.user) {
+          user = tokenData.user
+        }
+      } catch (err) {
+        console.warn('[/api/admin/kyc/signed-url] Bearer check notice:', err)
+      }
+    }
+
+    if (!user) {
+      const supabase = await createClient()
+      const { data: { user: cookieUser } } = await supabase.auth.getUser()
+      user = cookieUser
+    }
+
+    if (!user) {
       return NextResponse.json({ error: 'Unauthorized: Admin authentication required.' }, { status: 401 })
     }
 
-    const admin = getAdminClient()
     const { data: profile } = await admin
       .from('profiles')
       .select('role, email')
       .eq('id', user.id)
       .single()
 
-    const role = profile?.role || 'customer'
+    const userEmail = (user.email || '').toLowerCase().trim()
+    const isSuperAdminEmail = userEmail === 'raghav00424@gmail.com' || userEmail === 'raghav@trinetra.ai' || (process.env.NEXT_PUBLIC_ADMIN_EMAILS || '').includes(userEmail)
+    const role = profile?.role || (isSuperAdminEmail ? 'super_admin' : 'customer')
 
     // Master Plan Section 18.4: developer_tester accounts are strictly forbidden from viewing customer KYC
     if (role === 'developer_tester') {
@@ -61,9 +82,10 @@ export async function POST(
       }, { status: 403 })
     }
 
-    if (role !== 'admin' && role !== 'super_admin') {
+    if (role !== 'admin' && role !== 'super_admin' && !isSuperAdminEmail) {
       return NextResponse.json({ error: 'Forbidden: Admin access required.' }, { status: 403 })
     }
+
 
     // Step-Up Re-Authentication verification (300-second token)
     const stepUpToken = req.headers.get('x-admin-step-up-token')
@@ -103,10 +125,10 @@ export async function POST(
     }
 
     // Fetch user details
-    let userEmail = 'N/A'
+    let docUserEmail = 'N/A'
     if (doc.user_id) {
       const { data: uProf } = await admin.from('profiles').select('email').eq('id', doc.user_id).maybeSingle()
-      if (uProf?.email) userEmail = uProf.email
+      if (uProf?.email) docUserEmail = uProf.email
     }
 
     // Master Plan Section 18.4 & 18.6: Generate short-lived signed URL (max 15 minutes / 900 seconds)
@@ -173,7 +195,7 @@ export async function POST(
       document: {
         ...doc,
         organization_name: orgName,
-        user_email: userEmail,
+        user_email: docUserEmail,
       },
     })
   } catch (err: any) {

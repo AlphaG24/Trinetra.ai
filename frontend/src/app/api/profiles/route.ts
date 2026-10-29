@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { headers } from 'next/headers'
 import { createClient } from '@/lib/server'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
 import { cached, invalidateCache } from '@/lib/redis'
@@ -27,26 +28,43 @@ function getAdminClient() {
 // GET /api/profiles - Returns the authenticated user's profile
 export async function GET() {
   try {
-    const supabase = await createClient()
-    
     let user: any = null
+    const admin = getAdminClient()
+
+    // 1. Try Bearer token from header
     try {
-      const authPromise = supabase.auth.getUser().catch(() => ({ data: { user: null } }))
-      const timeoutPromise = new Promise<any>((_, reject) =>
-        setTimeout(() => reject(new Error('Auth timeout')), 3000)
-      )
-      const authRes = await Promise.race([authPromise, timeoutPromise])
-      user = authRes?.data?.user ?? null
-    } catch {
-      user = null
+      const headerList = await headers()
+      const authHeader = headerList.get('authorization')
+      const bearerToken = authHeader?.startsWith('Bearer ') ? authHeader.substring(7) : null
+      if (bearerToken) {
+        const { data: tokenData, error: tokenErr } = await admin.auth.getUser(bearerToken)
+        if (!tokenErr && tokenData?.user) {
+          user = tokenData.user
+        }
+      }
+    } catch {}
+
+    // 2. Fall back to cookie-based session
+    if (!user) {
+      try {
+        const supabase = await createClient()
+        const authPromise = supabase.auth.getUser()
+        const timeoutPromise = new Promise<any>((_, reject) =>
+          setTimeout(() => reject(new Error('Auth timeout')), 3500)
+        )
+        const authRes = await Promise.race([authPromise, timeoutPromise])
+        user = authRes?.data?.user ?? null
+      } catch {
+        user = null
+      }
     }
 
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const admin = getAdminClient()
     let profile: any = null
+
 
     try {
       const dbPromise = admin
@@ -185,12 +203,32 @@ export async function GET() {
 // PATCH /api/profiles - Updates allowed profile fields atomically
 export async function PATCH(request: NextRequest) {
   try {
-    const supabase = await createClient()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    const authHeader = request.headers.get('authorization')
+    const bearerToken = authHeader?.startsWith('Bearer ') ? authHeader.substring(7) : null
+    let user: any = null
 
-    if (authError || !user) {
+    if (bearerToken) {
+      try {
+        const admin = getAdminClient()
+        const { data: tokenData, error: tokenErr } = await admin.auth.getUser(bearerToken)
+        if (!tokenErr && tokenData?.user) {
+          user = tokenData.user
+        }
+      } catch (err) {
+        console.warn('[/api/profiles PATCH] Bearer auth notice:', err)
+      }
+    }
+
+    if (!user) {
+      const supabase = await createClient()
+      const { data: cookieData } = await supabase.auth.getUser()
+      user = cookieData?.user
+    }
+
+    if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+
 
     const body = await request.json()
 

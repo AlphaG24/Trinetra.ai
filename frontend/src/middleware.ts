@@ -26,10 +26,19 @@ export async function middleware(request: NextRequest) {
     {
       cookies: {
         getAll() {
-          return request.cookies.getAll()
+          const all = request.cookies.getAll()
+          // Deduplicate cookies by name to prevent conflicting chunk or token parsing
+          const map = new Map<string, string>()
+          for (const c of all) {
+            if (!map.has(c.name) || (c.value && !map.get(c.name))) {
+              map.set(c.name, c.value)
+            }
+          }
+          return Array.from(map.entries()).map(([name, value]) => ({ name, value }))
         },
         setAll(cookiesToSet) {
           cookiesToSet.forEach(({ name, value, options }) => {
+            const isClearing = !value || options?.maxAge === 0
             const setOptions = {
               ...options,
               domain: cookieDomain || options?.domain,
@@ -39,6 +48,13 @@ export async function middleware(request: NextRequest) {
             }
             request.cookies.set(name, value)
             supabaseResponse.cookies.set({ name, value, ...setOptions })
+
+            // If clearing, ensure host cookie is also cleared
+            if (isClearing && cookieDomain) {
+              try {
+                supabaseResponse.cookies.set({ name, value: '', path: '/', maxAge: 0 })
+              } catch {}
+            }
           })
         },
       },
@@ -83,27 +99,30 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
-  // Refresh user session with a strict 2s timeout guard to prevent page hangs
+  // Refresh user session with a 3.5s timeout guard to prevent page hangs
   let user = null
   let authFailedOrTimedOut = false
   try {
-    const userPromise = supabase.auth.getUser().catch(err => ({ data: { user: null }, error: err }))
+    const userPromise = supabase.auth.getUser()
     const timeoutPromise = new Promise<{ data: { user: null }; error: Error }>((_, reject) =>
-      setTimeout(() => reject(new Error('Supabase Auth timeout')), 2000)
+      setTimeout(() => reject(new Error('Supabase Auth timeout')), 3500)
     )
 
     const result = await Promise.race([userPromise, timeoutPromise])
     user = result?.data?.user ?? null
+    if (result?.error) {
+      authFailedOrTimedOut = true
+    }
   } catch (err) {
     authFailedOrTimedOut = true
     console.warn('[Middleware] Auth check timed out or failed:', err instanceof Error ? err.message : err)
   }
 
   // Unauthenticated user trying to access protected area
-  // If user has auth cookies but auth call timed out due to high DB IO, do not trigger a redirect storm
+  // If user has auth cookies, do not trigger a premature redirect storm during navigation or soft errors
   if (!user && isProtectedRoute) {
-    if (hasAuthCookie && authFailedOrTimedOut) {
-      console.warn('[Middleware] Allowing request through despite auth timeout due to active auth cookies')
+    if (hasAuthCookie) {
+      console.warn('[Middleware] Allowing protected request through with active auth cookies (auth deferred to layout)')
       return supabaseResponse
     }
     const url = request.nextUrl.clone()
@@ -111,6 +130,7 @@ export async function middleware(request: NextRequest) {
     url.searchParams.set('redirect', currentPath)
     return NextResponse.redirect(url)
   }
+
 
   // Authenticated user trying to access login/signup
   if (user && isAuthRoute) {

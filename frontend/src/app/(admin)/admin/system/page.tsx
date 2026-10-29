@@ -301,15 +301,23 @@ export default function SystemConfigPage() {
 
     try {
       setStepUpLoading(true)
+      const supabase = createClient()
+      const { data: sessionData } = await supabase.auth.getSession()
+      const token = sessionData?.session?.access_token
+
       const res = await fetch('/api/admin/step-up', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
         body: JSON.stringify({
           action: pendingSaveRotation ? 'credential_update' : 'price_change',
           credential: stepUpPassword,
           credential_type: 'password'
         })
       })
+
 
       const data = await res.json()
       if (!res.ok) {

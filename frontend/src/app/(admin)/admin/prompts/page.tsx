@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation'
 import { PromptTemplatesClient } from '@/src/components/admin/PromptTemplatesClient'
 
 export const metadata = {
-  title: 'Prompt Templates | Trinetra AI Admin',
+  title: 'Prompt Templates | Vaakriti Admin',
   description: 'Manage AI system prompts for each personality type',
 }
 

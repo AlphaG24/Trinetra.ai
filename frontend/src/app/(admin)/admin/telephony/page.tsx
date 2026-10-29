@@ -465,7 +465,7 @@ export default function AdminTelephonyPage() {
           <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-xl p-6 space-y-5">
             <h2 className="text-lg font-bold text-[var(--heading)] font-[family-name:var(--font-montserrat)] border-b border-[var(--border)] pb-3">Global Webhook URL</h2>
             <div className="space-y-1.5">
-              <label className="text-xs font-bold text-[var(--muted)] uppercase tracking-wider">Trinetra Webhook Base URL</label>
+              <label className="text-xs font-bold text-[var(--muted)] uppercase tracking-wider">Vaakriti Webhook Base URL</label>
               <input 
                 type="url"
                 placeholder="https://api.trinetraedu-ai.com"
@@ -504,7 +504,7 @@ export default function AdminTelephonyPage() {
             {/* Markup & Limits */}
             <div className="space-y-6">
               <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-xl p-6 space-y-4">
-                <h2 className="text-lg font-bold text-[var(--heading)] font-[family-name:var(--font-montserrat)] border-b border-[var(--border)] pb-3">Trinetra Markup</h2>
+                <h2 className="text-lg font-bold text-[var(--heading)] font-[family-name:var(--font-montserrat)] border-b border-[var(--border)] pb-3">Vaakriti Markup</h2>
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-[var(--muted)] uppercase tracking-wider">Markup Percentage (%)</label>
                   <input 
@@ -581,7 +581,7 @@ export default function AdminTelephonyPage() {
                 <div className="p-4 border-b border-[var(--border)] bg-emerald-500/5 flex items-center justify-between">
                   <div>
                     <h2 className="font-bold text-[var(--heading)]">Exotel Indian DID Costs</h2>
-                    <p className="text-xs text-[var(--muted)]">Cost Price to Trinetra (₹/mo)</p>
+                    <p className="text-xs text-[var(--muted)]">Cost Price to Vaakriti (₹/mo)</p>
                   </div>
                   <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 text-xs font-bold border border-emerald-500/30">Primary IN</span>
                 </div>
@@ -627,7 +627,7 @@ export default function AdminTelephonyPage() {
               <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-xl overflow-hidden">
                 <div className="p-4 border-b border-[var(--border)]">
                   <h2 className="font-bold text-[var(--heading)]">Twilio DID Costs</h2>
-                  <p className="text-xs text-[var(--muted)]">Cost Price to Trinetra</p>
+                  <p className="text-xs text-[var(--muted)]">Cost Price to Vaakriti</p>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm text-left">

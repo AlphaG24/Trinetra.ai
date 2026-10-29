@@ -230,7 +230,7 @@ export default function AdminEnterpriseLeadsPage() {
                           View Details
                         </button>
                         <a
-                          href={`mailto:${lead.work_email}?subject=Trinetra%20AI%20Enterprise%20Inquiry%20-%20${encodeURIComponent(lead.company_name)}`}
+                          href={`mailto:${lead.work_email}?subject=Vaakriti%20Enterprise%20Inquiry%20-%20${encodeURIComponent(lead.company_name)}`}
                           className="px-2.5 py-1 rounded-lg bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 text-xs font-semibold hover:opacity-90 transition cursor-pointer inline-flex items-center gap-1"
                         >
                           <span>Email</span>
@@ -321,7 +321,7 @@ export default function AdminEnterpriseLeadsPage() {
                 Close
               </button>
               <a
-                href={`mailto:${selectedLead.work_email}?subject=Trinetra%20AI%20Enterprise%20Plan%20Discussion&body=Hello%20${encodeURIComponent(selectedLead.company_name)}%20Team,%0A%0AThank%20you%20for%20reaching%20out%20regarding%20Trinetra%20AI%20Enterprise.`}
+                href={`mailto:${selectedLead.work_email}?subject=Vaakriti%20Enterprise%20Plan%20Discussion&body=Hello%20${encodeURIComponent(selectedLead.company_name)}%20Team,%0A%0AThank%20you%20for%20reaching%20out%20regarding%20Vaakriti%20Enterprise.`}
                 className="px-4 py-2 bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:text-zinc-900 dark:hover:bg-zinc-100 text-xs font-bold uppercase tracking-wider rounded-xl transition cursor-pointer shadow-sm flex items-center gap-1.5"
               >
                 <span>Initiate Contact</span>

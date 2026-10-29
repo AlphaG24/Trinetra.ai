@@ -103,8 +103,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return 'Raghav'
     }
 
+    const getAuthHeaders = async (): Promise<Record<string, string>> => {
+      try {
+        const { data } = await supabase.auth.getSession()
+        const token = data?.session?.access_token
+        return token ? { Authorization: `Bearer ${token}` } : {}
+      } catch {
+        return {}
+      }
+    }
+
     try {
-      const res = await fetch('/api/profiles')
+      const authHeaders = await getAuthHeaders()
+      const res = await fetch('/api/profiles', { headers: authHeaders })
       if (res.ok) {
         const { profile: data, user: serverUser } = await res.json()
         if (data) {
@@ -175,7 +186,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // 2. If client getUser() failed or timed out, attempt server /api/profiles fallback
       if (!currentUser) {
         try {
-          const sRes = await fetch('/api/profiles')
+          const { data } = await supabase.auth.getSession()
+          const token = data?.session?.access_token
+          const sRes = await fetch('/api/profiles', {
+            headers: token ? { Authorization: `Bearer ${token}` } : {},
+          })
           if (sRes.ok) {
             const sData = await sRes.json()
             if (sData?.profile) {
@@ -231,7 +246,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Server-side /api/profiles fallback if client getUser() yielded null
         if (!currentUser) {
           try {
-            const sRes = await fetch('/api/profiles')
+            const { data } = await supabase.auth.getSession()
+            const token = data?.session?.access_token
+            const sRes = await fetch('/api/profiles', {
+              headers: token ? { Authorization: `Bearer ${token}` } : {},
+            })
             if (sRes.ok) {
               const sData = await sRes.json()
               if (sData?.profile) {
@@ -248,6 +267,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             }
           } catch {}
         }
+
 
         if (!currentUser) {
           const cached = sessionStorage.getItem(CACHE_KEY) || localStorage.getItem(CACHE_KEY)

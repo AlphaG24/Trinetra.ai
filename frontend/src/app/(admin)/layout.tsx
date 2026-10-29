@@ -7,7 +7,7 @@ import { AdminSidebar } from '@/src/components/admin/AdminSidebar'
 import { AdminIdleWatcher } from '@/src/components/admin/AdminIdleWatcher'
 
 export const metadata = {
-  title: 'Admin Control Center — Trinetra AI',
+  title: 'Admin Control Center — Vaakriti',
   description: 'Enterprise Management & Platform Administration',
 }
 

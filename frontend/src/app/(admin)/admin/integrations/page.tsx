@@ -1,7 +1,7 @@
 import { AdminIntegrationsClient } from './AdminIntegrationsClient'
 
 export const metadata = {
-  title: 'Integrations Management | Trinetra.ai Admin',
+  title: 'Integrations Management | Vaakriti Admin',
 }
 
 export default function AdminIntegrationsPage() {

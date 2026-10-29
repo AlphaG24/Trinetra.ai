@@ -79,12 +79,12 @@ export function AdminTopbar({ onMenuClick, isMobileSidebarOpen }: AdminTopbarPro
           <Link href="/admin" className="flex items-center gap-3 group">
             <img
               src="/trident.png"
-              alt="Trinetra"
+              alt="Vaakriti"
               className="dynamic-logo h-11 md:h-12 w-auto object-contain -mt-0.5 transition-transform duration-200 group-hover:scale-105"
             />
             <div className="flex items-center gap-2">
               <span className="font-playfair font-black text-sm md:text-base text-[var(--heading)] tracking-tight">
-                Trinetra AI
+                Vaakriti
               </span>
               <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-violet-500/15 text-violet-600 dark:text-violet-400 border border-violet-500/25">
                 <ShieldCheck className="w-3 h-3" />

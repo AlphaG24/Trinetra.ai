@@ -16,24 +16,46 @@ export async function POST(
 ) {
   try {
     const { id } = await params
-    const supabase = await createClient()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    const authHeader = req.headers.get('authorization')
+    const bearerToken = authHeader?.startsWith('Bearer ') ? authHeader.substring(7) : null
 
-    if (authError || !user) {
+    const admin = getAdminClient()
+    let user: any = null
+
+    if (bearerToken) {
+      try {
+        const { data: tokenData, error: tokenErr } = await admin.auth.getUser(bearerToken)
+        if (!tokenErr && tokenData?.user) {
+          user = tokenData.user
+        }
+      } catch (err) {
+        console.warn('[/api/admin/kyc/review] Bearer check notice:', err)
+      }
+    }
+
+    if (!user) {
+      const supabase = await createClient()
+      const { data: { user: cookieUser } } = await supabase.auth.getUser()
+      user = cookieUser
+    }
+
+    if (!user) {
       return NextResponse.json({ error: 'Unauthorized: Admin authentication required.' }, { status: 401 })
     }
 
-    const admin = getAdminClient()
     const { data: profile } = await admin
       .from('profiles')
       .select('role, email')
       .eq('id', user.id)
       .single()
 
-    const role = profile?.role || 'customer'
-    if (role !== 'admin' && role !== 'super_admin') {
+    const userEmail = (user.email || '').toLowerCase().trim()
+    const isSuperAdminEmail = userEmail === 'raghav00424@gmail.com' || userEmail === 'raghav@trinetra.ai' || (process.env.NEXT_PUBLIC_ADMIN_EMAILS || '').includes(userEmail)
+    const role = profile?.role || (isSuperAdminEmail ? 'super_admin' : 'customer')
+    if (role !== 'admin' && role !== 'super_admin' && !isSuperAdminEmail) {
       return NextResponse.json({ error: 'Forbidden: Admin access required.' }, { status: 403 })
     }
+
 
     const body = await req.json().catch(() => ({}))
     const { status, rejection_reason } = body

@@ -208,10 +208,11 @@ export function AdminSidebar({
             <div className="px-1 flex items-center justify-between text-[11px] text-[var(--muted)]">
               <div className="flex items-center gap-1.5">
                 <Bot className="w-3 h-3 text-zinc-500" />
-                <span className="font-playfair font-medium">Trinetra v2.0</span>
+                <span className="font-playfair font-medium">Vaakriti v2.0</span>
               </div>
               <span className="font-mono text-[10px] text-emerald-500">Active</span>
             </div>
+
           )}
         </div>
       </aside>

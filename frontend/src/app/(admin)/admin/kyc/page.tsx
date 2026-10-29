@@ -21,6 +21,7 @@ import {
 import Link from 'next/link'
 import toast from 'react-hot-toast'
 import { getValidStepUpToken, cacheStepUpToken } from '@/lib/safety/adminAuthService'
+import { createClient } from '@/utils/supabase/client'
 
 interface KYCDocument {
   id: string
@@ -66,6 +67,17 @@ export default function AdminKYCVerificationPage() {
   const [rejectionReason, setRejectionReason] = useState('')
   const [processingReviewId, setProcessingReviewId] = useState<string | null>(null)
 
+  const getClientAuthHeader = async (): Promise<Record<string, string>> => {
+    try {
+      const supabase = createClient()
+      const { data } = await supabase.auth.getSession()
+      const token = data?.session?.access_token
+      return token ? { Authorization: `Bearer ${token}` } : {}
+    } catch {
+      return {}
+    }
+  }
+
   const fetchDocuments = async (overrideToken?: string) => {
     try {
       setLoading(true)
@@ -77,9 +89,11 @@ export default function AdminKYCVerificationPage() {
         return
       }
 
+      const authHeaders = await getClientAuthHeader()
       const res = await fetch('/api/admin/kyc', {
         headers: {
           'x-admin-step-up-token': token,
+          ...authHeaders,
         },
       })
 
@@ -116,9 +130,13 @@ export default function AdminKYCVerificationPage() {
 
     try {
       setSubmittingStepUp(true)
+      const authHeaders = await getClientAuthHeader()
       const res = await fetch('/api/admin/step-up', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...authHeaders,
+        },
         body: JSON.stringify({
           action: 'kyc_view',
           credential: stepUpPassword,
@@ -152,10 +170,12 @@ export default function AdminKYCVerificationPage() {
   const executeViewDocument = async (doc: KYCDocument, token: string) => {
     try {
       setLoadingDocId(doc.id)
+      const authHeaders = await getClientAuthHeader()
       const res = await fetch(`/api/admin/kyc/${doc.id}/signed-url`, {
         method: 'POST',
         headers: {
           'x-admin-step-up-token': token,
+          ...authHeaders,
         },
       })
 
@@ -196,14 +216,19 @@ export default function AdminKYCVerificationPage() {
   const handleReview = async (id: string, status: 'verified' | 'rejected', reason?: string) => {
     try {
       setProcessingReviewId(id)
+      const authHeaders = await getClientAuthHeader()
       const res = await fetch(`/api/admin/kyc/${id}/review`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...authHeaders,
+        },
         body: JSON.stringify({
           status,
           rejection_reason: reason,
         }),
       })
+
 
       const data = await res.json()
       if (!res.ok) {
