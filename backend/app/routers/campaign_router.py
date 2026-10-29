@@ -333,8 +333,10 @@ async def trigger_instant_demo_call(req: InstantCallRequest):
         if not req.phone or not req.name:
             raise HTTPException(status_code=400, detail="Name and phone number are required")
 
-        # 1. Resolve agent
-        agent = {"id": req.agent_id or "dd4da4c1-9deb-4047-8927-5e12402e6b1f", "name": "Shubh", "organization_id": req.organization_id or "b1ddf1e9-abc1-4ff4-90f5-3ac66913738a"}
+        # 1. Resolve agent: default to public demo sandbox (Arika), never Nexus private tenant
+        PUBLIC_DEMO_ORG_ID = "d3300000-0000-0000-0000-000000000001"
+        PUBLIC_DEMO_AGENT_ID = "ac11e104-a37a-4ff1-aef6-fc8a2c97f4d7"
+        agent = {"id": req.agent_id or PUBLIC_DEMO_AGENT_ID, "name": "Arika", "organization_id": req.organization_id or PUBLIC_DEMO_ORG_ID}
         try:
             if req.agent_id:
                 a_res = await asyncio.wait_for(

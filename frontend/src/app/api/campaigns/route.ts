@@ -35,12 +35,11 @@ export async function GET(request: Request) {
         `)
         .order("created_at", { ascending: false });
 
-      if (!isPrivileged) {
-        if (orgId) {
-          query = query.or(`organization_id.eq.${orgId},organization_id.eq.${userId}`);
-        } else {
-          query = query.eq("organization_id", userId);
-        }
+      // Strictly scope campaigns to the active workspace organization_id or user_id
+      if (orgId) {
+        query = query.or(`organization_id.eq.${orgId},organization_id.eq.${userId}`);
+      } else {
+        query = query.eq("organization_id", userId);
       }
 
       const { data: dbCampaigns, error: dbError } = await query;
@@ -62,8 +61,10 @@ export async function GET(request: Request) {
         .select("*")
         .order("created_at", { ascending: false });
 
-      if (!isPrivileged && orgId) {
+      if (orgId) {
         simpleQuery = simpleQuery.or(`organization_id.eq.${orgId},organization_id.eq.${userId}`);
+      } else {
+        simpleQuery = simpleQuery.eq("organization_id", userId);
       }
 
       const { data: simpleCampaigns } = await simpleQuery;

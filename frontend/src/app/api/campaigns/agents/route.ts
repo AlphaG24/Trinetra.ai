@@ -21,23 +21,30 @@ export async function GET(request: Request) {
     const userId = user.id;
     const admin = getAdminClient();
 
-    const isPrivileged =
-      ['developer_tester', 'admin', 'super_admin'].includes(profile.role || '') ||
-      ['raghav00424@gmail.com', 'raghav@trinetra.ai'].includes((profile.email || '').toLowerCase().trim());
+    const SHUBH_AGENT_ID = "dd4da4c1-9deb-4047-8927-5e12402e6b1f";
+    const NEXUS_ORG_ID = "b1ddf1e9-abc1-4ff4-90f5-3ac66913738a";
+    const NEXUS_OWNER_ID = "9363a829-8d11-42ae-bfff-d8ea5c17a71b";
+    const NEXUS_EMAIL = "nexus.ai.ops@gmail.com";
 
-    // 1. Fetch agents
+    const userEmail = (user.email || '').toLowerCase().trim();
+    const isNexusUser = userId === NEXUS_OWNER_ID || userEmail === NEXUS_EMAIL || orgId === NEXUS_ORG_ID;
+
+    // 1. Fetch agents strictly belonging to user or organization
     let agentsQuery = admin
       .from('agents')
       .select('id, name, status, is_demo, agent_type, phone_number, organization_id, user_id')
       .neq('status', 'deleted')
       .order('created_at', { ascending: false });
 
-    if (!isPrivileged) {
-      if (orgId) {
-        agentsQuery = agentsQuery.or(`user_id.eq.${userId},organization_id.eq.${orgId}`);
-      } else {
-        agentsQuery = agentsQuery.eq('user_id', userId);
-      }
+    if (orgId) {
+      agentsQuery = agentsQuery.or(`user_id.eq.${userId},organization_id.eq.${orgId}`);
+    } else {
+      agentsQuery = agentsQuery.eq('user_id', userId);
+    }
+
+    // Exclude Shubh agent if caller is not the Nexus account
+    if (!isNexusUser) {
+      agentsQuery = agentsQuery.neq('id', SHUBH_AGENT_ID);
     }
 
     const { data: agentsData, error: agentsError } = await agentsQuery;

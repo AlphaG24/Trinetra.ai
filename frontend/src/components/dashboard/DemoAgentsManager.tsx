@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { toast } from 'sonner';
+import { useAuth } from '@/components/providers/AuthProvider';
 
 export interface DemoAgentItem {
   id: string;
@@ -28,6 +29,7 @@ export interface DemoAgentItem {
 }
 
 export function DemoAgentsManager() {
+  const { role } = useAuth();
   const [agents, setAgents] = useState<DemoAgentItem[]>([]);
   const [allAgents, setAllAgents] = useState<any[]>([]);
   const [selectedAgentIndex, setSelectedAgentIndex] = useState(0);
@@ -207,7 +209,7 @@ export function DemoAgentsManager() {
                 Live Voice Demo Studio Configuration
               </h3>
               <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                Developer Tester
+                {role === 'super_admin' ? 'Super Admin' : role === 'admin' ? 'Admin' : 'Developer Studio'}
               </span>
             </div>
             <p className="text-xs text-zinc-400 mt-0.5">

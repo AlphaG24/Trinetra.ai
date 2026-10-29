@@ -128,24 +128,44 @@ export async function GET() {
       }
     }
 
-    // Fetch ALL agents from database for developer_tester without tenant limitations
-    const { data: allDatabaseAgents, error: agentsError } = await (supabaseAdmin as any)
+    // Strictly scope agents to the user's workspace
+    const SHUBH_AGENT_ID = "dd4da4c1-9deb-4047-8927-5e12402e6b1f";
+    const NEXUS_ORG_ID = "b1ddf1e9-abc1-4ff4-90f5-3ac66913738a";
+    const NEXUS_OWNER_ID = "9363a829-8d11-42ae-bfff-d8ea5c17a71b";
+    const NEXUS_EMAIL = "nexus.ai.ops@gmail.com";
+
+    const userEmail = (profile.email || '').toLowerCase().trim();
+    const isNexusUser = profile.id === NEXUS_OWNER_ID || userEmail === NEXUS_EMAIL || profile.organization_id === NEXUS_ORG_ID;
+
+    let dbAgentsQuery = (supabaseAdmin as any)
       .from('agents')
       .select('id, name, personality, greeting_message, voice_id, language, gender, status, organization_id, created_at, system_prompt, user_id, personalities, campaign_purpose, industry_domain, agent_type, voice_provider')
+      .neq('status', 'deleted')
       .order('name', { ascending: true });
 
-    if (agentsError) {
-      console.warn('[DeveloperDemoAgents] Notice loading all agents:', agentsError.message);
+    if (profile.organization_id) {
+      dbAgentsQuery = dbAgentsQuery.or(`organization_id.eq.${profile.organization_id},user_id.eq.${profile.id}`);
+    } else {
+      dbAgentsQuery = dbAgentsQuery.eq('user_id', profile.id);
     }
 
-    // developer_tester gets ALL agents unrestricted — no tenant filtering
-    const myAgents = allDatabaseAgents || [];
+    if (!isNexusUser) {
+      dbAgentsQuery = dbAgentsQuery.neq('id', SHUBH_AGENT_ID);
+    }
+
+    const { data: myDatabaseAgents, error: agentsError } = await dbAgentsQuery;
+
+    if (agentsError) {
+      console.warn('[DeveloperDemoAgents] Notice loading agents:', agentsError.message);
+    }
+
+    const myAgents = myDatabaseAgents || [];
 
     return NextResponse.json({ 
       success: true, 
       agents, 
       my_agents: myAgents,
-      all_agents: allDatabaseAgents || [],
+      all_agents: myAgents,
       developer_id: profile.id,
     });
   } catch (err: any) {

@@ -114,7 +114,7 @@ export async function GET() {
     }
 
     // Default primary org for founder / super admin fleet
-    const PRIMARY_TRINETRA_ORG = 'b1ddf1e9-abc1-4ff4-90f5-3ac66913738a'
+    const PRIMARY_TRINETRA_ORG = '871e8dc2-b744-4562-bead-6fa1df719376'
 
     let effectiveOrgId = profile?.organization_id
     if (!effectiveOrgId) {

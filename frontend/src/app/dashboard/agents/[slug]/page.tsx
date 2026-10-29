@@ -62,13 +62,24 @@ export default async function ToolOrAgentPage({ params }: PageProps) {
     query = query.eq('vapi_agent_id', slug)
   }
 
-  // Privileged users (developer_tester/admin) can manage all workspace agents
-  if (!isPrivileged) {
-    if (profile?.organization_id) {
-      query = query.or(`organization_id.eq.${profile.organization_id},user_id.eq.${user.id}`)
-    } else {
-      query = query.eq('user_id', user.id)
-    }
+  // Strict isolation: Shubhansh agent (dd4da4c1-9deb-4047-8927-5e12402e6b1f) is strictly locked to Nexus account
+  const SHUBH_AGENT_ID = 'dd4da4c1-9deb-4047-8927-5e12402e6b1f'
+  const NEXUS_ORG_ID = 'b1ddf1e9-abc1-4ff4-90f5-3ac66913738a'
+  const NEXUS_OWNER_ID = '9363a829-8d11-42ae-bfff-d8ea5c17a71b'
+  const NEXUS_EMAIL = 'nexus.ai.ops@gmail.com'
+
+  const userEmail = (user.email || '').toLowerCase().trim()
+  const isNexusUser = user.id === NEXUS_OWNER_ID || userEmail === NEXUS_EMAIL || profile?.organization_id === NEXUS_ORG_ID
+
+  if (slug === SHUBH_AGENT_ID && !isNexusUser) {
+    return notFound()
+  }
+
+  // Strictly scope agent access to the creator user or active workspace organization
+  if (profile?.organization_id) {
+    query = query.or(`organization_id.eq.${profile.organization_id},user_id.eq.${user.id}`)
+  } else {
+    query = query.eq('user_id', user.id)
   }
 
   const { data: agentData } = await query.maybeSingle()

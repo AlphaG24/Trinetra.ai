@@ -38,12 +38,11 @@ export const GET = safeApiHandler(async (request: Request) => {
       .select('id, transcript, call_summary, recording_url, caller_name, caller_phone, duration_seconds, sentiment, outcome, created_at')
       .eq('id', callId)
 
-    if (!isPrivileged) {
-      if (profile?.organization_id) {
-        callQuery = callQuery.or(`user_id.eq.${user.id},organization_id.eq.${profile.organization_id}`)
-      } else {
-        callQuery = callQuery.eq('user_id', user.id)
-      }
+    // Customer dashboard calls must always be strictly isolated to the caller's workspace
+    if (profile?.organization_id) {
+      callQuery = callQuery.or(`user_id.eq.${user.id},organization_id.eq.${profile.organization_id}`)
+    } else {
+      callQuery = callQuery.eq('user_id', user.id)
     }
 
     const { data: singleCall, error: singleErr } = await callQuery.maybeSingle()
@@ -58,12 +57,11 @@ export const GET = safeApiHandler(async (request: Request) => {
     .from('voice_calls')
     .select('id, created_at, duration_seconds, sentiment, outcome, caller_name, caller_phone, recording_url, transcript, agent_id', { count: 'exact' })
 
-  if (!isPrivileged) {
-    if (profile?.organization_id) {
-      query = query.or(`user_id.eq.${user.id},organization_id.eq.${profile.organization_id}`)
-    } else {
-      query = query.eq('user_id', user.id)
-    }
+  // Customer dashboard calls must always be strictly isolated to the caller's workspace
+  if (profile?.organization_id) {
+    query = query.or(`user_id.eq.${user.id},organization_id.eq.${profile.organization_id}`)
+  } else {
+    query = query.eq('user_id', user.id)
   }
 
   if (sentiment && sentiment !== 'all') {
