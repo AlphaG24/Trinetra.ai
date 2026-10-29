@@ -30,11 +30,13 @@ const PUBLIC_KEYS = [
   "starter_price_eur_cents", "professional_price_eur_cents",
   "enterprise_price_eur_cents", "trial_price_eur_cents",
   "foreign_number_cost_eur_cents", "overage_per_minute_eur_cents",
-  "onboarding_fee_enabled", "onboarding_fee_paisa"
+  "onboarding_fee_enabled", "onboarding_fee_paisa",
+  "TELEPHONY_ROUTING_MODE"
 ]
 
 export const DEFAULT_PUBLIC_CONFIGS: Record<string, string> = {
   maintenance_mode: 'false',
+  TELEPHONY_ROUTING_MODE: 'sarvam_managed',
   free_demo_minutes: '10',
   trial_price_paisa: '9900',
   trial_days: '7',

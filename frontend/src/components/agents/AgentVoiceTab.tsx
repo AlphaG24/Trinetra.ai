@@ -106,9 +106,10 @@ export function AgentVoiceTab({ agent, isPaid, upgradeUrl }: AgentVoiceTabProps)
   const [isCloning, setIsCloning] = useState(false)
   const [elevenLabsVoices, setElevenLabsVoices] = useState<any[]>([])
   const [sarvamVoices, setSarvamVoices] = useState<any[]>([])
+  const [routingMode, setRoutingMode] = useState<'sarvam_managed' | 'custom_pipeline'>('sarvam_managed')
 
   const handleResetVoice = async () => {
-    if (!window.confirm("WARNING: This will reset all voice settings for this agent to default Indian accents (Sarvam AI). Your custom speed, pitch, and voice provider changes will be overwritten. Do you want to proceed?")) {
+    if (!window.confirm("WARNING: This will reset all voice settings for this agent to default Indian accents. Your custom speed, pitch, and voice provider changes will be overwritten. Do you want to proceed?")) {
       return
     }
     setResetting(true)
@@ -130,17 +131,29 @@ export function AgentVoiceTab({ agent, isPaid, upgradeUrl }: AgentVoiceTabProps)
   }
 
   useEffect(() => {
+    // Check global telephony voice routing mode
+    fetch('/api/public/config')
+      .then(res => res.json())
+      .then(data => {
+        const mode = data?.configs?.TELEPHONY_ROUTING_MODE
+        if (mode === 'custom_pipeline') {
+          setRoutingMode('custom_pipeline')
+        } else {
+          setRoutingMode('sarvam_managed')
+        }
+      })
+      .catch(() => {})
+
     // Load both catalogs on mount so voice selection works seamlessly without manual provider toggle
     if (elevenLabsVoices.length === 0) {
       fetch('/api/elevenlabs/voices')
         .then(res => res.json())
         .then(data => {
           if (data.voices && Array.isArray(data.voices)) {
-            // Display all available studio voices from the ElevenLabs account
             setElevenLabsVoices(data.voices)
           }
         })
-        .catch(err => console.error("Error fetching ElevenLabs voices:", err))
+        .catch(err => console.error("Error fetching studio voices:", err))
     }
     if (sarvamVoices.length === 0) {
       fetch('/api/sarvam/voices')
@@ -148,7 +161,7 @@ export function AgentVoiceTab({ agent, isPaid, upgradeUrl }: AgentVoiceTabProps)
         .then(data => {
           if (data.voices) setSarvamVoices(data.voices)
         })
-        .catch(err => console.error("Error fetching Sarvam voices:", err))
+        .catch(err => console.error("Error fetching Indic voices:", err))
     }
   }, [elevenLabsVoices.length, sarvamVoices.length])
 
@@ -190,7 +203,7 @@ export function AgentVoiceTab({ agent, isPaid, upgradeUrl }: AgentVoiceTabProps)
 
   const handleProviderChange = (newProvider: 'elevenlabs' | 'sarvam') => {
     if (newProvider === 'elevenlabs' && (language === 'hinglish' || language === 'hi-IN')) {
-      toast.warning("ElevenLabs does not support Hindi voices. Switch to Sarvam for Hindi/Hinglish.")
+      toast.warning("Selected engine does not support Hindi voices. Switched to Indic voice catalog.")
       setProvider('sarvam')
       return
     }
@@ -217,11 +230,11 @@ export function AgentVoiceTab({ agent, isPaid, upgradeUrl }: AgentVoiceTabProps)
     try {
       const isMale = sarvamVoices.find(v => v.id === voiceId)?.gender === 'Male' || ['pNInz6obpgDQGcFmaJgB', 'TxGEqnHWrfWFTfGW9XjX'].includes(voiceId)
       
-      let previewText = "Hello, I'm an AI assistant from Vaakriti. How can I help you today?"
+      let previewText = "Hello, I'm an AI assistant. How can I help you today?"
       if (language === 'hinglish' || language === 'hi-IN') {
         previewText = isMale 
-          ? "Namaste ji, main Vaakriti AI se Vikram bol raha hoon. Kya main 30 second ke liye aapka time le sakta hoon?"
-          : "Namaste ji, main Vaakriti AI se Anushka bol rahi hoon. Kya main 30 second ke liye aapka time le sakti hoon?"
+          ? "Namaste ji, main AI assistant bol raha hoon. Kya main 30 second ke liye aapka time le sakta hoon?"
+          : "Namaste ji, main AI assistant bol rahi hoon. Kya main 30 second ke liye aapka time le sakti hoon?"
       }
 
       const res = await fetch('/api/voice/tts-test', {
@@ -240,7 +253,7 @@ export function AgentVoiceTab({ agent, isPaid, upgradeUrl }: AgentVoiceTabProps)
       if (!res.ok) {
         const errText = await res.text()
         if (errText.includes('paid_plan_required') || errText.includes('402')) {
-          throw new Error("This voice requires a paid ElevenLabs plan.")
+          throw new Error("This voice requires a premium plan.")
         }
         throw new Error(errText)
       }
@@ -300,6 +313,10 @@ export function AgentVoiceTab({ agent, isPaid, upgradeUrl }: AgentVoiceTabProps)
   // Process voice cloning audio file upload
   const handleCloneVoice = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (routingMode !== 'custom_pipeline') {
+      toast.error("Voice cloning is only available when Custom Pipeline is enabled.")
+      return
+    }
     if (!cloningFile || !clonedName.trim()) {
       toast.error("Please provide both an audio file and a voice name.")
       return
@@ -400,7 +417,7 @@ export function AgentVoiceTab({ agent, isPaid, upgradeUrl }: AgentVoiceTabProps)
                   >
                     {/* Show voices categorized cleanly by region/engine */}
                     {language === 'hinglish' || language === 'hi-IN' || language === 'en-IN' ? (
-                      <optgroup label="Vaakriti Indic Voices">
+                      <optgroup label="Indic Regional Voices">
                         {sarvamVoices.length > 0 ? sarvamVoices.map(voice => (
                           <option key={voice.id} value={voice.id}>
                             {voice.name} ({voice.gender})
@@ -559,10 +576,16 @@ export function AgentVoiceTab({ agent, isPaid, upgradeUrl }: AgentVoiceTabProps)
 
         {/* Voice Cloning (2 cols) */}
         <div className="lg:col-span-2">
-          {isPaid ? (
+          {routingMode !== 'custom_pipeline' ? (
+            <LockedFeature
+              title="Voice Cloning Locked"
+              description="Voice cloning requires the Custom Voice Pipeline. The active standard cloud telephony pipeline operates with fixed catalog voices."
+              hideCta={true}
+            />
+          ) : isPaid ? (
             <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-6 md:p-8 shadow-sm space-y-6">
               <div className="space-y-2">
-                <h3 className="text-lg font-bold font-display text-[var(--heading)]">Premium Voice Cloning</h3>
+                <h3 className="text-lg font-bold font-display text-[var(--heading)]">Custom Voice Cloning</h3>
                 <p className="text-xs text-[var(--muted)] font-sans">
                   Upload an audio file of a human voice (10s - 2min) to synthesize an exact digital replica.
                 </p>

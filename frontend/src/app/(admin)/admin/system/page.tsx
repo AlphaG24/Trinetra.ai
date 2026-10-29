@@ -199,8 +199,8 @@ export default function SystemConfigPage() {
       }
       toast.success(
         newMode === 'sarvam_managed'
-          ? '🇮🇳 Sarvam AI Cloud Pipeline is now ACTIVE'
-          : '⚡ In-House Custom Voice Pipeline (LiveKit / STT / LLM / TTS) is now ACTIVE'
+          ? 'Standard Cloud Voice Pipeline is now ACTIVE'
+          : '⚡ In-House Custom Voice Pipeline is now ACTIVE'
       )
     } catch (err: any) {
       // Revert on failure
@@ -453,13 +453,13 @@ export default function SystemConfigPage() {
                   ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30'
                   : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
               }`}>
-                {(configs.TELEPHONY_ROUTING_MODE || 'sarvam_managed') === 'sarvam_managed' ? 'Sarvam Cloud Managed' : 'Custom In-House Pipeline'}
+                {(configs.TELEPHONY_ROUTING_MODE || 'sarvam_managed') === 'sarvam_managed' ? 'Standard Cloud Pipeline' : 'Custom In-House Pipeline'}
               </span>
             </div>
             <p className="text-xs text-zinc-400 mt-1 max-w-2xl leading-relaxed">
               {(configs.TELEPHONY_ROUTING_MODE || 'sarvam_managed') === 'sarvam_managed'
-                ? 'Outbound & inbound voice calls route directly through Sarvam AI Indic cloud agent infrastructure. Turn OFF to switch to your custom in-house telephony stack.'
-                : 'Calls route through your custom in-house stack (Twilio / Exotel + LiveKit room + local STT/LLM/TTS orchestration). Turn ON to resume Sarvam cloud routing.'}
+                ? 'Outbound & inbound voice calls route through the managed cloud telephony infrastructure. Custom voice cloning is locked in this mode. Switch to Custom Pipeline to enable custom voice cloning.'
+                : 'Calls route through your in-house custom pipeline with custom voice cloning and custom synthesis unlocked. Switch to Standard Cloud Pipeline to resume managed cloud routing.'}
             </p>
           </div>
         </div>
@@ -483,8 +483,8 @@ export default function SystemConfigPage() {
             )}
             <span>
               {(configs.TELEPHONY_ROUTING_MODE || 'sarvam_managed') === 'sarvam_managed'
-                ? 'Turn Off Sarvam (Switch to Custom)'
-                : 'Turn On Sarvam (Switch to Cloud)'}
+                ? 'Switch to Custom Pipeline'
+                : 'Switch to Standard Cloud'}
             </span>
           </button>
         </div>

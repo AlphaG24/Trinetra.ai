@@ -24,9 +24,28 @@ export async function POST(
       return NextResponse.json({ error: "File and Name are required." }, { status: 400 });
     }
 
-    // 2. Fetch ElevenLabs API key
-    let apiKey = process.env.ELEVENLABS_API_KEY || '';
     const admin = createAdminClient();
+
+    // 2. Check Telephony Voice Pipeline Mode (Voice cloning requires custom_pipeline mode)
+    try {
+      const { data: routingConfig } = await admin
+        .from('system_config')
+        .select('config_value')
+        .eq('config_key', 'TELEPHONY_ROUTING_MODE')
+        .maybeSingle();
+      
+      const routingMode = routingConfig?.config_value || process.env.TELEPHONY_ROUTING_MODE || 'sarvam_managed';
+      if (routingMode !== 'custom_pipeline') {
+        return NextResponse.json({
+          error: "Voice cloning is locked while Standard Cloud Pipeline is active. Switch to Custom Pipeline in System Settings to unlock."
+        }, { status: 403 });
+      }
+    } catch (routeErr) {
+      console.warn("[Voice Clone] Could not check routing mode:", routeErr);
+    }
+
+    // 3. Fetch Voice Engine API key
+    let apiKey = process.env.ELEVENLABS_API_KEY || '';
 
     if (!apiKey) {
       try {
@@ -39,15 +58,15 @@ export async function POST(
           apiKey = configRecord.config_value;
         }
       } catch (err) {
-        console.warn("[Voice Clone] Could not read ELEVENLABS_API_KEY from system_config:", err);
+        console.warn("[Voice Clone] Could not read engine key from system_config:", err);
       }
     }
 
     if (!apiKey) {
-      return NextResponse.json({ error: "ElevenLabs API key is not configured in the system." }, { status: 500 });
+      return NextResponse.json({ error: "Voice cloning service key is not configured in the system." }, { status: 500 });
     }
 
-    // 3. Call ElevenLabs voices/add API
+    // 4. Call voice synthesis cloning endpoint
     const elFormData = new FormData();
     elFormData.append("name", name.trim());
     elFormData.append("description", `Cloned voice for agent ${agentId} (${name.trim()})`);
@@ -63,9 +82,9 @@ export async function POST(
 
     if (!elResponse.ok) {
       const errDetail = await elResponse.text();
-      console.error("[Voice Clone] ElevenLabs API error:", elResponse.status, errDetail);
+      console.error("[Voice Clone] Voice cloning service error:", elResponse.status, errDetail);
       return NextResponse.json({
-        error: `ElevenLabs voice cloning failed: ${errDetail || elResponse.statusText}`
+        error: `Voice cloning failed: ${errDetail || elResponse.statusText}`
       }, { status: elResponse.status });
     }
 
@@ -73,7 +92,7 @@ export async function POST(
     const newVoiceId = elData.voice_id;
 
     if (!newVoiceId) {
-      return NextResponse.json({ error: "ElevenLabs did not return a valid voice_id." }, { status: 500 });
+      return NextResponse.json({ error: "Voice service did not return a valid voice identifier." }, { status: 500 });
     }
 
     // 4. Update agent's voice settings in Supabase
