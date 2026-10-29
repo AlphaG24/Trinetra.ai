@@ -9,6 +9,7 @@ import { NewCampaignModal } from '@/src/components/campaigns/NewCampaignModal'
 import { InstantDemoCallModal } from '@/src/components/campaigns/InstantDemoCallModal'
 import toast from 'react-hot-toast'
 import Link from 'next/link'
+import { createClient } from '@/lib/client'
 
 interface Campaign {
   id: string
@@ -55,29 +56,45 @@ export default function CampaignsPage() {
     const timer = setTimeout(() => {
       setTimeoutPassed(true)
       setLoading(false)
-    }, 1200)
+    }, 2000)
 
     fetchCampaigns()
 
     return () => clearTimeout(timer)
   }, [])
 
-  const fetchCampaigns = async () => {
-    try {
-      setLoading(true)
-      // Background sync of any completed calls
-      fetch('/api/campaigns/sync-calls', { method: 'POST' }).catch(() => {})
+  // Auto-refetch when user profile is confirmed loaded
+  useEffect(() => {
+    if (authProfile?.id || storeProfile?.id) {
+      fetchCampaigns()
+    }
+  }, [authProfile?.id, storeProfile?.id])
 
-      const res = await fetch('/api/campaigns')
-      const data = await res.json()
+  const fetchCampaigns = async (silent = false) => {
+    try {
+      if (!silent) setLoading(true)
+
+      const supabase = createClient()
+      const { data: { session } } = await supabase.auth.getSession().catch(() => ({ data: { session: null } }))
+      const headers: Record<string, string> = {}
+      if (session?.access_token) {
+        headers['Authorization'] = `Bearer ${session.access_token}`
+      }
+
+      const res = await fetch('/api/campaigns', { headers })
+      const data = await res.json().catch(() => ({}))
+
       if (res.ok) {
         setCampaigns(data.data || [])
-      } else {
+      } else if (res.status === 401 && !silent) {
+        // If 401 on initial load, retry once after a brief 500ms delay for session sync
+        setTimeout(() => fetchCampaigns(true), 600)
+      } else if (!silent) {
         toast.error(data.error || 'Failed to fetch campaigns')
       }
     } catch (err) {
       console.error(err)
-      toast.error('Failed to load campaigns')
+      if (!silent) toast.error('Failed to load campaigns')
     } finally {
       setLoading(false)
     }

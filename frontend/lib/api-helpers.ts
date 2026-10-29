@@ -15,29 +15,48 @@ export async function authenticateRequest(): Promise<
   | { authenticated: true; user: any; profile: any; error: null; supabase: any }
   | { authenticated: false; user: null; profile: null; error: string; supabase: any }
 > {
-  const cookieStore = await cookies()
-  const hasAuthCookie = cookieStore.getAll().some(
-    c => c.name.includes('auth-token') || c.name.startsWith('sb-')
-  )
-  if (!hasAuthCookie) {
-    return { authenticated: false, user: null, profile: null, error: "Authentication required", supabase: null }
-  }
-
-  const supabase = await createClient()
-
-  // Guard getUser() with timeout per SEC-003
   let user: any = null
   let authError: any = null
+  let supabase: any = null
+
+  // 1. Try Bearer token from authorization header first (instant, avoids cookie sync race)
   try {
-    const authPromise = supabase.auth.getUser()
-    const timeoutPromise = new Promise<{ data: { user: null }; error: Error }>((_, reject) =>
-      setTimeout(() => reject(new Error('Auth request timeout')), 8000)
+    const { headers: nextHeaders } = await import('next/headers')
+    const headerList = await nextHeaders()
+    const authHeader = headerList.get('authorization')
+    const bearerToken = authHeader?.startsWith('Bearer ') ? authHeader.substring(7).trim() : null
+    if (bearerToken) {
+      const admin = getAdminClient()
+      const { data: tokenData, error: tokenErr } = await admin.auth.getUser(bearerToken)
+      if (!tokenErr && tokenData?.user) {
+        user = tokenData.user
+      }
+    }
+  } catch {}
+
+  // 2. Fall back to cookie-based session
+  if (!user) {
+    const cookieStore = await cookies()
+    const hasAuthCookie = cookieStore.getAll().some(
+      c => c.name.includes('auth-token') || c.name.startsWith('sb-')
     )
-    const result = await Promise.race([authPromise, timeoutPromise])
-    user = result?.data?.user ?? null
-    authError = result?.error ?? null
-  } catch (err: any) {
-    authError = err
+    if (!hasAuthCookie) {
+      return { authenticated: false, user: null, profile: null, error: "Authentication required", supabase: null }
+    }
+
+    supabase = await createClient()
+
+    try {
+      const authPromise = supabase.auth.getUser()
+      const timeoutPromise = new Promise<{ data: { user: null }; error: Error }>((_, reject) =>
+        setTimeout(() => reject(new Error('Auth request timeout')), 4000)
+      )
+      const result = await Promise.race([authPromise, timeoutPromise])
+      user = result?.data?.user ?? null
+      authError = result?.error ?? null
+    } catch (err: any) {
+      authError = err
+    }
   }
 
   if (authError || !user) {

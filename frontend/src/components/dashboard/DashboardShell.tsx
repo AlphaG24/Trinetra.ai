@@ -1,17 +1,25 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { Sidebar } from '@/src/components/dashboard/Sidebar'
 import { Topbar } from '@/src/components/dashboard/Topbar'
 import { useDashboardStore } from '@/src/store/dashboardStore'
+import { useAuth } from '@/src/components/providers/AuthProvider'
 
 export function DashboardShell({ children }: { children: React.ReactNode }) {
+  const router = useRouter()
+  const { user, profile } = useAuth()
   const [mounted, setMounted] = useState(false)
   const { isSidebarCollapsed } = useDashboardStore()
 
   useEffect(() => {
     setMounted(true)
-  }, [])
+    const email = (user?.email || profile?.email || '').toLowerCase().trim()
+    if (email === 'raghav00424@gmail.com' || email === 'raghav@trinetra.ai') {
+      router.replace('/admin')
+    }
+  }, [user?.email, profile?.email, router])
 
   // Hydration-safe: always use expanded layout (pl-60) for SSR baseline.
   // After mount, switch to real collapsed state. This matches what Sidebar renders on server.

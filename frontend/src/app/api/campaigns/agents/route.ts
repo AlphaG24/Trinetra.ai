@@ -72,7 +72,7 @@ export async function GET(request: Request) {
         .eq('status', 'active')
         .not('assigned_agent_id', 'is', null);
 
-      if (!isPrivileged && orgId) {
+      if (orgId) {
         pnQuery = pnQuery.or(`organization_id.eq.${orgId},organization_id.is.null`);
       }
 

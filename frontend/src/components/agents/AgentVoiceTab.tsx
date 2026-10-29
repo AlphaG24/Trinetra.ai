@@ -323,6 +323,15 @@ export function AgentVoiceTab({ agent, isPaid, upgradeUrl }: AgentVoiceTabProps)
       if (data.voiceId) {
         setProvider('elevenlabs')
         setSelectedVoice(data.voiceId)
+
+        // Refresh ElevenLabs catalog so the new cloned voice appears immediately
+        try {
+          const vRes = await fetch('/api/elevenlabs/voices')
+          const vData = await vRes.json()
+          if (vData.voices && Array.isArray(vData.voices)) {
+            setElevenLabsVoices(vData.voices)
+          }
+        } catch {}
       }
       setCloningFile(null)
       setClonedName('')
@@ -404,10 +413,10 @@ export function AgentVoiceTab({ agent, isPaid, upgradeUrl }: AgentVoiceTabProps)
                         )}
                       </optgroup>
                     ) : (
-                      <optgroup label="Studio International Voices">
+                      <optgroup label="Studio International & Cloned Voices">
                         {elevenLabsVoices.length > 0 ? elevenLabsVoices.map(voice => (
                           <option key={voice.voice_id} value={voice.voice_id}>
-                            {voice.name} ({voice.labels?.gender || 'Voice'}, {voice.labels?.accent || 'Studio'})
+                            {voice.category === 'cloned' ? '✨ [Cloned] ' : ''}{voice.name} ({voice.labels?.gender || (voice.category === 'cloned' ? 'Custom' : 'Voice')}, {voice.labels?.accent || 'Studio'})
                           </option>
                         )) : (
                           <>
@@ -420,8 +429,8 @@ export function AgentVoiceTab({ agent, isPaid, upgradeUrl }: AgentVoiceTabProps)
                             <option value="AZnzlk1XvdvUeBnXmlld">Domi (Female, Strong & Confident)</option>
                           </>
                         )}
-                        {selectedVoice.startsWith('cloned-') && (
-                          <option value={selectedVoice}>Custom Cloned Voice</option>
+                        {selectedVoice && !elevenLabsVoices.some(v => v.voice_id === selectedVoice) && (
+                          <option value={selectedVoice}>✨ [Cloned] Active Custom Voice</option>
                         )}
                       </optgroup>
                     )}
