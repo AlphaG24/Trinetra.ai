@@ -174,6 +174,7 @@ export async function POST(request: Request) {
         .update({
           assigned_agent_id: agent_id,
           assigned_org_id: organization_id || null,
+          organization_id: organization_id || null,
           is_assigned: true,
           status: 'assigned',
           updated_at: new Date().toISOString()
