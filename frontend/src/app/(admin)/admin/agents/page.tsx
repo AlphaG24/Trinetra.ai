@@ -124,17 +124,10 @@ export default function TenantVoiceAgentsPage() {
     let kbSection = ''
     if (agent.knowledge_docs && agent.knowledge_docs.length > 0) {
       const docSnippets = agent.knowledge_docs.map((doc, idx) => {
-        return `--- Document ${idx + 1}: ${doc.name} ---
-${doc.content_excerpt || '(Uploaded business document content)'}`
+        return `--- Document ${idx + 1}: ${doc.name} ---\n${doc.content_excerpt || '(Uploaded business document content)'}`
       })
-      kbSection = `
-
-=== VERIFIED BUSINESS KNOWLEDGE BASE ===
-${docSnippets.join('
-
-')}
-========================================
-`
+      const joinedDocs = docSnippets.join('\n\n')
+      kbSection = `\n\n=== VERIFIED BUSINESS KNOWLEDGE BASE ===\n${joinedDocs}\n========================================\n`
     }
 
     return `Placeholders: {{agent_name}}, {{company_name}}, {{customer_name}}, {{customer_phone}}, {{intent}}, {{notes}}
