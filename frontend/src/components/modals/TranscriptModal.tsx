@@ -42,6 +42,12 @@ export function TranscriptModal({
 }: TranscriptModalProps) {
   const [copied, setCopied] = useState(false)
   const resolvedCallId = (log as any)?.id || (log as any)?.call_id || callId
+  const hasPaymentProof = Boolean(
+    ((log as any)?.revenue_inr && (log as any)?.revenue_inr > 0) ||
+    (log as any)?.metadata?.payment_dispatched ||
+    (log as any)?.revenue_status ||
+    (log as any)?.metadata?.proof_receipt_id
+  )
 
   // Resolve properties dynamically to support both new 'log' prop and legacy individual parameters
   const resolvedTranscript = log ? log.transcript : transcript
@@ -231,7 +237,7 @@ export function TranscriptModal({
               </div>
               
               <div className="flex items-center gap-2">
-                {resolvedCallId && (
+                {resolvedCallId && hasPaymentProof && (
                   <a
                     href={`/receipt/${resolvedCallId}`}
                     target="_blank"
@@ -333,7 +339,7 @@ export function TranscriptModal({
 
             {/* Footer */}
             <div className="px-6 py-4 border-t border-[var(--border)] bg-[var(--background)]/60 flex items-center justify-between">
-              {resolvedCallId ? (
+              {resolvedCallId && hasPaymentProof ? (
                 <a
                   href={`/receipt/${resolvedCallId}`}
                   target="_blank"

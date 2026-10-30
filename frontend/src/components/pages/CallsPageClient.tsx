@@ -219,15 +219,17 @@ export function CallsPageClient({ agents }: { agents: any[] }) {
                           >
                             <FileText className="w-4 h-4" />
                           </button>
-                          <a
-                            href={`/receipt/${call.id}`}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="p-1.5 rounded transition-colors text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10 cursor-pointer"
-                            title="View 3-Part Statutory & Money Proof Receipt"
-                          >
-                            <ShieldCheck className="w-4 h-4" />
-                          </a>
+                          {Boolean((call.revenue_inr && call.revenue_inr > 0) || call.metadata?.payment_dispatched || call.revenue_status) && (
+                            <a
+                              href={`/receipt/${call.id}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="p-1.5 rounded transition-colors text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10 cursor-pointer"
+                              title="View 3-Part Statutory & Money Proof Receipt"
+                            >
+                              <ShieldCheck className="w-4 h-4" />
+                            </a>
+                          )}
                           {call.recording_url ? (
                             <a 
                               href={call.recording_url} 

@@ -18,7 +18,7 @@ export async function GET(
     let { data: call, error: callErr } = await admin
       .from('voice_calls')
       .select('*')
-      .or(`id.eq.${call_id},provider_call_id.eq.${call_id},session_id.eq.${call_id}`)
+      .eq("id", call_id)
       .maybeSingle()
 
     // Fallback: check call_records table if voice_calls didn't find it

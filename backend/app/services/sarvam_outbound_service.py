@@ -752,12 +752,36 @@ Respond ONLY with valid JSON."""
                             if c_res.data:
                                 existing_call = c_res.data[0]
 
+                        if not existing_call and att_id and att_id != "NO_JOB_ID":
+                            c_res = await asyncio.to_thread(
+                                supabase_admin.table("voice_calls").select("id").filter("metadata->>provider_call_id", "eq", att_id).limit(1).execute
+                            )
+                            if c_res.data:
+                                existing_call = c_res.data[0]
+
                         if not existing_call and audio_url:
                             c_res = await asyncio.to_thread(
                                 supabase_admin.table("voice_calls").select("id").eq("recording_url", audio_url).limit(1).execute
                             )
                             if c_res.data:
                                 existing_call = c_res.data[0]
+
+                        # Fallback: Match any recent in_progress call record for this prospect phone
+                        if not existing_call and phone_for_lead:
+                            clean_p = re.sub(r"\D", "", phone_for_lead)
+                            last10 = clean_p[-10:] if len(clean_p) >= 10 else clean_p
+                            if last10:
+                                c_res = await asyncio.to_thread(
+                                    supabase_admin.table("voice_calls")
+                                    .select("id")
+                                    .eq("status", "in_progress")
+                                    .ilike("caller_phone", f"%{last10}%")
+                                    .order("created_at", desc=True)
+                                    .limit(1)
+                                    .execute
+                                )
+                                if c_res.data:
+                                    existing_call = c_res.data[0]
 
                         if existing_call:
                             call_id = existing_call["id"]

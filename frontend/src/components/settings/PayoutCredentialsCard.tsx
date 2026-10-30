@@ -11,8 +11,7 @@ import {
   AlertCircle,
   Loader2,
   Upload,
-  ExternalLink,
-  Sparkles
+  ExternalLink
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -217,7 +216,7 @@ export function PayoutCredentialsCard() {
           {/* 1. UPI ID / VPA */}
           <div className="space-y-2">
             <label className="block text-[11px] font-bold font-montserrat text-zinc-700 dark:text-zinc-300 uppercase tracking-wider flex items-center gap-1.5">
-              <Sparkles className="w-3.5 h-3.5 text-violet-500" />
+              <CreditCard className="w-3.5 h-3.5 text-zinc-400" />
               Business UPI ID / VPA
             </label>
             <input

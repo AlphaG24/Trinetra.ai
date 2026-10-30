@@ -972,6 +972,7 @@ class CampaignService:
                         "to_number": contact["phone"],
                         "caller_name": contact_name,
                         "provider_call_id": call_sid,
+                        "attempt_id": call_sid,
                         "session_id": call_sid,
                         "room_name": room_name,
                         "contact_id": contact_id,
