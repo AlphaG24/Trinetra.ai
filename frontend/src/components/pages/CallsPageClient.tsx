@@ -38,9 +38,6 @@ export function CallsPageClient({ agents }: { agents: any[] }) {
     const fetchCalls = async () => {
       setIsLoading(true)
       try {
-        // Trigger background sync with Sarvam
-        fetch('/api/campaigns/sync-calls', { method: 'POST' }).catch(() => {})
-
         const params = new URLSearchParams({
           page: String(page),
           per_page: String(perPage),
@@ -48,39 +45,30 @@ export function CallsPageClient({ agents }: { agents: any[] }) {
         })
         if (search) params.set('search', search)
 
-        const res = await fetch(`/api/dashboard/calls?${params.toString()}`)
+        const res = await fetch(`/api/dashboard/calls?${params.toString()}`, {
+          credentials: 'include'
+        })
         if (res.ok) {
           const data = await res.json()
           setCalls(data.calls || [])
           setTotal(data.total || 0)
-          setIsLoading(false)
-          return
+        } else if (res.status === 401) {
+          // Retry once after brief session settlement
+          setTimeout(async () => {
+            try {
+              const retryRes = await fetch(`/api/dashboard/calls?${params.toString()}`, {
+                credentials: 'include'
+              })
+              if (retryRes.ok) {
+                const retryData = await retryRes.json()
+                setCalls(retryData.calls || [])
+                setTotal(retryData.total || 0)
+              }
+            } catch {}
+          }, 500)
         }
       } catch (apiErr) {
         console.warn('[/api/dashboard/calls fetch notice]', apiErr)
-      }
-
-      // Client Supabase fallback
-      try {
-        const supabase = createClient()
-        let query = supabase
-          .from('voice_calls')
-          .select('id, created_at, duration_seconds, sentiment, outcome, caller_name, caller_phone, recording_url, transcript, agent_id', { count: 'estimated' })
-          .order('created_at', { ascending: false })
-          .range((page - 1) * perPage, page * perPage - 1)
-
-        if (sentimentFilter !== 'all') {
-          query = query.eq('sentiment', sentimentFilter)
-        }
-        if (search) {
-          query = query.ilike('caller_name', `%${search}%`)
-        }
-
-        const { data, count } = await query
-        setCalls(data || [])
-        setTotal(count || 0)
-      } catch (err) {
-        console.error('Failed to load calls fallback:', err)
       } finally {
         setIsLoading(false)
       }

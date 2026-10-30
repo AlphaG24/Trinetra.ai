@@ -18,7 +18,11 @@ export async function POST() {
       method: "POST",
       headers: {
         "Content-Type": "application/json"
-      }
+      },
+      body: JSON.stringify({
+        organization_id: profile.organization_id,
+        user_id: user.id
+      })
     });
 
     const data = await res.json().catch(() => ({}));

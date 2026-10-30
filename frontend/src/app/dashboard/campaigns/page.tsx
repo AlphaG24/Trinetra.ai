@@ -91,7 +91,7 @@ export default function CampaignsPage() {
         setCampaigns(data.data || [])
       } else if (res.status === 401 && !silent) {
         // If 401 on initial load, retry once after a brief 500ms delay for session sync
-        setTimeout(() => fetchCampaigns(true), 600)
+        setTimeout(() => fetchCampaigns(false), 500)
       } else if (!silent) {
         toast.error(data.error || 'Failed to fetch campaigns')
       }

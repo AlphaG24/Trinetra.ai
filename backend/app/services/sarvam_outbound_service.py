@@ -66,34 +66,23 @@ class SarvamOutboundService:
     ) -> str:
         """
         Resolves caller's display name accurately using:
-        1. Explicit template_name/provided contact name (from Homepage modal, Dashboard direct call, or Campaign contact)
+        1. Campaign contacts table by phone (exact contact entered when placing call)
         2. Spoken self-introduction extracted by Gemini from transcript
-        3. Campaign contacts record by phone
-        4. Customer contacts record by phone
-        5. Leads record by phone
-        6. User profile record by phone
-        7. Clean fallback
+        3. Customer contacts record by phone
+        4. Leads record by phone
+        5. Explicit template_name/provided contact name (if not a generic placeholder or test dummy)
+        6. Clean fallback: 'Customer'
         """
-        GENERIC_PLACEHOLDERS = {"unknown", "contact", "customer", "prospect", "none", "client", "website visitor", "caller", "null", "undefined", ""}
+        GENERIC_PLACEHOLDERS = {
+            "unknown", "contact", "customer", "prospect", "none", "client", 
+            "website visitor", "caller", "null", "undefined", "", "amar", "shubh", "ritu", "user", "test"
+        }
 
-        # 1. If explicit contact name was provided at dial-time (from Modal, Dashboard, or Campaign)
-        if template_name and template_name.strip():
-            candidate = template_name.strip()
-            if candidate.lower() not in GENERIC_PLACEHOLDERS and len(candidate) >= 2:
-                return candidate.title()
-
-        # 2. If caller self-introduced in transcript and extracted by LLM
-        if extracted_name and extracted_name.strip():
-            candidate = extracted_name.strip()
-            if candidate.lower() not in GENERIC_PLACEHOLDERS and len(candidate) >= 2:
-                return candidate.title()
-
-        # 3. Clean phone digits for database lookup
         clean_p = re.sub(r'[^\d+]', '', phone or '')
         digits = re.sub(r'\D', '', clean_p)
         last10 = digits[-10:] if len(digits) >= 10 else digits
 
-        # 4. Check campaign_contacts table (stores exact name entered when placing call)
+        # 1. First Priority: Check campaign_contacts table by caller's phone (actual name uploaded in CSV/campaign)
         if last10:
             try:
                 camp_res = await asyncio.to_thread(
@@ -111,7 +100,13 @@ class SarvamOutboundService:
             except Exception as e:
                 logger.warning(f"[resolve_caller_name] campaign_contacts lookup error: {e}")
 
-        # 5. Check customer_contacts table
+        # 2. Second Priority: Spoken self-introduction in transcript extracted by Gemini
+        if extracted_name and extracted_name.strip():
+            candidate = extracted_name.strip()
+            if candidate.lower() not in GENERIC_PLACEHOLDERS and len(candidate) >= 2:
+                return candidate.title()
+
+        # 3. Third Priority: Check customer_contacts table
         if last10:
             try:
                 cust_res = await asyncio.to_thread(
@@ -129,7 +124,7 @@ class SarvamOutboundService:
             except Exception as e:
                 logger.warning(f"[resolve_caller_name] customer_contacts lookup error: {e}")
 
-        # 6. Check leads table
+        # 4. Check leads table
         if last10:
             try:
                 leads_res = await asyncio.to_thread(
@@ -147,25 +142,14 @@ class SarvamOutboundService:
             except Exception as e:
                 logger.warning(f"[resolve_caller_name] leads lookup error: {e}")
 
-        # 7. Check profiles table
-        if last10:
-            try:
-                prof_res = await asyncio.to_thread(
-                    supabase_admin.table("profiles")
-                    .select("full_name")
-                    .ilike("phone", f"%{last10}%")
-                    .limit(1)
-                    .execute
-                )
-                if prof_res.data:
-                    fn = (prof_res.data[0].get("full_name") or "").strip()
-                    if fn and fn.lower() not in GENERIC_PLACEHOLDERS and len(fn) >= 2:
-                        return fn.title()
-            except Exception as e:
-                logger.warning(f"[resolve_caller_name] profiles lookup error: {e}")
+        # 5. Check explicit dial-time template_name (only if not a placeholder or test dummy)
+        if template_name and template_name.strip():
+            candidate = template_name.strip()
+            if candidate.lower() not in GENERIC_PLACEHOLDERS and len(candidate) >= 2:
+                return candidate.title()
 
-        # 8. Clean default fallback
-        return "Website Visitor"
+        # 6. Fallback: Clean 'Customer'
+        return "Customer"
 
     async def evaluate_call_intelligence(
         self,
@@ -705,7 +689,10 @@ Respond ONLY with valid JSON."""
                         stat_normalized = "completed" if status_raw in ("connected", "completed") else status_raw
 
                         agent_vars = att.get("agent_variables") or {}
-                        user_name = contact_name or agent_vars.get("user_name") or agent_vars.get("customer_name") or agent_vars.get("name") or "Contact"
+                        raw_var_name = agent_vars.get("user_name") or agent_vars.get("customer_name") or agent_vars.get("name")
+                        if raw_var_name and str(raw_var_name).strip().lower() in ("amar", "shubh", "ritu", "contact", "user", "test", "unknown"):
+                            raw_var_name = None
+                        user_name = contact_name or raw_var_name or ""
                         summary = agent_vars.get("call_summary") or "Call completed via Shubh"
 
                         # Handle phone length and emails safely (database column is VARCHAR(20))

@@ -385,7 +385,10 @@ async def trigger_instant_demo_call(req: InstantCallRequest):
         sarvam = SarvamOutboundService()
         call_res = await sarvam.trigger_instant_call(
             target_phone=target_phone,
-            contact_name=req.name
+            contact_name=req.name,
+            agent_id=agent_id,
+            org_id=org_id,
+            user_id=agent.get("user_id")
         )
 
         # Asynchronously log campaign and contact to DB in background so Supabase delays never block the call
@@ -450,14 +453,41 @@ async def trigger_instant_demo_call(req: InstantCallRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/sync-calls")
-async def sync_sarvam_calls_endpoint(hours_back: int = 24):
+async def sync_sarvam_calls_endpoint(
+    body: Optional[Dict[str, Any]] = None,
+    hours_back: int = 24
+):
     """
     Synchronizes completed calls, audio recordings, transcripts, and leads from Sarvam to Trinetra.
     """
     try:
         from app.services.sarvam_outbound_service import SarvamOutboundService
         sarvam = SarvamOutboundService()
-        count = await sarvam.sync_recent_calls(hours_back=hours_back)
+        org_id = body.get("organization_id") if body else None
+        user_id = body.get("user_id") if body else None
+        agent_id = body.get("agent_id") if body else None
+
+        target_app = None
+        if agent_id or org_id:
+            query = supabase_admin.table("agents").select("id, sarvam_agent_id, organization_id, user_id")
+            if agent_id:
+                query = query.eq("id", agent_id)
+            elif org_id:
+                query = query.eq("organization_id", org_id)
+            ag_row = await asyncio.to_thread(query.limit(1).execute)
+            if ag_row.data and ag_row.data[0].get("sarvam_agent_id"):
+                target_app = ag_row.data[0]["sarvam_agent_id"]
+                agent_id = ag_row.data[0]["id"]
+                org_id = ag_row.data[0]["organization_id"]
+                user_id = ag_row.data[0]["user_id"]
+
+        count = await sarvam.sync_recent_calls(
+            hours_back=hours_back,
+            app_id=target_app,
+            org_id=org_id,
+            user_id=user_id,
+            agent_id=agent_id
+        )
         return {"success": True, "synced_calls": count}
     except Exception as e:
         logger.error(f"Error syncing calls from Sarvam: {e}", exc_info=True)
