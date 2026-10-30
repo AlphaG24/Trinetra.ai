@@ -1530,12 +1530,81 @@ def create_appointment_tools(
             logger.error(f"[transfer_to_human] Error: {err}")
             return "Transferring you to a human representative right now."
 
+    @llm.function_tool(description="Dispatch official payment details, UPI ID, payment link, or QR code to the customer's phone on WhatsApp during or at the close of a call when an order, booking, service fee, or advance payment is agreed.")
+    async def dispatch_payment_request(phone_number: str = "", amount: str = "", item_description: str = "") -> str:
+        """
+        Dispatches non-custodial direct payment details to the caller's phone number via WhatsApp/SMS.
+        Args:
+            phone_number: Customer's 10-digit mobile number or full international format.
+            amount: Amount agreed or quoted (e.g. '500', '1200', '2500').
+            item_description: Brief description of the service, product, consultation, or advance.
+        """
+        async def _execute() -> str:
+            if timing_tracker:
+                timing_tracker.mark("tool_start", extra="tool=dispatch_payment_request")
+            try:
+                # 1. Clean phone number
+                cleaned = re.sub(r'\D', '', phone_number) if phone_number else ""
+                if len(cleaned) == 10:
+                    cleaned = "+91" + cleaned
+                elif len(cleaned) == 12 and cleaned.startswith("91"):
+                    cleaned = "+" + cleaned
+                elif cleaned and not cleaned.startswith("+"):
+                    cleaned = "+" + cleaned
+
+                # 2. Query tenant payout credentials with strict tenant isolation
+                query = supabase_admin.table("tenant_payout_credentials").select("*").eq("is_active", True).eq("consent_attested", True)
+                if organization_id:
+                    query = query.eq("organization_id", organization_id)
+                elif user_id:
+                    query = query.eq("user_id", user_id)
+                else:
+                    return "PAYMENT_UNAVAILABLE: Payout vault not active for this account. Inform caller that invoices and payment details will be dispatched via email."
+
+                res = await asyncio.to_thread(query.maybe_single().execute)
+                payout = res.data if res else None
+                if not payout or (not payout.get("upi_id") and not payout.get("payment_link_url") and not payout.get("qr_code_url")):
+                    return "PAYMENT_UNAVAILABLE: No active payment link or UPI is configured in the business vault. Advise caller that our billing desk will share payment instructions shortly."
+
+                # 3. Dispatch via IntegrationExecutor
+                from app.services.integration_executor import IntegrationExecutor
+                executor = IntegrationExecutor()
+                dispatch_success = await executor.dispatch_payment_request(
+                    agent_id=agent_id or "default",
+                    payment_data={
+                        "contact_phone": cleaned,
+                        "amount": amount,
+                        "item_description": item_description or "Order / Service Booking",
+                        "organization_id": organization_id,
+                        "user_id": user_id,
+                        "call_id": call_id,
+                        "payout": payout
+                    }
+                )
+
+                upi_ref = payout.get("upi_id") or "direct payment link"
+                if dispatch_success:
+                    return f"PAYMENT_DISPATCHED: Successfully sent payment details ({upi_ref}) to {cleaned} via WhatsApp. Let the customer know that the link has been sent to their WhatsApp and they can review and pay."
+                else:
+                    return f"PAYMENT_DISPATCH_QUEUED: Payment instructions prepared. Inform the customer that the payment details ({upi_ref}) are being dispatched to their phone."
+            except Exception as pe:
+                logger.error(f"[dispatch_payment_request] Execution error: {pe}")
+                return "PAYMENT_DISPATCH_QUEUED: Tell the customer that payment details are being dispatched to their registered phone number."
+            finally:
+                if timing_tracker:
+                    timing_tracker.mark("tool_end", extra="tool=dispatch_payment_request")
+
+        if tool_guard:
+            return await tool_guard.execute_tool("dispatch_payment_request", _execute)
+        return await _execute()
+
     return [
         check_existing_appointment,
         book_appointment_slot,
         reschedule_appointment_slot,
         decline_call_recording,
-        transfer_to_human
+        transfer_to_human,
+        dispatch_payment_request
     ]
 
 class VikramAgent(Agent):

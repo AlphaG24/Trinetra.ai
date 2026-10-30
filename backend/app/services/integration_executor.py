@@ -464,6 +464,154 @@ class IntegrationExecutor:
             logger.warning(f"[Interested Followup] No active messaging provider reached for phone={prospect_phone}, email={prospect_email}")
         return total_sent
 
+    async def dispatch_payment_request(self, agent_id: str, payment_data: dict) -> bool:
+        """
+        Dispatches tenant's non-custodial payment request (UPI ID, direct link, QR code, bank details)
+        to the customer via WhatsApp/SMS during or immediately after a call.
+        Enforces RBI Non-Custodial compliance: payments settle directly to tenant's verified account.
+        """
+        dest_phone = payment_data.get("contact_phone") or payment_data.get("phone_number") or ""
+        cleaned_phone = format_whatsapp_number(dest_phone)
+        if not cleaned_phone:
+            logger.warning("[Payment Request] Discarded: invalid or missing phone number.")
+            return False
+
+        raw_phone = cleaned_phone.replace("whatsapp:", "")
+        org_id = payment_data.get("organization_id")
+        user_id = payment_data.get("user_id")
+        call_id = payment_data.get("call_id")
+        amount = payment_data.get("amount") or ""
+        item_desc = payment_data.get("item_description") or "Order / Service Booking"
+        
+        # Payout data can be passed directly or queried
+        payout = payment_data.get("payout")
+        if not payout and (org_id or user_id):
+            query = supabase_admin.table("tenant_payout_credentials").select("*").eq("is_active", True).eq("consent_attested", True)
+            if org_id:
+                query = query.eq("organization_id", org_id)
+            elif user_id:
+                query = query.eq("user_id", user_id)
+            res = await asyncio.to_thread(query.maybe_single().execute)
+            payout = res.data if res else None
+
+        if not payout:
+            logger.warning(f"[Payment Request] Skipped: No active payout credentials for org={org_id}, user={user_id}.")
+            return False
+
+        upi_id = payout.get("upi_id") or ""
+        payment_link = payout.get("payment_link_url") or ""
+        qr_code_url = payout.get("qr_code_url") or ""
+        bank_name = payout.get("bank_name") or ""
+        masked_acc = payout.get("account_number_masked") or ""
+        ifsc = payout.get("ifsc_code") or ""
+        beneficiary = payout.get("beneficiary_name") or "Authorized Merchant"
+        business_name = payment_data.get("business_name") or "Vaakriti Partner"
+
+        # Try to resolve actual business name if available
+        if business_name == "Vaakriti Partner" and org_id:
+            try:
+                org_res = await asyncio.to_thread(
+                    supabase_admin.table("organizations").select("name").eq("id", org_id).maybe_single().execute
+                )
+                if org_res.data and org_res.data.get("name"):
+                    business_name = org_res.data["name"]
+            except Exception:
+                pass
+
+        # Build clean, high-conversion WhatsApp message
+        msg_parts = [
+            f"Namaste! 🙏",
+            f"\nThank you for speaking with our team at *{business_name}*.",
+            f"As discussed on your call, here are the official payment details to confirm your order/booking:\n",
+            "━━━━━━━━━━━━━━━━━━━━━━━━",
+            f"📦 *Item / Service:* {item_desc}"
+        ]
+        if amount:
+            msg_parts.append(f"💰 *Total Payable:* ₹{amount}")
+        msg_parts.append("━━━━━━━━━━━━━━━━━━━━━━━━")
+
+        if upi_id:
+            msg_parts.append(f"\n📲 *Pay via UPI:*\n`{upi_id}`\n_(Tap to copy & pay in GPay, PhonePe, or Paytm)_")
+
+        if payment_link:
+            msg_parts.append(f"\n🔗 *Direct Payment Link:*\n{payment_link}")
+
+        if qr_code_url:
+            msg_parts.append(f"\n🖼️ *Scan & Pay QR Code:*\n{qr_code_url}")
+
+        if bank_name and masked_acc:
+            msg_parts.append(
+                f"\n🏦 *Direct Bank Transfer (NEFT/RTGS):*\n"
+                f"• Beneficiary: {beneficiary}\n"
+                f"• Bank: {bank_name}\n"
+                f"• Account: {masked_acc}\n"
+                f"• IFSC: {ifsc}"
+            )
+
+        msg_parts.append(
+            f"\n\n⚡ *Instant Confirmation:*\n"
+            f"Once your payment is done, please reply to this WhatsApp message with a screenshot or UTR number for immediate confirmation.\n\n"
+            f"Warm regards,\n*{business_name} Accounts & Support*"
+        )
+        message_wa = "\n".join(msg_parts)
+
+        # Dispatch via WhatsApp (caller verbally consented on live call, so whatsapp_opt_in=True)
+        wa_sent = False
+        try:
+            wa_sent = await self._send_whatsapp(
+                config={},
+                message=message_wa,
+                data={
+                    "contact_phone": raw_phone,
+                    "event_type": "payment_request_dispatched",
+                    "recipient_type": "customer",
+                    "whatsapp_opt_in": True,
+                    "is_proactive": False,
+                    "organization_id": org_id,
+                    "user_id": user_id
+                }
+            )
+        except Exception as we:
+            logger.error(f"[Payment Request] WhatsApp dispatch error: {we}")
+
+        # Fallback to SMS if WhatsApp failed or not configured
+        if not wa_sent:
+            sms_text = f"Payment details from {business_name}: {item_desc}. "
+            if amount:
+                sms_text += f"Amount: Rs. {amount}. "
+            if payment_link:
+                sms_text += f"Link: {payment_link}. "
+            elif upi_id:
+                sms_text += f"UPI ID: {upi_id}. "
+            sms_text += "Thank you!"
+            try:
+                wa_sent = await self._send_sms({}, sms_text, {"contact_phone": raw_phone})
+            except Exception as se:
+                logger.error(f"[Payment Request] SMS fallback error: {se}")
+
+        # Audit logging: record payment request event
+        try:
+            audit_entry = {
+                "organization_id": org_id,
+                "user_id": user_id,
+                "action": "payment_request.dispatched",
+                "entity_type": "call_records",
+                "entity_id": call_id or raw_phone,
+                "metadata": {
+                    "phone": raw_phone,
+                    "amount": amount,
+                    "item_description": item_desc,
+                    "upi_id": upi_id,
+                    "payment_link": payment_link,
+                    "dispatched_successfully": wa_sent
+                }
+            }
+            await asyncio.to_thread(supabase_admin.table("audit_logs").insert(audit_entry).execute)
+        except Exception as log_err:
+            logger.warning(f"[Payment Request] Audit logging warning: {log_err}")
+
+        return wa_sent
+
     async def _dispatch(self, slug: str, event_type: str, config: dict, data: dict):
         try:
             # Merge event_type into template context

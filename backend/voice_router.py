@@ -1409,30 +1409,70 @@ async def handle_sarvam_voice_webhook(
                     else:
                         query.eq("phone", from_number).execute()
 
-                # 5. WhatsApp Auto-Bridge
+                # 5. WhatsApp Auto-Bridge & In-Call Payment Closing (Call-to-Cash Phase 2)
                 # If caller asked for WhatsApp / preview or if duration > 10s:
                 if from_number and from_number.startswith("+"):
                     try:
                         from app.services.integration_executor import IntegrationExecutor
                         executor = IntegrationExecutor()
-                        preview_msg = (
-                            f"Namaste {caller_name} ji! Thank you for speaking with our AI assistant on call. "
-                            f"Here is your Vaakriti AI product preview and consultation link: https://vaakriti.com/demo. "
-                            f"Feel free to reply here if you'd like to schedule your team onboarding."
-                        )
-                        asyncio.create_task(
-                            executor._send_whatsapp(
-                                config={},
-                                message=preview_msg,
-                                data={
-                                    "contact_phone": from_number,
-                                    "event_type": "post_call_followup",
-                                    "recipient_type": "customer",
-                                    "whatsapp_opt_in": True
-                                }
+
+                        # Check if tenant has active payout credentials (UPI / payment link / QR)
+                        payout_row = None
+                        org_check = target_org if target_org != "default" else None
+                        if org_check or target_user:
+                            p_query = supabase_admin.table("tenant_payout_credentials").select("*").eq("is_active", True).eq("consent_attested", True)
+                            if org_check:
+                                p_query = p_query.eq("organization_id", org_check)
+                            elif target_user:
+                                p_query = p_query.eq("user_id", target_user)
+                            p_res = p_query.maybe_single().execute()
+                            payout_row = p_res.data if p_res else None
+
+                        # Check if payment or commercial pricing was discussed
+                        text_to_check = ((transcript_text or "") + " " + (call_summary or "")).lower()
+                        payment_discussed = any(w in text_to_check for w in [
+                            "pay", "payment", "upi", "rupee", "rs.", "amount", "advance",
+                            "cost", "price", "rate", "booking", "order", "bill", "invoice", "deal"
+                        ])
+
+                        if payout_row and payment_discussed:
+                            amt_match = re.search(r'(?:rs\.?|inr|₹)\s*([\d,]+)', text_to_check)
+                            amount_val = amt_match.group(1).replace(",", "") if amt_match else ""
+
+                            asyncio.create_task(
+                                executor.dispatch_payment_request(
+                                    agent_id=agent_id or "default",
+                                    payment_data={
+                                        "contact_phone": from_number,
+                                        "amount": amount_val,
+                                        "item_description": (call_summary[:100] if call_summary else "Order / Booking Confirmation"),
+                                        "organization_id": org_check,
+                                        "user_id": target_user,
+                                        "call_id": saved_call_id or call_id,
+                                        "payout": payout_row
+                                    }
+                                )
                             )
-                        )
-                        print(f"[Sarvam Webhook] Dispatched post-call WhatsApp follow-up to {from_number}", flush=True)
+                            print(f"[Sarvam Webhook] Dispatched Call-to-Cash payment details to {from_number}", flush=True)
+                        else:
+                            preview_msg = (
+                                f"Namaste {caller_name} ji! Thank you for speaking with our AI assistant on call. "
+                                f"Here is your Vaakriti AI product preview and consultation link: https://vaakriti.com/demo. "
+                                f"Feel free to reply here if you'd like to schedule your team onboarding."
+                            )
+                            asyncio.create_task(
+                                executor._send_whatsapp(
+                                    config={},
+                                    message=preview_msg,
+                                    data={
+                                        "contact_phone": from_number,
+                                        "event_type": "post_call_followup",
+                                        "recipient_type": "customer",
+                                        "whatsapp_opt_in": True
+                                    }
+                                )
+                            )
+                            print(f"[Sarvam Webhook] Dispatched post-call WhatsApp follow-up to {from_number}", flush=True)
                     except Exception as wa_err:
                         print(f"[Sarvam Webhook WhatsApp Error] {wa_err}", flush=True)
 
