@@ -839,12 +839,38 @@ def compose_single_opening_greeting(
     if v_clean == "short":
         v_clean = "concise"
     sel_variant = v_clean if v_clean in DISCLOSURE_VARIANTS else "standard"
-    agent_display = (agent_name or "Arika").strip()
-    biz_display = (business_name or "Trinetra AI").strip()
-    is_outbound = str(direction).lower() == "outbound"
+    raw_agent = (agent_name or "").strip()
+    clean_agent = re.sub(r"^\[[^\]]+\]\s*", "", raw_agent).strip()
+    GENERIC_ROLE_NAMES = {
+        "sales agent", "support agent", "lead qualifier", "appointment agent",
+        "neural unit", "multi agent", "voice agent", "custom agent", "receptionist",
+        "agent", "sales", "support", ""
+    }
 
-    # 4-Tier Gender Resolution: (1) explicit (2) voice catalog (3) persona name guess (4) neutral
-    resolved_gender, gender_source = resolve_agent_gender(gender=gender_tag, voice=voice, agent_name=agent_display)
+    # 4-Tier Gender Resolution first: (1) explicit (2) voice catalog (3) persona name guess (4) neutral
+    resolved_gender, gender_source = resolve_agent_gender(gender=gender_tag, voice=voice, agent_name=clean_agent or raw_agent)
+
+    if clean_agent.lower() in GENERIC_ROLE_NAMES:
+        # Resolve human name from voice persona — NEVER use generic role names as person names
+        v_lower = str(voice or "").lower().strip()
+        if "ritu" in v_lower:
+            clean_agent = "Ritu"
+        elif "anushka" in v_lower:
+            clean_agent = "Anushka"
+        elif "priya" in v_lower:
+            clean_agent = "Priya"
+        elif "shubh" in v_lower:
+            clean_agent = "Shubh"
+        elif "arvind" in v_lower:
+            clean_agent = "Arvind"
+        elif "kabir" in v_lower:
+            clean_agent = "Kabir"
+        else:
+            clean_agent = "Ritu" if resolved_gender == "female" else "Shubh"
+
+    agent_display = clean_agent or "Arika"
+    biz_display = (business_name or "Trinetra AI").strip()
+    is_outbound = str(direction).lower() == "outbound" 
     if resolved_gender == "male":
         verb = "raha"
         verb_hi = "रहा"
