@@ -437,6 +437,28 @@ Respond ONLY with valid JSON."""
         user_config["company_name"] = final_business_name
         user_config["business_name"] = final_business_name
 
+        # Standardize placeholders for Sarvam Voice Agents ({{agent_name}}, {{company_name}}, {{customer_name}}, {{customer_phone}}, {{intent}}, {{notes}})
+        if not user_config.get("agent_name"):
+            user_config["agent_name"] = resolved_agent_name or "Sales Agent"
+        if not user_config.get("customer_name"):
+            user_config["customer_name"] = (contact_name or "").strip()
+        if not user_config.get("customer_phone"):
+            user_config["customer_phone"] = cleaned_phone
+        if not user_config.get("intent"):
+            user_config["intent"] = (
+                user_config.get("call_purpose") or 
+                user_config.get("purpose") or 
+                user_config.get("lead_intent") or 
+                "consultative inquiry and business solutions"
+            )
+        if not user_config.get("notes"):
+            user_config["notes"] = (
+                user_config.get("customer_notes") or 
+                user_config.get("business_description") or 
+                user_config.get("prospect_company") or 
+                ""
+            )
+
         payload: Dict[str, Any] = {
             "app_config": {
                 "app_id": target_app_id,

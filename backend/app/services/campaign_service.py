@@ -875,12 +875,16 @@ class CampaignService:
                         "trinetra_agent_id": agent_id,
                         "campaign_id": campaign_id,
                         "contact_id": contact_id,
-                        "company_name": company_name,
+                        "company_name": business_name,
+                        "customer_name": contact_name,
+                        "customer_phone": contact_phone,
                         "prospect_company": company_name,
+                        "intent": contact.get("intent") or contact.get("lead_intent") or campaign_data.get("purpose") or campaign_data.get("type") or "consultative inquiry and business solutions",
+                        "notes": notes or (f"Prospect Company: {company_name}" if company_name else ""),
                         "customer_notes": notes,
                         "business_description": notes,
                         "call_purpose": campaign_data.get("purpose") or "consultation",
-                        "campaign_name": business_name
+                        "campaign_name": campaign_data.get("name") or business_name
                     },
                     webhook_url=sarvam_webhook,
                     user_id=agent.get("user_id"),
