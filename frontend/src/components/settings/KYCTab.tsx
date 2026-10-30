@@ -15,6 +15,7 @@ import {
   ExternalLink
 } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { PayoutCredentialsCard } from './PayoutCredentialsCard'
 
 interface KYCDoc {
   id: string
@@ -568,6 +569,9 @@ export function KYCTab() {
           )}
         </div>
       </div>
+      {/* Non-Custodial In-Call Payout & Collection Vault (Call-to-Cash Phase 1) */}
+      <PayoutCredentialsCard />
+
       {/* DigiLocker Instant Verification Modal */}
       {isDigiLockerModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4">
