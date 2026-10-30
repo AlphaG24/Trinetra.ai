@@ -1398,16 +1398,40 @@ async def handle_sarvam_voice_webhook(
                         "failed": "failed"
                     }
                     target_status = stat_map.get(call_status.lower(), "answered")
-                    query = supabase_admin.table("campaign_contacts").update({
+                    camp_data_update = {
                         "call_status": target_status,
                         "call_id": saved_call_id,
                         "notes": call_summary,
                         "last_attempt_at": datetime.utcnow().isoformat()
-                    })
+                    }
+                    clean_from_digits = re.sub(r"\D", "", from_number) if from_number else ""
+                    clean_10 = clean_from_digits[-10:] if len(clean_from_digits) >= 10 else clean_from_digits
+
+                    matched_campaign_id = None
                     if contact_id:
-                        query.eq("id", contact_id).execute()
-                    else:
-                        query.eq("phone", from_number).execute()
+                        supabase_admin.table("campaign_contacts").update(camp_data_update).eq("id", contact_id).execute()
+                        c_lookup = supabase_admin.table("campaign_contacts").select("campaign_id").eq("id", contact_id).limit(1).execute()
+                        if c_lookup.data and len(c_lookup.data) > 0:
+                            matched_campaign_id = c_lookup.data[0].get("campaign_id")
+                    elif clean_10:
+                        supabase_admin.table("campaign_contacts").update(camp_data_update).ilike("phone", f"%{clean_10}%").execute()
+                        c_lookup = supabase_admin.table("campaign_contacts").select("campaign_id").ilike("phone", f"%{clean_10}%").limit(1).execute()
+                        if c_lookup.data and len(c_lookup.data) > 0:
+                            matched_campaign_id = c_lookup.data[0].get("campaign_id")
+
+                    if matched_campaign_id:
+                        try:
+                            contacts_all = supabase_admin.table("campaign_contacts").select("call_status").eq("campaign_id", matched_campaign_id).execute()
+                            rows = contacts_all.data or []
+                            num_called = sum(1 for r in rows if r.get("call_status") != "pending")
+                            num_connected = sum(1 for r in rows if r.get("call_status") in ("answered", "completed"))
+                            supabase_admin.table("campaigns").update({
+                                "contacts_called": num_called,
+                                "contacts_connected": num_connected,
+                                "leads_generated": num_connected
+                            }).eq("id", matched_campaign_id).execute()
+                        except Exception as c_stat_err:
+                            print(f"[Sarvam Webhook] Failed to update campaign stats: {c_stat_err}", flush=True)
 
                 # 5. WhatsApp Auto-Bridge & In-Call Payment Closing (Call-to-Cash Phase 2)
                 # If caller asked for WhatsApp / preview or if duration > 10s:

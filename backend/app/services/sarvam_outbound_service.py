@@ -443,33 +443,80 @@ Respond ONLY with valid JSON."""
             except Exception:
                 pass
 
-        final_business_name = resolved_biz_name or "Trinetra AI"
-        if resolved_agent_name:
-            user_config["agent_name"] = resolved_agent_name
-        user_config["company_name"] = final_business_name
-        user_config["business_name"] = final_business_name
+        # Expand user_config with comprehensive aliases for Sarvam app templates
+        c_name = (contact_name or user_config.get("customer_name") or user_config.get("user_name") or "").strip()
+        first_name = c_name.split()[0] if c_name else ""
+        salutation = f"{first_name} ji" if first_name else "sir"
+        prospect_comp = (
+            user_config.get("prospect_company") or 
+            user_config.get("customer_company") or 
+            (custom_metadata.get("prospect_company") if custom_metadata else None) or 
+            ""
+        ).strip()
 
-        # Standardize placeholders for Sarvam Voice Agents ({{agent_name}}, {{company_name}}, {{customer_name}}, {{customer_phone}}, {{intent}}, {{notes}})
-        if not user_config.get("agent_name"):
-            user_config["agent_name"] = resolved_agent_name or "Sales Agent"
-        if not user_config.get("customer_name"):
-            user_config["customer_name"] = (contact_name or "").strip()
-        if not user_config.get("customer_phone"):
-            user_config["customer_phone"] = cleaned_phone
+        final_business_name = resolved_biz_name or "Purvi Roadlines"
+        resolved_agent = resolved_agent_name or user_config.get("agent_name") or "Jitendra"
+
+        user_config.update({
+            # Agent Aliases
+            "agent_name": resolved_agent,
+            "agent": resolved_agent,
+            "bot_name": resolved_agent,
+            "name": resolved_agent,
+
+            # Business / Tenant Aliases
+            "company_name": final_business_name,
+            "company": final_business_name,
+            "business_name": final_business_name,
+            "business": final_business_name,
+
+            # Prospect / Customer Aliases
+            "customer_name": c_name or "Customer",
+            "prospect_name": c_name or "Customer",
+            "user_name": c_name or "Customer",
+            "customer_first_name": first_name or "sir",
+            "first_name": first_name or "sir",
+            "customer_salutation": salutation,
+            "salutation": salutation,
+
+            # Prospect Company Aliases
+            "prospect_company": prospect_comp,
+            "customer_company": prospect_comp,
+            "client_company": prospect_comp,
+
+            # Contact Phone Aliases
+            "customer_phone": cleaned_phone,
+            "user_phone_number": cleaned_phone,
+            "user_phone": cleaned_phone,
+            "phone": cleaned_phone,
+            "phone_number": cleaned_phone,
+            "contact_phone": cleaned_phone,
+        })
+
         if not user_config.get("intent"):
             user_config["intent"] = (
                 user_config.get("call_purpose") or 
                 user_config.get("purpose") or 
                 user_config.get("lead_intent") or 
-                "consultative inquiry and business solutions"
+                "consultative inquiry and freight solutions"
             )
         if not user_config.get("notes"):
             user_config["notes"] = (
                 user_config.get("customer_notes") or 
                 user_config.get("business_description") or 
-                user_config.get("prospect_company") or 
+                prospect_comp or 
                 ""
             )
+
+        # Ensure webhook_url is ALWAYS populated so Sarvam sends transcript and audio back
+        if not webhook_url:
+            from app.services.config_service import ConfigService
+            webhook_base = ConfigService.get("TRINETRA_WEBHOOK_BASE_URL") or os.getenv("TRINETRA_WEBHOOK_BASE_URL") or "https://trinetra-ai-1-6f2n.onrender.com"
+            webhook_base = webhook_base.rstrip("/")
+            target_org_webhook = resolved_org_id or "default"
+            webhook_url = f"{webhook_base}/webhooks/voice/sarvam/{target_org_webhook}?agent_id={agent_id or ''}"
+            if custom_metadata and custom_metadata.get("contact_id"):
+                webhook_url += f"&contact_id={custom_metadata['contact_id']}"
 
         payload: Dict[str, Any] = {
             "app_config": {
@@ -480,11 +527,9 @@ Respond ONLY with valid JSON."""
                     "agent_phone_number": resolved_agent_phone
                 }
             },
-            "user_config": user_config
+            "user_config": user_config,
+            "webhook_config": {"url": webhook_url}
         }
-
-        if webhook_url:
-            payload["webhook_config"] = {"url": webhook_url}
 
         logger.info(f"[SarvamOutboundService] Dialing {cleaned_phone} via agent {target_app_id} (CLI: {resolved_agent_phone})")
 
@@ -852,19 +897,28 @@ Respond ONLY with valid JSON."""
 
                         # 4. Update campaign_contacts & Campaign Stats
                         if phone_for_lead:
-                            await asyncio.to_thread(
-                                supabase_admin.table("campaign_contacts")
-                                .update({
-                                    "call_status": "answered",
-                                    "call_id": call_id,
-                                    "notes": final_summary
-                                })
-                                .eq("phone", phone_for_lead)
-                                .execute
-                            )
+                            clean_lead_digits = re.sub(r"\D", "", phone_for_lead)
+                            clean_10 = clean_lead_digits[-10:] if len(clean_lead_digits) >= 10 else clean_lead_digits
+                            camp_update_data = {
+                                "call_status": "answered",
+                                "call_id": call_id,
+                                "notes": final_summary
+                            }
+                            # Robust matching by phone ending with clean 10 digits or exact match
+                            if clean_10:
+                                await asyncio.to_thread(
+                                    supabase_admin.table("campaign_contacts")
+                                    .update(camp_update_data)
+                                    .ilike("phone", f"%{clean_10}%")
+                                    .execute
+                                )
 
                             camp_lookup = await asyncio.to_thread(
-                                supabase_admin.table("campaign_contacts").select("campaign_id").eq("phone", phone_for_lead).limit(1).execute
+                                supabase_admin.table("campaign_contacts")
+                                .select("campaign_id")
+                                .ilike("phone", f"%{clean_10}%")
+                                .limit(1)
+                                .execute
                             )
                             if camp_lookup.data and len(camp_lookup.data) > 0:
                                 p_camp_id = camp_lookup.data[0]["campaign_id"]

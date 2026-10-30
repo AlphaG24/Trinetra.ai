@@ -208,8 +208,7 @@ export function CampaignDetailClient({ campaignId }: CampaignDetailClientProps) 
     fetchCampaignContacts()
   }, [campaignId, page, search, statusFilter])
 
-  // Poll progress: only as a slow fallback (every 20s) when campaign is actively running/dialing
-  // Supabase Realtime below already pushes instant changes without exhausting Disk IO budget
+  // Poll progress: when campaign is actively running/dialing, poll fast (every 3s) for smooth real-time feedback
   useEffect(() => {
     const isActive = campaign?.status === 'running' || campaign?.status === 'dialing'
     if (!isActive) return
@@ -217,7 +216,7 @@ export function CampaignDetailClient({ campaignId }: CampaignDetailClientProps) 
     pollIntervalRef.current = setInterval(() => {
       fetchCampaignInfo(true)
       fetchCampaignContacts(true)
-    }, 20000)
+    }, 3000)
 
     return () => {
       if (pollIntervalRef.current) {
@@ -274,18 +273,21 @@ export function CampaignDetailClient({ campaignId }: CampaignDetailClientProps) 
   const handleStart = async () => {
     try {
       setActionLoading(true)
+      setCampaign(prev => prev ? ({ ...prev, status: 'running' }) : null)
       const res = await fetch(`/api/campaigns/${campaignId}/start`, { method: 'POST' })
       const data = await res.json()
       if (res.ok) {
         toast.success('Campaign calling loop started in the background!')
-        fetchCampaignInfo()
-        fetchCampaignContacts()
+        fetchCampaignInfo(true)
+        fetchCampaignContacts(true)
       } else {
         toast.error(data.error || 'Failed to start campaign')
+        fetchCampaignInfo(true)
       }
     } catch (err) {
       console.error(err)
       toast.error('Error starting campaign')
+      fetchCampaignInfo(true)
     } finally {
       setActionLoading(false)
     }
@@ -295,18 +297,21 @@ export function CampaignDetailClient({ campaignId }: CampaignDetailClientProps) 
   const handlePause = async () => {
     try {
       setActionLoading(true)
+      setCampaign(prev => prev ? ({ ...prev, status: 'paused' }) : null)
       const res = await fetch(`/api/campaigns/${campaignId}/pause`, { method: 'POST' })
       const data = await res.json()
       if (res.ok) {
         toast.success('Campaign paused!')
-        fetchCampaignInfo()
-        fetchCampaignContacts()
+        fetchCampaignInfo(true)
+        fetchCampaignContacts(true)
       } else {
         toast.error(data.error || 'Failed to pause campaign')
+        fetchCampaignInfo(true)
       }
     } catch (err) {
       console.error(err)
       toast.error('Error pausing campaign')
+      fetchCampaignInfo(true)
     } finally {
       setActionLoading(false)
     }
@@ -316,18 +321,21 @@ export function CampaignDetailClient({ campaignId }: CampaignDetailClientProps) 
   const handleResume = async () => {
     try {
       setActionLoading(true)
+      setCampaign(prev => prev ? ({ ...prev, status: 'running' }) : null)
       const res = await fetch(`/api/campaigns/${campaignId}/resume`, { method: 'POST' })
       const data = await res.json()
       if (res.ok) {
         toast.success('Campaign calling loop resumed in the background!')
-        fetchCampaignInfo()
-        fetchCampaignContacts()
+        fetchCampaignInfo(true)
+        fetchCampaignContacts(true)
       } else {
         toast.error(data.error || 'Failed to resume campaign')
+        fetchCampaignInfo(true)
       }
     } catch (err) {
       console.error(err)
       toast.error('Error resuming campaign')
+      fetchCampaignInfo(true)
     } finally {
       setActionLoading(false)
     }
@@ -358,6 +366,7 @@ export function CampaignDetailClient({ campaignId }: CampaignDetailClientProps) 
   const handleRetryContact = async (contactId: string) => {
     try {
       setRetryingContactId(contactId)
+      setContacts(prev => prev.map(c => c.id === contactId ? { ...c, call_status: 'dialing' } : c))
       const res = await fetch(`/api/campaigns/${campaignId}/contacts/${contactId}/retry`, { method: 'POST' })
       const data = await res.json()
       if (res.ok) {
@@ -366,10 +375,12 @@ export function CampaignDetailClient({ campaignId }: CampaignDetailClientProps) 
         await fetchCampaignContacts(true)
       } else {
         toast.error(data.error || 'Failed to reset contact')
+        await fetchCampaignContacts(true)
       }
     } catch (err) {
       console.error(err)
       toast.error('Error resetting contact')
+      await fetchCampaignContacts(true)
     } finally {
       setRetryingContactId(null)
     }
@@ -399,13 +410,14 @@ export function CampaignDetailClient({ campaignId }: CampaignDetailClientProps) 
     )
   }
 
-  const completedCount = contacts.filter(c => ['answered', 'completed', 'no_answer', 'busy', 'failed', 'dnd'].includes((c.call_status || '').toLowerCase())).length;
+  const totalContacts = campaign.total_contacts || contactsCount || 0;
+  const totalCalled = campaign.contacts_called ?? 0;
   const pendingCount = contacts.filter(c => (c.call_status || '').toLowerCase() === 'pending').length;
   const dialingCount = contacts.filter(c => (c.call_status || '').toLowerCase() === 'dialing').length;
 
   const calledPercentage = campaign.status === 'completed' 
     ? 100 
-    : (contactsCount > 0 ? Math.min(100, Math.round((completedCount / contactsCount) * 100)) : 0);
+    : (totalContacts > 0 ? Math.min(100, Math.round((totalCalled / totalContacts) * 100)) : 0);
 
   const totalPages = Math.ceil(contactsCount / limit) || 1;
 
