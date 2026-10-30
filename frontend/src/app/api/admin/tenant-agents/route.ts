@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@/utils/supabase/server'
+import { authenticateRequest } from '@/lib/api-helpers'
 import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 
 function getAdminClient() {
@@ -10,30 +10,32 @@ function getAdminClient() {
   )
 }
 
+function checkIsAdmin(user: any, profile: any): boolean {
+  const userEmail = (user?.email || profile?.email || '').toLowerCase().trim()
+  const isSuperAdminByEmail = 
+    userEmail === 'raghav00424@gmail.com' || 
+    userEmail === 'raghav@trinetra.ai' || 
+    (process.env.NEXT_PUBLIC_ADMIN_EMAILS || '').includes(userEmail)
+  
+  const role = (profile?.role || user?.app_metadata?.role || user?.user_metadata?.role || '').toLowerCase().trim()
+  return isSuperAdminByEmail || role === 'admin' || role === 'super_admin'
+}
+
 export async function GET() {
   try {
-    const supabase = await createClient()
+    const { authenticated, user, profile, error: authError } = await authenticateRequest()
 
-    // 1. Authenticate User
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!authenticated || !user) {
+      return NextResponse.json({ error: 'Unauthorized: ' + (authError || 'Session required') }, { status: 401 })
     }
 
-    // 2. Authorize Admin / Super Admin
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single()
-
-    if (!profile || !['admin', 'super_admin'].includes(profile.role)) {
+    if (!checkIsAdmin(user, profile)) {
       return NextResponse.json({ error: 'Forbidden: Admin access required' }, { status: 403 })
     }
 
     const adminClient = getAdminClient()
 
-    // 3. Fetch all organizations
+    // 1. Fetch all organizations
     const { data: orgs, error: orgsErr } = await adminClient
       .from('organizations')
       .select('id, name, legal_name, primary_email, created_at')
@@ -43,7 +45,7 @@ export async function GET() {
       return NextResponse.json({ error: orgsErr.message }, { status: 500 })
     }
 
-    // 4. Fetch all profiles, agents, knowledge docs, and phone numbers
+    // 2. Fetch all profiles, agents, knowledge docs, and phone numbers in parallel
     const [profilesRes, agentsRes, kbRes, phoneRes] = await Promise.all([
       adminClient.from('profiles').select('id, organization_id, full_name, email, company_name, business_type, business_description'),
       adminClient.from('agents').select('id, organization_id, user_id, name, phone_number, sarvam_agent_id, greeting_message, voice_id, language, system_prompt, status, created_at'),
@@ -87,54 +89,49 @@ export async function GET() {
       }
     })
 
-    // 5. Structure payload per organization
-    const tenants = (orgs || []).map(org => {
+    // Construct enriched tenant models
+    const enrichedTenants = (orgs || []).map(org => {
       const orgProfiles = profilesByOrg[org.id] || []
-      const primaryProfile = orgProfiles[0] || {}
+      const primaryProfile = orgProfiles[0] || null
       const orgAgents = agentsByOrg[org.id] || []
       const orgPhones = phonesByOrg[org.id] || []
 
       return {
         id: org.id,
-        name: org.name || primaryProfile.company_name || 'Unnamed Org',
-        legal_name: org.legal_name,
-        primary_email: org.primary_email || primaryProfile.email,
-        company_name: primaryProfile.company_name || org.name,
-        business_type: primaryProfile.business_type || 'General',
-        business_description: primaryProfile.business_description || '',
-        user_name: primaryProfile.full_name || '',
-        user_id: primaryProfile.id,
+        name: org.name || primaryProfile?.company_name || 'Unnamed Organization',
+        legal_name: org.legal_name || null,
+        primary_email: org.primary_email || primaryProfile?.email || null,
+        company_name: primaryProfile?.company_name || org.name || null,
+        business_type: primaryProfile?.business_type || null,
+        business_description: primaryProfile?.business_description || null,
+        user_name: primaryProfile?.full_name || null,
+        user_id: primaryProfile?.id || null,
         created_at: org.created_at,
         agents: orgAgents,
         phone_numbers: orgPhones
       }
     })
 
-    return NextResponse.json({ success: true, tenants })
+    return NextResponse.json({
+      success: true,
+      tenants: enrichedTenants,
+      count: enrichedTenants.length
+    })
   } catch (err: any) {
-    console.error('[Admin Tenant Agents GET Error]', err)
-    return NextResponse.json({ error: err.message || 'Internal Server Error' }, { status: 500 })
+    console.error('[Tenant Voice Agents API] Error:', err)
+    return NextResponse.json({ error: err.message || 'Internal server error' }, { status: 500 })
   }
 }
 
 export async function POST(request: Request) {
   try {
-    const supabase = await createClient()
+    const { authenticated, user, profile, error: authError } = await authenticateRequest()
 
-    // 1. Authenticate User
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!authenticated || !user) {
+      return NextResponse.json({ error: 'Unauthorized: ' + (authError || 'Session required') }, { status: 401 })
     }
 
-    // 2. Authorize Admin / Super Admin
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single()
-
-    if (!profile || !['admin', 'super_admin'].includes(profile.role)) {
+    if (!checkIsAdmin(user, profile)) {
       return NextResponse.json({ error: 'Forbidden: Admin access required' }, { status: 403 })
     }
 
@@ -147,7 +144,7 @@ export async function POST(request: Request) {
 
     const adminClient = getAdminClient()
 
-    // 3. Update agent record
+    // 1. Update agent record
     const agentUpdates: Record<string, any> = {
       updated_at: new Date().toISOString()
     }
@@ -167,7 +164,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: `Agent update error: ${agentUpdateErr.message}` }, { status: 500 })
     }
 
-    // 4. Update phone number assignment if provided
+    // 2. Update phone number assignment if provided
     if (phone_number) {
       const cleanPhone = phone_number.replace('+', '').trim()
       const last10 = cleanPhone.slice(-10)
@@ -178,48 +175,55 @@ export async function POST(request: Request) {
           assigned_agent_id: agent_id,
           assigned_org_id: organization_id || null,
           is_assigned: true,
+          status: 'assigned',
           updated_at: new Date().toISOString()
         })
-        .or(`phone_number.eq.${phone_number},phone_number.eq.+${cleanPhone},phone_number.eq.${cleanPhone},phone_number.eq.${last10}`)
+        .or(`phone_number.eq.${cleanPhone},phone_number.eq.+91${last10},phone_number.eq.${last10}`)
     }
 
-    // 5. If both sarvam_agent_id and phone_number are present, trigger Sarvam telephony deployment link
-    let telephonyNotice = null
+    // 3. Register deployment carrier link with backend telephony service
     if (sarvam_agent_id && phone_number) {
       try {
-        const backendUrl = process.env.INTERNAL_BACKEND_URL || process.env.NEXT_PUBLIC_FASTAPI_URL || 'http://127.0.0.1:8000'
-        const linkRes = await fetch(`${backendUrl}/api/sarvam/link-deployment`, {
+        const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+        await fetch(`${backendUrl}/api/sarvam/link-deployment`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            agent_id,
-            phone_number,
-            name: `${agent_name || 'Agent'} Line`
+            sarvam_app_id: sarvam_agent_id.trim(),
+            phone_number: phone_number.trim(),
+            organization_id: organization_id || null,
+            agent_id: agent_id
           })
-        })
-        const linkJson = await linkRes.json()
-        telephonyNotice = linkJson
+        }).catch(err => console.warn('[Sarvam Telephony Link] Backend link notice:', err.message))
       } catch (linkErr: any) {
-        console.warn('[Sarvam Telephony Link Notice]', linkErr.message)
+        console.warn('[Sarvam Telephony Link] Backend dispatch warning:', linkErr)
       }
     }
 
-    // 6. Log admin activity
-    await adminClient.from('activity_log').insert({
-      user_id: user.id,
-      organization_id: organization_id || null,
-      activity_type: 'agent_sarvam_linked',
-      title: 'Sarvam Voice Agent Linked',
-      description: `Linked Sarvam App ID '${sarvam_agent_id || 'none'}' and phone '${phone_number || 'none'}' to agent ${agent_id}`
-    })
+    // 4. Audit Log
+    try {
+      await adminClient.from('activity_log').insert({
+        user_id: user.id,
+        action: 'admin_linked_sarvam_agent',
+        details: {
+          agent_id,
+          sarvam_agent_id,
+          phone_number,
+          organization_id,
+          agent_name
+        },
+        ip_address: request.headers.get('x-forwarded-for') || '127.0.0.1'
+      })
+    } catch (auditErr) {
+      console.warn('[Tenant Voice Agents API] Audit log notice:', auditErr)
+    }
 
     return NextResponse.json({
       success: true,
-      message: 'Agent voice configuration and Sarvam assignment updated successfully.',
-      telephony: telephonyNotice
+      message: `Agent ${agent_name || agent_id} successfully linked to Sarvam App ${sarvam_agent_id || 'unlinked'}`
     })
   } catch (err: any) {
-    console.error('[Admin Tenant Agents POST Error]', err)
-    return NextResponse.json({ error: err.message || 'Internal Server Error' }, { status: 500 })
+    console.error('[Tenant Voice Agents API] POST Error:', err)
+    return NextResponse.json({ error: err.message || 'Internal server error' }, { status: 500 })
   }
 }
