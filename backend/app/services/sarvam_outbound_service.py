@@ -571,21 +571,46 @@ Respond ONLY with valid JSON."""
         user_id: Optional[str] = None,
         org_id: Optional[str] = None,
         agent_id: Optional[str] = None,
-        contact_name: Optional[str] = None
+        contact_name: Optional[str] = None,
+        app_id: Optional[str] = None
     ) -> int:
         """
         Pulls completed call attempts from Sarvam Analytics API and syncs to Supabase.
+        Dynamically routes analytics to the tenant's registered Sarvam agent and organization.
         """
         if not self.api_key:
             logger.warning("[Sarvam Sync] SARVAM_WORKSPACE_API_KEY is missing.")
             return 0
+
+        target_user = user_id or DEFAULT_USER_ID
+        target_org = org_id or DEFAULT_ORGANIZATION_ID
+        target_agent = agent_id or DEFAULT_AGENT_ID
+        target_app = app_id or self.app_id
+
+        # Dynamically resolve target_app from agent if sarvam_agent_id is registered
+        if agent_id and not app_id:
+            try:
+                a_row = await asyncio.to_thread(
+                    supabase_admin.table("agents")
+                    .select("sarvam_agent_id, organization_id, user_id")
+                    .eq("id", agent_id)
+                    .maybe_single()
+                    .execute
+                )
+                if a_row.data:
+                    if a_row.data.get("sarvam_agent_id"):
+                        target_app = a_row.data["sarvam_agent_id"]
+                    target_org = a_row.data.get("organization_id") or target_org
+                    target_user = a_row.data.get("user_id") or target_user
+            except Exception as e:
+                logger.warning(f"[Sarvam Sync] Agent resolution notice: {e}")
 
         now = datetime.now(timezone.utc)
         start_time = now - timedelta(hours=hours_back)
         start_str = start_time.strftime("%Y-%m-%dT00:00:00Z")
         end_str = now.strftime("%Y-%m-%dT23:59:59Z")
 
-        base_url = f"https://apps.sarvam.ai/api/analytics/v1/{self.org_id}/{self.workspace_id}/{self.app_id}"
+        base_url = f"https://apps.sarvam.ai/api/analytics/v1/{self.org_id}/{self.workspace_id}/{target_app}"
         headers = {
             "X-API-Key": self.api_key,
             "Content-Type": "application/json"
