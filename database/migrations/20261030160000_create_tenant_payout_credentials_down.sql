@@ -9,3 +9,4 @@ DROP INDEX IF EXISTS public.idx_tenant_payout_user;
 DROP INDEX IF EXISTS public.idx_tenant_payout_org;
 
 DROP TABLE IF EXISTS public.tenant_payout_credentials;
+

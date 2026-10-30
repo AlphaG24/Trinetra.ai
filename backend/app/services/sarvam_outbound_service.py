@@ -381,8 +381,14 @@ Respond ONLY with valid JSON."""
                     resolved_user_id = resolved_user_id or ag_data.get("user_id")
                     resolved_org_id = resolved_org_id or ag_data.get("organization_id")
                     if ag_data.get("phone_number"):
-                        p_raw = str(ag_data["phone_number"]).strip()
-                        resolved_agent_phone = f"+{p_raw}" if not p_raw.startswith("+") else p_raw
+                        p_raw = str(ag_data["phone_number"]).strip().replace(" ", "").replace("-", "")
+                        digits = re.sub(r"\D", "", p_raw)
+                        if len(digits) == 10:
+                            resolved_agent_phone = f"+91{digits}"
+                        elif len(digits) == 12 and digits.startswith("91"):
+                            resolved_agent_phone = f"+{digits}"
+                        else:
+                            resolved_agent_phone = f"+{p_raw}" if not p_raw.startswith("+") else p_raw
             except Exception as a_err:
                 logger.warning(f"[SarvamOutboundService] Error checking agent sarvam_agent_id: {a_err}")
 
@@ -397,8 +403,14 @@ Respond ONLY with valid JSON."""
                         .execute
                     )
                     if p_lookup.data and p_lookup.data[0].get("phone_number"):
-                        p_raw = str(p_lookup.data[0]["phone_number"]).strip()
-                        resolved_agent_phone = f"+{p_raw}" if not p_raw.startswith("+") else p_raw
+                        p_raw = str(p_lookup.data[0]["phone_number"]).strip().replace(" ", "").replace("-", "")
+                        digits = re.sub(r"\D", "", p_raw)
+                        if len(digits) == 10:
+                            resolved_agent_phone = f"+91{digits}"
+                        elif len(digits) == 12 and digits.startswith("91"):
+                            resolved_agent_phone = f"+{digits}"
+                        else:
+                            resolved_agent_phone = f"+{p_raw}" if not p_raw.startswith("+") else p_raw
                 except Exception as p_err:
                     logger.warning(f"[SarvamOutboundService] Error checking phone_numbers: {p_err}")
 

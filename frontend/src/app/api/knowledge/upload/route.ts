@@ -1,6 +1,16 @@
 import { createClient } from "@/utils/supabase/server";
 import { NextResponse } from "next/server";
 
+function cleanUnicode(str: string): string {
+  if (!str) return "";
+  return str
+    .replace(/\0/g, "")
+    .replace(/\\u0000/g, "")
+    .replace(/\\x00/g, "")
+    .replace(/[\u0000-\u0008\u000B-\u000C\u000E-\u001F]/g, " ")
+    .replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, "");
+}
+
 // Helper to notify Super Admin via audit_logs & email
 async function notifyAdminAndUser(supabase: any, user: any, agentId: string, fileName: string, charCount: number) {
   try {
@@ -165,12 +175,8 @@ export async function POST(request: Request) {
         extractedText = fileBuffer.toString('utf-8');
       }
 
-      // Sanitize: Strip null bytes (\0, \u0000) and control characters
-      extractedText = extractedText
-        .replace(/\0/g, '')
-        .replace(/[\u0000-\u0008\u000B-\u000C\u000E-\u001F]/g, ' ')
-        .slice(0, 100000);
-
+      // Sanitize: Strip null bytes, unicode null sequences, and control characters
+      extractedText = cleanUnicode(extractedText).slice(0, 100000);
       console.log(`[Knowledge Upload] Extracted and sanitized ${extractedText.length} chars from ${file.name}`);
       
     } catch (parseErr: any) {
@@ -179,7 +185,8 @@ export async function POST(request: Request) {
       console.error(`[Knowledge Upload] Extraction error: ${parseErr.message}`);
     }
 
-    extractedText = (extractedText || "").replace(/\0/g, '').replace(/[\u0000-\u0008\u000B-\u000C\u000E-\u001F]/g, ' ');
+    extractedText = cleanUnicode(extractedText).slice(0, 100000);
+    const safeFileName = cleanUnicode(file.name).replace(/[^\w\.\-\s\(\)]/g, '_').slice(0, 150) || "Document";
 
     // STEP 2: Insert into agent_knowledge
     const { data: newDoc, error: insertError } = await supabase
@@ -187,10 +194,10 @@ export async function POST(request: Request) {
       .insert({
         user_id: user.id,
         agent_id: agentId,
-        name: file.name,
+        name: safeFileName,
         status: finalStatus,
         content_excerpt: extractedText,
-        file_url: "https://storage.trinetraedu-ai.com/" + agentId + "/" + file.name
+        file_url: "https://storage.trinetraedu-ai.com/" + agentId + "/" + safeFileName
       })
       .select()
       .single();
@@ -201,7 +208,7 @@ export async function POST(request: Request) {
     }
 
     // STEP 3: Notify Admin & User
-    await notifyAdminAndUser(supabase, user, agentId, file.name, extractedText.length);
+    await notifyAdminAndUser(supabase, user, agentId, safeFileName, extractedText.length);
 
     // STEP 4: Append knowledge to agent system prompt in database
     if (finalStatus === "ready" && extractedText && extractedText.trim()) {

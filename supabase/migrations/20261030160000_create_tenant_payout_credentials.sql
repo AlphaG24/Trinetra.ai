@@ -57,3 +57,4 @@ CREATE POLICY "Users update own org payout credentials"
         OR user_id = auth.uid()
         OR EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('admin', 'super_admin'))
     );
+

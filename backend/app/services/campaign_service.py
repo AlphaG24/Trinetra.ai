@@ -817,8 +817,17 @@ class CampaignService:
         else:
             agent_phone = agent.get("phone_number") or os.getenv("TWILIO_PHONE_NUMBER") or "+12282950908"
 
-        if agent_phone and not str(agent_phone).startswith("+"):
-            agent_phone = f"+{agent_phone}"
+        if agent_phone:
+            ap_raw = str(agent_phone).strip().replace(" ", "").replace("-", "")
+            ap_digits = re.sub(r"\D", "", ap_raw)
+            if len(ap_digits) == 10:
+                agent_phone = f"+91{ap_digits}"
+            elif len(ap_digits) == 12 and ap_digits.startswith("91"):
+                agent_phone = f"+{ap_digits}"
+            elif not ap_raw.startswith("+"):
+                agent_phone = f"+{ap_raw}"
+            else:
+                agent_phone = ap_raw
 
         # Task 3.9 & Decision N8: CLI integrity check (Never spoof)
         from app.services.outbound_safety_guardrails import validate_outbound_cli

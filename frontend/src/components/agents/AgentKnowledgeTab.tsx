@@ -31,14 +31,19 @@ export function AgentKnowledgeTab({ agent, unlocked, upgradeUrl }: AgentKnowledg
   const fetchDocuments = async () => {
     try {
       setLoading(true)
-      const { data, error } = await supabase
-        .from('agent_knowledge')
-        .select('id, name, status, created_at')
-        .eq('agent_id', agentId)
-        .order('created_at', { ascending: false })
-
-      if (error) throw error
-      setDocs(data || [])
+      const res = await fetch(`/api/knowledge/documents?agent_id=${agentId}`)
+      const data = await res.json()
+      if (res.ok && data.documents) {
+        setDocs(data.documents)
+      } else {
+        const { data: sbData, error: sbErr } = await supabase
+          .from('agent_knowledge')
+          .select('id, name, status, created_at')
+          .eq('agent_id', agentId)
+          .order('created_at', { ascending: false })
+        if (sbErr) throw sbErr
+        setDocs(sbData || [])
+      }
     } catch (err: any) {
       console.error('Failed to load documents:', err)
       toast.error('Failed to load documents from database')
