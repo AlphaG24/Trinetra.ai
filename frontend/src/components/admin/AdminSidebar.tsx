@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { 
   LayoutDashboard, 
+  TrendingUp, 
   FileText, 
   Building2, 
   Bot, 
@@ -33,6 +34,7 @@ import { useDashboardStore } from '@/src/store/dashboardStore'
 
 const navItems = [
   { name: 'Overview', href: '/admin', icon: LayoutDashboard },
+  { name: 'Revenue & GMV Hub', href: '/admin/revenue', icon: TrendingUp },
   { name: 'Pricing Plans', href: '/admin/plans', icon: CreditCard },
   { name: 'Enterprise Leads', href: '/admin/enterprise-leads', icon: Users },
   { name: 'Region Rules', href: '/admin/regions', icon: Globe2 },

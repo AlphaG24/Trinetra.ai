@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { X, Headphones, MessageSquare, Bot, User, Clock, Copy, Check, Download } from 'lucide-react'
+import { X, Headphones, MessageSquare, Bot, User, Clock, Copy, Check, Download, ShieldCheck } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { toast } from 'sonner'
 import { CallAudioPlayer } from '@/src/components/shared/CallAudioPlayer'
@@ -18,7 +18,8 @@ interface LogObject {
 interface TranscriptModalProps {
   isOpen: boolean
   onClose: () => void
-  log?: LogObject | null
+  log?: (LogObject & { id?: string; call_id?: string }) | null
+  callId?: string
   
   // Backward compatibility fallbacks
   transcript?: any
@@ -32,6 +33,7 @@ export function TranscriptModal({
   isOpen, 
   onClose, 
   log,
+  callId,
   transcript, 
   recordingUrl, 
   callerName = 'Customer',
@@ -39,6 +41,7 @@ export function TranscriptModal({
   autoPlay = false
 }: TranscriptModalProps) {
   const [copied, setCopied] = useState(false)
+  const resolvedCallId = (log as any)?.id || (log as any)?.call_id || callId
 
   // Resolve properties dynamically to support both new 'log' prop and legacy individual parameters
   const resolvedTranscript = log ? log.transcript : transcript
@@ -228,6 +231,18 @@ export function TranscriptModal({
               </div>
               
               <div className="flex items-center gap-2">
+                {resolvedCallId && (
+                  <a
+                    href={`/receipt/${resolvedCallId}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 transition-all cursor-pointer"
+                    title="View 3-Part Statutory & Money Proof Receipt"
+                  >
+                    <ShieldCheck className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">Proof Receipt</span>
+                  </a>
+                )}
                 {resolvedTranscript && (
                   <button 
                     onClick={handleCopyTranscript}
@@ -317,7 +332,18 @@ export function TranscriptModal({
             </div>
 
             {/* Footer */}
-            <div className="px-6 py-4 border-t border-[var(--border)] bg-[var(--background)]/60 flex justify-end">
+            <div className="px-6 py-4 border-t border-[var(--border)] bg-[var(--background)]/60 flex items-center justify-between">
+              {resolvedCallId ? (
+                <a
+                  href={`/receipt/${resolvedCallId}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 transition-all cursor-pointer"
+                >
+                  <ShieldCheck className="w-4 h-4" />
+                  <span>Open 3-Part Proof Receipt ↗</span>
+                </a>
+              ) : <div />}
               <button
                 onClick={onClose}
                 className="px-5 py-2.5 bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 text-xs font-bold uppercase tracking-wider rounded-xl transition-all shadow-sm active:scale-[0.98] cursor-pointer"

@@ -403,6 +403,7 @@ export function RevenueDashboardClient({ embedded = false }: { embedded?: boolea
                   <th className="pb-3">Price Type</th>
                   <th className="pb-3">Status</th>
                   <th className="pb-3">Won Amount</th>
+                  <th className="pb-3">Proof Receipt</th>
                   <th className="pb-3 pr-2 text-right">Quick Action</th>
                 </tr>
               </thead>
@@ -455,6 +456,22 @@ export function RevenueDashboardClient({ embedded = false }: { embedded?: boolea
                         {isWon && (ev.won_amount || ev.quoted_amount)
                           ? `₹${Number(ev.won_amount || ev.quoted_amount).toLocaleString()}`
                           : '—'}
+                      </td>
+                      <td className="py-3.5 whitespace-nowrap">
+                        {ev.call_id ? (
+                          <a
+                            href={`/receipt/${ev.call_id}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 text-[10px] font-bold transition-all"
+                            title="View 3-Part Statutory & Money Proof Receipt"
+                          >
+                            <ShieldCheck className="w-3.5 h-3.5" />
+                            <span>Proof Receipt</span>
+                          </a>
+                        ) : (
+                          <span className="text-[10px] text-[var(--muted)] font-mono">—</span>
+                        )}
                       </td>
                       <td className="py-3.5 pr-2 text-right whitespace-nowrap">
                         {ev.deal_status === 'open' ? (

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/client'
-import { Phone, Search, Filter, Play, FileText, Download, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react'
+import { Phone, Search, Filter, Play, FileText, Download, ChevronLeft, ChevronRight, Loader2, ShieldCheck } from 'lucide-react'
 import { TranscriptModal } from '../modals/TranscriptModal'
 import { TableSkeleton } from '@/src/components/ui/skeleton'
 
@@ -219,6 +219,15 @@ export function CallsPageClient({ agents }: { agents: any[] }) {
                           >
                             <FileText className="w-4 h-4" />
                           </button>
+                          <a
+                            href={`/receipt/${call.id}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="p-1.5 rounded transition-colors text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10 cursor-pointer"
+                            title="View 3-Part Statutory & Money Proof Receipt"
+                          >
+                            <ShieldCheck className="w-4 h-4" />
+                          </a>
                           {call.recording_url ? (
                             <a 
                               href={call.recording_url} 
@@ -282,6 +291,7 @@ export function CallsPageClient({ agents }: { agents: any[] }) {
           setSelectedCall(null)
           setAutoPlayAudio(false)
         }}
+        callId={selectedCall?.id}
         log={selectedCall}
         transcript={selectedCall?.transcript || null}
         recordingUrl={selectedCall?.recording_url || null}
