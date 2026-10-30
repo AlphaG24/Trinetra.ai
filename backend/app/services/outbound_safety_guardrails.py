@@ -558,15 +558,25 @@ def validate_outbound_cli(
             "reason": "empty_cli"
         }
 
-    # Format variations (+ prefix, bare digits, 91 prefix)
-    candidates = [clean_caller]
+    # Format variations (+ prefix, bare digits, 91 prefix, and last 10 digits for Indian carriers)
+    candidates_set = {clean_caller}
     if clean_caller.startswith("+"):
-        candidates.append(clean_caller[1:])
+        candidates_set.add(clean_caller[1:])
     else:
-        candidates.append(f"+{clean_caller}")
-    if len(clean_caller) == 10 and clean_caller.isdigit():
-        candidates.append(f"+91{clean_caller}")
-        candidates.append(f"91{clean_caller}")
+        candidates_set.add(f"+{clean_caller}")
+
+    digits_only = re.sub(r'\D', '', clean_caller)
+    if digits_only:
+        candidates_set.add(digits_only)
+        candidates_set.add(f"+{digits_only}")
+        if len(digits_only) >= 10:
+            last10 = digits_only[-10:]
+            candidates_set.add(last10)
+            candidates_set.add(f"+{last10}")
+            candidates_set.add(f"+91{last10}")
+            candidates_set.add(f"91{last10}")
+
+    candidates = list(candidates_set)
 
     # Check verified platform default trunks from environment
     verified_platform_trunks = set()
@@ -600,7 +610,7 @@ def validate_outbound_cli(
             res = (
                 supabase_client.table("phone_numbers")
                 .select("id, phone_number, organization_id, status")
-                .eq("organization_id", organization_id)
+                .or_(f"organization_id.eq.{organization_id},assigned_org_id.eq.{organization_id}")
                 .in_("phone_number", candidates)
                 .limit(1)
                 .execute()

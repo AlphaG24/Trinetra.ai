@@ -1,3 +1,4 @@
+import re
 import os
 import uuid
 from datetime import datetime
@@ -49,7 +50,9 @@ async def upload_document(
                 extracted_text = content.decode("utf-8", errors="ignore")
             
             parse_status = "ready"
-            extracted_text = extracted_text[:100000]
+            # Strip null bytes and control chars that cause Postgres 22P05 error
+            extracted_text = extracted_text.replace("\x00", "").replace("\u0000", "")
+            extracted_text = re.sub(r'[\x00-\x08\x0B-\x0C\x0E-\x1F]', ' ', extracted_text)[:100000]
             print(f"[KNOWLEDGE UPLOAD] Successfully extracted {len(extracted_text)} chars from {file_name}", flush=True)
             
         except Exception as parse_err:

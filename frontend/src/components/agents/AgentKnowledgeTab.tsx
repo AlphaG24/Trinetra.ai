@@ -85,9 +85,14 @@ export function AgentKnowledgeTab({ agent, unlocked, upgradeUrl }: AgentKnowledg
         body: formData
       })
 
-      if (!res.ok) throw new Error(await res.text())
+      if (!res.ok) {
+        const errorText = await res.text()
+        let errJson: any
+        try { errJson = JSON.parse(errorText) } catch {}
+        throw new Error(errJson?.error || errorText || 'Upload failed')
+      }
 
-      toast.success('Document uploaded successfully. Parsing in progress...')
+      toast.success('Document uploaded and ingested into agent memory successfully!')
       fetchDocuments()
     } catch (err: any) {
       toast.error('Failed to upload document: ' + err.message)

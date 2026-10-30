@@ -77,8 +77,14 @@ export async function POST(request: Request) {
         extractedText = fileBuffer.toString('utf-8');
       }
 
-      extractedText = extractedText.slice(0, 100000); // Limit to 100k chars
-      console.log(`[Knowledge Upload] Extracted ${extractedText.length} chars from ${file.name}`);
+      // Sanitize extracted text: Strip null bytes (\0, \u0000) and unescaped control characters
+      // that cause PostgreSQL to throw "unsupported Unicode escape sequence"
+      extractedText = extractedText
+        .replace(/\0/g, '')
+        .replace(/[\u0000-\u0008\u000B-\u000C\u000E-\u001F]/g, ' ')
+        .slice(0, 100000);
+
+      console.log(`[Knowledge Upload] Extracted and sanitized ${extractedText.length} chars from ${file.name}`);
       
     } catch (parseErr: any) {
       finalStatus = "failed";
@@ -86,7 +92,10 @@ export async function POST(request: Request) {
       console.error(`[Knowledge Upload] Extraction error: ${parseErr.message}`);
     }
 
-    // STEP 2: Insert with FINAL status (NOT 'parsing')
+    // Ensure fallback text is also clean of null bytes
+    extractedText = (extractedText || "").replace(/\0/g, '').replace(/[\u0000-\u0008\u000B-\u000C\u000E-\u001F]/g, ' ');
+
+    // STEP 2: Insert with FINAL status (NOT 'parsing' or 'processing')
     const { data: newDoc, error: insertError } = await supabase
       .from("agent_knowledge")
       .insert({
@@ -103,6 +112,23 @@ export async function POST(request: Request) {
     if (insertError) {
       console.error("[Knowledge Upload] DB Error:", insertError);
       return NextResponse.json({ error: insertError.message }, { status: 500 });
+    }
+
+    // Notify Admin of new knowledge upload in audit_logs
+    try {
+      await supabase.from("audit_logs").insert({
+        action: "knowledge.document_uploaded",
+        user_id: user.id,
+        organization_id: (user as any).organization_id,
+        details: {
+          file_name: file.name,
+          agent_id: agentId,
+          char_count: extractedText.length,
+          status: finalStatus
+        }
+      });
+    } catch (auditErr) {
+      // Non-blocking
     }
 
     // STEP 3: Automatically train/update agent system prompt with knowledge
