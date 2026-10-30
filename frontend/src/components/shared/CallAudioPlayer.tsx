@@ -309,10 +309,8 @@ export function CallAudioPlayer({
 
           {hasAudio && normalizedRecordingUrl && (
             <a
-              href={normalizedRecordingUrl}
-              download={`call_recording_${Date.now()}`}
-              target="_blank"
-              rel="noopener noreferrer"
+              href={`/api/voice/recordings/download?url=${encodeURIComponent(normalizedRecordingUrl)}&filename=call_recording_${Date.now()}.wav`}
+              download={`call_recording_${Date.now()}.wav`}
               className="p-2 rounded-xl text-[var(--muted)] hover:text-[var(--heading)] hover:bg-[var(--hover-bg)] border border-[var(--border)] transition-all cursor-pointer"
               title="Download Actual Call Audio"
             >

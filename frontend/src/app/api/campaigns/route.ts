@@ -17,9 +17,23 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: error || "Unauthorized" }, { status: 401 });
     }
 
-    const orgId = profile.organization_id;
+    let orgId = profile.organization_id;
     const userId = profile.id;
     const admin = getAdminClient();
+
+    if (!orgId) {
+      try {
+        const { data: member } = await admin
+          .from('organization_members')
+          .select('organization_id')
+          .eq('user_id', userId)
+          .limit(1)
+          .maybeSingle();
+        if (member?.organization_id) {
+          orgId = member.organization_id;
+        }
+      } catch {}
+    }
 
     const isPrivileged = ['developer_tester', 'admin', 'super_admin'].includes(profile.role || '') ||
       ['raghav00424@gmail.com', 'raghav@trinetra.ai'].includes((profile.email || '').toLowerCase().trim());

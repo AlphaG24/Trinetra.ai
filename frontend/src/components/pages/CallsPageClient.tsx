@@ -219,7 +219,7 @@ export function CallsPageClient({ agents }: { agents: any[] }) {
                           >
                             <FileText className="w-4 h-4" />
                           </button>
-                          {Boolean((call.revenue_inr && call.revenue_inr > 0) || call.metadata?.payment_dispatched || call.revenue_status) && (
+                          {Boolean((call.revenue_inr && call.revenue_inr > 0) || call.metadata?.payment_dispatched || call.metadata?.proof_receipt_id) && (
                             <a
                               href={`/receipt/${call.id}`}
                               target="_blank"
@@ -232,10 +232,8 @@ export function CallsPageClient({ agents }: { agents: any[] }) {
                           )}
                           {call.recording_url ? (
                             <a 
-                              href={call.recording_url} 
-                              download 
-                              target="_blank" 
-                              rel="noopener noreferrer"
+                              href={`/api/voice/recordings/download?url=${encodeURIComponent(call.recording_url)}&filename=call_recording_${call.id || Date.now()}.wav`}
+                              download={`call_recording_${call.id || Date.now()}.wav`}
                               className="p-1.5 text-[var(--muted)] hover:text-[var(--heading)] hover:bg-[var(--hover-bg)] rounded transition-colors" 
                               title="Download Recording"
                             >

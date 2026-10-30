@@ -81,7 +81,10 @@ export default function CampaignsPage() {
         headers['Authorization'] = `Bearer ${session.access_token}`
       }
 
-      const res = await fetch('/api/campaigns', { headers })
+      const res = await fetch('/api/campaigns', { 
+        headers,
+        credentials: 'include'
+      })
       const data = await res.json().catch(() => ({}))
 
       if (res.ok) {

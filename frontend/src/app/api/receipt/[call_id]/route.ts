@@ -77,7 +77,7 @@ export async function GET(
     let payoutData = null
     const orgOrUser = call.organization_id || call.user_id
     if (orgOrUser) {
-      let pQuery = admin.table('tenant_payout_credentials').select('upi_id, payment_link_url, qr_code_url, bank_name, account_number_masked, ifsc_code, beneficiary_name, is_active, consent_attested, attested_at')
+      let pQuery = admin.from('tenant_payout_credentials').select('upi_id, payment_link_url, qr_code_url, bank_name, account_number_masked, ifsc_code, beneficiary_name, is_active, consent_attested, attested_at')
       if (call.organization_id) {
         pQuery = pQuery.eq('organization_id', call.organization_id)
       } else {

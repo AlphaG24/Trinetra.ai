@@ -45,7 +45,6 @@ export function TranscriptModal({
   const hasPaymentProof = Boolean(
     ((log as any)?.revenue_inr && (log as any)?.revenue_inr > 0) ||
     (log as any)?.metadata?.payment_dispatched ||
-    (log as any)?.revenue_status ||
     (log as any)?.metadata?.proof_receipt_id
   )
 

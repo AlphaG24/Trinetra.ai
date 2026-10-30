@@ -36,17 +36,8 @@ export async function authenticateRequest(): Promise<
 
   // 2. Fall back to cookie-based session
   if (!user) {
-    const cookieStore = await cookies()
-    const hasAuthCookie = cookieStore.getAll().some(
-      c => c.name.includes('auth-token') || c.name.startsWith('sb-')
-    )
-    if (!hasAuthCookie) {
-      return { authenticated: false, user: null, profile: null, error: "Authentication required", supabase: null }
-    }
-
-    supabase = await createClient()
-
     try {
+      supabase = await createClient()
       const authPromise = supabase.auth.getUser()
       const timeoutPromise = new Promise<{ data: { user: null }; error: Error }>((_, reject) =>
         setTimeout(() => reject(new Error('Auth request timeout')), 4000)
