@@ -64,7 +64,7 @@ export async function POST(
       if (lawyer_confirmed !== true || !lawyer_name || typeof lawyer_name !== "string" || lawyer_name.trim().length < 3) {
         return NextResponse.json(
           {
-            error: "Recording notice exemption is disabled by default for callers in India and the European Union [CONFIRM WITH A LAWYER: Digital Personal Data Protection Act 2023 Sec 6 / EU GDPR Art 7]. To unlock, you must provide verified legal counsel confirmation ('lawyer_confirmed: true', 'lawyer_name', and bar/registration details).",
+            error: "Recording notice exemption is disabled by default for callers in India and the European Union under Digital Personal Data Protection Act 2023 Sec 6 and EU GDPR Art 7. To unlock, you must provide verified legal counsel confirmation ('lawyer_confirmed: true', 'lawyer_name', and bar/registration details).",
             jurisdiction: cleanJur,
             requires_lawyer_confirmation: true,
           },

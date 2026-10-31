@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { ApiKeyManager } from '@/src/components/admin/ApiKeyManager'
 import { 
   Sliders, Key, Send, CreditCard, RefreshCw, Save, Loader2, AlertTriangle,
-  Gift, DollarSign, ShieldAlert, Cpu, Percent, WrenchIcon, Globe, Lock,
+  Gift, DollarSign, ShieldAlert, CheckCircle2, Cpu, Percent, WrenchIcon, Globe, Lock,
   Coins, Target, Activity, Phone, Euro
 } from 'lucide-react'
 import toast from 'react-hot-toast'
@@ -167,6 +167,8 @@ export default function SystemConfigPage() {
         const json = await res.json()
         throw new Error(json.error || 'Failed to save')
       }
+      // Instantly bust client and edge cache
+      await fetch(`/api/public/config?t=${Date.now()}&fresh=true`, { cache: 'no-store' }).catch(() => {})
       toast.success(
         newValue === 'true'
           ? '🔒 Maintenance mode ON — users will see the maintenance screen'
@@ -176,7 +178,9 @@ export default function SystemConfigPage() {
       // Revert on failure
       setConfigs((prev) => ({ ...prev, maintenance_mode: newValue === 'true' ? 'false' : 'true' }))
       toast.error(err.message || 'Failed to toggle maintenance mode')
-  }
+    } finally {
+      setMaintenanceSaving(false)
+    }
   }
 
   // Telephony Voice Pipeline Toggle — Instant switch between Sarvam Cloud and In-House Custom Pipeline
@@ -397,44 +401,78 @@ export default function SystemConfigPage() {
         </div>
       </div>
 
-      {/* Maintenance Mode Toggle */}
-      <div className="bg-amber-500/5 border border-amber-500/20 rounded-2xl p-6 flex items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-amber-500/10 rounded-xl">
-            <WrenchIcon className="w-5 h-5 text-amber-400" />
+      {/* Platform Maintenance Mode Control Card */}
+      <div className={`border rounded-2xl p-6 transition-all duration-200 flex flex-col md:flex-row items-start md:items-center justify-between gap-6 shadow-sm ${
+        configs.maintenance_mode === 'true'
+          ? 'bg-amber-950/20 border-amber-500/30 ring-1 ring-amber-500/20'
+          : 'bg-zinc-900/60 border-zinc-800'
+      }`}>
+        <div className="flex items-start gap-4">
+          <div className={`p-3 rounded-xl shrink-0 mt-0.5 ${
+            configs.maintenance_mode === 'true'
+              ? 'bg-amber-500/20 text-amber-400'
+              : 'bg-zinc-800 text-zinc-400'
+          }`}>
+            <WrenchIcon className="w-5 h-5" />
           </div>
-          <div>
-            <h2 className="text-sm font-bold text-white">Platform Maintenance Mode</h2>
-            <p className="text-xs text-zinc-400 mt-0.5">
-              When enabled, all non-admin users will be blocked from accessing the dashboard and shown a maintenance screen.
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-2.5 flex-wrap">
+              <h2 className="text-sm font-bold text-white tracking-wide">
+                Platform Maintenance Mode
+              </h2>
+              {configs.maintenance_mode === 'true' ? (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500" />
+                  </span>
+                  Maintenance Active (Public Blocked)
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                  Live (Normal Access)
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-zinc-400 leading-relaxed max-w-xl">
+              {configs.maintenance_mode === 'true'
+                ? 'Public visitors and regular users are currently redirected to the maintenance page. Admins maintain full system access.'
+                : 'Platform is operating normally. Toggle maintenance mode when performing database migrations or statutory updates.'}
             </p>
           </div>
         </div>
-        <button
-          type="button"
-          id="maintenance-mode-toggle"
-          onClick={handleMaintenanceToggle}
-          disabled={maintenanceSaving}
-          className={`relative inline-flex h-7 w-12 flex-shrink-0 cursor-pointer rounded-full border-2 transition-colors duration-200 ease-in-out focus:outline-none disabled:opacity-60 disabled:cursor-not-allowed ${
-            configs.maintenance_mode === 'true'
-              ? 'bg-amber-500 border-amber-600'
-              : 'bg-zinc-700 border-zinc-600'
-          }`}
-          aria-pressed={configs.maintenance_mode === 'true'}
-          role="switch"
-        >
-          {maintenanceSaving ? (
-            <span className="flex items-center justify-center h-full">
-              <Loader2 className="w-3.5 h-3.5 text-white animate-spin" />
-            </span>
-          ) : (
-            <span
-              className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out mt-0.5 ${
-                configs.maintenance_mode === 'true' ? 'translate-x-5' : 'translate-x-0'
-              }`}
-            />
-          )}
-        </button>
+
+        <div className="flex items-center gap-3 shrink-0 self-end md:self-center">
+          <button
+            type="button"
+            id="maintenance-mode-toggle"
+            onClick={handleMaintenanceToggle}
+            disabled={maintenanceSaving}
+            className={`px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-2 cursor-pointer shadow-md disabled:opacity-50 disabled:cursor-not-allowed ${
+              configs.maintenance_mode === 'true'
+                ? 'bg-emerald-500 hover:bg-emerald-400 text-zinc-950 shadow-emerald-500/20'
+                : 'bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30'
+            }`}
+          >
+            {maintenanceSaving ? (
+              <>
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                <span>Applying changes...</span>
+              </>
+            ) : configs.maintenance_mode === 'true' ? (
+              <>
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span>Resume Live Platform</span>
+              </>
+            ) : (
+              <>
+                <ShieldAlert className="w-3.5 h-3.5 text-amber-400" />
+                <span>Schedule Maintenance</span>
+              </>
+            )}
+          </button>
+        </div>
       </div>
 
       {/* Voice Telephony Pipeline Controller (Sarvam Managed vs Custom In-House LiveKit Pipeline) */}

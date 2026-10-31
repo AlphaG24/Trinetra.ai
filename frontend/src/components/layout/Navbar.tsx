@@ -268,11 +268,16 @@ export function Navbar() {
           onMouseEnter={handleMouseEnterProducts}
           className="w-full max-w-[1536px] h-[54px] sm:h-[62px] mx-auto px-6 sm:px-10 lg:px-14 flex items-center justify-between"
         >
-          {/* Brand Logo on Left */}
+          {/* Brand Logo on Left (Sarvam-style entry brand wordmark + hero line on landing page) */}
           <div className="flex items-center gap-3">
-            <Link href="/" className="group select-none flex items-center py-2" aria-label="Vaakriti Home">
-              <div className="text-[#0F172A] hover:text-[#2563EB] transition-colors">
+            <Link href="/" className="group select-none flex items-center py-1.5" aria-label="Vaakriti Home">
+              <div className="flex flex-col items-start text-[#0F172A] hover:text-[#2563EB] transition-colors">
                 <VaakritiWordmark className="h-[15px] sm:h-[16.5px] md:h-[18px] w-auto transition-colors duration-200" />
+                {isLanding && (
+                  <span className="text-[9px] sm:text-[10px] font-medium tracking-tight text-slate-500 group-hover:text-slate-700 transition-colors mt-0.5 font-sans leading-none">
+                    The Creation of Voice
+                  </span>
+                )}
               </div>
             </Link>
           </div>
@@ -480,6 +485,16 @@ export function Navbar() {
         <div className="fixed inset-0 z-50 bg-[#F8FAFC] flex flex-col p-6 sm:hidden overflow-y-auto">
           <div className="flex items-center justify-between pb-4 border-b border-[#E2E8F0]">
             <VaakritiWordmark className="h-[17px] w-auto text-[#0F172A]" />
+            {isLanding && (
+              <span className="text-[9.5px] font-medium tracking-tight text-slate-500 mt-0.5 font-sans leading-none">
+                The Creation of Voice
+              </span>
+            )}
+            {isLanding && (
+              <span className="text-[9.5px] font-medium tracking-tight text-slate-500 mt-0.5 font-sans leading-none">
+                The Creation of Voice
+              </span>
+            )}
             <button
               onClick={() => setMenuOpen(false)}
               className="p-2 text-[#0F172A] text-lg font-bold"

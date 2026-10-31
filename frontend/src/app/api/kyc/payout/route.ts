@@ -123,7 +123,7 @@ export async function POST(request: Request) {
       consent_attested: Boolean(consent_attested),
       attested_at: consent_attested ? new Date().toISOString() : null,
       attestation_statement: consent_attested 
-        ? "I confirm that these payment credentials belong to our verified legal entity and authorize Vaakriti AI to dispatch this link/QR upon caller request. [CONFIRM WITH A LAWYER]"
+        ? "I confirm that these payment credentials belong to our verified legal entity and authorize Vaakriti AI to dispatch this link/QR upon caller request."
         : null,
       updated_at: new Date().toISOString()
     };

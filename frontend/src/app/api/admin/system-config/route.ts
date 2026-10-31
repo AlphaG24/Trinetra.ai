@@ -1,6 +1,7 @@
 import { createClient } from '@/utils/supabase/server'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
+import { invalidateConfigCache } from '@/src/app/api/public/config/route'
 
 // Service role client bypasses RLS — only used after super_admin check
 function getAdminClient() {
@@ -243,6 +244,8 @@ async function handleUpdateConfigs(request: Request) {
     const { error: upsertError } = await adminClient
       .from('system_config')
       .upsert(upsertRows, { onConflict: 'config_key' })
+
+    invalidateConfigCache()
 
     if (upsertError) {
       console.error('System config upsert failed:', upsertError)

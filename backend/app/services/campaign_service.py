@@ -114,14 +114,14 @@ class CampaignService:
     ) -> Dict:
         logger.info(f"Creating campaign: {name} (org: {organization_id}, purpose: {purpose})")
 
-        # Mandatory affirmative consent attestation check [CONFIRM WITH A LAWYER]
+        # Mandatory affirmative consent attestation check
         if not consent_attestation:
             raise ValueError(
                 "Mandatory statutory attestation missing: You must certify that you have verifiable affirmative consent "
-                "for all contacts before creating a campaign. [CONFIRM WITH A LAWYER]"
+                "for all contacts before creating a campaign."
             )
 
-        # Mandatory purpose attestation for non-promotional campaigns [CONFIRM WITH A LAWYER]
+        # Mandatory purpose attestation for non-promotional campaigns
         norm_purpose = str(purpose).strip().lower()
         if norm_purpose not in ("promotional", "service", "transactional"):
             norm_purpose = "promotional"
@@ -129,14 +129,14 @@ class CampaignService:
         if norm_purpose != "promotional" and not purpose_attestation:
             raise ValueError(
                 f"Statutory purpose attestation missing: '{norm_purpose}' campaigns require explicit affirmative "
-                "certification that calls contain no marketing or sales content under TRAI TCCCPR 2018 / TCPA. [CONFIRM WITH A LAWYER]"
+                "certification that calls contain no marketing or sales content under TRAI TCCCPR 2018 / TCPA."
             )
 
         import hashlib
         file_hash = hashlib.sha256(file_content).hexdigest()
         statement_text = attestation_statement or (
             "I confirm and attest that I hold valid, verifiable affirmative consent for all contacts in this list "
-            "under applicable statutory telecommunications regulations (including TRAI TCCCPR 2018 and TCPA). [CONFIRM WITH A LAWYER]"
+            "under applicable statutory telecommunications regulations (including TRAI TCCCPR 2018 and TCPA)."
         )
         attestation_meta = {
             "attested": True,
@@ -248,7 +248,7 @@ class CampaignService:
                         skipped_contacts.append({
                             "phone": phone,
                             "full_name": full_name,
-                            "reason": reject_reason or "Missing required consent flag or consent source [CONFIRM WITH A LAWYER]"
+                            "reason": reject_reason or "Missing required consent flag or consent source"
                         })
                         continue
                     
@@ -318,7 +318,7 @@ class CampaignService:
                         skipped_contacts.append({
                             "phone": phone,
                             "full_name": full_name,
-                            "reason": reject_reason or "Missing required consent flag or consent source [CONFIRM WITH A LAWYER]"
+                            "reason": reject_reason or "Missing required consent flag or consent source"
                         })
                         continue
                     
@@ -341,7 +341,7 @@ class CampaignService:
             if skipped_contacts:
                 raise ValueError(
                     f"All {len(skipped_contacts)} contact(s) were skipped due to missing consent flags or sources. "
-                    f"Outbound safety rules require 'consent' (true/yes/1) and 'consent_source' on every contact. [CONFIRM WITH A LAWYER]"
+                    f"Outbound safety rules require 'consent' (true/yes/1) and 'consent_source' on every contact."
                 )
             raise ValueError("No valid contacts with phone numbers found in the uploaded file.")
 
@@ -715,12 +715,12 @@ class CampaignService:
             # Contact is outside legal calling hours; leave in pending for when hours open
             return False
 
-        # Phase 3 Guard: Promotional campaigns require verified affirmative consent flag [CONFIRM WITH A LAWYER]
+        # Phase 3 Guard: Promotional campaigns require verified affirmative consent flag
         if purpose == "promotional" and not contact.get("consent_flag"):
             await asyncio.to_thread(
                 supabase_admin.table("campaign_contacts").update({
                     "call_status": "skipped_no_consent",
-                    "notes": "Skipped pre-dial: Missing affirmative contact consent flag or source [CONFIRM WITH A LAWYER]",
+                    "notes": "Skipped pre-dial: Missing affirmative contact consent flag or source",
                     "last_attempt_at": datetime.now(timezone.utc).isoformat()
                 }).eq("id", contact_id).execute
             )
@@ -1285,7 +1285,7 @@ class CampaignService:
     async def get_active_campaigns_consent_audit() -> Dict[str, Any]:
         """
         Generates an audit report on running/active campaigns and contact consent breakdown.
-        Provides regulatory oversight for active campaigns dialed under TRAI TCCCPR 2018. [CONFIRM WITH A LAWYER]
+        Provides regulatory oversight for active campaigns dialed under TRAI TCCCPR 2018.
         """
         try:
             try:
@@ -1349,7 +1349,7 @@ class CampaignService:
                     "consented_contacts": consented_count,
                     "unconsented_contacts": unconsented_count,
                     "status_breakdown": status_counts,
-                    "legacy_unconsented_action": "Safe: skipped pre-dial with 'skipped_no_consent' status [CONFIRM WITH A LAWYER]"
+                    "legacy_unconsented_action": "Safe: skipped pre-dial with 'skipped_no_consent' status"
                 })
                 
             return report

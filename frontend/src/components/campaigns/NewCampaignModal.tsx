@@ -95,10 +95,10 @@ export function NewCampaignModal({ isOpen, onClose, onSuccess }: NewCampaignModa
     if (!agentId) return toast.error('Please select an agent')
     if (!file) return toast.error('Please upload a contact list')
     if (!consentAttestation) {
-      return toast.error('You must certify affirmative consent attestation before creating this campaign [CONFIRM WITH A LAWYER]')
+      return toast.error('You must certify affirmative consent attestation before creating this campaign')
     }
     if (purpose !== 'promotional' && !purposeAttestation) {
-      return toast.error('You must certify the statutory purpose attestation for non-promotional campaigns [CONFIRM WITH A LAWYER]')
+      return toast.error('You must certify the statutory purpose attestation for non-promotional campaigns')
     }
 
     try {
@@ -116,7 +116,7 @@ export function NewCampaignModal({ isOpen, onClose, onSuccess }: NewCampaignModa
       formData.append('consent_attestation', 'true')
       formData.append(
         'attestation_statement',
-        'I confirm and attest that I hold valid, verifiable affirmative consent for all contacts in this list under applicable statutory telecommunications regulations (including TRAI TCCCPR 2018 and TCPA). [CONFIRM WITH A LAWYER]'
+        'I confirm and attest that I hold valid, verifiable affirmative consent for all contacts in this list under applicable statutory telecommunications regulations (including TRAI TCCCPR 2018 and TCPA).'
       )
       if (scheduledStart) {
         formData.append('scheduled_start', new Date(scheduledStart).toISOString())
@@ -275,7 +275,7 @@ export function NewCampaignModal({ isOpen, onClose, onSuccess }: NewCampaignModa
                   <span className="font-semibold text-amber-300 block mb-0.5">
                     Statutory Non-Promotional Purpose Certification
                   </span>
-                  I solemnly certify that this campaign is strictly for genuine {purpose} communications and contains <strong>NO sales, marketing, or promotional offers</strong>. I acknowledge that misclassifying promotional telemarketing calls as service or transactional constitutes a statutory violation under TRAI TCCCPR 2018 Regulation 12 and FCC TCPA rules. <span className="text-amber-400 font-medium">[CONFIRM WITH A LAWYER]</span>
+                  I solemnly certify that this campaign is strictly for genuine {purpose} communications and contains <strong>NO sales, marketing, or promotional offers</strong>. I acknowledge that misclassifying promotional telemarketing calls as service or transactional constitutes a statutory violation under TRAI TCCCPR 2018 Regulation 12 and FCC TCPA rules. 
                 </label>
               </div>
             </div>
@@ -391,7 +391,7 @@ export function NewCampaignModal({ isOpen, onClose, onSuccess }: NewCampaignModa
                   <ShieldCheck className="w-3.5 h-3.5 text-violet-400 shrink-0" />
                   Affirmative Consent & Statutory Compliance Attestation
                 </span>
-                I confirm and attest that I hold valid, verifiable affirmative consent for all contacts in this list in compliance with statutory telecommunications regulations (TRAI TCCCPR 2018 Regulation 12 / TCPA 47 U.S.C. § 227). I acknowledge this upload will be logged with cryptographic SHA-256 fingerprinting. <span className="text-violet-400 font-medium">[CONFIRM WITH A LAWYER]</span>
+                I confirm and attest that I hold valid, verifiable affirmative consent for all contacts in this list in compliance with statutory telecommunications regulations (TRAI TCCCPR 2018 Regulation 12 / TCPA 47 U.S.C. § 227). I acknowledge this upload will be logged with cryptographic SHA-256 fingerprinting. 
               </label>
             </div>
           </div>

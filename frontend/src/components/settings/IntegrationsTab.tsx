@@ -894,7 +894,7 @@ export function IntegrationsTab() {
       {accordionItem(
         'twilio',
         'Twilio Telephony & SIP Trunking',
-        'Bring your own Twilio numbers for global calling coverage with AES-256 vault encryption',
+        'Bring your own Twilio numbers for global calling coverage with enterprise-grade encrypted vault storage',
         Phone,
         twilio.connected,
         <div className="space-y-4">

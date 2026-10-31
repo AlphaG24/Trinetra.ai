@@ -145,7 +145,7 @@ export function KYCTab() {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Failed to submit KYC document')
 
-      toast.success('Document uploaded securely to AES-256 vault!')
+      toast.success('Document uploaded securely to verified vault!')
       setRawId('')
       setFileBase64(null)
       setFileName('')
@@ -260,7 +260,7 @@ export function KYCTab() {
             {getStatusBadge(overallStatus)}
           </div>
           <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1 leading-relaxed">
-            Per Telecom Regulatory Authority guidelines (TRAI & DPDP Act), live production outbound calling and dedicated DID numbers require verified organization KYC. Documents are vaulted with AES-256 encryption with automatic UIDAI masking.
+            Per Telecom Regulatory Authority guidelines (TRAI & DPDP Act), live production outbound calling and dedicated DID numbers require verified organization KYC. Documents are vaulted with bank-grade encryption and automatic UIDAI masking.
           </p>
         </div>
       </div>
@@ -560,7 +560,7 @@ export function KYCTab() {
                       </p>
                     )}
                   </div>
-                  <div className="shrink-0" title="AES-256 Vaulted">
+                  <div className="shrink-0" title="Securely Vaulted">
                     <Lock className="w-4 h-4 text-emerald-500" />
                   </div>
                 </div>

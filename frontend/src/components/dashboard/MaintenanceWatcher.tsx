@@ -13,13 +13,12 @@ interface MaintenanceWatcherProps {
 }
 
 /**
- * Global Maintenance Watcher for Trinetra AI.
+ * Global Maintenance Watcher for Vaakriti AI.
  * 
  * Intercepts platform traffic when `system_config.maintenance_mode === 'true'`.
  * - Public visitors and non-admins see a sleek, minimal, branded maintenance screen.
  * - Administrators (admin / super_admin) or users accessing /admin or /login?admin=true are bypassed
  *   with an unobtrusive alert bar so they can manage and restore the system.
- * - Supabase Realtime pushes instant updates when maintenance mode is toggled.
  */
 export default function MaintenanceWatcher({
   initialMaintenanceMode = false,
@@ -39,7 +38,7 @@ export default function MaintenanceWatcher({
   const checkMaintenanceStatus = useCallback(async () => {
     try {
       setIsChecking(true)
-      const res = await fetch('/api/public/config', { cache: 'no-store' })
+      const res = await fetch(`/api/public/config?t=${Date.now()}`, { cache: 'no-store' })
       if (res.ok) {
         const data = await res.json()
         const isMaint = data.configs?.maintenance_mode === 'true'
@@ -56,13 +55,26 @@ export default function MaintenanceWatcher({
     // Initial sync
     checkMaintenanceStatus()
 
-    // Lightweight 5-minute poll instead of persistent Postgres replication slot
+    // Responsive 10-second poll for instant reaction to maintenance toggles
     const interval = setInterval(() => {
       checkMaintenanceStatus()
-    }, 300000)
+    }, 10000)
 
-    return () => clearInterval(interval)
+    const handleFocus = () => checkMaintenanceStatus()
+    window.addEventListener('focus', handleFocus)
+
+    return () => {
+      clearInterval(interval)
+      window.removeEventListener('focus', handleFocus)
+    }
   }, [checkMaintenanceStatus])
+
+  // Update document title during maintenance mode
+  useEffect(() => {
+    if (isMaintenanceMode && !isAdmin && !isAdminRoute) {
+      document.title = "Scheduled Maintenance | Vaakriti AI"
+    }
+  }, [isMaintenanceMode, isAdmin, isAdminRoute])
 
   // Admins and admin routes are never locked out
   if (isAdmin || isAdminRoute || isAdminLoginIntent) {
@@ -112,12 +124,12 @@ export default function MaintenanceWatcher({
       />
 
       <div className="relative z-10 max-w-md w-full text-center flex flex-col items-center space-y-6">
-        {/* Sleek Standalone Trident Logo */}
+        {/* Sleek Standalone Brand Logo */}
         <div className="relative flex items-center justify-center">
           <div className="absolute inset-0 bg-violet-600/25 blur-3xl rounded-full scale-150 pointer-events-none" />
           <img
             src="/trident.png"
-            alt="Trinetra AI"
+            alt="Vaakriti AI"
             className="w-16 h-16 sm:w-20 sm:h-20 object-contain relative z-10 transition-transform duration-500 hover:scale-105"
             style={{
               filter: 'drop-shadow(0 0 25px rgba(139, 92, 246, 0.45))',
@@ -143,7 +155,7 @@ export default function MaintenanceWatcher({
             We&apos;ll be right back
           </h1>
           <p className="text-zinc-400 text-sm leading-relaxed max-w-sm mx-auto">
-            Trinetra AI is currently undergoing scheduled platform upgrades. Services will resume automatically shortly.
+            Vaakriti AI is currently undergoing scheduled platform upgrades. Services will resume automatically shortly.
           </p>
         </div>
 
@@ -167,7 +179,7 @@ export default function MaintenanceWatcher({
       {/* Discreet footer */}
       <div className="absolute bottom-6 inset-x-0 text-center pointer-events-none">
         <p className="text-[11px] text-zinc-600 font-mono tracking-wider">
-          TRINETRA AI
+          VAAKRITI AI
         </p>
       </div>
     </div>

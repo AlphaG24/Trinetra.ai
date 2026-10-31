@@ -36,7 +36,7 @@ const PILLARS: InfrastructurePillar[] = [
     id: "governance",
     name: "Governance & Compliance",
     subtitle: "Statutory 09:00-21:00 calling windows, DND scrub engine, AI disclosure, and encrypted call vaults.",
-    metric: "AES-256 Encrypted",
+    metric: "Bank-Grade Encryption",
     features: ["DND Scrub Engine", "AI Identity Notice", "Searchable Transcripts"],
   },
 ];

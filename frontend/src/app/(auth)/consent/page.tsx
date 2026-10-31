@@ -148,11 +148,11 @@ export default function ConsentPage() {
         {/* Notice Content */}
         <div className="bg-zinc-100 dark:bg-zinc-900/40 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-6 space-y-3 text-sm leading-relaxed text-zinc-700 dark:text-zinc-300">
           <p className="font-medium">
-            Trinetra AI collects and processes your personal data to provide AI voice agent services. 
+            Vaakriti AI collects and processes your personal data to provide AI voice agent services. 
             This includes your name, email, phone number, business details, and call recordings.
           </p>
           <p className="font-medium">
-            Your data is encrypted (AES-256), stored securely, and never shared without consent. 
+            Your data is encrypted, stored securely with bank-grade standards, and never shared without consent. 
             You can request deletion at any time from your dashboard settings.
           </p>
         </div>
@@ -177,7 +177,7 @@ export default function ConsentPage() {
                 {personalConsent && <Check className="w-3.5 h-3.5" />}
               </div>
               <span className="text-sm font-medium text-zinc-800 dark:text-zinc-200 select-none leading-relaxed">
-                I consent to Trinetra AI processing my personal data for service delivery <span className="text-rose-500 font-bold">*</span>
+                I consent to Vaakriti AI processing my personal data for service delivery <span className="text-rose-500 font-bold">*</span>
               </span>
             </label>
 

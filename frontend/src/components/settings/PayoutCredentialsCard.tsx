@@ -387,7 +387,7 @@ export function PayoutCredentialsCard() {
               className="mt-0.5 rounded border-zinc-300 dark:border-white/20 text-emerald-600 focus:ring-emerald-500"
             />
             <span className="text-[11px] text-zinc-600 dark:text-zinc-400 leading-snug">
-              I affirmatively confirm and certify that these payment credentials belong to our verified legal entity. I authorize Vaakriti AI to dispatch this payment link, UPI ID, or QR code to callers upon their verbal request or transaction agreement during calls. <span className="text-zinc-400 font-mono">[CONFIRM WITH A LAWYER]</span>
+              I affirmatively confirm and certify that these payment credentials belong to our verified legal entity. I authorize Vaakriti AI to dispatch this payment link, UPI ID, or QR code to callers upon their verbal request or transaction agreement during calls.
             </span>
           </label>
           {lastAttestedAt && (

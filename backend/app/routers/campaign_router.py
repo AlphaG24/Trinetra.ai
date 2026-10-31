@@ -15,7 +15,7 @@ async def get_campaign_contacts_template():
     """
     Returns a downloadable sample CSV template for campaign contact lists
     demonstrating required affirmative consent columns (consent, consent_source).
-    [CONFIRM WITH A LAWYER]
+   
     """
     sample_csv = (
         "full_name,phone,company_name,consent,consent_source,notes\n"
@@ -33,7 +33,7 @@ async def get_campaign_contacts_template():
 async def get_active_campaigns_consent_audit():
     """
     Returns an audit report on running/active campaigns and contact consent breakdown.
-    Documents status of legacy contacts and statutory compliance before dialing. [CONFIRM WITH A LAWYER]
+    Documents status of legacy contacts and statutory compliance before dialing.
     """
     try:
         report = await CampaignService.get_active_campaigns_consent_audit()
@@ -60,7 +60,7 @@ async def create_campaign(
     file: UploadFile = File(...)
 ):
     try:
-        # Validate affirmative consent attestation (TRAI TCCCPR 2018 / TCPA) [CONFIRM WITH A LAWYER]
+        # Validate affirmative consent attestation (TRAI TCCCPR 2018 / TCPA)
         is_attested = False
         if isinstance(consent_attestation, bool):
             is_attested = consent_attestation
@@ -70,16 +70,16 @@ async def create_campaign(
         if not is_attested:
             raise HTTPException(
                 status_code=400,
-                detail="Mandatory statutory attestation missing: You must certify that you have verifiable affirmative consent for all contacts in this campaign before uploading. [CONFIRM WITH A LAWYER]"
+                detail="Mandatory statutory attestation missing: You must certify that you have verifiable affirmative consent for all contacts in this campaign before uploading."
             )
 
-        # Validate purpose classification and purpose attestation [CONFIRM WITH A LAWYER]
+        # Validate purpose classification and purpose attestation
         valid_purposes = ("promotional", "service", "transactional")
         norm_purpose = purpose.strip().lower()
         if norm_purpose not in valid_purposes:
             raise HTTPException(
                 status_code=400,
-                detail=f"Invalid campaign purpose '{purpose}'. Allowed values: {list(valid_purposes)}. [CONFIRM WITH A LAWYER]"
+                detail=f"Invalid campaign purpose '{purpose}'. Allowed values: {list(valid_purposes)}."
             )
 
         is_purpose_attested = False
@@ -91,7 +91,7 @@ async def create_campaign(
         if norm_purpose != "promotional" and not is_purpose_attested:
             raise HTTPException(
                 status_code=400,
-                detail=f"Statutory purpose attestation missing: '{norm_purpose}' campaigns require explicit affirmative certification that calls contain no marketing or sales content under TRAI TCCCPR 2018 / TCPA. [CONFIRM WITH A LAWYER]"
+                detail=f"Statutory purpose attestation missing: '{norm_purpose}' campaigns require explicit affirmative certification that calls contain no marketing or sales content under TRAI TCCCPR 2018 / TCPA."
             )
 
         file_content = await file.read()
