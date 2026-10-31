@@ -820,15 +820,26 @@ def build_outbound_sales_protocol(
     gender_verb_speak = _gp["v_bol"].split()[1] if len(_gp["v_bol"].split()) > 1 else "raha"  # rahi/raha/rahe
     
     protocol = (
-        f"\n\n## OUTBOUND SALES PROTOCOL:\n"
-        f"Target: {p_name}{comp_part} | You represent: {b_name} | Services: {b_services}\n"
-        f"Lead context: {notes_summary}\n"
-        f"\n"
-        f"### NAME FREQUENCY GOVERNOR (STRICT):\n"
-        f"- You used the prospect's name ONCE already in your greeting. That counts as your opening name-use.\n"
-        f"- DURING THE CONVERSATION (all middle turns): NEVER use their name. Use 'ji', 'sir', 'bilkul', 'haanji' instead.\n"
-        f"- Use their name ONE LAST TIME only in your final goodbye sentence.\n"
-        f"- Total name usage in entire call: EXACTLY 2 times (greeting + goodbye). Not 3, not 4, not 5. EXACTLY 2.\n"
+        f"
+
+## OUTBOUND SALES PROTOCOL:
+"
+        f"Target: {p_name}{comp_part} | You represent: {b_name} | Services: {b_services}
+"
+        f"Lead context: {notes_summary}
+"
+        f"
+"
+        f"### CUSTOMER IDENTITY & NAME ACCURACY:
+"
+        f"- You are speaking with: {p_name}{comp_part}.
+"
+        f"- Always address them respectfully as '{first_name} ji' or 'sir/ma'am'.
+"
+        f"- If the customer asks 'Mera naam kya hai?', 'Aap kisse baat kar rahe ho?', or 'Who am I?', IMMEDIATELY confirm their name with certainty: 'Main {p_name} se hi baat kar raha/rahi hoon'. NEVER claim not to know their name!
+"
+        f"- In middle conversation turns, speak naturally without repetitive robot-like repetition of their full name on every single turn.
+"
         f"\n"
         f"### CONVERSATION FLOW (adapt to your business):\n"
         f"1. OPENING (done): You greeted and asked for 2 minutes.\n"
@@ -3572,15 +3583,20 @@ async def entrypoint(ctx: JobContext):
                         )
                         agent_data["_multi_personality_enabled"] = True
                         agent_data["_enabled_personalities"] = enabled_personalities
-                        from app.services.prompt_service import PromptService
-                        prompt_svc = PromptService(supabase_admin)
-                        base_prompt = prompt_svc._load_from_file("multi_agent")
-                        if not base_prompt or "You are" not in base_prompt:
-                            path_m = os.path.normpath(os.path.join(PROMPTS_DIR, "multi_agent.txt"))
-                            if os.path.exists(path_m):
-                                with open(path_m, "r", encoding="utf-8") as mf:
-                                    base_prompt = mf.read()
-                        logger.info(f"[MULTI-PERSONALITY] Loaded base prompt from multi_agent.txt for agent {agent_id}")
+                        custom_prompt = (agent_data.get("system_prompt") or "").strip()
+                        if custom_prompt and len(custom_prompt) > 30:
+                            base_prompt = custom_prompt
+                            logger.info(f"[PROMPT] Using user custom system_prompt from database for agent {agent_id}")
+                        else:
+                            from app.services.prompt_service import PromptService
+                            prompt_svc = PromptService(supabase_admin)
+                            base_prompt = prompt_svc._load_from_file("multi_agent")
+                            if not base_prompt or "You are" not in base_prompt:
+                                path_m = os.path.normpath(os.path.join(PROMPTS_DIR, "multi_agent.txt"))
+                                if os.path.exists(path_m):
+                                    with open(path_m, "r", encoding="utf-8") as mf:
+                                        base_prompt = mf.read()
+                            logger.info(f"[MULTI-PERSONALITY] Loaded base prompt from multi_agent.txt for agent {agent_id}")
                     except Exception as mp_err:
                         logger.warning(f"[MULTI-PERSONALITY] Setup failed: {mp_err}")
                         agent_data["_multi_personality_enabled"] = False
@@ -4637,15 +4653,20 @@ async def run_agent(room_name: str, agent_id: str | None = None, contact_id: str
                         )
                         agent_data["_multi_personality_enabled"] = True
                         agent_data["_enabled_personalities"] = _ep
-                        from app.services.prompt_service import PromptService
-                        prompt_svc = PromptService(supabase_admin)
-                        base_prompt = prompt_svc._load_from_file("multi_agent")
-                        if not base_prompt or "You are" not in base_prompt:
-                            path_m = os.path.normpath(os.path.join(PROMPTS_DIR, "multi_agent.txt"))
-                            if os.path.exists(path_m):
-                                with open(path_m, "r", encoding="utf-8") as mf:
-                                    base_prompt = mf.read()
-                        logger.info(f"[MULTI-PERSONALITY (run_agent)] Loaded base prompt from multi_agent.txt for agent {agent_id}")
+                        custom_prompt = (agent_data.get("system_prompt") or "").strip()
+                        if custom_prompt and len(custom_prompt) > 30:
+                            base_prompt = custom_prompt
+                            logger.info(f"[PROMPT (run_agent)] Using user custom system_prompt from database for agent {agent_id}")
+                        else:
+                            from app.services.prompt_service import PromptService
+                            prompt_svc = PromptService(supabase_admin)
+                            base_prompt = prompt_svc._load_from_file("multi_agent")
+                            if not base_prompt or "You are" not in base_prompt:
+                                path_m = os.path.normpath(os.path.join(PROMPTS_DIR, "multi_agent.txt"))
+                                if os.path.exists(path_m):
+                                    with open(path_m, "r", encoding="utf-8") as mf:
+                                        base_prompt = mf.read()
+                            logger.info(f"[MULTI-PERSONALITY (run_agent)] Loaded base prompt from multi_agent.txt for agent {agent_id}")
                     except Exception as mp_err:
                         logger.warning(f"[MULTI-PERSONALITY (run_agent)] Setup failed: {mp_err}")
                         agent_data["_multi_personality_enabled"] = False
@@ -5583,4 +5604,4 @@ if __name__ == "__main__":
         num_idle_processes=0,
     ))
 
-
+
