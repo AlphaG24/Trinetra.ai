@@ -224,7 +224,7 @@ export default function CampaignsPage() {
   if (!isMounted && loading) {
     return (
       <div className="flex h-[50vh] w-full items-center justify-center">
-        <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+        <div className="w-8 h-8 border-2 border-zinc-900 dark:border-white border-t-transparent rounded-full animate-spin" />
       </div>
     )
   }
@@ -250,8 +250,8 @@ export default function CampaignsPage() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2 border-b border-[var(--border)]">
         <div>
           <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
-              <Megaphone className="w-5 h-5 text-indigo-500" />
+            <div className="w-9 h-9 rounded-xl bg-zinc-100 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 flex items-center justify-center text-zinc-700 dark:text-zinc-300">
+              <Megaphone className="w-5 h-5 text-zinc-900 dark:text-white" />
             </div>
             <div>
               <h1 className="text-xl md:text-2xl font-bold tracking-tight text-[var(--heading)] font-display flex items-center gap-2">
@@ -278,7 +278,7 @@ export default function CampaignsPage() {
             className="p-2.5 rounded-xl border border-[var(--border)] bg-[var(--card-bg)] text-[var(--body)] hover:text-[var(--heading)] hover:bg-[var(--hover-bg)] transition-all cursor-pointer shadow-xs disabled:opacity-50"
             title="Refresh Campaigns"
           >
-            <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin text-indigo-400' : ''}`} />
+            <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin text-zinc-700 dark:text-zinc-300' : ''}`} />
           </button>
           
           <Link
@@ -311,7 +311,7 @@ export default function CampaignsPage() {
 
           <button
             onClick={() => setIsModalOpen(true)}
-            className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl tracking-wide transition-all flex items-center gap-2 shadow-md cursor-pointer active:scale-[0.98]"
+            className="px-4 py-2.5 bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 text-xs font-bold rounded-xl tracking-wide transition-all flex items-center gap-2 shadow-md cursor-pointer active:scale-[0.98]"
           >
             <Plus className="w-4 h-4" />
             New Campaign
@@ -363,7 +363,7 @@ export default function CampaignsPage() {
               onClick={() => setStatusFilter(st)}
               className={`px-3 py-1.5 text-xs font-semibold rounded-lg capitalize transition-all cursor-pointer whitespace-nowrap ${
                 statusFilter === st
-                  ? 'bg-indigo-600 text-white shadow-xs'
+                  ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-950 shadow-xs'
                   : 'text-[var(--muted)] hover:text-[var(--heading)] hover:bg-[var(--hover-bg)]'
               }`}
             >
@@ -379,7 +379,7 @@ export default function CampaignsPage() {
             placeholder="Search campaigns or agents..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-3 py-2 bg-[var(--card-bg)] border border-[var(--border)] rounded-xl text-xs text-[var(--heading)] placeholder-[var(--muted)] focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            className="w-full pl-9 pr-3 py-2 bg-[var(--card-bg)] border border-[var(--border)] rounded-xl text-xs text-[var(--heading)] placeholder-[var(--muted)] focus:outline-none focus:ring-1 focus:ring-zinc-900 dark:focus:ring-white"
           />
         </div>
       </div>
@@ -388,14 +388,14 @@ export default function CampaignsPage() {
       {loading ? (
         <div className="flex h-[30vh] w-full items-center justify-center">
           <div className="flex flex-col items-center gap-2">
-            <Loader2 className="w-7 h-7 animate-spin text-indigo-500" />
+            <Loader2 className="w-7 h-7 animate-spin text-zinc-900 dark:text-white" />
             <p className="text-xs text-[var(--muted)]">Syncing campaigns...</p>
           </div>
         </div>
       ) : filteredCampaigns.length === 0 ? (
         <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-12 text-center max-w-xl mx-auto space-y-4 my-6 shadow-xs">
-          <div className="w-12 h-12 rounded-full bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center mx-auto text-indigo-400">
-            <Megaphone className="w-6 h-6 text-indigo-500" />
+          <div className="w-12 h-12 rounded-full bg-zinc-100 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 flex items-center justify-center mx-auto text-zinc-700 dark:text-zinc-300">
+            <Megaphone className="w-6 h-6 text-zinc-900 dark:text-white" />
           </div>
           <div className="space-y-1.5">
             <h3 className="text-base font-bold text-[var(--heading)]">
@@ -417,7 +417,7 @@ export default function CampaignsPage() {
           ) : (
             <button
               onClick={() => setIsModalOpen(true)}
-              className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl tracking-wide transition-all cursor-pointer shadow-md active:scale-[0.98]"
+              className="px-5 py-2.5 bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 text-xs font-bold rounded-xl tracking-wide transition-all cursor-pointer shadow-md active:scale-[0.98]"
             >
               Create First Campaign
             </button>
@@ -435,12 +435,12 @@ export default function CampaignsPage() {
             return (
               <div
                 key={camp.id}
-                className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-5 transition-all hover:border-indigo-500/30 hover:shadow-md flex flex-col md:flex-row justify-between gap-5 relative overflow-hidden group"
+                className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-5 transition-all hover:border-zinc-400 dark:border-zinc-600 hover:shadow-md flex flex-col md:flex-row justify-between gap-5 relative overflow-hidden group"
               >
                 {/* Left Side: Campaign Metadata */}
                 <div className="space-y-3.5 flex-1">
                   <div className="flex flex-wrap items-center gap-2.5">
-                    <h3 className="text-base font-bold text-[var(--heading)] font-display group-hover:text-indigo-400 transition-colors">
+                    <h3 className="text-base font-bold text-[var(--heading)] font-display group-hover:text-zinc-700 dark:text-zinc-300 transition-colors">
                       {camp.name}
                     </h3>
 
@@ -503,14 +503,14 @@ export default function CampaignsPage() {
                   <div className="space-y-1.5 max-w-xl pt-1">
                     <div className="flex items-center justify-between text-[11px]">
                       <span className="font-medium text-[var(--muted)] flex items-center gap-1.5">
-                        <Users className="w-3.5 h-3.5 text-indigo-400" />
+                        <Users className="w-3.5 h-3.5 text-zinc-700 dark:text-zinc-300" />
                         <span>Dialed: <strong className="text-[var(--heading)]">{camp.contacts_called || 0}</strong> / {camp.total_contacts || 0}</span>
                       </span>
-                      <span className="font-bold text-indigo-400 font-mono">{calledPct}%</span>
+                      <span className="font-bold text-zinc-700 dark:text-zinc-300 font-mono">{calledPct}%</span>
                     </div>
                     <div className="w-full bg-[var(--background)] rounded-full h-2 overflow-hidden border border-[var(--border)]">
                       <div 
-                        className="bg-indigo-600 h-full rounded-full transition-all duration-500"
+                        className="bg-zinc-900 dark:bg-white h-full rounded-full transition-all duration-500"
                         style={{ width: `${calledPct}%` }}
                       />
                     </div>

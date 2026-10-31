@@ -241,23 +241,34 @@ Respond ONLY with valid JSON."""
         s_lower = (summary or "").lower()
         t_lower = (t_clean or "").lower()
 
-        apt_in_summary = any(k in s_lower for k in ["tomorrow at 11 am", "11 am", "appointment", "demo", "follow-up call"])
+        # Distinguish Callback vs Appointment
+        is_callback = (
+            any(k in s_lower for k in ["callback", "call back", "call later", "reschedule", "call again", "follow-up call", "busy", "driving"]) or
+            any(k in t_lower for k in ["callback", "call back", "baad me", "baad mein", "busy hoon", "driving", "bahar hoon", "phir call", "phir se call", "dusre time", "baad me baat", "kal call", "kal phone", "shaam ko call", "sham ko call", "call kar lena", "call karna"])
+        )
+        is_explicit_demo = (
+            any(k in s_lower for k in ["demo booked", "meeting booked", "consultation", "doctor appointment", "site visit"]) or
+            any(k in t_lower for k in ["demo class", "demo session", "live demo", "doctor se milna", "site visit", "meeting schedule"])
+        )
+
+        apt_in_summary = any(k in s_lower for k in ["tomorrow at 11 am", "11 am", "appointment", "demo"])
         apt_agreed_in_trans = any(k in t_lower for k in ["eleven am", "11 am", "11:00", "tomorrow", "kal", "5 pm", "paanch baje"]) and any(k in t_lower for k in ["no problem", "sure", "theek hai", "yes", "deal", "chalega", "sometime", "bhej do"])
 
-        appointment_booked = bool(llm_data.get("appointment_booked")) or (apt_in_summary and "scheduled" in s_lower) or apt_agreed_in_trans
+        appointment_booked = (bool(llm_data.get("appointment_booked")) or (apt_in_summary and "scheduled" in s_lower) or apt_agreed_in_trans) and not is_callback and is_explicit_demo
 
-        if appointment_booked:
-            outcome = "Appointment Booked"
-            sentiment = "positive"
-        elif any(k in t_lower for k in ["गलती से गलत नंबर", "wrong number", "galti se lag gaya"]):
+        if any(k in t_lower for k in ["गलती से गलत नंबर", "wrong number", "galti se lag gaya"]):
             outcome = "Wrong Number"
             sentiment = "neutral"
         elif any(k in s_lower for k in ["declined to talk", "asked to end the call", "not interested", "declined"]) or any(k in t_lower for k in ["nahi chahiye", "phone rakho", "mat karo call", "not interested", "kick rocks"]):
             outcome = "Not Interested"
             sentiment = "negative"
-        elif any(k in s_lower for k in ["propose alternative times", "reschedule", "callback"]) or any(k in t_lower for k in ["baad me call karna", "call me later", "busy hoon"]):
+        elif is_callback or llm_data.get("outcome") == "Callback Scheduled":
             outcome = "Callback Scheduled"
-            sentiment = "neutral"
+            sentiment = "positive" if any(k in t_lower for k in ["theek hai", "sure", "yes", "deal", "chalega", "kar lena"]) else "neutral"
+            appointment_booked = False
+        elif appointment_booked or llm_data.get("outcome") == "Appointment Booked":
+            outcome = "Appointment Booked"
+            sentiment = "positive"
         elif any(k in s_lower for k in ["custom sample", "whatsapp", "expressed interest", "automate"]):
             outcome = "Lead Qualified"
             sentiment = "positive"
@@ -928,7 +939,7 @@ Respond ONLY with valid JSON."""
                                 )
 
                         # 5. Auto-schedule Appointment if booked in call
-                        if intelligence.get("appointment_booked") and phone_for_lead:
+                        if intelligence.get("appointment_booked") and final_outcome == "Appointment Booked" and phone_for_lead:
                             try:
                                 exist_appt = await asyncio.to_thread(
                                     supabase_admin.table("appointments").select("id").eq("voice_call_id", call_id).limit(1).execute
@@ -989,7 +1000,7 @@ Respond ONLY with valid JSON."""
                                     supabase_admin.table("callbacks").select("id").eq("original_call_id", call_id).limit(1).execute
                                 )
                                 if not exist_cb.data and call_id:
-                                    cb_time = (datetime.now(timezone.utc) + timedelta(hours=3)).replace(microsecond=0).isoformat()
+                                    cb_time = intelligence.get("appointment_time_iso") or (datetime.now(timezone.utc) + timedelta(hours=3)).replace(microsecond=0).isoformat()
                                     await asyncio.to_thread(
                                         supabase_admin.table("callbacks").insert({
                                             "organization_id": target_org,

@@ -423,7 +423,7 @@ export function CampaignDetailClient({ campaignId }: CampaignDetailClientProps) 
     return (
       <div className="flex h-[60vh] w-full items-center justify-center">
         <div className="flex flex-col items-center gap-2">
-          <Loader2 className="w-8 h-8 animate-spin text-violet-500" />
+          <Loader2 className="w-8 h-8 animate-spin text-zinc-900 dark:text-white" />
           <p className="text-xs text-[var(--muted)]">Loading campaign details...</p>
         </div>
       </div>
@@ -655,28 +655,28 @@ export function CampaignDetailClient({ campaignId }: CampaignDetailClientProps) 
       {/* Meta configuration settings */}
       <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-5 grid grid-cols-1 md:grid-cols-4 gap-4 text-xs">
         <div className="flex items-center gap-2">
-          <Bot className="w-4 h-4 text-violet-500" />
+          <Bot className="w-4 h-4 text-zinc-900 dark:text-white" />
           <div>
             <p className="text-[10px] text-[var(--muted)] uppercase font-bold tracking-wider">Voice Agent</p>
             <p className="font-semibold text-[var(--heading)] mt-0.5">{campaign.agents?.name || 'Unknown Agent'}</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <Clock className="w-4 h-4 text-violet-500" />
+          <Clock className="w-4 h-4 text-zinc-900 dark:text-white" />
           <div>
             <p className="text-[10px] text-[var(--muted)] uppercase font-bold tracking-wider">Calling Window</p>
             <p className="font-semibold text-[var(--heading)] mt-0.5">{campaign.calling_hours_start} - {campaign.calling_hours_end}</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <Globe className="w-4 h-4 text-violet-500" />
+          <Globe className="w-4 h-4 text-zinc-900 dark:text-white" />
           <div>
             <p className="text-[10px] text-[var(--muted)] uppercase font-bold tracking-wider">Timezone</p>
             <p className="font-semibold text-[var(--heading)] mt-0.5">{campaign.timezone}</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <AlertCircle className="w-4 h-4 text-violet-500" />
+          <AlertCircle className="w-4 h-4 text-zinc-900 dark:text-white" />
           <div>
             <p className="text-[10px] text-[var(--muted)] uppercase font-bold tracking-wider">Contact List URL</p>
             {campaign.contact_list_url ? (
@@ -684,7 +684,7 @@ export function CampaignDetailClient({ campaignId }: CampaignDetailClientProps) 
                 href={campaign.contact_list_url} 
                 target="_blank" 
                 rel="noreferrer" 
-                className="font-semibold text-violet-500 hover:underline mt-0.5 block truncate max-w-[180px]"
+                className="font-semibold text-zinc-900 dark:text-white hover:underline mt-0.5 block truncate max-w-[180px]"
               >
                 Download Spreadsheet
               </a>
@@ -738,7 +738,7 @@ export function CampaignDetailClient({ campaignId }: CampaignDetailClientProps) 
         {/* Contacts Table List */}
         {contactsLoading && contacts.length === 0 ? (
           <div className="p-12 text-center flex flex-col items-center justify-center gap-2">
-            <Loader2 className="w-6 h-6 animate-spin text-violet-500" />
+            <Loader2 className="w-6 h-6 animate-spin text-zinc-900 dark:text-white" />
             <p className="text-xs text-[var(--muted)]">Loading contacts...</p>
           </div>
         ) : contacts.length === 0 ? (
@@ -787,7 +787,7 @@ export function CampaignDetailClient({ campaignId }: CampaignDetailClientProps) 
                         <button
                           type="button"
                           onClick={() => handleOpenTranscript(item.call_id || '', item.full_name, item.id)}
-                          className="block text-[10px] text-violet-500 hover:text-violet-400 font-bold hover:underline cursor-pointer text-left"
+                          className="block text-[10px] text-zinc-900 dark:text-white hover:text-violet-400 font-bold hover:underline cursor-pointer text-left"
                         >
                           View Call Transcript
                         </button>
