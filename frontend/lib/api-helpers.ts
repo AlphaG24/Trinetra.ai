@@ -30,6 +30,7 @@ export async function authenticateRequest(): Promise<
       const { data: tokenData, error: tokenErr } = await admin.auth.getUser(bearerToken)
       if (!tokenErr && tokenData?.user) {
         user = tokenData.user
+        supabase = admin
       }
     }
   } catch {}
@@ -145,6 +146,10 @@ export async function authenticateRequest(): Promise<
       console.error('[API Helpers] Failed to auto-assign organization:', err)
       profile.organization_id = user.id
     }
+  }
+
+  if (!supabase) {
+    supabase = getAdminClient()
   }
 
   return { authenticated: true, user, profile, error: null, supabase }
