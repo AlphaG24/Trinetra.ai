@@ -259,14 +259,19 @@ class CallbackSchedulerService:
                     agent_id=agent_id
                 )
 
-                # Update callback to completed
+                if not call_res.get("success"):
+                    err_msg = call_res.get("error") or "Unknown Sarvam dial error"
+                    logger.error(f"[CallbackScheduler] Sarvam dial failed for callback {cb_id}: {err_msg}")
+                    raise RuntimeError(f"Sarvam outbound call failed: {err_msg}")
+
+                # Update callback to completed only when outbound call was successfully placed
                 await asyncio.to_thread(
                     supabase_admin.table("callbacks").update({
                         "status": "completed",
                         "completed_at": datetime.now(timezone.utc).isoformat()
                     }).eq("id", cb_id).execute
                 )
-                logger.info(f"[CallbackScheduler] Callback {cb_id} successfully dispatched via Sarvam! Call SID: {call_res.get('call_sid') or call_res.get('id')}")
+                logger.info(f"[CallbackScheduler] Callback {cb_id} successfully dispatched via Sarvam! Attempt ID: {call_res.get('attempt_id') or call_res.get('call_sid') or call_res.get('id')}")
                 return
 
             has_exotel = bool(ConfigService.get("EXOTEL_API_KEY") or os.getenv("EXOTEL_API_KEY"))
@@ -351,13 +356,13 @@ class CallbackSchedulerService:
         except Exception as dial_err:
             logger.error(f"[CallbackScheduler] Outbound callback call failed for {cb_id}: {dial_err}")
             
-            # Retry logic: If attempts remaining, reschedule for 15 minutes later; otherwise mark missed
+            # Retry logic: If attempts remaining, reschedule for 2 minutes later; otherwise mark missed
             if attempt_count >= max_attempts:
                 new_status = "missed"
                 next_time = None
             else:
                 new_status = "scheduled"
-                next_time = (datetime.now(timezone.utc) + timedelta(minutes=15)).isoformat()
+                next_time = (datetime.now(timezone.utc) + timedelta(minutes=2)).isoformat()
 
             update_data = {
                 "status": new_status,
