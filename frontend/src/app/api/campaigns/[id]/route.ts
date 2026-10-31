@@ -53,6 +53,31 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
           return NextResponse.json({ error: "Campaign not found" }, { status: 404 });
         }
 
+        // Dynamically compute live counts from campaign_contacts
+        try {
+          const { data: contactsData } = await supabase
+            .from("campaign_contacts")
+            .select("call_status, call_attempts, lead_id")
+            .eq("campaign_id", id);
+          
+          if (contactsData && contactsData.length > 0) {
+            dbCampaign.total_contacts = contactsData.length;
+            dbCampaign.contacts_called = Math.max(
+              dbCampaign.contacts_called || 0,
+              contactsData.filter((c: any) => (c.call_attempts || 0) > 0 || !['pending', ''].includes((c.call_status || '').toLowerCase())).length
+            );
+            dbCampaign.contacts_connected = Math.max(
+              dbCampaign.contacts_connected || 0,
+              contactsData.filter((c: any) => ['answered', 'completed', 'in-progress', 'connected'].includes((c.call_status || '').toLowerCase())).length
+            );
+            dbCampaign.leads_generated = Math.max(
+              dbCampaign.leads_generated || 0,
+              contactsData.filter((c: any) => c.lead_id !== null).length
+            );
+            dbCampaign.contacts_dnd = contactsData.filter((c: any) => (c.call_status || '').toLowerCase() === 'dnd').length;
+          }
+        } catch {}
+
         return NextResponse.json({
           success: true,
           data: dbCampaign

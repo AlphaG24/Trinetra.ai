@@ -22,7 +22,10 @@ export async function GET(request: NextRequest) {
 
     // Handle Sarvam Voice Agent Audio Recordings
     if (targetUrl.includes("sarvam.ai")) {
-      const sarvamKey = process.env.SARVAM_WORKSPACE_API_KEY || process.env.SARVAM_API_KEY || process.env.SARVA_VOICE_AGENTS || "";
+      const sarvamKey = process.env.SARVAM_WORKSPACE_API_KEY || 
+        process.env.SARVAM_API_KEY || 
+        process.env.SARVA_VOICE_AGENTS || 
+        "sk_samvaad_werdeggz_BnUoezMCwoT5iHjhMKEVNipM";
       if (sarvamKey) {
         headers["X-API-Key"] = sarvamKey;
       }

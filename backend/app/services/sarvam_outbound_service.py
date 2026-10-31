@@ -218,9 +218,10 @@ Rules:
    - "Dropped / Silence"
 3. APPOINTMENT_BOOKED: boolean (true ONLY if appointment/demo/consultation was scheduled)
 4. APPOINTMENT_TIME_ISO: ISO-8601 UTC datetime for appointment if booked. If tomorrow at 11 AM mentioned, use tomorrow at 05:30:00Z.
-5. APPOINTMENT_NOTES: Brief note of appointment agreement.
-6. EXTRACTED_NAME: Caller's name if stated by them in the transcript.
-7. CALL_SUMMARY: 2-sentence summary.
+5. CALLBACK_TIME_ISO: ISO-8601 UTC datetime for callback if prospect requested callback. If 'after 5 mins' or general 'baad me call karna', compute 5-10 minutes from now.
+6. APPOINTMENT_NOTES: Brief note of appointment agreement.
+7. EXTRACTED_NAME: Caller's name if stated by them in the transcript.
+8. CALL_SUMMARY: 2-sentence summary.
 
 Respond ONLY with valid JSON."""
 
@@ -1032,7 +1033,7 @@ Respond ONLY with valid JSON."""
                                     supabase_admin.table("callbacks").select("id").eq("original_call_id", call_id).limit(1).execute
                                 )
                                 if not exist_cb.data and call_id:
-                                    cb_time = intelligence.get("appointment_time_iso") or (datetime.now(timezone.utc) + timedelta(hours=3)).replace(microsecond=0).isoformat()
+                                    cb_time = intelligence.get("callback_time_iso") or intelligence.get("appointment_time_iso") or (datetime.now(timezone.utc) + timedelta(minutes=10)).replace(microsecond=0).isoformat()
                                     await asyncio.to_thread(
                                         supabase_admin.table("callbacks").insert({
                                             "organization_id": target_org,

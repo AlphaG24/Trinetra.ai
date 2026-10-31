@@ -166,16 +166,41 @@ async def get_campaign_detail(id: str):
         if not campaign_res.data:
             raise HTTPException(status_code=404, detail="Campaign not found")
             
-        dnd_count_res = await asyncio.to_thread(
+        # Dynamically compute live stats from campaign_contacts
+        contacts_stats_res = await asyncio.to_thread(
             supabase_admin.table("campaign_contacts")
-            .select("id", count="exact")
+            .select("call_status, call_attempts, lead_id")
             .eq("campaign_id", id)
-            .eq("call_status", "dnd")
             .execute
         )
-        
+        c_list = contacts_stats_res.data or []
+        dynamic_total = len(c_list)
+        dynamic_called = sum(1 for c in c_list if (c.get("call_attempts") or 0) > 0 or (c.get("call_status") or "").lower() not in ("pending", ""))
+        dynamic_connected = sum(1 for c in c_list if (c.get("call_status") or "").lower() in ("answered", "completed", "in-progress", "connected"))
+        dynamic_leads = sum(1 for c in c_list if c.get("lead_id") is not None)
+        dynamic_dnd = sum(1 for c in c_list if (c.get("call_status") or "").lower() == "dnd")
+
         campaign_data = campaign_res.data
-        campaign_data["contacts_dnd"] = dnd_count_res.count or 0
+        if dynamic_total > 0:
+            campaign_data["total_contacts"] = dynamic_total
+        campaign_data["contacts_called"] = max(dynamic_called, campaign_data.get("contacts_called") or 0)
+        campaign_data["contacts_connected"] = max(dynamic_connected, campaign_data.get("contacts_connected") or 0)
+        campaign_data["leads_generated"] = max(dynamic_leads, campaign_data.get("leads_generated") or 0)
+        campaign_data["contacts_dnd"] = dynamic_dnd
+
+        # Sync updated metrics back to campaigns table in background
+        try:
+            await asyncio.to_thread(
+                supabase_admin.table("campaigns").update({
+                    "total_contacts": campaign_data["total_contacts"],
+                    "contacts_called": campaign_data["contacts_called"],
+                    "contacts_connected": campaign_data["contacts_connected"],
+                    "leads_generated": campaign_data["leads_generated"]
+                }).eq("id", id).execute
+            )
+        except Exception:
+            pass
+
         return {"success": True, "data": campaign_data}
     except HTTPException:
         raise

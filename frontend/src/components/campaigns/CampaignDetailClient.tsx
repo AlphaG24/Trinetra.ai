@@ -443,8 +443,13 @@ export function CampaignDetailClient({ campaignId }: CampaignDetailClientProps) 
     )
   }
 
-  const totalContacts = campaign.total_contacts || contactsCount || 0;
-  const totalCalled = campaign.contacts_called ?? 0;
+  const totalContacts = campaign.total_contacts || contactsCount || contacts.length || 0;
+  const answeredInList = contacts.filter(c => ['answered', 'completed', 'connected', 'in-progress'].includes((c.call_status || '').toLowerCase())).length;
+  const totalConnected = Math.max(campaign.contacts_connected ?? 0, answeredInList);
+  const leadsInList = contacts.filter(c => c.lead_id !== null).length;
+  const totalLeads = Math.max(campaign.leads_generated ?? 0, leadsInList);
+  const calledInList = contacts.filter(c => (c.call_attempts || 0) > 0 || !['pending', ''].includes((c.call_status || '').toLowerCase())).length;
+  const totalCalled = Math.max(campaign.contacts_called ?? 0, calledInList);
   const pendingCount = contacts.filter(c => (c.call_status || '').toLowerCase() === 'pending').length;
   const dialingCount = contacts.filter(c => (c.call_status || '').toLowerCase() === 'dialing').length;
 
@@ -622,9 +627,9 @@ export function CampaignDetailClient({ campaignId }: CampaignDetailClientProps) 
         <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-6 space-y-2">
           <p className="text-[10px] text-[var(--muted)] uppercase font-bold tracking-wider">Answered Ratio</p>
           <p className="text-3xl font-extrabold text-blue-500 font-mono">
-            {campaign.contacts_connected} 
+            {totalConnected} 
             <span className="text-xs text-[var(--muted)] font-sans font-bold ml-1.5">
-              ({campaign.contacts_called > 0 ? Math.min(100, Math.round((campaign.contacts_connected / campaign.contacts_called) * 100)) : 0}% connected)
+              ({totalCalled > 0 ? Math.min(100, Math.round((totalConnected / totalCalled) * 100)) : 0}% connected)
             </span>
           </p>
           <p className="text-[10px] text-[var(--muted)] font-sans">Total calls answered by active customer contacts</p>
@@ -634,9 +639,9 @@ export function CampaignDetailClient({ campaignId }: CampaignDetailClientProps) 
         <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-6 space-y-2">
           <p className="text-[10px] text-[var(--muted)] uppercase font-bold tracking-wider">Leads Extracted</p>
           <p className="text-3xl font-extrabold text-emerald-500 font-mono">
-            {campaign.leads_generated}
+            {totalLeads}
             <span className="text-xs text-[var(--muted)] font-sans font-bold ml-1.5">
-              ({campaign.contacts_connected > 0 ? Math.round((campaign.leads_generated / campaign.contacts_connected) * 100) : 0}% conversion)
+              ({totalConnected > 0 ? Math.round((totalLeads / totalConnected) * 100) : 0}% conversion)
             </span>
           </p>
           <p className="text-[10px] text-[var(--muted)] font-sans">High-intent prospects identified by AI agent</p>

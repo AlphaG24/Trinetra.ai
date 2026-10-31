@@ -19,7 +19,7 @@ class CallbackSchedulerService:
     """
     _running: bool = False
     _worker_task: Optional[asyncio.Task] = None
-    _poll_interval_seconds: int = int(os.getenv("CALLBACK_POLL_INTERVAL_SECONDS", "180"))
+    _poll_interval_seconds: int = int(os.getenv("CALLBACK_POLL_INTERVAL_SECONDS", "30"))
 
     @classmethod
     def start_worker(cls):

@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { createClient } from '@/utils/supabase/client'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Bell, LogOut, User, CheckCheck } from 'lucide-react'
+import { Bell, LogOut, User, CheckCheck, Globe } from 'lucide-react'
 import { useAuth, UserProfile } from '@/src/components/providers/AuthProvider'
 import { VaakritiWordmark } from '@/components/ui/VaakritiWordmark'
 
@@ -224,14 +224,25 @@ export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
   const handleSignOut = async () => {
     try {
       const supabase = createClient()
-      await supabase.auth.signOut()
+      // Enforce a 600ms ceiling on supabase.auth.signOut() so it NEVER hangs
+      await Promise.race([
+        supabase.auth.signOut(),
+        new Promise((resolve) => setTimeout(resolve, 600))
+      ])
     } catch {}
     try {
       sessionStorage.clear()
       localStorage.removeItem('trinetra_auth_profile_cache')
       localStorage.removeItem('trinetra_user_role')
+      localStorage.removeItem('supabase.auth.token')
+      // Clear cookies
+      document.cookie.split(";").forEach((c) => {
+        document.cookie = c
+          .replace(/^ +/, "")
+          .replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
+      });
     } catch {}
-    window.location.href = '/'
+    window.location.href = '/login?signed_out=true'
   }
 
   const [mounted, setMounted] = useState(false)
@@ -411,6 +422,13 @@ export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
                     className="flex items-center gap-2.5 px-4 py-3 text-[13px] text-[var(--body)] hover:bg-[var(--hover-bg)] hover:text-[var(--heading)] transition-colors font-playfair font-extrabold"
                   >
                     <User className="w-4 h-4 text-[var(--muted)]" /> My Profile
+                  </Link>
+                  <Link
+                    href="/"
+                    onClick={() => setIsDropdownOpen(false)}
+                    className="flex items-center gap-2.5 px-4 py-3 text-[13px] text-[var(--body)] hover:bg-[var(--hover-bg)] hover:text-[var(--heading)] transition-colors font-playfair font-extrabold"
+                  >
+                    <Globe className="w-4 h-4 text-[var(--muted)]" /> View Website
                   </Link>
                   <button
                     suppressHydrationWarning

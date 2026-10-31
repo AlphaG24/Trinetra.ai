@@ -6,7 +6,8 @@ import Link from 'next/link'
 import { 
   Eye, 
   EyeOff, 
-  AlertCircle
+  AlertCircle,
+  ArrowLeft
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { createClient } from '@/lib/client'
@@ -315,6 +316,17 @@ function AuthForm() {
          ───────────────────────────────────────────────────────────── */}
       <section className="relative w-full lg:w-1/2 min-h-full flex-1 flex flex-col justify-center items-center px-4 sm:px-6 lg:px-10 py-6 sm:py-10 bg-white">
         
+        {/* Navigation link to Homepage */}
+        <div className="w-full max-w-[410px] flex justify-start mb-2">
+          <Link
+            href="/"
+            className="inline-flex items-center gap-1.5 text-xs font-semibold text-zinc-500 hover:text-zinc-900 transition-colors px-2.5 py-1 rounded-lg hover:bg-zinc-100"
+          >
+            <ArrowLeft className="w-3.5 h-3.5" />
+            <span>Back to Homepage</span>
+          </Link>
+        </div>
+
         <div className="w-full max-w-[410px] mx-auto flex flex-col items-center">
 
           {/* 1. Official Emblem Vector on Top Center */}
