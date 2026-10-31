@@ -80,6 +80,23 @@ export function CampaignDetailClient({ campaignId }: CampaignDetailClientProps) 
   const [selectedRecordingUrl, setSelectedRecordingUrl] = useState<string | null>(null)
   const [selectedCallerName, setSelectedCallerName] = useState<string>('Contact')
   const [selectedDuration, setSelectedDuration] = useState<number | undefined>(undefined)
+  const [selectedCallId, setSelectedCallId] = useState<string | null>(null)
+
+  const getAuthHeaders = async (): Promise<Record<string, string>> => {
+    try {
+      const supabase = createClient()
+      const { data: { session } } = await supabase.auth.getSession()
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json'
+      }
+      if (session?.access_token) {
+        headers['Authorization'] = `Bearer ${session.access_token}`
+      }
+      return headers
+    } catch {
+      return { 'Content-Type': 'application/json' }
+    }
+  }
 
   const handleOpenTranscript = async (callId: string, contactName: string, contactId?: string) => {
     try {
@@ -87,32 +104,40 @@ export function CampaignDetailClient({ campaignId }: CampaignDetailClientProps) 
       setSelectedTranscript(null)
       setSelectedRecordingUrl(null)
       setSelectedDuration(undefined)
+      setSelectedCallId(callId || null)
       setShowTranscriptModal(true)
 
+      // 1. Fetch from secure server endpoint
+      if (contactId) {
+        const headers = await getAuthHeaders()
+        const res = await fetch(`/api/campaigns/${campaignId}/contacts/${contactId}/transcript`, {
+          headers,
+          credentials: 'include'
+        })
+        if (res.ok) {
+          const resData = await res.json()
+          if (resData.success && resData.data) {
+            setSelectedTranscript(resData.data.transcript || 'No transcript registered for this call yet.')
+            setSelectedRecordingUrl(resData.data.recording_url || null)
+            setSelectedDuration(resData.data.duration_seconds)
+            if (resData.data.call_id) setSelectedCallId(resData.data.call_id)
+            return
+          }
+        }
+      }
+
+      // 2. Fallback to client query
       const supabase = createClient()
-      let query = supabase
-        .from('voice_calls')
-        .select('transcript, recording_url, duration_seconds')
-
-      if (callId && contactId) {
-        query = query.or(`id.eq.${callId},metadata->>provider_call_id.eq.${callId},metadata->>session_id.eq.${callId},metadata->>contact_id.eq.${contactId}`)
-      } else if (callId) {
-        query = query.or(`id.eq.${callId},metadata->>provider_call_id.eq.${callId},metadata->>session_id.eq.${callId}`)
-      } else if (contactId) {
-        query = query.eq('metadata->>contact_id', contactId)
+      let query = supabase.from('voice_calls').select('id, transcript, recording_url, duration_seconds')
+      if (callId) {
+        query = query.or(`id.eq.${callId},metadata->>attempt_id.eq.${callId}`)
       }
-
-      const { data } = await query.order('created_at', { ascending: false }).limit(1).maybeSingle()
-
-      if (data?.recording_url) {
-        setSelectedRecordingUrl(data.recording_url)
-      }
-      if (data?.duration_seconds !== undefined) {
+      const { data } = await query.limit(1).maybeSingle()
+      if (data) {
+        setSelectedTranscript(data.transcript || 'No transcript registered for this call yet.')
+        setSelectedRecordingUrl(data.recording_url || null)
         setSelectedDuration(data.duration_seconds)
-      }
-
-      if (data?.transcript) {
-        setSelectedTranscript(data.transcript)
+        setSelectedCallId(data.id)
       } else {
         setSelectedTranscript('No transcript registered for this call yet.')
       }
@@ -137,7 +162,8 @@ export function CampaignDetailClient({ campaignId }: CampaignDetailClientProps) 
   const fetchAgentInfo = async (agentId: string) => {
     try {
       setAgentLoading(true)
-      const res = await fetch(`/api/agents/${agentId}`)
+      const headers = await getAuthHeaders()
+      const res = await fetch(`/api/agents/${agentId}`, { headers, credentials: 'include' })
       const data = await res.json()
       if (res.ok && data.success && data.data) {
         setAgentPhone(data.data.phone_number || null)
@@ -150,13 +176,14 @@ export function CampaignDetailClient({ campaignId }: CampaignDetailClientProps) 
     }
   }
 
-  const isSimulated = !agentPhone || !agentProvider || agentProvider === 'simulated' || agentProvider === 'sandbox'
+  const isSimulated = !agentPhone || agentProvider === 'simulated' || agentProvider === 'sandbox'
 
   // Fetch campaign info
   const fetchCampaignInfo = async (silent = false) => {
     try {
       if (!silent) setCampaignLoading(true)
-      const res = await fetch(`/api/campaigns/${campaignId}`)
+      const headers = await getAuthHeaders()
+      const res = await fetch(`/api/campaigns/${campaignId}`, { headers, credentials: 'include' })
       const data = await res.json()
       if (res.ok) {
         setCampaign(data.data)
@@ -182,7 +209,8 @@ export function CampaignDetailClient({ campaignId }: CampaignDetailClientProps) 
       if (statusFilter !== 'all') {
         url += `&status=${encodeURIComponent(statusFilter)}`
       }
-      const res = await fetch(url)
+      const headers = await getAuthHeaders()
+      const res = await fetch(url, { headers, credentials: 'include' })
       const data = await res.json()
       if (res.ok) {
         setContacts(data.data || [])
@@ -274,7 +302,8 @@ export function CampaignDetailClient({ campaignId }: CampaignDetailClientProps) 
     try {
       setActionLoading(true)
       setCampaign(prev => prev ? ({ ...prev, status: 'running' }) : null)
-      const res = await fetch(`/api/campaigns/${campaignId}/start`, { method: 'POST' })
+      const headers = await getAuthHeaders()
+      const res = await fetch(`/api/campaigns/${campaignId}/start`, { method: 'POST', headers, credentials: 'include' })
       const data = await res.json()
       if (res.ok) {
         toast.success('Campaign calling loop started in the background!')
@@ -298,7 +327,8 @@ export function CampaignDetailClient({ campaignId }: CampaignDetailClientProps) 
     try {
       setActionLoading(true)
       setCampaign(prev => prev ? ({ ...prev, status: 'paused' }) : null)
-      const res = await fetch(`/api/campaigns/${campaignId}/pause`, { method: 'POST' })
+      const headers = await getAuthHeaders()
+      const res = await fetch(`/api/campaigns/${campaignId}/pause`, { method: 'POST', headers, credentials: 'include' })
       const data = await res.json()
       if (res.ok) {
         toast.success('Campaign paused!')
@@ -322,7 +352,8 @@ export function CampaignDetailClient({ campaignId }: CampaignDetailClientProps) 
     try {
       setActionLoading(true)
       setCampaign(prev => prev ? ({ ...prev, status: 'running' }) : null)
-      const res = await fetch(`/api/campaigns/${campaignId}/resume`, { method: 'POST' })
+      const headers = await getAuthHeaders()
+      const res = await fetch(`/api/campaigns/${campaignId}/resume`, { method: 'POST', headers, credentials: 'include' })
       const data = await res.json()
       if (res.ok) {
         toast.success('Campaign calling loop resumed in the background!')
@@ -346,7 +377,8 @@ export function CampaignDetailClient({ campaignId }: CampaignDetailClientProps) 
     if (!window.confirm("Are you sure you want to delete this campaign? All contacts and call history for this campaign will be removed.")) return
     try {
       setActionLoading(true)
-      const res = await fetch(`/api/campaigns/${campaignId}`, { method: 'DELETE' })
+      const headers = await getAuthHeaders()
+      const res = await fetch(`/api/campaigns/${campaignId}`, { method: 'DELETE', headers, credentials: 'include' })
       if (res.ok) {
         toast.success('Campaign successfully deleted')
         router.push('/dashboard/campaigns')
@@ -367,7 +399,8 @@ export function CampaignDetailClient({ campaignId }: CampaignDetailClientProps) 
     try {
       setRetryingContactId(contactId)
       setContacts(prev => prev.map(c => c.id === contactId ? { ...c, call_status: 'dialing' } : c))
-      const res = await fetch(`/api/campaigns/${campaignId}/contacts/${contactId}/retry`, { method: 'POST' })
+      const headers = await getAuthHeaders()
+      const res = await fetch(`/api/campaigns/${campaignId}/contacts/${contactId}/retry`, { method: 'POST', headers, credentials: 'include' })
       const data = await res.json()
       if (res.ok) {
         toast.success('Calling contact...')
@@ -827,10 +860,13 @@ export function CampaignDetailClient({ campaignId }: CampaignDetailClientProps) 
           setSelectedTranscript(null)
           setSelectedRecordingUrl(null)
           setSelectedDuration(undefined)
+          setSelectedCallId(null)
         }}
+        callId={selectedCallId || undefined}
         transcript={selectedTranscript}
         recordingUrl={selectedRecordingUrl}
         callerName={selectedCallerName}
+        agentName="Shubh"
       />
     </div>
   )

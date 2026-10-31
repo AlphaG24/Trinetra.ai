@@ -159,7 +159,7 @@ async def get_campaign_detail(id: str):
             supabase_admin.table("campaigns")
             .select("*, agents(name, phone_number, telephony_provider)")
             .eq("id", id)
-            .single()
+            .maybe_single()
             .execute
         )
             

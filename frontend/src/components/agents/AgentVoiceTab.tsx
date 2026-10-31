@@ -433,7 +433,7 @@ export function AgentVoiceTab({ agent, isPaid, upgradeUrl }: AgentVoiceTabProps)
                       <optgroup label="Studio International & Cloned Voices">
                         {elevenLabsVoices.length > 0 ? elevenLabsVoices.map(voice => (
                           <option key={voice.voice_id} value={voice.voice_id}>
-                            {voice.category === 'cloned' ? '✨ [Cloned] ' : ''}{voice.name} ({voice.labels?.gender || (voice.category === 'cloned' ? 'Custom' : 'Voice')}, {voice.labels?.accent || 'Studio'})
+                            {voice.category === 'cloned' ? '[Cloned] ' : ''}{voice.name} ({voice.labels?.gender || (voice.category === 'cloned' ? 'Custom' : 'Voice')}, {voice.labels?.accent || 'Studio'})
                           </option>
                         )) : (
                           <>
@@ -447,7 +447,7 @@ export function AgentVoiceTab({ agent, isPaid, upgradeUrl }: AgentVoiceTabProps)
                           </>
                         )}
                         {selectedVoice && !elevenLabsVoices.some(v => v.voice_id === selectedVoice) && (
-                          <option value={selectedVoice}>✨ [Cloned] Active Custom Voice</option>
+                          <option value={selectedVoice}>[Cloned] Active Custom Voice</option>
                         )}
                       </optgroup>
                     )}

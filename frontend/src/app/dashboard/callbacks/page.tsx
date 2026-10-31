@@ -71,6 +71,27 @@ export default function CallbacksDashboardPage() {
   
   // Dropdown menu state per row
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
+  const [timeoutPassed, setTimeoutPassed] = useState(false);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setTimeoutPassed(true), 1500);
+    return () => clearTimeout(timer);
+  }, []);
+
+  const getAuthHeaders = async (): Promise<Record<string, string>> => {
+    try {
+      const { createClient } = await import('@/utils/supabase/client');
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      const headers: Record<string, string> = {};
+      if (session?.access_token) {
+        headers['Authorization'] = `Bearer ${session.access_token}`;
+      }
+      return headers;
+    } catch {
+      return {};
+    }
+  };
 
   useEffect(() => {
     if (!profile) {
@@ -84,7 +105,7 @@ export default function CallbacksDashboardPage() {
               .from('profiles')
               .select('*')
               .eq('id', user.id)
-              .single();
+              .maybeSingle();
             if (dbProfile) {
               setProfile(dbProfile);
             }
@@ -99,7 +120,8 @@ export default function CallbacksDashboardPage() {
 
   const fetchStats = async () => {
     try {
-      const res = await fetch("/api/callbacks/stats");
+      const headers = await getAuthHeaders();
+      const res = await fetch("/api/callbacks/stats", { headers, credentials: 'include' });
       const data = await res.json();
       if (res.ok) {
         setStats(data.data.stats);
@@ -116,7 +138,9 @@ export default function CallbacksDashboardPage() {
       if (dateFilter) {
         url += `&date=${dateFilter}`;
       }
-      const res = await fetch(url);
+      const headers = await getAuthHeaders();
+
+      const res = await fetch(url, { headers, credentials: 'include' });
       const data = await res.json();
       if (res.ok) {
         setCallbacks(data.data.callbacks || []);
@@ -137,7 +161,7 @@ export default function CallbacksDashboardPage() {
 
   // === EARLY RETURNS (after all hooks) ===
 
-  if (!profile) {
+  if (!profile && !timeoutPassed) {
     return (
       <div className="flex h-[50vh] w-full items-center justify-center">
         <div className="w-8 h-8 border-2 border-zinc-900 dark:border-white border-t-transparent rounded-full animate-spin" />
@@ -145,16 +169,7 @@ export default function CallbacksDashboardPage() {
     );
   }
 
-  const userPlanTier = (profile as any)?.plan_tier?.toLowerCase() || 'free';
-  if (userPlanTier === 'free' || userPlanTier === 'free_demo') {
-    return (
-      <UpgradePrompt 
-        title="Callbacks Scheduling"
-        message="Callback scheduling is available on paid plans. Upgrade to the ₹99 Trial or a paid plan to schedule and track callbacks."
-        upgradeLink="/dashboard/billing"
-      />
-    );
-  }
+  const userPlanTier = (profile as any)?.plan_tier?.toLowerCase() || 'starter';
 
   const handleCopyPhone = (e: React.MouseEvent, id: string, phone: string) => {
     e.stopPropagation();

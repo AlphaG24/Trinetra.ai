@@ -578,15 +578,15 @@ Respond ONLY with valid JSON."""
         org_id: str,
         agent_id: str,
         max_attempts: int = 36,
-        poll_interval: int = 5
+        poll_interval: int = 3
     ):
         """
         Polls Sarvam Analytics API until the call is completed, then automatically
         syncs recordings, transcript, and leads into Trinetra.
         """
         logger.info(f"[Sarvam Poller] Started tracking attempt {attempt_id} for {target_phone}")
-        # Wait 10 seconds before first check to let call establish
-        await asyncio.sleep(10)
+        # Wait 3 seconds before first check to let call establish
+        await asyncio.sleep(3)
 
         for i in range(max_attempts):
             try:
@@ -684,6 +684,10 @@ Respond ONLY with valid JSON."""
                         inter_id = att.get("interaction_id")
                         user_phone = att.get("user_contact")
                         audio_url = att.get("audio_url")
+                        if inter_id and inter_id != "NO_INTERACTION_ID":
+                            direct_rec_url = f"https://apps.sarvam.ai/api/analytics/v1/{self.org_id}/{self.workspace_id}/{target_app}/recordings/{inter_id}"
+                            if not audio_url:
+                                audio_url = direct_rec_url
                         duration = int(float(att.get("duration_in_seconds") or 0))
                         status_raw = (att.get("connectivity_status") or "completed").lower()
                         stat_normalized = "completed" if status_raw in ("connected", "completed") else status_raw

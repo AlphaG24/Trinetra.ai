@@ -56,6 +56,10 @@ export function CallAudioPlayer({
     if (trimmed.startsWith('https://') && trimmed.includes('.supabase.co/storage/')) {
       return `/api/recordings/proxy?url=${encodeURIComponent(trimmed)}`
     }
+    // Route Sarvam URLs through authenticated download proxy to stream audio without 403 Forbidden
+    if (trimmed.includes('sarvam.ai')) {
+      return `/api/voice/recordings/download?url=${encodeURIComponent(trimmed)}`
+    }
     return trimmed
   }, [recordingUrl])
 

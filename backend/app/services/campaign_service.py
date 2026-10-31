@@ -152,7 +152,7 @@ class CampaignService:
         
         # Check if agent is a free demo agent
         agent_res = await asyncio.to_thread(
-            supabase_admin.table("agents").select("id, name, is_demo, agent_type").eq("id", agent_id).single().execute
+            supabase_admin.table("agents").select("id, name, is_demo, agent_type").eq("id", agent_id).maybe_single().execute
         )
         if not agent_res.data:
             raise ValueError("Agent not found.")
@@ -555,7 +555,7 @@ class CampaignService:
                 try:
                     # 1. Fetch current status
                     campaign_res = await asyncio.to_thread(
-                        supabase_admin.table("campaigns").select("*").eq("id", campaign_id).single().execute
+                        supabase_admin.table("campaigns").select("*").eq("id", campaign_id).maybe_single().execute
                     )
                     
                     if not campaign_res.data:
@@ -743,7 +743,7 @@ class CampaignService:
         agent_id = campaign_data["agent_id"]
         organization_id = campaign_data["organization_id"]
         agent_res = await asyncio.to_thread(
-            supabase_admin.table("agents").select("*").eq("id", agent_id).single().execute
+            supabase_admin.table("agents").select("*").eq("id", agent_id).maybe_single().execute
         )
         
         agent = agent_res.data or {}
@@ -1262,7 +1262,7 @@ class CampaignService:
         from app.services.outbound_safety_guardrails import generate_pre_send_campaign_report
 
         camp_res = await asyncio.to_thread(
-            supabase_admin.table("campaigns").select("*").eq("id", campaign_id).single().execute
+            supabase_admin.table("campaigns").select("*").eq("id", campaign_id).maybe_single().execute
         )
         if not camp_res.data:
             raise ValueError(f"Campaign '{campaign_id}' not found")

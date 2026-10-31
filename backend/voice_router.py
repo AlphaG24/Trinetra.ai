@@ -1317,6 +1317,15 @@ async def handle_sarvam_voice_webhook(
             try:
                 stat_normalized = "completed" if call_status.lower() in ["completed", "terminated", "ended"] else "in_progress" if call_status.lower() in ["in-progress", "connected", "answered"] else call_status.lower()
                 
+                # Resolve call direction and phone assignments:
+                # If from_number is one of our system/agent numbers or contact_id is provided, it is an OUTBOUND call
+                system_numbers = ["+917965481258", "917965481258", "7965481258", "+917965481738", "917965481738", "7965481738"]
+                is_outbound_call = bool(contact_id) or any(sn in str(from_number).replace(" ", "") for sn in system_numbers)
+                
+                final_caller_phone = to_number if is_outbound_call else from_number
+                final_agent_phone = from_number if is_outbound_call else to_number
+                final_direction = "outbound" if is_outbound_call else "inbound"
+
                 # 1. Upsert voice_calls
                 call_upsert_res = supabase_admin.table("voice_calls").upsert({
                     "user_id": target_user,
@@ -1325,9 +1334,9 @@ async def handle_sarvam_voice_webhook(
                     "provider_call_id": call_id,
                     "session_id": call_id,
                     "caller_name": caller_name,
-                    "caller_phone": from_number,
-                    "agent_number": to_number,
-                    "direction": "inbound" if not contact_id else "outbound",
+                    "caller_phone": final_caller_phone,
+                    "agent_number": final_agent_phone,
+                    "direction": final_direction,
                     "status": stat_normalized,
                     "duration_seconds": duration,
                     "recording_url": recording_url,
@@ -1387,37 +1396,45 @@ async def handle_sarvam_voice_webhook(
                     else:
                         supabase_admin.table("customer_contacts").insert(cust_payload).execute()
 
-                # 4. Update campaign_contacts
-                if contact_id or (from_number and from_number != "Unknown"):
-                    stat_map = {
-                        "completed": "answered",
-                        "ended": "answered",
-                        "answered": "answered",
-                        "in-progress": "answered",
-                        "busy": "busy",
-                        "failed": "failed"
-                    }
-                    target_status = stat_map.get(call_status.lower(), "answered")
-                    camp_data_update = {
-                        "call_status": target_status,
-                        "call_id": saved_call_id,
-                        "notes": call_summary,
-                        "last_attempt_at": datetime.utcnow().isoformat()
-                    }
-                    clean_from_digits = re.sub(r"\D", "", from_number) if from_number else ""
-                    clean_10 = clean_from_digits[-10:] if len(clean_from_digits) >= 10 else clean_from_digits
+                # 4. Update campaign_contacts (Check contact_id, to_number, and from_number)
+                stat_map = {
+                    "completed": "answered",
+                    "ended": "answered",
+                    "answered": "answered",
+                    "in-progress": "answered",
+                    "connected": "answered",
+                    "busy": "busy",
+                    "failed": "failed",
+                    "no-answer": "no_answer"
+                }
+                target_status = stat_map.get(call_status.lower(), "answered")
+                camp_data_update = {
+                    "call_status": target_status,
+                    "call_id": saved_call_id,
+                    "last_attempt_at": datetime.utcnow().isoformat()
+                }
 
-                    matched_campaign_id = None
-                    if contact_id:
-                        supabase_admin.table("campaign_contacts").update(camp_data_update).eq("id", contact_id).execute()
-                        c_lookup = supabase_admin.table("campaign_contacts").select("campaign_id").eq("id", contact_id).limit(1).execute()
-                        if c_lookup.data and len(c_lookup.data) > 0:
-                            matched_campaign_id = c_lookup.data[0].get("campaign_id")
-                    elif clean_10:
-                        supabase_admin.table("campaign_contacts").update(camp_data_update).ilike("phone", f"%{clean_10}%").execute()
-                        c_lookup = supabase_admin.table("campaign_contacts").select("campaign_id").ilike("phone", f"%{clean_10}%").limit(1).execute()
-                        if c_lookup.data and len(c_lookup.data) > 0:
-                            matched_campaign_id = c_lookup.data[0].get("campaign_id")
+                clean_to_digits = re.sub(r"\D", "", str(to_number or ""))
+                clean_to_10 = clean_to_digits[-10:] if len(clean_to_digits) >= 10 else clean_to_digits
+                clean_from_digits = re.sub(r"\D", "", str(from_number or ""))
+                clean_from_10 = clean_from_digits[-10:] if len(clean_from_digits) >= 10 else clean_from_digits
+
+                matched_campaign_id = None
+                if contact_id:
+                    supabase_admin.table("campaign_contacts").update(camp_data_update).eq("id", contact_id).execute()
+                    c_lookup = supabase_admin.table("campaign_contacts").select("campaign_id").eq("id", contact_id).limit(1).execute()
+                    if c_lookup.data and len(c_lookup.data) > 0:
+                        matched_campaign_id = c_lookup.data[0].get("campaign_id")
+                elif clean_to_10:
+                    supabase_admin.table("campaign_contacts").update(camp_data_update).ilike("phone", f"%{clean_to_10}%").execute()
+                    c_lookup = supabase_admin.table("campaign_contacts").select("campaign_id").ilike("phone", f"%{clean_to_10}%").order("last_attempt_at", desc=True).limit(1).execute()
+                    if c_lookup.data and len(c_lookup.data) > 0:
+                        matched_campaign_id = c_lookup.data[0].get("campaign_id")
+                elif clean_from_10:
+                    supabase_admin.table("campaign_contacts").update(camp_data_update).ilike("phone", f"%{clean_from_10}%").execute()
+                    c_lookup = supabase_admin.table("campaign_contacts").select("campaign_id").ilike("phone", f"%{clean_from_10}%").order("last_attempt_at", desc=True).limit(1).execute()
+                    if c_lookup.data and len(c_lookup.data) > 0:
+                        matched_campaign_id = c_lookup.data[0].get("campaign_id")
 
                     if matched_campaign_id:
                         try:

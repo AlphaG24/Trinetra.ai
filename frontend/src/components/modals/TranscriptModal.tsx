@@ -43,9 +43,9 @@ export function TranscriptModal({
   const [copied, setCopied] = useState(false)
   const resolvedCallId = (log as any)?.id || (log as any)?.call_id || callId
   const hasPaymentProof = Boolean(
-    ((log as any)?.revenue_inr && (log as any)?.revenue_inr > 0) ||
-    (log as any)?.metadata?.payment_dispatched ||
-    (log as any)?.metadata?.proof_receipt_id
+    ((log as any)?.revenue_inr && Number((log as any)?.revenue_inr) > 0) ||
+    (log as any)?.metadata?.payment_dispatched === true ||
+    Boolean((log as any)?.metadata?.proof_receipt_id)
   )
 
   // Resolve properties dynamically to support both new 'log' prop and legacy individual parameters

@@ -19,7 +19,7 @@ export function AgentCallingStatus({ phoneNumber, providerType, lifecycleStatus,
     label = lifecycleStatus === 'grace_period' ? 'Grace Period (15 Days)' : 'Hold Period'
     description = 'Pack expired • Auto-disconnected from agent'
   } else if (phoneNumber) {
-    const isSimulated = !providerType || providerType === 'sandbox' || providerType === 'simulated'
+    const isSimulated = providerType === 'sandbox' || providerType === 'simulated'
     if (isSimulated) {
       status = 'test'
       label = 'Test Mode Only'

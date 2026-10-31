@@ -11,7 +11,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     
     const fastApiUrl = process.env.NEXT_PUBLIC_FASTAPI_URL || 'http://127.0.0.1:8000';
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 800);
+    const timeoutId = setTimeout(() => controller.abort(), 4000);
 
     try {
       const response = await fetch(`${fastApiUrl}/api/campaigns/${id}`, {
@@ -42,11 +42,15 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
             )
           `)
           .eq("id", id)
-          .single();
+          .maybeSingle();
 
         if (dbError) {
           console.error(`[GET /api/campaigns/${id}] Supabase fallback query failed:`, dbError);
           return NextResponse.json({ error: "Failed to fetch campaign from database" }, { status: 500 });
+        }
+
+        if (!dbCampaign) {
+          return NextResponse.json({ error: "Campaign not found" }, { status: 404 });
         }
 
         return NextResponse.json({
