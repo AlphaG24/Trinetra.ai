@@ -294,9 +294,13 @@ async def delete_campaign(id: str):
 @router.post("/{id}/contacts/{contact_id}/retry")
 async def retry_contact(id: str, contact_id: str):
     try:
-        # Reset the contact status to pending
+        # Reset contact status to pending and clear callback flag for immediate manual retry
         res = supabase_admin.table("campaign_contacts")\
-            .update({"call_status": "pending"})\
+            .update({
+                "call_status": "pending",
+                "is_requested_callback": False,
+                "requested_callback_time": None
+            })\
             .eq("id", contact_id)\
             .eq("campaign_id", id)\
             .execute()

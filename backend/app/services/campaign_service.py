@@ -896,7 +896,8 @@ class CampaignService:
                         "customer_notes": notes,
                         "business_description": notes,
                         "call_purpose": campaign_data.get("purpose") or "consultation",
-                        "campaign_name": campaign_data.get("name") or business_name
+                        "campaign_name": campaign_data.get("name") or business_name,
+                        "app_version": (4 if "purvi" in str(agent.get("sarvam_agent_id") or "").lower() else 1)
                     },
                     webhook_url=sarvam_webhook,
                     user_id=agent.get("user_id"),

@@ -538,19 +538,27 @@ Respond ONLY with valid JSON."""
             if custom_metadata and custom_metadata.get("contact_id"):
                 webhook_url += f"&contact_id={custom_metadata['contact_id']}"
 
+        # Resolve required app_version for Sarvam outbounds API
+        resolved_version = None
+        if custom_metadata and custom_metadata.get("app_version"):
+            try:
+                resolved_version = int(custom_metadata["app_version"])
+            except Exception:
+                pass
+        if not resolved_version:
+            if "purvi" in str(target_app_id).lower():
+                resolved_version = 4
+            else:
+                resolved_version = 1
+
         app_cfg: Dict[str, Any] = {
             "app_id": target_app_id,
+            "app_version": resolved_version,
             "connection_config": {
                 "connection_id": self.connection_id,
                 "agent_phone_number": resolved_agent_phone
             }
         }
-        # Only specify app_version if explicitly configured, otherwise let Sarvam use active/latest version
-        if custom_metadata and custom_metadata.get("app_version"):
-            try:
-                app_cfg["app_version"] = int(custom_metadata["app_version"])
-            except Exception:
-                pass
 
         payload: Dict[str, Any] = {
             "app_config": app_cfg,
@@ -565,6 +573,7 @@ Respond ONLY with valid JSON."""
             import json
             import urllib.request
 
+            import urllib.error
             def _send_sarvam_request():
                 req_data = json.dumps(payload).encode('utf-8')
                 request = urllib.request.Request(
@@ -573,8 +582,17 @@ Respond ONLY with valid JSON."""
                     headers=headers,
                     method="POST"
                 )
-                with urllib.request.urlopen(request, timeout=12.0) as response:
-                    return response.status, json.loads(response.read().decode('utf-8'))
+                try:
+                    with urllib.request.urlopen(request, timeout=12.0) as response:
+                        return response.status, json.loads(response.read().decode('utf-8'))
+                except urllib.error.HTTPError as http_err:
+                    err_body = http_err.read().decode('utf-8')
+                    try:
+                        err_json = json.loads(err_body)
+                    except Exception:
+                        err_json = {"raw": err_body}
+                    logger.error(f"[Sarvam API Error] HTTP {http_err.code}: {err_json}")
+                    return http_err.code, err_json
 
             status_code, res_data = await asyncio.to_thread(_send_sarvam_request)
 

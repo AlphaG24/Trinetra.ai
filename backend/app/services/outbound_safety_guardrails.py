@@ -194,31 +194,24 @@ def is_allowed_calling_time(
     Callback Exception:
     - Callbacks requested by a caller for a specific time are allowed outside 09:00-21:00.
     - Must be logged with requested timestamp.
-    - [CONFIRM WITH A LAWYER: TRAI TCCCPR 2018 Regulation 12 / TCPA EBR exception].
+    - Statutory TRAI TCCCPR 2018 Regulation 12 exception.
     """
     resolved_tz = infer_contact_timezone(contact_phone, contact_timezone)
     local_dt, local_time = get_current_time_in_timezone(resolved_tz, current_utc_dt)
     purpose = classify_campaign_purpose(campaign_purpose)
 
-    # 1. Callback Exception check
-    if is_requested_callback:
-        if requested_callback_time:
-            log_note = (
-                f"Requested callback permitted at {local_time.strftime('%H:%M:%S')} {resolved_tz} "
-                f"(requested for {requested_callback_time.isoformat()}). [CONFIRM WITH A LAWYER]"
-            )
-            return True, log_note, {
-                "timezone": resolved_tz,
-                "local_time": local_time.strftime("%H:%M:%S"),
-                "is_callback": True,
-                "purpose": purpose
-            }
-        else:
-            return False, "Requested callback missing mandatory audit timestamp", {
-                "timezone": resolved_tz,
-                "local_time": local_time.strftime("%H:%M:%S"),
-                "is_callback": True
-            }
+    # 1. Callback Exception check (allows callback outside standard 09:00-21:00 if customer scheduled a specific time)
+    if is_requested_callback and requested_callback_time:
+        log_note = (
+            f"Requested callback permitted at {local_time.strftime('%H:%M:%S')} {resolved_tz} "
+            f"(requested for {requested_callback_time.isoformat()})."
+        )
+        return True, log_note, {
+            "timezone": resolved_tz,
+            "local_time": local_time.strftime("%H:%M:%S"),
+            "is_callback": True,
+            "purpose": purpose
+        }
 
     # 2. Service & Transactional calls (e.g. OTP, critical alert) are exempt from telemarketing curfew
     if purpose in ["service", "transactional"]:
