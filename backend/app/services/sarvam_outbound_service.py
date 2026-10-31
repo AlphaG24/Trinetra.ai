@@ -558,6 +558,7 @@ Respond ONLY with valid JSON."""
         }
 
         logger.info(f"[SarvamOutboundService] Dialing {cleaned_phone} via agent {target_app_id} (CLI: {resolved_agent_phone})")
+        logger.info(f"[SarvamOutboundService] Full payload user_config: customer_name={user_config.get('customer_name')}, company_name={user_config.get('company_name')}, agent_name={user_config.get('agent_name')}, intent={user_config.get('intent')}, notes={user_config.get('notes')}")
 
         try:
             import json
