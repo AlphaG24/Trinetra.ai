@@ -12,8 +12,19 @@ export const metadata: Metadata = {
 }
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  let user: any = null
+
+  try {
+    const supabase = await createClient()
+    const authPromise = supabase.auth.getUser()
+    const timeoutPromise = new Promise<{ data: { user: null }; error: Error }>((resolve) =>
+      setTimeout(() => resolve({ data: { user: null }, error: new Error('Auth timeout') }), 1500)
+    )
+    const res = await Promise.race([authPromise, timeoutPromise])
+    user = res?.data?.user
+  } catch (err) {
+    // Proceed - client handles auth state via AuthProvider
+  }
 
   if (user) {
     const userEmail = (user.email || '').toLowerCase().trim()

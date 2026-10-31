@@ -25,6 +25,17 @@ export async function createClient() {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
+      global: {
+        fetch: (url, options: any = {}) => {
+          const timeout = 6000
+          const controller = new AbortController()
+          const id = setTimeout(() => controller.abort(), timeout)
+          if (options.signal) {
+            options.signal.addEventListener('abort', () => controller.abort(), { once: true })
+          }
+          return fetch(url, { ...options, signal: controller.signal }).finally(() => clearTimeout(id))
+        }
+      },
       cookies: {
         getAll() {
           const all = cookieStore.getAll()

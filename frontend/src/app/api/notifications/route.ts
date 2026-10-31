@@ -14,13 +14,21 @@ export const dynamic = 'force-dynamic'
 
 export async function GET() {
   try {
+    const { cookies } = await import('next/headers')
+    const cookieStore = await cookies()
+    const allCookies = cookieStore.getAll()
+    const hasAuthCookie = allCookies.some(c => c.name.includes('auth-token') || c.name.startsWith('sb-'))
+    if (!hasAuthCookie) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const supabase = await createClient()
 
     let user: any = null
     try {
       const authPromise = supabase.auth.getUser().catch(() => ({ data: { user: null } }))
       const timeoutPromise = new Promise<any>((_, reject) =>
-        setTimeout(() => reject(new Error('Auth timeout')), 15000)
+        setTimeout(() => reject(new Error('Auth timeout')), 3000)
       )
       const authRes = await Promise.race([authPromise, timeoutPromise])
       user = authRes?.data?.user ?? null
@@ -43,7 +51,7 @@ export async function GET() {
         .order('created_at', { ascending: false })
         .limit(30)
       const timeoutPromise = new Promise<any>((_, reject) =>
-        setTimeout(() => reject(new Error('DB timeout')), 15000)
+        setTimeout(() => reject(new Error('DB timeout')), 4000)
       )
       const { data, error } = await Promise.race([dbPromise, timeoutPromise])
       if (!error && data) {
