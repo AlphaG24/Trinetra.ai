@@ -820,26 +820,15 @@ def build_outbound_sales_protocol(
     gender_verb_speak = _gp["v_bol"].split()[1] if len(_gp["v_bol"].split()) > 1 else "raha"  # rahi/raha/rahe
     
     protocol = (
-        f"
-
-## OUTBOUND SALES PROTOCOL:
-"
-        f"Target: {p_name}{comp_part} | You represent: {b_name} | Services: {b_services}
-"
-        f"Lead context: {notes_summary}
-"
-        f"
-"
-        f"### CUSTOMER IDENTITY & NAME ACCURACY:
-"
-        f"- You are speaking with: {p_name}{comp_part}.
-"
-        f"- Always address them respectfully as '{first_name} ji' or 'sir/ma'am'.
-"
-        f"- If the customer asks 'Mera naam kya hai?', 'Aap kisse baat kar rahe ho?', or 'Who am I?', IMMEDIATELY confirm their name with certainty: 'Main {p_name} se hi baat kar raha/rahi hoon'. NEVER claim not to know their name!
-"
-        f"- In middle conversation turns, speak naturally without repetitive robot-like repetition of their full name on every single turn.
-"
+        f"\n\n## OUTBOUND SALES PROTOCOL:\n"
+        f"Target: {p_name}{comp_part} | You represent: {b_name} | Services: {b_services}\n"
+        f"Lead context: {notes_summary}\n"
+        f"\n"
+        f"### CUSTOMER IDENTITY & NAME ACCURACY:\n"
+        f"- You are speaking with: {p_name}{comp_part}.\n"
+        f"- Always address them respectfully as '{first_name} ji' or 'sir/ma\'am'.\n"
+        f"- If the customer asks 'Mera naam kya hai?', 'Aap kisse baat kar rahe ho?', or 'Who am I?', IMMEDIATELY confirm their name with certainty: 'Main {p_name} se hi baat kar raha/rahi hoon'. NEVER claim not to know their name!\n"
+        f"- In middle conversation turns, speak naturally without repetitive robot-like repetition of their full name on every single turn.\n"
         f"\n"
         f"### CONVERSATION FLOW (adapt to your business):\n"
         f"1. OPENING (done): You greeted and asked for 2 minutes.\n"
