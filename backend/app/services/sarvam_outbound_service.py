@@ -551,23 +551,44 @@ Respond ONLY with valid JSON."""
             else:
                 resolved_version = 1
 
+        # Sarvam strictly requires prompt template variables inside app_config.agent_variables
+        agent_vars: Dict[str, Any] = {
+            "customer_name": c_name or "Customer",
+            "customer_first_name": first_name or "sir",
+            "customer_salutation": salutation,
+            "user_name": c_name or "Customer",
+            "agent_name": resolved_agent,
+            "company_name": final_business_name,
+            "prospect_company": prospect_comp or "their organization",
+            "customer_phone": cleaned_phone,
+            "intent": call_intent,
+            "notes": call_notes,
+            "knowledge_base": ""
+        }
+
         app_cfg: Dict[str, Any] = {
             "app_id": target_app_id,
             "app_version": resolved_version,
             "connection_config": {
                 "connection_id": self.connection_id,
                 "agent_phone_number": resolved_agent_phone
-            }
+            },
+            "agent_variables": agent_vars
+        }
+
+        # Sarvam strictly accepts only user_phone_number inside user_config
+        clean_user_cfg: Dict[str, Any] = {
+            "user_phone_number": cleaned_phone
         }
 
         payload: Dict[str, Any] = {
             "app_config": app_cfg,
-            "user_config": user_config,
+            "user_config": clean_user_cfg,
             "webhook_config": {"url": webhook_url}
         }
 
         logger.info(f"[SarvamOutboundService] Dialing {cleaned_phone} via agent {target_app_id} (CLI: {resolved_agent_phone})")
-        logger.info(f"[SarvamOutboundService] Full payload user_config: customer_name={user_config.get('customer_name')}, company_name={user_config.get('company_name')}, agent_name={user_config.get('agent_name')}, intent={user_config.get('intent')}, notes={user_config.get('notes')}")
+        logger.info(f"[SarvamOutboundService] Injected agent_variables: customer_name={agent_vars.get('customer_name')}, customer_salutation={agent_vars.get('customer_salutation')}, company_name={agent_vars.get('company_name')}, agent_name={agent_vars.get('agent_name')}, prospect_company={agent_vars.get('prospect_company')}, intent={agent_vars.get('intent')}, notes={agent_vars.get('notes')}")
 
         try:
             import json
@@ -595,6 +616,28 @@ Respond ONLY with valid JSON."""
                     return http_err.code, err_json
 
             status_code, res_data = await asyncio.to_thread(_send_sarvam_request)
+
+            # Auto-fallback: if an unconfigured app rejects agent_variables (HTTP 422), retry without them
+            if status_code == 422 and "not found in agent variables of app" in str(res_data):
+                logger.warning(f"[SarvamOutboundService] App {target_app_id} does not accept custom agent_variables; retrying without them...")
+                fallback_payload = dict(payload)
+                fallback_app_cfg = dict(app_cfg)
+                fallback_app_cfg.pop("agent_variables", None)
+                fallback_payload["app_config"] = fallback_app_cfg
+                def _send_sarvam_fallback():
+                    fallback_req_data = json.dumps(fallback_payload).encode('utf-8')
+                    fallback_request = urllib.request.Request(url, data=fallback_req_data, headers=headers, method="POST")
+                    try:
+                        with urllib.request.urlopen(fallback_request, timeout=12.0) as fallback_response:
+                            return fallback_response.status, json.loads(fallback_response.read().decode('utf-8'))
+                    except urllib.error.HTTPError as f_err:
+                        f_body = f_err.read().decode('utf-8')
+                        try:
+                            f_json = json.loads(f_body)
+                        except Exception:
+                            f_json = {"raw": f_body}
+                        return f_err.code, f_json
+                status_code, res_data = await asyncio.to_thread(_send_sarvam_fallback)
 
             if status_code in (200, 201):
                 attempt_id = res_data.get("attempt_id") or f"att_{datetime.now(timezone.utc).timestamp()}"
