@@ -68,23 +68,17 @@ export const DEFAULT_PUBLIC_CONFIGS: Record<string, string> = {
   onboarding_fee_paisa: '0'
 }
 
-// In-memory cache for public system configs
+// In-memory cache for public system configs (TTL: 60 seconds)
 let cachedConfigs: Record<string, string> = DEFAULT_PUBLIC_CONFIGS
 let cacheExpiresAt = 0
-
-export function invalidateConfigCache() {
-  cacheExpiresAt = 0
-}
-
-export async function GET(request?: Request) {
+export async function GET() {
   const now = Date.now()
-  const isFreshRequested = request?.url ? (request.url.includes('t=') || request.url.includes('fresh')) : false
 
-  // Return from memory cache if fresh and no bypass requested
-  if (!isFreshRequested && cachedConfigs && now < cacheExpiresAt) {
+  // Return from memory cache if fresh
+  if (cachedConfigs && now < cacheExpiresAt) {
     return NextResponse.json(
       { configs: cachedConfigs },
-      { headers: { 'Cache-Control': 'public, s-maxage=10, stale-while-revalidate=60' } }
+      { headers: { 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300' } }
     )
   }
 
@@ -107,22 +101,29 @@ export async function GET(request?: Request) {
       return cachedConfigs || DEFAULT_PUBLIC_CONFIGS
     })()
 
+    // Resilient 1500ms timeout guard so downstream clients never hang or throw TypeError: Failed to fetch
     const timeoutPromise = new Promise<Record<string, string>>((resolve) =>
       setTimeout(() => resolve(cachedConfigs || DEFAULT_PUBLIC_CONFIGS), 1500)
     )
 
+
     const resolvedConfigs = await Promise.race([fetchPromise, timeoutPromise])
     cachedConfigs = resolvedConfigs
-    cacheExpiresAt = now + 10000 // 10s TTL
+    cacheExpiresAt = now + 60000 // 60 seconds TTL
 
     return NextResponse.json(
       { configs: resolvedConfigs },
-      { headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' } }
+      { headers: { 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300' } }
     )
   } catch (error: any) {
     return NextResponse.json(
       { configs: cachedConfigs || DEFAULT_PUBLIC_CONFIGS },
-      { status: 200 }
+      { headers: { 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300' } }
     )
   }
+}
+
+export function invalidateConfigCache() {
+  cachedConfigs = null
+  cacheExpiresAt = 0
 }

@@ -410,7 +410,16 @@ Respond ONLY with valid JSON."""
                     logger.warning(f"[SarvamOutboundService] Error checking phone_numbers: {p_err}")
 
         # Resolve organization/company name for tenant
-        if resolved_org_id:
+        resolved_biz_name = ""
+        if custom_metadata:
+            resolved_biz_name = (
+                custom_metadata.get("company_name") or 
+                custom_metadata.get("business_name") or 
+                custom_metadata.get("campaign_name") or 
+                ""
+            )
+
+        if not resolved_biz_name and resolved_org_id:
             try:
                 org_row = await asyncio.to_thread(
                     supabase_admin.table("organizations")
@@ -439,18 +448,43 @@ Respond ONLY with valid JSON."""
                 pass
 
         # Expand user_config with comprehensive aliases for Sarvam app templates
-        c_name = (contact_name or user_config.get("customer_name") or user_config.get("user_name") or "").strip()
+        c_name = (
+            contact_name or 
+            user_config.get("customer_name") or 
+            user_config.get("user_name") or 
+            (custom_metadata.get("customer_name") if custom_metadata else None) or
+            (custom_metadata.get("name") if custom_metadata else None) or
+            ""
+        ).strip()
         first_name = c_name.split()[0] if c_name else ""
         salutation = f"{first_name} ji" if first_name else "sir"
         prospect_comp = (
             user_config.get("prospect_company") or 
             user_config.get("customer_company") or 
             (custom_metadata.get("prospect_company") if custom_metadata else None) or 
+            (custom_metadata.get("company") if custom_metadata else None) or
             ""
         ).strip()
 
         final_business_name = resolved_biz_name or "Purvi Roadlines"
         resolved_agent = resolved_agent_name or user_config.get("agent_name") or "Jitendra"
+
+        call_intent = (
+            user_config.get("intent") or 
+            (custom_metadata.get("intent") if custom_metadata else None) or
+            user_config.get("call_purpose") or 
+            user_config.get("purpose") or 
+            user_config.get("lead_intent") or 
+            "consultative inquiry and freight solutions"
+        )
+        call_notes = (
+            user_config.get("notes") or 
+            (custom_metadata.get("notes") if custom_metadata else None) or
+            user_config.get("customer_notes") or 
+            user_config.get("business_description") or 
+            (f"Prospect Company: {prospect_comp}" if prospect_comp else "") or 
+            "Standard logistics inquiry"
+        )
 
         user_config.update({
             # Agent Aliases
@@ -475,9 +509,9 @@ Respond ONLY with valid JSON."""
             "salutation": salutation,
 
             # Prospect Company Aliases
-            "prospect_company": prospect_comp,
-            "customer_company": prospect_comp,
-            "client_company": prospect_comp,
+            "prospect_company": prospect_comp or "their organization",
+            "customer_company": prospect_comp or "their organization",
+            "client_company": prospect_comp or "their organization",
 
             # Contact Phone Aliases
             "customer_phone": cleaned_phone,
@@ -486,22 +520,11 @@ Respond ONLY with valid JSON."""
             "phone": cleaned_phone,
             "phone_number": cleaned_phone,
             "contact_phone": cleaned_phone,
-        })
 
-        if not user_config.get("intent"):
-            user_config["intent"] = (
-                user_config.get("call_purpose") or 
-                user_config.get("purpose") or 
-                user_config.get("lead_intent") or 
-                "consultative inquiry and freight solutions"
-            )
-        if not user_config.get("notes"):
-            user_config["notes"] = (
-                user_config.get("customer_notes") or 
-                user_config.get("business_description") or 
-                prospect_comp or 
-                ""
-            )
+            # Intent & Notes
+            "intent": call_intent,
+            "notes": call_notes,
+        })
 
         # Ensure webhook_url is ALWAYS populated so Sarvam sends transcript and audio back
         if not webhook_url:
@@ -513,15 +536,22 @@ Respond ONLY with valid JSON."""
             if custom_metadata and custom_metadata.get("contact_id"):
                 webhook_url += f"&contact_id={custom_metadata['contact_id']}"
 
+        app_cfg: Dict[str, Any] = {
+            "app_id": target_app_id,
+            "connection_config": {
+                "connection_id": self.connection_id,
+                "agent_phone_number": resolved_agent_phone
+            }
+        }
+        # Only specify app_version if explicitly configured, otherwise let Sarvam use active/latest version
+        if custom_metadata and custom_metadata.get("app_version"):
+            try:
+                app_cfg["app_version"] = int(custom_metadata["app_version"])
+            except Exception:
+                pass
+
         payload: Dict[str, Any] = {
-            "app_config": {
-                "app_id": target_app_id,
-                "app_version": 1,
-                "connection_config": {
-                    "connection_id": self.connection_id,
-                    "agent_phone_number": resolved_agent_phone
-                }
-            },
+            "app_config": app_cfg,
             "user_config": user_config,
             "webhook_config": {"url": webhook_url}
         }

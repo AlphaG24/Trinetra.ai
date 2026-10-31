@@ -3676,14 +3676,22 @@ async def entrypoint(ctx: JobContext):
                             logger.warning(f"Failed to lookup caller_phone from voice_calls in EP: {vc_err}")
 
                 campaign_contact = None
-                if not contact_id and ctx.room and ctx.room.name.startswith("twilio-"):
+                if not contact_id and ctx.room and ctx.room.name:
                     call_sid = ctx.room.name.split("-")[-1]
                     try:
                         call_res = await asyncio.to_thread(
-                            supabase_admin.table("voice_calls").select("metadata").or_(f"metadata->>room_name.eq.{ctx.room.name},metadata->>provider_call_id.eq.{call_sid}").maybe_single().execute
+                            supabase_admin.table("voice_calls")
+                            .select("metadata")
+                            .or_(f"metadata->>room_name.eq.{ctx.room.name},metadata->>provider_call_id.eq.{call_sid}")
+                            .order("started_at", desc=True)
+                            .limit(1)
+                            .execute
                         )
-                        if call_res and hasattr(call_res, 'data') and call_res.data and call_res.data.get("metadata"):
-                            contact_id = call_res.data["metadata"].get("contact_id")
+                        if call_res and hasattr(call_res, 'data') and call_res.data and len(call_res.data) > 0:
+                            v_meta = call_res.data[0].get("metadata") or {}
+                            contact_id = v_meta.get("contact_id") or v_meta.get("campaign_contact_id")
+                            if not db_caller_name and v_meta.get("customer_name"):
+                                db_caller_name = v_meta["customer_name"]
                     except Exception as e:
                         logger.error(f"Failed to resolve contact_id from voice_calls metadata in entrypoint: {e}")
 
@@ -3798,6 +3806,48 @@ async def entrypoint(ctx: JobContext):
                         end_msg_text=end_msg_text
                     )
                     system_prompt += personalized_context
+
+                # Hydrate all prospect template placeholders in system_prompt
+                resolved_c_name = (
+                    (campaign_contact.get("full_name") if campaign_contact else None) or
+                    (customer.get("full_name") if customer else None) or
+                    db_caller_name or
+                    ""
+                ).strip()
+                if resolved_c_name.lower() in ("unknown", "unknown caller"):
+                    resolved_c_name = ""
+                resolved_c_first = resolved_c_name.split()[0] if resolved_c_name else ""
+                resolved_c_salut = f"{resolved_c_first} ji" if resolved_c_first else "sir"
+                resolved_prospect_co = (
+                    (campaign_contact.get("company_name") if campaign_contact else None) or
+                    (customer.get("company") if customer else None) or
+                    ""
+                ).strip()
+                resolved_intent = (
+                    (campaign_contact.get("intent") if campaign_contact else None) or
+                    (campaign_contact.get("lead_intent") if campaign_contact else None) or
+                    "consultative inquiry and freight solutions"
+                )
+                resolved_notes = (
+                    (campaign_contact.get("notes") if campaign_contact else None) or
+                    (f"Prospect Company: {resolved_prospect_co}" if resolved_prospect_co else "") or
+                    "Standard logistics consultation"
+                )
+
+                system_prompt = system_prompt.replace('{{customer_name}}', resolved_c_name or 'the customer')
+                system_prompt = system_prompt.replace('{customer_name}', resolved_c_name or 'the customer')
+                system_prompt = system_prompt.replace('{{customer_first_name}}', resolved_c_first or 'sir')
+                system_prompt = system_prompt.replace('{customer_first_name}', resolved_c_first or 'sir')
+                system_prompt = system_prompt.replace('{{customer_salutation}}', resolved_c_salut)
+                system_prompt = system_prompt.replace('{customer_salutation}', resolved_c_salut)
+                system_prompt = system_prompt.replace('{{prospect_company}}', resolved_prospect_co or 'their company')
+                system_prompt = system_prompt.replace('{prospect_company}', resolved_prospect_co or 'their company')
+                system_prompt = system_prompt.replace('{{customer_phone}}', caller_number if caller_number != "Unknown" else "")
+                system_prompt = system_prompt.replace('{customer_phone}', caller_number if caller_number != "Unknown" else "")
+                system_prompt = system_prompt.replace('{{intent}}', resolved_intent)
+                system_prompt = system_prompt.replace('{intent}', resolved_intent)
+                system_prompt = system_prompt.replace('{{notes}}', resolved_notes)
+                system_prompt = system_prompt.replace('{notes}', resolved_notes)
 
                 # 11. Ending and Fallback Messages
                 if agent_data and agent_data.get("ending_message"):
@@ -4703,14 +4753,20 @@ async def run_agent(room_name: str, agent_id: str | None = None, contact_id: str
                             break
 
                 campaign_contact = None
-                if not contact_id and room_name and ("twilio-" in room_name or "sip-" in room_name):
-                    call_sid = room_name.split("_")[0].replace("twilio-", "").replace("sip-", "")
+                if not contact_id and room_name:
+                    call_sid = room_name.split("_")[0].replace("twilio-", "").replace("sip-", "").replace("exotel-", "")
                     try:
                         call_res = await asyncio.to_thread(
-                            supabase_admin.table("voice_calls").select("metadata").eq("metadata->>provider_call_id", call_sid).maybe_single().execute
+                            supabase_admin.table("voice_calls")
+                            .select("metadata")
+                            .or_(f"metadata->>room_name.eq.{room_name},metadata->>provider_call_id.eq.{call_sid}")
+                            .order("started_at", desc=True)
+                            .limit(1)
+                            .execute
                         )
-                        if call_res and getattr(call_res, "data", None) and isinstance(call_res.data, dict) and call_res.data.get("metadata"):
-                            contact_id = call_res.data["metadata"].get("contact_id")
+                        if call_res and getattr(call_res, "data", None) and len(call_res.data) > 0:
+                            v_meta = call_res.data[0].get("metadata") or {}
+                            contact_id = v_meta.get("contact_id") or v_meta.get("campaign_contact_id")
                     except Exception as e:
                         logger.error(f"Failed to resolve contact_id from voice_calls metadata in run_agent: {e}")
 
@@ -4839,6 +4895,48 @@ async def run_agent(room_name: str, agent_id: str | None = None, contact_id: str
                         end_msg_text=end_msg_text
                     )
                     system_prompt += personalized_context
+
+                # Hydrate all prospect template placeholders in system_prompt
+                resolved_c_name = (
+                    (campaign_contact.get("full_name") if campaign_contact else None) or
+                    (customer.get("full_name") if customer else None) or
+                    db_caller_name or
+                    ""
+                ).strip()
+                if resolved_c_name.lower() in ("unknown", "unknown caller"):
+                    resolved_c_name = ""
+                resolved_c_first = resolved_c_name.split()[0] if resolved_c_name else ""
+                resolved_c_salut = f"{resolved_c_first} ji" if resolved_c_first else "sir"
+                resolved_prospect_co = (
+                    (campaign_contact.get("company_name") if campaign_contact else None) or
+                    (customer.get("company") if customer else None) or
+                    ""
+                ).strip()
+                resolved_intent = (
+                    (campaign_contact.get("intent") if campaign_contact else None) or
+                    (campaign_contact.get("lead_intent") if campaign_contact else None) or
+                    "consultative inquiry and freight solutions"
+                )
+                resolved_notes = (
+                    (campaign_contact.get("notes") if campaign_contact else None) or
+                    (f"Prospect Company: {resolved_prospect_co}" if resolved_prospect_co else "") or
+                    "Standard logistics consultation"
+                )
+
+                system_prompt = system_prompt.replace('{{customer_name}}', resolved_c_name or 'the customer')
+                system_prompt = system_prompt.replace('{customer_name}', resolved_c_name or 'the customer')
+                system_prompt = system_prompt.replace('{{customer_first_name}}', resolved_c_first or 'sir')
+                system_prompt = system_prompt.replace('{customer_first_name}', resolved_c_first or 'sir')
+                system_prompt = system_prompt.replace('{{customer_salutation}}', resolved_c_salut)
+                system_prompt = system_prompt.replace('{customer_salutation}', resolved_c_salut)
+                system_prompt = system_prompt.replace('{{prospect_company}}', resolved_prospect_co or 'their company')
+                system_prompt = system_prompt.replace('{prospect_company}', resolved_prospect_co or 'their company')
+                system_prompt = system_prompt.replace('{{customer_phone}}', caller_number if caller_number != "Unknown" else "")
+                system_prompt = system_prompt.replace('{customer_phone}', caller_number if caller_number != "Unknown" else "")
+                system_prompt = system_prompt.replace('{{intent}}', resolved_intent)
+                system_prompt = system_prompt.replace('{intent}', resolved_intent)
+                system_prompt = system_prompt.replace('{{notes}}', resolved_notes)
+                system_prompt = system_prompt.replace('{notes}', resolved_notes)
 
                 # 11. Ending and Fallback Messages
                 if agent_data and agent_data.get("ending_message"):

@@ -93,7 +93,7 @@ export function KYCTab() {
     e.preventDefault()
 
     if (!consentGiven) {
-      toast.error('You must affirmatively consent to statutory verification')
+      toast.error('Please confirm document authenticity before submitting')
       return
     }
 
@@ -255,12 +255,12 @@ export function KYCTab() {
         <div className="flex-1">
           <div className="flex items-center justify-between flex-wrap gap-2">
             <h4 className="text-sm font-bold text-zinc-900 dark:text-white uppercase tracking-wider">
-              Statutory KYC & Regulatory Compliance Vault
+              Business Identity & Verification Vault
             </h4>
             {getStatusBadge(overallStatus)}
           </div>
           <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1 leading-relaxed">
-            Per Telecom Regulatory Authority guidelines (TRAI & DPDP Act), live production outbound calling and dedicated DID numbers require verified organization KYC. Documents are vaulted with bank-grade encryption and automatic UIDAI masking.
+            To activate dedicated caller IDs and outbound campaigns, verify your organization identity. Documents are securely stored with automatic sensitive data masking.
           </p>
         </div>
       </div>
@@ -280,7 +280,7 @@ export function KYCTab() {
             Verify Instantly via DigiLocker (Govt. of India)
           </h3>
           <p className="text-xs text-zinc-600 dark:text-zinc-400 max-w-xl leading-relaxed">
-            Direct MeitY DigiLocker gateway integration is currently in scheduled release. Once unlocked, you can fetch your government-verified Aadhaar or PAN digitally in 30 seconds. In the meantime, please complete statutory verification using the document upload portal below.
+            Direct MeitY DigiLocker gateway integration is currently in scheduled release. Once unlocked, you can fetch your verified Aadhaar or PAN digitally in 30 seconds. In the meantime, please complete verification using the document upload portal below.
           </p>
         </div>
         <button
@@ -438,7 +438,7 @@ export function KYCTab() {
               />
               <p className="text-[10px] text-zinc-400 dark:text-zinc-500 mt-1 flex items-center gap-1 font-mono">
                 <Lock className="w-3 h-3 text-emerald-500" />
-                Statutory Privacy Safe: Raw Aadhaar numbers are never stored; only masked identifiers are permanently vaulted.
+                Privacy Protected: Raw identity numbers are never stored; only masked identifiers are securely retained.
               </p>
             </div>
 
@@ -473,7 +473,7 @@ export function KYCTab() {
                   className="mt-0.5 rounded border-zinc-300 dark:border-white/20 text-violet-600 focus:ring-zinc-900 dark:focus:ring-white"
                 />
                 <span className="text-[11px] text-zinc-600 dark:text-zinc-400 leading-snug">
-                  I affirmatively declare that this identity document is authentic and grant consent to Vaakriti AI and its authorized carriers for statutory telecom KYC verification pursuant to the Digital Personal Data Protection Act.
+                  I confirm that this identity document is authentic and authorize verification of our business identity for calling capabilities.
                 </span>
               </label>
             </div>

@@ -7,6 +7,7 @@ import localFont from 'next/font/local';
 import { Toaster } from "sonner";
 import { Toaster as HotToaster } from "react-hot-toast";
 import { AuthProvider } from "@/src/components/providers/AuthProvider";
+import { EntryLoader } from "@/src/components/shared/EntryLoader";
 // Client wrapper that applies ssr:false for MaintenanceWatcher
 import { MaintenanceWatcherLoader } from '@/src/components/dashboard/MaintenanceWatcherLoader';
 
@@ -198,6 +199,7 @@ export default async function RootLayout({
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
         <AuthProvider>
+          <EntryLoader />
           <Suspense fallback={null}>
             <MaintenanceWatcherLoader initialMaintenanceMode={initialMaintenanceMode} />
           </Suspense>

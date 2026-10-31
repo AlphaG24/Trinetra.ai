@@ -150,33 +150,59 @@ export default function SystemConfigPage() {
     setConfigs((prev) => ({ ...prev, [key]: value }))
   }
 
-  // Maintenance mode toggle — auto-saves immediately without needing "Save All Changes"
+  // Maintenance mode toggle — auto-saves immediately with optimistic state & cross-tab broadcast
   const [maintenanceSaving, setMaintenanceSaving] = useState(false)
 
   const handleMaintenanceToggle = async () => {
+    if (maintenanceSaving) return
     const newValue = configs.maintenance_mode === 'true' ? 'false' : 'true'
+    
+    // Instant optimistic UI update
     setConfigs((prev) => ({ ...prev, maintenance_mode: newValue }))
+    setMaintenanceSaving(true)
+
+    // Broadcast immediately across all open tabs
+    if (typeof window !== 'undefined') {
+      try {
+        const bc = new BroadcastChannel('vaakriti_maintenance_channel')
+        bc.postMessage({ maintenance_mode: newValue })
+        bc.close()
+      } catch {}
+      window.dispatchEvent(new CustomEvent('vaakriti-maintenance-update', { detail: { maintenance_mode: newValue } }))
+    }
+
     try {
-      setMaintenanceSaving(true)
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 6000)
+
       const res = await fetch('/api/admin/system-config', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ configs: { maintenance_mode: newValue } }),
+        signal: controller.signal,
       })
+      clearTimeout(timeoutId)
+
       if (!res.ok) {
         const json = await res.json()
         throw new Error(json.error || 'Failed to save')
       }
-      // Instantly bust client and edge cache
-      await fetch(`/api/public/config?t=${Date.now()}&fresh=true`, { cache: 'no-store' }).catch(() => {})
+
+      // Bust cache asynchronously without blocking the UI
+      fetch(`/api/public/config?t=${Date.now()}&fresh=true`, { cache: 'no-store' }).catch(() => {})
+
       toast.success(
         newValue === 'true'
-          ? '🔒 Maintenance mode ON — users will see the maintenance screen'
+          ? '🔒 Maintenance mode ON — public visitors will see the maintenance screen'
           : '✅ Maintenance mode OFF — platform is live'
       )
     } catch (err: any) {
       // Revert on failure
-      setConfigs((prev) => ({ ...prev, maintenance_mode: newValue === 'true' ? 'false' : 'true' }))
+      const reverted = newValue === 'true' ? 'false' : 'true'
+      setConfigs((prev) => ({ ...prev, maintenance_mode: reverted }))
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('vaakriti-maintenance-update', { detail: { maintenance_mode: reverted } }))
+      }
       toast.error(err.message || 'Failed to toggle maintenance mode')
     } finally {
       setMaintenanceSaving(false)
@@ -404,14 +430,14 @@ export default function SystemConfigPage() {
       {/* Platform Maintenance Mode Control Card */}
       <div className={`border rounded-2xl p-6 transition-all duration-200 flex flex-col md:flex-row items-start md:items-center justify-between gap-6 shadow-sm ${
         configs.maintenance_mode === 'true'
-          ? 'bg-amber-950/20 border-amber-500/30 ring-1 ring-amber-500/20'
+          ? 'bg-zinc-900 border-amber-500/40 ring-1 ring-amber-500/30'
           : 'bg-zinc-900/60 border-zinc-800'
       }`}>
         <div className="flex items-start gap-4">
-          <div className={`p-3 rounded-xl shrink-0 mt-0.5 ${
+          <div className={`p-3 rounded-xl shrink-0 mt-0.5 border ${
             configs.maintenance_mode === 'true'
-              ? 'bg-amber-500/20 text-amber-400'
-              : 'bg-zinc-800 text-zinc-400'
+              ? 'bg-amber-500/10 border-amber-500/30 text-amber-400'
+              : 'bg-zinc-800/80 border-zinc-700/60 text-zinc-400'
           }`}>
             <WrenchIcon className="w-5 h-5" />
           </div>
@@ -421,7 +447,7 @@ export default function SystemConfigPage() {
                 Platform Maintenance Mode
               </h2>
               {configs.maintenance_mode === 'true' ? (
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-amber-500/15 text-amber-300 border border-amber-500/30">
                   <span className="relative flex h-2 w-2">
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
                     <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500" />
@@ -437,8 +463,8 @@ export default function SystemConfigPage() {
             </div>
             <p className="text-xs text-zinc-400 leading-relaxed max-w-xl">
               {configs.maintenance_mode === 'true'
-                ? 'Public visitors and regular users are currently redirected to the maintenance page. Admins maintain full system access.'
-                : 'Platform is operating normally. Toggle maintenance mode when performing database migrations or statutory updates.'}
+                ? 'Public visitors and regular users are currently shown the maintenance screen. Admins maintain full system access.'
+                : 'Platform is operating normally. Toggle maintenance mode during scheduled system upgrades.'}
             </p>
           </div>
         </div>
@@ -449,20 +475,20 @@ export default function SystemConfigPage() {
             id="maintenance-mode-toggle"
             onClick={handleMaintenanceToggle}
             disabled={maintenanceSaving}
-            className={`px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-2 cursor-pointer shadow-md disabled:opacity-50 disabled:cursor-not-allowed ${
+            className={`group px-5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-2.5 cursor-pointer shadow-md disabled:opacity-50 disabled:cursor-not-allowed ${
               configs.maintenance_mode === 'true'
-                ? 'bg-emerald-500 hover:bg-emerald-400 text-zinc-950 shadow-emerald-500/20'
-                : 'bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30'
+                ? 'bg-white text-zinc-950 hover:bg-zinc-200 border border-white'
+                : 'bg-zinc-800 text-white hover:bg-zinc-700 border border-zinc-700'
             }`}
           >
             {maintenanceSaving ? (
               <>
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                <span>Applying changes...</span>
+                <Loader2 className="w-3.5 h-3.5 animate-spin text-zinc-400" />
+                <span>Updating...</span>
               </>
             ) : configs.maintenance_mode === 'true' ? (
               <>
-                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
                 <span>Resume Live Platform</span>
               </>
             ) : (

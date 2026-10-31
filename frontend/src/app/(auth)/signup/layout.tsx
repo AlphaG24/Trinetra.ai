@@ -1,8 +1,8 @@
 import { Metadata } from 'next'
 
 export const metadata: Metadata = {
-  title: 'Sign Up — Trinetra AI',
-  description: 'Sign up for a Trinetra AI account and start deploying Hinglish/multilingual voice agents for your business.'
+  title: 'Sign Up — Vaakriti AI',
+  description: 'Create your Vaakriti AI account to launch autonomous conversational voice agents.'
 }
 
 export default function SignupLayout({ children }: { children: React.ReactNode }) {
