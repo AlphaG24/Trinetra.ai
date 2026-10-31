@@ -2,14 +2,15 @@ import { createClient } from '@/utils/supabase/server'
 import { Metadata } from 'next'
 import { Search, ChevronLeft, ChevronRight } from 'lucide-react'
 import SubscribeForm from './SubscribeForm'
+import { FALLBACK_BLOG_POSTS, BlogPostItem } from '@/src/lib/blogData'
 
 export const dynamic = 'force-dynamic'
 
 export const metadata: Metadata = {
-  title: 'Blog & Research | Trinetra AI',
+  title: 'Blog & Research | Vaakriti AI',
   description: 'Practical guides, architectural deep-dives, and engineering insights on autonomous voice AI systems, agentic workflows, and scalable intelligence.',
   openGraph: {
-    title: 'Blog & Research | Trinetra AI',
+    title: 'Blog & Research | Vaakriti AI',
     description: 'Insights on Autonomous Voice AI Systems, Agentic Workflows & Scalable Telephony.',
     type: 'website',
   },
@@ -38,32 +39,62 @@ export default async function BlogListingPage({
   const activeCategory = resolvedSearchParams.category || 'All'
   const searchQuery = (resolvedSearchParams.search || '').trim()
   const currentPage = Math.max(1, parseInt(resolvedSearchParams.page || '1', 10))
-
-  const supabase = await createClient()
-
-  // Base query with exact count
-  let query = supabase
-    .from('blog_posts')
-    .select('id, title, slug, excerpt, cover_image_url, category, tags, author_name, author_avatar_url, read_time_minutes, published_at, created_at', { count: 'exact' })
-    .eq('status', 'published')
-    .order('published_at', { ascending: false, nullsFirst: false })
-    .order('created_at', { ascending: false })
-
-  if (activeCategory !== 'All') {
-    query = query.eq('category', activeCategory)
-  }
-
-  if (searchQuery) {
-    query = query.or(`title.ilike.%${searchQuery}%,excerpt.ilike.%${searchQuery}%,content.ilike.%${searchQuery}%`)
-  }
-
-  // Calculate pagination range
   const from = (currentPage - 1) * POSTS_PER_PAGE
   const to = from + POSTS_PER_PAGE - 1
 
-  const { data: posts, count: totalCount } = await query.range(from, to)
-  const allPosts = posts || []
-  const total = totalCount || 0
+  let allPosts: BlogPostItem[] = []
+  let total = 0
+
+  try {
+    const supabase = await createClient()
+
+    // Base query with exact count
+    let query = supabase
+      .from('blog_posts')
+      .select('id, title, slug, excerpt, cover_image_url, category, tags, author_name, author_avatar_url, read_time_minutes, published_at, created_at, status', { count: 'exact' })
+      .eq('status', 'published')
+      .order('published_at', { ascending: false, nullsFirst: false })
+      .order('created_at', { ascending: false })
+
+    if (activeCategory !== 'All') {
+      query = query.eq('category', activeCategory)
+    }
+
+    if (searchQuery) {
+      query = query.or(`title.ilike.%${searchQuery}%,excerpt.ilike.%${searchQuery}%,content.ilike.%${searchQuery}%`)
+    }
+
+    // 2-second timeout guard to prevent Cloudflare 522 hangs
+    const timeoutPromise = new Promise<any>((_, reject) =>
+      setTimeout(() => reject(new Error('Supabase blog query timeout')), 2000)
+    )
+
+    const result = await Promise.race([query.range(from, to), timeoutPromise])
+    if (result?.data && result.data.length > 0) {
+      allPosts = result.data as any
+      total = result.count || result.data.length
+    }
+  } catch {
+    // Graceful fallback to rich built-in posts on network timeout
+  }
+
+  // Fallback to built-in blog posts if database is empty or unreachable
+  if (allPosts.length === 0) {
+    let filtered = FALLBACK_BLOG_POSTS.filter(p => p.status === 'published')
+    if (activeCategory !== 'All') {
+      filtered = filtered.filter(p => p.category.toLowerCase() === activeCategory.toLowerCase())
+    }
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase()
+      filtered = filtered.filter(p =>
+        p.title.toLowerCase().includes(q) ||
+        p.excerpt.toLowerCase().includes(q)
+      )
+    }
+    total = filtered.length
+    allPosts = filtered.slice(from, from + POSTS_PER_PAGE)
+  }
+
   const totalPages = Math.ceil(total / POSTS_PER_PAGE) || 1
 
   // Show hero card ONLY on page 1 when no search is active and category is 'All'

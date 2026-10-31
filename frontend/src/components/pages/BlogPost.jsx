@@ -63,7 +63,7 @@ export default function BlogPost({ slug: slugProp }) {
 
   useEffect(() => {
     if (!post?.title) return;
-    document.title = `${post.title} | Trinetra AI Blog`;
+    document.title = `${post.title} | Vaakriti AI Blog`;
     setMetaDescription(post.excerpt || "");
   }, [post?.excerpt, post?.title]);
 

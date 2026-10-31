@@ -41,7 +41,7 @@ export default function Blog() {
   });
 
   useEffect(() => {
-    document.title = "Insights & Innovation Blog | Trinetra AI";
+    document.title = "Insights & Innovation Blog | Vaakriti AI";
   }, []);
 
   useEffect(() => {

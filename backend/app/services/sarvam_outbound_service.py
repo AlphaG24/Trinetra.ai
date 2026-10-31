@@ -466,8 +466,8 @@ Respond ONLY with valid JSON."""
             ""
         ).strip()
 
-        final_business_name = resolved_biz_name or "Purvi Roadlines"
-        resolved_agent = resolved_agent_name or user_config.get("agent_name") or "Jitendra"
+        final_business_name = resolved_biz_name or user_config.get("company_name") or "Vaakriti AI"
+        resolved_agent = resolved_agent_name or user_config.get("agent_name") or "Shubh"
 
         call_intent = (
             user_config.get("intent") or 
@@ -475,7 +475,7 @@ Respond ONLY with valid JSON."""
             user_config.get("call_purpose") or 
             user_config.get("purpose") or 
             user_config.get("lead_intent") or 
-            "consultative inquiry and freight solutions"
+            "consultative inquiry and business solutions"
         )
         call_notes = (
             user_config.get("notes") or 
@@ -483,7 +483,7 @@ Respond ONLY with valid JSON."""
             user_config.get("customer_notes") or 
             user_config.get("business_description") or 
             (f"Prospect Company: {prospect_comp}" if prospect_comp else "") or 
-            "Standard logistics inquiry"
+            "Standard business inquiry"
         )
 
         user_config.update({
@@ -491,7 +491,8 @@ Respond ONLY with valid JSON."""
             "agent_name": resolved_agent,
             "agent": resolved_agent,
             "bot_name": resolved_agent,
-            "name": resolved_agent,
+            "name": c_name or "Customer",
+            "contact_name": c_name or "Customer",
 
             # Business / Tenant Aliases
             "company_name": final_business_name,

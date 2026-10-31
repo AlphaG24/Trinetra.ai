@@ -1,8 +1,15 @@
+import { Metadata } from 'next'
 import { ThemeProvider, DashboardThemeWrapper } from '@/src/components/ui/theme-provider'
 import { DashboardShell } from '@/src/components/dashboard/DashboardShell'
 import { NetworkStatusBanner } from '@/src/components/shared/NetworkStatusBanner'
+import { EntryLoader } from '@/src/components/shared/EntryLoader'
 import { createClient } from '@/lib/server'
 import { redirect } from 'next/navigation'
+
+export const metadata: Metadata = {
+  title: 'Dashboard — Vaakriti',
+  description: 'Enterprise AI Voice Agent Management Dashboard',
+}
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient()
@@ -18,6 +25,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   return (
     <ThemeProvider>
       <DashboardThemeWrapper>
+        <EntryLoader />
         <NetworkStatusBanner />
         <DashboardShell>{children}</DashboardShell>
       </DashboardThemeWrapper>

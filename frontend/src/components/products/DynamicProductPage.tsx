@@ -246,7 +246,7 @@ export function DynamicProductPage({ slug }: { slug: string }) {
       return;
     }
 
-    document.title = product.metaTitle || `${product.name} — Trinetra AI`;
+    document.title = product.metaTitle || `${product.name} — Vaakriti AI`;
   }, [product]);
 
   useEffect(() => {

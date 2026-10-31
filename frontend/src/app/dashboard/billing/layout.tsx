@@ -1,7 +1,7 @@
 import { Metadata } from 'next'
 
 export const metadata: Metadata = {
-  title: 'Plans & Pricing — Trinetra AI',
+  title: 'Plans & Pricing — Vaakriti AI',
   description: 'View plan packages, minutes pricing, active subscriptions, and billing invoices.'
 }
 

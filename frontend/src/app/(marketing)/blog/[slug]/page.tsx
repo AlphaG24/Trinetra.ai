@@ -2,6 +2,7 @@ import { createClient } from '@/utils/supabase/server'
 import { notFound } from 'next/navigation'
 import { Metadata } from 'next'
 import { ArrowLeft, Clock, Calendar, Share2 } from 'lucide-react'
+import { FALLBACK_BLOG_POSTS } from '@/src/lib/blogData'
 
 export const dynamic = 'force-dynamic'
 
@@ -22,19 +23,37 @@ function getAuthorAvatar(authorName?: string, authorAvatarUrl?: string): string 
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug } = await params
-  const supabase = await createClient()
+  let post: any = null
 
-  const { data: post } = await supabase
-    .from('blog_posts')
-    .select('title, excerpt, seo_title, seo_description, cover_image_url')
-    .eq('slug', slug)
-    .eq('status', 'published')
-    .maybeSingle()
+  try {
+    const supabase = await createClient()
+    const queryPromise = supabase
+      .from('blog_posts')
+      .select('title, excerpt, seo_title, seo_description, cover_image_url')
+      .eq('slug', slug)
+      .eq('status', 'published')
+      .maybeSingle()
 
-  if (!post) return { title: 'Article Not Found | Trinetra Publications' }
+    const timeoutPromise = new Promise<{ data: null; error: Error }>((resolve) =>
+      setTimeout(() => resolve({ data: null, error: new Error('Metadata timeout') }), 1500)
+    )
+
+    const res = await Promise.race([queryPromise, timeoutPromise])
+    if (res.data) {
+      post = res.data
+    }
+  } catch (err) {
+    // ignore
+  }
+
+  if (!post) {
+    post = FALLBACK_BLOG_POSTS.find((p) => p.slug === slug)
+  }
+
+  if (!post) return { title: 'Article Not Found | Vaakriti AI' }
 
   return {
-    title: `${post.seo_title || post.title} | Trinetra AI`,
+    title: `${post.seo_title || post.title} | Vaakriti AI`,
     description: post.seo_description || post.excerpt || '',
     openGraph: {
       title: post.seo_title || post.title,
@@ -47,26 +66,52 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
 export default async function BlogPostDetailPage({ params }: PageProps) {
   const { slug } = await params
-  const supabase = await createClient()
+  let post: any = null
+  let related: any[] = []
 
-  const { data: post } = await supabase
-    .from('blog_posts')
-    .select('*')
-    .eq('slug', slug)
-    .eq('status', 'published')
-    .single()
+  try {
+    const supabase = await createClient()
+    const queryPromise = supabase
+      .from('blog_posts')
+      .select('*')
+      .eq('slug', slug)
+      .eq('status', 'published')
+      .single()
+
+    const timeoutPromise = new Promise<{ data: null; error: Error }>((resolve) =>
+      setTimeout(() => resolve({ data: null, error: new Error('Post query timeout') }), 2000)
+    )
+
+    const res = await Promise.race([queryPromise, timeoutPromise])
+    if (res.data) {
+      post = res.data
+
+      const { data: relatedData } = await supabase
+        .from('blog_posts')
+        .select('id, title, slug, excerpt, cover_image_url, category, author_name, author_avatar_url, read_time_minutes, published_at, created_at')
+        .eq('status', 'published')
+        .eq('category', post.category)
+        .neq('id', post.id)
+        .order('published_at', { ascending: false, nullsFirst: false })
+        .limit(3)
+
+      if (relatedData && relatedData.length > 0) {
+        related = relatedData
+      }
+    }
+  } catch (err) {
+    console.warn('[BlogPostDetailPage] Error or timeout querying blog:', err)
+  }
+
+  if (!post) {
+    post = FALLBACK_BLOG_POSTS.find((p) => p.slug === slug)
+  }
 
   if (!post) notFound()
 
-  // Related posts
-  const { data: related } = await supabase
-    .from('blog_posts')
-    .select('id, title, slug, excerpt, cover_image_url, category, author_name, author_avatar_url, read_time_minutes, published_at, created_at')
-    .eq('status', 'published')
-    .eq('category', post.category)
-    .neq('id', post.id)
-    .order('published_at', { ascending: false, nullsFirst: false })
-    .limit(3)
+  if (related.length === 0) {
+    related = FALLBACK_BLOG_POSTS.filter((p) => p.slug !== slug).slice(0, 3)
+  }
 
   const publishDate = new Date(post.published_at || post.created_at).toLocaleDateString('en-US', {
     month: 'long',
@@ -245,9 +290,9 @@ export default async function BlogPostDetailPage({ params }: PageProps) {
                 />
               </div>
               <div className="space-y-1 font-sans">
-                <p className="font-bold text-base text-[#0F172A]">Written by {post.author_name || 'Trinetra AI'}</p>
+                <p className="font-bold text-base text-[#0F172A]">Written by {post.author_name || 'Vaakriti AI'}</p>
                 <p className="text-xs text-[#64748B] leading-relaxed">
-                  Engineering Team at Trinetra AI · Building the sovereign voice intelligence and telephone infrastructure layer for modern enterprises.
+                  Engineering Team at Vaakriti AI · Building the sovereign voice intelligence and telephone infrastructure layer for modern enterprises.
                 </p>
               </div>
             </div>

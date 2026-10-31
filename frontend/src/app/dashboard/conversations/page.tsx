@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation'
 import { ConversationsPageClient } from '@/src/components/pages/ConversationsPageClient'
 
 export const metadata = {
-  title: 'Conversations — Trinetra AI',
+  title: 'Conversations — Vaakriti AI',
   description: 'All chat and WhatsApp conversations handled by your AI agents.',
 }
 

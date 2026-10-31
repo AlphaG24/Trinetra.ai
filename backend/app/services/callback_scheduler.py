@@ -156,7 +156,7 @@ class CallbackSchedulerService:
                 try:
                     a_res = await asyncio.to_thread(
                         supabase_admin.table("agents")
-                        .select("id, name, organization_id, phone_number, telephony_provider")
+                        .select("id, name, organization_id, user_id, phone_number, telephony_provider, sarvam_agent_id")
                         .eq("id", agent_id)
                         .maybe_single()
                         .execute
@@ -168,7 +168,7 @@ class CallbackSchedulerService:
             if not agent_data and org_id:
                 a_res = await asyncio.to_thread(
                     supabase_admin.table("agents")
-                    .select("id, name, organization_id, phone_number, telephony_provider")
+                    .select("id, name, organization_id, user_id, phone_number, telephony_provider, sarvam_agent_id")
                     .eq("organization_id", org_id)
                     .limit(1)
                     .execute
@@ -225,7 +225,50 @@ class CallbackSchedulerService:
                 except Exception as ne:
                     logger.warning(f"[CallbackScheduler] Failed to query organization phone: {ne}")
 
-            # 5. Telephony provider resolution based on assigned phone number & destination
+                        # 5. Telephony provider resolution based on assigned phone number & destination
+            routing_mode = (os.getenv("TELEPHONY_ROUTING_MODE") or ConfigService.get("TELEPHONY_ROUTING_MODE") or "sarvam_managed").lower().strip()
+            agent_sarvam_id = agent_data.get("sarvam_agent_id") if agent_data else None
+            user_id = agent_data.get("user_id") if agent_data else None
+
+            is_sarvam = (
+                chosen_provider == "sarvam" or
+                bool(agent_sarvam_id) or
+                routing_mode == "sarvam_managed" or
+                (not ConfigService.get("EXOTEL_API_KEY") and not os.getenv("EXOTEL_API_KEY") and bool(os.getenv("SARVAM_API_KEY") or ConfigService.get("SARVAM_API_KEY")))
+            )
+
+            if is_sarvam:
+                logger.info(f"[CallbackScheduler] Routing callback {cb_id} to {prospect_name} ({prospect_phone}) via SarvamOutboundService")
+                from app.services.sarvam_outbound_service import SarvamOutboundService
+                sarvam_svc = SarvamOutboundService()
+                first_name = prospect_name.split()[0] if prospect_name else "Sir"
+                call_res = await sarvam_svc.trigger_instant_call(
+                    target_phone=prospect_phone,
+                    contact_name=prospect_name or "Valued Client",
+                    custom_metadata={
+                        "customer_name": prospect_name or "Valued Client",
+                        "customer_first_name": first_name,
+                        "customer_salutation": "Sir/Ma'am",
+                        "intent": "Follow-up Callback",
+                        "notes": f"Scheduled callback regarding: {notes or 'previous inquiry'}",
+                        "is_callback": "true",
+                        "callback_id": str(cb_id),
+                    },
+                    user_id=user_id,
+                    org_id=org_id,
+                    agent_id=agent_id
+                )
+
+                # Update callback to completed
+                await asyncio.to_thread(
+                    supabase_admin.table("callbacks").update({
+                        "status": "completed",
+                        "completed_at": datetime.now(timezone.utc).isoformat()
+                    }).eq("id", cb_id).execute
+                )
+                logger.info(f"[CallbackScheduler] Callback {cb_id} successfully dispatched via Sarvam! Call SID: {call_res.get('call_sid') or call_res.get('id')}")
+                return
+
             has_exotel = bool(ConfigService.get("EXOTEL_API_KEY") or os.getenv("EXOTEL_API_KEY"))
             has_twilio = bool(ConfigService.get("TWILIO_ACCOUNT_SID") or os.getenv("TWILIO_ACCOUNT_SID"))
 

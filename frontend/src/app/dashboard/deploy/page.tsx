@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation'
 import { DeployPageClient } from '@/src/components/pages/DeployPageClient'
 
 export const metadata = {
-  title: 'Deploy Custom Agent — Trinetra AI',
+  title: 'Deploy Custom Agent — Vaakriti AI',
   description: 'Deploy custom voice and communication agents for your enterprise.',
 }
 

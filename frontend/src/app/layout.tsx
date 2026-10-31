@@ -7,7 +7,6 @@ import localFont from 'next/font/local';
 import { Toaster } from "sonner";
 import { Toaster as HotToaster } from "react-hot-toast";
 import { AuthProvider } from "@/src/components/providers/AuthProvider";
-import { EntryLoader } from "@/src/components/shared/EntryLoader";
 // Client wrapper that applies ssr:false for MaintenanceWatcher
 import { MaintenanceWatcherLoader } from '@/src/components/dashboard/MaintenanceWatcherLoader';
 
@@ -44,7 +43,7 @@ const calSans = localFont({
 export const metadata: Metadata = {
   metadataBase: new URL('https://vaakriti.com'),
   title: {
-    default: 'Vaakriti AI — The Creation of Voice | Intelligent Voice Agents',
+    default: 'Vaakriti AI | Sovereign Intelligent Voice Agents',
     template: '%s | Vaakriti AI',
   },
   description:
@@ -199,7 +198,6 @@ export default async function RootLayout({
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
         <AuthProvider>
-          <EntryLoader />
           <Suspense fallback={null}>
             <MaintenanceWatcherLoader initialMaintenanceMode={initialMaintenanceMode} />
           </Suspense>
