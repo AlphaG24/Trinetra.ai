@@ -95,8 +95,11 @@ export default function CampaignsPage() {
     try {
       const cached = sessionStorage.getItem('trinetra_cached_campaigns')
       if (cached) {
-        setCampaigns(JSON.parse(cached))
-        setLoading(false)
+        const parsed = JSON.parse(cached)
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setCampaigns(parsed)
+          setLoading(false)
+        }
       }
       const c = sessionStorage.getItem('trinetra_auth_profile_cache') || localStorage.getItem('trinetra_auth_profile_cache')
       if (c) setCachedProfile(JSON.parse(c)?.profile)
@@ -106,10 +109,9 @@ export default function CampaignsPage() {
 
     const timer = setTimeout(() => {
       setTimeoutPassed(true)
-      setLoading(false)
     }, 1200)
 
-    fetchCampaigns(true)
+    fetchCampaigns(false)
 
     return () => clearTimeout(timer)
   }, [fetchCampaigns])
@@ -384,13 +386,31 @@ export default function CampaignsPage() {
         </div>
       </div>
 
-      {/* Campaigns List / Empty State */}
+      {/* Campaigns List / Shimmer Skeleton Loader */}
       {loading ? (
-        <div className="flex h-[30vh] w-full items-center justify-center">
-          <div className="flex flex-col items-center gap-2">
-            <Loader2 className="w-7 h-7 animate-spin text-zinc-900 dark:text-white" />
-            <p className="text-xs text-[var(--muted)]">Syncing campaigns...</p>
-          </div>
+        <div className="grid grid-cols-1 gap-4">
+          {[1, 2].map((i) => (
+            <div
+              key={i}
+              className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-6 shadow-xs animate-pulse space-y-4"
+            >
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="space-y-2">
+                  <div className="h-5 w-48 bg-zinc-200 dark:bg-zinc-800 rounded-md" />
+                  <div className="h-3 w-64 bg-zinc-100 dark:bg-zinc-800/60 rounded-md" />
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="h-8 w-24 bg-zinc-200 dark:bg-zinc-800 rounded-xl" />
+                  <div className="h-8 w-8 bg-zinc-200 dark:bg-zinc-800 rounded-xl" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
+                {[1, 2, 3, 4].map((j) => (
+                  <div key={j} className="h-14 bg-zinc-100 dark:bg-zinc-800/40 rounded-xl" />
+                ))}
+              </div>
+            </div>
+          ))}
         </div>
       ) : filteredCampaigns.length === 0 ? (
         <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-12 text-center max-w-xl mx-auto space-y-4 my-6 shadow-xs">

@@ -160,7 +160,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({
       success: true,
-      message: `${carrier.toUpperCase()} credentials successfully encrypted and vaulted with AES-256-GCM.`,
+      message: `${carrier.toUpperCase()} credentials successfully encrypted and vaulted.`,
       credential: upserted,
     })
   } catch (err: any) {

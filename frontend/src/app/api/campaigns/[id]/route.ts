@@ -38,7 +38,9 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
           .select(`
             *,
             agents (
-              name
+              name,
+              phone_number,
+              telephony_provider
             )
           `)
           .eq("id", id)

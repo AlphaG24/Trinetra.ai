@@ -23,6 +23,7 @@ function getAuthorAvatar(authorName?: string, authorAvatarUrl?: string): string 
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug } = await params
+  const targetSlug = slug.includes('scaling-multilingual') ? 'scaling-multilingual-voice-ai-india' : slug
   let post: any = null
 
   try {
@@ -30,7 +31,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     const queryPromise = supabase
       .from('blog_posts')
       .select('title, excerpt, seo_title, seo_description, cover_image_url')
-      .eq('slug', slug)
+      .eq('slug', targetSlug)
       .eq('status', 'published')
       .maybeSingle()
 
@@ -47,7 +48,14 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   }
 
   if (!post) {
-    post = FALLBACK_BLOG_POSTS.find((p) => p.slug === slug)
+    post = FALLBACK_BLOG_POSTS.find((p) => 
+      p.slug === slug || 
+      p.slug === targetSlug ||
+      (slug.includes('multilingual') && p.slug.includes('multilingual')) ||
+      (slug.includes('sub-480ms') && p.slug.includes('sub-480ms')) ||
+      (slug.includes('sovereign') && p.slug.includes('sovereign')) ||
+      (slug.includes('freight') && p.slug.includes('freight'))
+    )
   }
 
   if (!post) return { title: 'Article Not Found | Vaakriti AI' }
@@ -66,6 +74,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
 export default async function BlogPostDetailPage({ params }: PageProps) {
   const { slug } = await params
+  const targetSlug = slug.includes('scaling-multilingual') ? 'scaling-multilingual-voice-ai-india' : slug
   let post: any = null
   let related: any[] = []
 
@@ -74,7 +83,7 @@ export default async function BlogPostDetailPage({ params }: PageProps) {
     const queryPromise = supabase
       .from('blog_posts')
       .select('*')
-      .eq('slug', slug)
+      .eq('slug', targetSlug)
       .eq('status', 'published')
       .single()
 

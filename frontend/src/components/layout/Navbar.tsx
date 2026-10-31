@@ -204,7 +204,7 @@ export function Navbar() {
       tag: latestBlog ? "Latest Post" : "Blogs & Research",
       title: latestBlog?.title || "Scaling Multilingual Voice AI",
       subtitle: "Read latest engineering insights",
-      href: latestBlog?.slug ? `/blog/${latestBlog.slug}` : "/blog",
+      href: latestBlog?.slug ? `/blog/${latestBlog.slug}` : "/blog/scaling-multilingual-voice-ai-india",
     },
   ];
 

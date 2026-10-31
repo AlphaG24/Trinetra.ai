@@ -173,7 +173,7 @@ export default function SystemConfigPage() {
 
     try {
       const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), 6000)
+      const timeoutId = setTimeout(() => controller.abort(), 12000)
 
       const res = await fetch('/api/admin/system-config', {
         method: 'PUT',
@@ -193,8 +193,8 @@ export default function SystemConfigPage() {
 
       toast.success(
         newValue === 'true'
-          ? '🔒 Maintenance mode ON — public visitors will see the maintenance screen'
-          : '✅ Maintenance mode OFF — platform is live'
+          ? 'Maintenance mode ON — platform is locked for upgrades'
+          : 'Platform is LIVE — services are fully accessible'
       )
     } catch (err: any) {
       // Revert on failure
@@ -207,6 +207,7 @@ export default function SystemConfigPage() {
     } finally {
       setMaintenanceSaving(false)
     }
+  }
   }
 
   // Telephony Voice Pipeline Toggle — Instant switch between Sarvam Cloud and In-House Custom Pipeline
@@ -475,25 +476,28 @@ export default function SystemConfigPage() {
             id="maintenance-mode-toggle"
             onClick={handleMaintenanceToggle}
             disabled={maintenanceSaving}
-            className={`group px-5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-2.5 cursor-pointer shadow-md disabled:opacity-50 disabled:cursor-not-allowed ${
+            className={`group relative overflow-hidden px-5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all duration-200 flex items-center gap-2.5 cursor-pointer shadow-md active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed ${
               configs.maintenance_mode === 'true'
-                ? 'bg-white text-zinc-950 hover:bg-zinc-200 border border-white'
-                : 'bg-zinc-800 text-white hover:bg-zinc-700 border border-zinc-700'
+                ? 'bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-zinc-950 shadow-amber-500/20'
+                : 'bg-zinc-800/90 hover:bg-zinc-700 text-white border border-zinc-700/80 shadow-black/40'
             }`}
           >
             {maintenanceSaving ? (
               <>
-                <Loader2 className="w-3.5 h-3.5 animate-spin text-zinc-400" />
-                <span>Updating...</span>
+                <Loader2 className="w-3.5 h-3.5 animate-spin text-current" />
+                <span>Synchronizing...</span>
               </>
             ) : configs.maintenance_mode === 'true' ? (
               <>
-                <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-zinc-950 opacity-75" />
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-zinc-950" />
+                </span>
                 <span>Resume Live Platform</span>
               </>
             ) : (
               <>
-                <ShieldAlert className="w-3.5 h-3.5 text-amber-400" />
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
                 <span>Schedule Maintenance</span>
               </>
             )}

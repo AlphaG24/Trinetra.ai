@@ -841,8 +841,8 @@ class CampaignService:
             try:
                 await asyncio.to_thread(
                     supabase_admin.table("campaign_contacts").update({
-                        "status": "failed",
-                        "error_message": f"CLI spoof blocked: {cli_reason}",
+                        "call_status": "failed",
+                        "notes": f"CLI spoof blocked: {cli_reason}",
                         "updated_at": datetime.now(timezone.utc).isoformat()
                     }).eq("id", contact_id).execute
                 )

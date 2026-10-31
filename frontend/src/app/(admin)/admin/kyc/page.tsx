@@ -627,7 +627,7 @@ export default function AdminKYCVerificationPage() {
                   <h3 className="text-base font-extrabold text-white flex items-center gap-2">
                     Decrypted Statutory Document
                     <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 uppercase tracking-wider">
-                      AES-256 Verified
+                      Securely Verified
                     </span>
                   </h3>
                   <p className="text-xs text-zinc-400 mt-0.5">

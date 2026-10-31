@@ -355,7 +355,7 @@ export async function POST(req: Request) {
         await admin.from('notifications').insert({
           user_id: user.id,
           title: '📋 KYC Document Vaulted',
-          message: `Your ${document_type.replace(/_/g, ' ')} has been safely stored with AES-256 encryption. OCR confidence: ${Math.round(ocrResult.confidenceScore * 100)}%. Awaiting compliance confirmation.`,
+          message: `Your ${document_type.replace(/_/g, ' ')} has been safely stored with secure encryption. OCR confidence: ${Math.round(ocrResult.confidenceScore * 100)}%. Awaiting compliance confirmation.`,
           type: 'info',
           action_url: '/dashboard/settings',
           action_text: 'View Status',

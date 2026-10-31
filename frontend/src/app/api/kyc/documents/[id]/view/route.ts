@@ -333,7 +333,7 @@ export async function GET(
         <div class="id-title">
           🏛️ ${doc.document_type === 'authorized_signatory_id' ? 'GOVERNMENT OF INDIA - MASKED e-AADHAAR' : 'GOVERNMENT OF INDIA - GST CERTIFICATE (REG-06)'}
         </div>
-        <span class="badge badge-verified">AES-256 Validated</span>
+        <span class="badge badge-verified">Securely Validated</span>
       </div>
 
       <div class="id-row">

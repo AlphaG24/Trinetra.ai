@@ -147,17 +147,23 @@ export function CampaignDetailClient({ campaignId }: CampaignDetailClientProps) 
     }
   }
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  const fetchedAgentRef = useRef<string | null>(null)
 
-  // Fetch agent details once campaign is loaded
+  // Fetch agent details once campaign is loaded - stabilized against polling oscillation
   useEffect(() => {
     if (campaign?.agents) {
-      if (campaign.agents.phone_number) setAgentPhone(campaign.agents.phone_number)
-      if (campaign.agents.telephony_provider) setAgentProvider(campaign.agents.telephony_provider)
+      if (campaign.agents.phone_number) {
+        setAgentPhone(prev => prev || campaign.agents.phone_number)
+      }
+      if (campaign.agents.telephony_provider && campaign.agents.telephony_provider !== 'simulated') {
+        setAgentProvider(campaign.agents.telephony_provider)
+      }
     }
-    if (campaign?.agent_id) {
+    if (campaign?.agent_id && fetchedAgentRef.current !== campaign.agent_id) {
+      fetchedAgentRef.current = campaign.agent_id
       fetchAgentInfo(campaign.agent_id)
     }
-  }, [campaign?.agent_id, campaign?.agents])
+  }, [campaign?.agent_id, campaign?.agents?.phone_number, campaign?.agents?.telephony_provider])
 
   const fetchAgentInfo = async (agentId: string) => {
     try {
@@ -166,8 +172,10 @@ export function CampaignDetailClient({ campaignId }: CampaignDetailClientProps) 
       const res = await fetch(`/api/agents/${agentId}`, { headers, credentials: 'include' })
       const data = await res.json()
       if (res.ok && data.success && data.data) {
-        setAgentPhone(data.data.phone_number || null)
-        setAgentProvider(data.data.telephony_provider || (data.data.phone_number ? 'twilio' : null))
+        const pNum = data.data.phone_number || null
+        const pProv = data.data.telephony_provider || (pNum ? 'sarvam' : null)
+        if (pNum) setAgentPhone(pNum)
+        if (pProv) setAgentProvider(pProv)
       }
     } catch (err) {
       console.error("Failed to fetch agent info for campaign:", err)
@@ -176,7 +184,7 @@ export function CampaignDetailClient({ campaignId }: CampaignDetailClientProps) 
     }
   }
 
-  const isSimulated = !agentPhone || agentProvider === 'simulated' || agentProvider === 'sandbox'
+  const isSimulated = !agentLoading && (!agentPhone || agentProvider === 'simulated' || agentProvider === 'sandbox')
 
   // Fetch campaign info
   const fetchCampaignInfo = async (silent = false) => {

@@ -1184,9 +1184,7 @@ export default function PrivacyPolicyPage() {
 
               <hr className="border-[#E2E8F0] my-6" />
 
-              <p className="text-[13px] text-[#64748B] italic">
-                <em>This Privacy Policy was drafted for Vaakriti AI and should be reviewed by qualified Indian legal counsel prior to publication — specifically to: (a) confirm and insert the final registered entity name, registration number, and address upon LLP incorporation; (b) finalize the name of the designated Grievance Officer; (c) confirm the applicable court of jurisdiction; (d) verify the terms of service / data processing agreements with all AI processors (Google Gemini and Mistral AI) with respect to the prohibition on model training using submitted data; and (e) monitor and incorporate any subordinate rules, regulations, or Board decisions issued under the DPDP Act 2023 after the date of this draft.</em>
-              </p>
+              
 
               <p className="text-center font-semibold text-[#0F172A] text-[16px] mt-8">
                 <strong>Vaakriti AI | vaakriti.com | grievance@vaakriti.com</strong>

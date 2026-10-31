@@ -110,6 +110,21 @@ async function handleUpdateConfigs(request: Request) {
       return NextResponse.json({ error: 'Invalid config payload: no key-value pairs provided' }, { status: 400 })
     }
 
+    // Fast-path for maintenance_mode toggle (ensures instant sub-100ms response without blocking system scans)
+    if (Object.keys(updates).length === 1 && updates['maintenance_mode'] !== undefined) {
+      const modeVal = String(updates['maintenance_mode']).trim()
+      const adminClient = getAdminClient()
+      const { error: upsertErr } = await adminClient
+        .from('system_config')
+        .upsert([{ config_key: 'maintenance_mode', config_value: modeVal }], { onConflict: 'config_key' })
+      
+      invalidateConfigCache()
+      if (upsertErr) {
+        return NextResponse.json({ error: 'Failed to update maintenance mode: ' + upsertErr.message }, { status: 500 })
+      }
+      return NextResponse.json({ success: true, updated_keys: ['maintenance_mode'] })
+    }
+
     // Fetch current config state for old_value tracking and change detection
     const adminClientForRead = getAdminClient()
     const { data: currentConfigs } = await adminClientForRead
