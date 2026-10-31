@@ -4,7 +4,10 @@ import logging
 from dotenv import load_dotenv
 from livekit import rtc
 from livekit.agents.voice import Agent, AgentSession
-from livekit.plugins import sarvam, silero
+try:
+    from livekit.plugins import sarvam, silero
+except Exception:
+    sarvam, silero = None, None
 import yaml
 from app.services.disclosure_service import resolve_agent_gender, resolve_gendered_phrases
 
