@@ -995,8 +995,12 @@ Respond ONLY with valid JSON."""
                         if phone_for_lead:
                             clean_lead_digits = re.sub(r"\D", "", phone_for_lead)
                             clean_10 = clean_lead_digits[-10:] if len(clean_lead_digits) >= 10 else clean_lead_digits
+                            is_missed = stat_normalized in ("failed", "missed", "no_answer", "busy") or duration == 0
+                            is_someone_else = final_outcome == "Wrong Number" or any(k in (final_summary or "").lower() for k in ["wrong person", "someone else", "not the person", "wrong number"])
+
+                            camp_status = "failed" if is_missed else "answered"
                             camp_update_data = {
-                                "call_status": "answered",
+                                "call_status": camp_status,
                                 "call_id": call_id,
                                 "notes": final_summary
                             }
@@ -1087,14 +1091,44 @@ Respond ONLY with valid JSON."""
                             except Exception as appt_err:
                                 logger.warning(f"[Sarvam Sync] Appointment booking error: {appt_err}")
 
-                        # 6. Auto-schedule Callback if prospect requested callback or busy
-                        if (final_outcome == "Callback Scheduled" or "callback" in final_summary.lower()) and phone_for_lead:
+                        # 6. Auto-schedule Callback if prospect requested callback, was busy, missed call, or someone else picked
+                        is_missed_call = stat_normalized in ("failed", "missed", "no_answer", "busy") or duration == 0
+                        is_someone_else_call = final_outcome == "Wrong Number" or any(k in (final_summary or "").lower() for k in ["wrong person", "someone else", "not the person", "wrong number"])
+                        has_callback_intent = (final_outcome == "Callback Scheduled" or "callback" in (final_summary or "").lower())
+
+                        if (has_callback_intent or is_missed_call or is_someone_else_call) and phone_for_lead:
                             try:
                                 exist_cb = await asyncio.to_thread(
                                     supabase_admin.table("callbacks").select("id").eq("original_call_id", call_id).limit(1).execute
                                 )
                                 if not exist_cb.data and call_id:
-                                    cb_time = intelligence.get("callback_time_iso") or intelligence.get("appointment_time_iso") or (datetime.now(timezone.utc) + timedelta(minutes=10)).replace(microsecond=0).isoformat()
+                                    # Parse relative minute requests from transcript/summary (e.g. "call after 2 min", "5 minutes")
+                                    rel_mins = None
+                                    comb_text = f"{final_summary or ''} {transcript_text or ''}"
+                                    time_match = re.search(r'(\d+)\s*(?:min|minute|ghante|ghanta|hour)', comb_text, re.IGNORECASE)
+                                    if time_match:
+                                        try:
+                                            raw_val = int(time_match.group(1))
+                                            if "ghant" in time_match.group(0).lower() or "hour" in time_match.group(0).lower():
+                                                rel_mins = raw_val * 60
+                                            elif 1 <= raw_val <= 180:
+                                                rel_mins = raw_val
+                                        except Exception:
+                                            pass
+
+                                    if rel_mins:
+                                        cb_time = (datetime.now(timezone.utc) + timedelta(minutes=rel_mins)).replace(microsecond=0).isoformat()
+                                        cb_note = final_summary or f"Customer requested callback in {rel_mins} minutes."
+                                    elif is_missed_call:
+                                        cb_time = (datetime.now(timezone.utc) + timedelta(minutes=15)).replace(microsecond=0).isoformat()
+                                        cb_note = f"Missed call auto-retry: {final_summary or 'Call was not answered; auto-retry scheduled.'}"
+                                    elif is_someone_else_call:
+                                        cb_time = (datetime.now(timezone.utc) + timedelta(minutes=30)).replace(microsecond=0).isoformat()
+                                        cb_note = f"Wrong person / someone else picked: {final_summary or 'Rescheduled to reach intended prospect.'}"
+                                    else:
+                                        cb_time = intelligence.get("callback_time_iso") or intelligence.get("appointment_time_iso") or (datetime.now(timezone.utc) + timedelta(minutes=10)).replace(microsecond=0).isoformat()
+                                        cb_note = final_summary or "Scheduled callback requested by customer during call."
+
                                     await asyncio.to_thread(
                                         supabase_admin.table("callbacks").insert({
                                             "organization_id": target_org,
@@ -1104,12 +1138,12 @@ Respond ONLY with valid JSON."""
                                             "prospect_phone": phone_for_lead,
                                             "scheduled_at": cb_time,
                                             "timezone": "Asia/Kolkata",
-                                            "notes": final_summary or "Scheduled callback requested by customer during call.",
+                                            "notes": cb_note,
                                             "status": "scheduled",
                                             "priority": "normal"
                                         }).execute
                                     )
-                                    logger.info(f"[Sarvam Sync] Auto-scheduled callback for {resolved_name} ({phone_for_lead}) at {cb_time}")
+                                    logger.info(f"[Sarvam Sync] Auto-scheduled callback for {resolved_name} ({phone_for_lead}) at {cb_time} (Reason: {cb_note})")
                             except Exception as cb_err:
                                 logger.warning(f"[Sarvam Sync] Callback auto-scheduling error: {cb_err}")
 
