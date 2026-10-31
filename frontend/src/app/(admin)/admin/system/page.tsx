@@ -208,7 +208,6 @@ export default function SystemConfigPage() {
       setMaintenanceSaving(false)
     }
   }
-  }
 
   // Telephony Voice Pipeline Toggle — Instant switch between Sarvam Cloud and In-House Custom Pipeline
   const [pipelineRoutingSaving, setPipelineRoutingSaving] = useState(false)
