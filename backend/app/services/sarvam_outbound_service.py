@@ -617,12 +617,25 @@ Respond ONLY with valid JSON."""
 
             status_code, res_data = await asyncio.to_thread(_send_sarvam_request)
 
-            # Auto-fallback: if an unconfigured app rejects agent_variables (HTTP 422), retry without them
+            # Auto-fallback: if an unconfigured app rejects agent_variables (HTTP 422), retry with standard universal variables
             if status_code == 422 and "not found in agent variables of app" in str(res_data):
-                logger.warning(f"[SarvamOutboundService] App {target_app_id} does not accept custom agent_variables; retrying without them...")
+                logger.warning(f"[SarvamOutboundService] App {target_app_id} rejected custom agent_variables; retrying with standard universal variables (user_name, agent_name, company_name)...")
+                
+                # Build context-rich user_name string for standard apps
+                enriched_user = c_name or "Customer"
+                if prospect_comp and prospect_comp.lower() not in enriched_user.lower():
+                    enriched_user += f" ({prospect_comp})"
+                if call_notes and call_notes != "Standard business inquiry" and call_notes.lower() not in enriched_user.lower():
+                    enriched_user += f" - {call_notes}"
+
+                standard_vars = {
+                    "user_name": enriched_user,
+                    "agent_name": resolved_agent,
+                    "company_name": final_business_name
+                }
                 fallback_payload = dict(payload)
                 fallback_app_cfg = dict(app_cfg)
-                fallback_app_cfg.pop("agent_variables", None)
+                fallback_app_cfg["agent_variables"] = standard_vars
                 fallback_payload["app_config"] = fallback_app_cfg
                 def _send_sarvam_fallback():
                     fallback_req_data = json.dumps(fallback_payload).encode('utf-8')
@@ -1093,7 +1106,24 @@ Respond ONLY with valid JSON."""
                         is_someone_else_call = final_outcome == "Wrong Number" or any(k in (final_summary or "").lower() for k in ["wrong person", "someone else", "not the person", "wrong number"])
                         has_callback_intent = (final_outcome == "Callback Scheduled" or "callback" in (final_summary or "").lower())
 
-                        if (has_callback_intent or is_missed_call or is_someone_else_call) and phone_for_lead:
+                        # Never infinite-loop callbacks: only schedule if user verbally asked, or if 1st-time missed call
+                        clean_digits_check = re.sub(r"\D", "", phone_for_lead or "")
+                        last10_cb = clean_digits_check[-10:] if len(clean_digits_check) >= 10 else clean_digits_check
+                        existing_pending_cb = None
+                        if last10_cb:
+                            c_check = await asyncio.to_thread(
+                                supabase_admin.table("callbacks")
+                                .select("id")
+                                .ilike("prospect_phone", f"%{last10_cb}%")
+                                .eq("status", "scheduled")
+                                .limit(1)
+                                .execute
+                            )
+                            if c_check.data and len(c_check.data) > 0:
+                                existing_pending_cb = c_check.data[0]
+
+                        should_schedule_cb = (has_callback_intent or is_someone_else_call) and not existing_pending_cb
+                        if should_schedule_cb and phone_for_lead:
                             try:
                                 exist_cb = await asyncio.to_thread(
                                     supabase_admin.table("callbacks").select("id").eq("original_call_id", call_id).limit(1).execute
@@ -1147,10 +1177,13 @@ Respond ONLY with valid JSON."""
                         # 6.5 Call-to-Cash: In-Call Payment Closing Dispatch
                         try:
                             comb_payment_text = f"{final_summary or ''} {transcript_text or ''}".lower()
-                            payment_discussed = any(w in comb_payment_text for w in [
-                                "pay", "payment", "upi", "rupee", "rs.", "amount", "advance",
-                                "cost", "price", "rate", "booking", "order", "bill", "invoice", "deal", "quote", "quotation"
-                            ])
+                            # Payment details must be explicitly requested by customer (never casual mentions of 'rate' or 'booking')
+                            explicit_payment_requests = [
+                                "payment link", "upi link", "qr code", "advance payment", "pay now",
+                                "send payment", "send upi", "payment bhej do", "upi bhej do", "link bhej do payment",
+                                "advance bhej do", "payment kar deta", "payment kar doon"
+                            ]
+                            payment_discussed = any(k in comb_payment_text for k in explicit_payment_requests)
                             if payment_discussed and phone_for_lead:
                                 from app.services.integration_executor import IntegrationExecutor
                                 executor = IntegrationExecutor()

@@ -1469,12 +1469,14 @@ async def handle_sarvam_voice_webhook(
                             p_res = p_query.maybe_single().execute()
                             payout_row = p_res.data if p_res else None
 
-                        # Check if payment or commercial pricing was discussed
+                        # Check if payment details were explicitly requested by customer
                         text_to_check = ((transcript_text or "") + " " + (call_summary or "")).lower()
-                        payment_discussed = any(w in text_to_check for w in [
-                            "pay", "payment", "upi", "rupee", "rs.", "amount", "advance",
-                            "cost", "price", "rate", "booking", "order", "bill", "invoice", "deal"
-                        ])
+                        explicit_payment_requests = [
+                            "payment link", "upi link", "qr code", "advance payment", "pay now",
+                            "send payment", "send upi", "payment bhej do", "upi bhej do", "link bhej do payment",
+                            "advance bhej do", "payment kar deta", "payment kar doon"
+                        ]
+                        payment_discussed = any(w in text_to_check for w in explicit_payment_requests)
 
                         if payout_row and payment_discussed:
                             amt_match = re.search(r'(?:rs\.?|inr|₹)\s*([\d,]+)', text_to_check)

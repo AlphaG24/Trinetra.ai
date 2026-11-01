@@ -248,10 +248,11 @@ class CallbackSchedulerService:
                     custom_metadata={
                         "customer_name": prospect_name or "Valued Client",
                         "customer_first_name": first_name,
-                        "customer_salutation": "Sir/Ma'am",
+                        "customer_salutation": f"{first_name} ji" if first_name != "Sir" else "Sir",
                         "intent": "Follow-up Callback",
-                        "notes": f"Scheduled callback regarding: {notes or 'previous inquiry'}",
+                        "notes": notes or "previous inquiry discussion",
                         "is_callback": "true",
+                        "call_type": "callback",
                         "callback_id": str(cb_id),
                     },
                     user_id=user_id,
