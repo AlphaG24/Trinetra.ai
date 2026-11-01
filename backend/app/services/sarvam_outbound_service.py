@@ -546,10 +546,26 @@ Respond ONLY with valid JSON."""
             except Exception:
                 pass
         if not resolved_version:
+            env_ver = os.getenv("SARVAM_APP_VERSION")
+            if env_ver:
+                try:
+                    resolved_version = int(env_ver)
+                except Exception:
+                    pass
+
+        if not resolved_version and agent_data:
+            ag_cfg = agent_data.get("config") or {}
+            if ag_cfg.get("app_version"):
+                try:
+                    resolved_version = int(ag_cfg["app_version"])
+                except Exception:
+                    pass
+
+        if not resolved_version:
             if "purvi" in str(target_app_id).lower():
                 resolved_version = 4
             else:
-                resolved_version = 1
+                resolved_version = 18
 
         # Build comprehensive context-rich user_name string that carries all prospect details into Sarvam apps
         enriched_user_name = c_name or "Customer"
@@ -563,27 +579,20 @@ Respond ONLY with valid JSON."""
         if context_parts:
             enriched_user_name += f" ({'; '.join(context_parts)})"
 
-        # Sarvam strictly requires prompt template variables inside app_config.agent_variables
-        if "shubhansh" in str(target_app_id).lower():
-            agent_vars: Dict[str, Any] = {
-                "user_name": enriched_user_name,
-                "agent_name": resolved_agent,
-                "company_name": final_business_name
-            }
-        else:
-            agent_vars: Dict[str, Any] = {
-                "customer_name": c_name or "Customer",
-                "customer_first_name": first_name or "sir",
-                "customer_salutation": salutation,
-                "user_name": enriched_user_name,
-                "agent_name": resolved_agent,
-                "company_name": final_business_name,
-                "prospect_company": prospect_comp or "their organization",
-                "customer_phone": cleaned_phone,
-                "intent": call_intent,
-                "notes": call_notes,
-                "knowledge_base": ""
-            }
+        # Sarvam v18+ strictly requires prompt template variables inside app_config.agent_variables
+        agent_vars: Dict[str, Any] = {
+            "agent_name": resolved_agent,
+            "company_name": final_business_name,
+            "customer_name": c_name or "Abhay",
+            "customer_first_name": first_name or "Abhay",
+            "customer_salutation": salutation or "Abhay ji",
+            "prospect_company": prospect_comp or "XYZ limited",
+            "customer_phone": cleaned_phone,
+            "intent": call_intent,
+            "notes": call_notes,
+            "call_type": user_config.get("call_type") or "outbound",
+            "user_name": enriched_user_name
+        }
 
         app_cfg: Dict[str, Any] = {
             "app_id": target_app_id,
