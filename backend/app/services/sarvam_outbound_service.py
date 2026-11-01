@@ -551,20 +551,39 @@ Respond ONLY with valid JSON."""
             else:
                 resolved_version = 1
 
+        # Build comprehensive context-rich user_name string that carries all prospect details into Sarvam apps
+        enriched_user_name = c_name or "Customer"
+        context_parts = []
+        if prospect_comp and prospect_comp.lower() not in enriched_user_name.lower():
+            context_parts.append(f"Company: {prospect_comp}")
+        if call_notes and call_notes != "Standard business inquiry" and call_notes.lower() not in enriched_user_name.lower():
+            context_parts.append(f"Business & Purpose: {call_notes}")
+        elif call_intent and call_intent.lower() not in enriched_user_name.lower():
+            context_parts.append(f"Purpose: {call_intent}")
+        if context_parts:
+            enriched_user_name += f" ({'; '.join(context_parts)})"
+
         # Sarvam strictly requires prompt template variables inside app_config.agent_variables
-        agent_vars: Dict[str, Any] = {
-            "customer_name": c_name or "Customer",
-            "customer_first_name": first_name or "sir",
-            "customer_salutation": salutation,
-            "user_name": c_name or "Customer",
-            "agent_name": resolved_agent,
-            "company_name": final_business_name,
-            "prospect_company": prospect_comp or "their organization",
-            "customer_phone": cleaned_phone,
-            "intent": call_intent,
-            "notes": call_notes,
-            "knowledge_base": ""
-        }
+        if "shubhansh" in str(target_app_id).lower():
+            agent_vars: Dict[str, Any] = {
+                "user_name": enriched_user_name,
+                "agent_name": resolved_agent,
+                "company_name": final_business_name
+            }
+        else:
+            agent_vars: Dict[str, Any] = {
+                "customer_name": c_name or "Customer",
+                "customer_first_name": first_name or "sir",
+                "customer_salutation": salutation,
+                "user_name": enriched_user_name,
+                "agent_name": resolved_agent,
+                "company_name": final_business_name,
+                "prospect_company": prospect_comp or "their organization",
+                "customer_phone": cleaned_phone,
+                "intent": call_intent,
+                "notes": call_notes,
+                "knowledge_base": ""
+            }
 
         app_cfg: Dict[str, Any] = {
             "app_id": target_app_id,
