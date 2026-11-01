@@ -486,13 +486,20 @@ class IntegrationExecutor:
         # Payout data can be passed directly or queried
         payout = payment_data.get("payout")
         if not payout and (org_id or user_id):
-            query = supabase_admin.table("tenant_payout_credentials").select("*").eq("is_active", True).eq("consent_attested", True)
-            if org_id:
-                query = query.eq("organization_id", org_id)
-            elif user_id:
-                query = query.eq("user_id", user_id)
-            res = await asyncio.to_thread(query.maybe_single().execute)
-            payout = res.data if res else None
+            for _ in range(3):
+                try:
+                    query = supabase_admin.table("tenant_payout_credentials").select("*").eq("is_active", True).eq("consent_attested", True)
+                    if org_id:
+                        query = query.eq("organization_id", org_id)
+                    elif user_id:
+                        query = query.eq("user_id", user_id)
+                    res = await asyncio.to_thread(query.maybe_single().execute)
+                    payout = res.data if res else None
+                    if payout:
+                        break
+                except Exception as p_err:
+                    logger.warning(f"[Payment Request] Transient error fetching payout: {p_err}")
+                    await asyncio.sleep(0.5)
 
         if not payout:
             logger.warning(f"[Payment Request] Skipped: No active payout credentials for org={org_id}, user={user_id}.")
@@ -592,12 +599,11 @@ class IntegrationExecutor:
         # Audit logging: record payment request event
         try:
             audit_entry = {
-                "organization_id": org_id,
                 "user_id": user_id,
                 "action": "payment_request.dispatched",
-                "entity_type": "call_records",
-                "entity_id": call_id or raw_phone,
-                "metadata": {
+                "resource_type": "call_records",
+                "resource_id": call_id or raw_phone,
+                "new_values": {
                     "phone": raw_phone,
                     "amount": amount,
                     "item_description": item_desc,

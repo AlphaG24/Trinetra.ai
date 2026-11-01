@@ -1144,6 +1144,35 @@ Respond ONLY with valid JSON."""
                             except Exception as cb_err:
                                 logger.warning(f"[Sarvam Sync] Callback auto-scheduling error: {cb_err}")
 
+                        # 6.5 Call-to-Cash: In-Call Payment Closing Dispatch
+                        try:
+                            comb_payment_text = f"{final_summary or ''} {transcript_text or ''}".lower()
+                            payment_discussed = any(w in comb_payment_text for w in [
+                                "pay", "payment", "upi", "rupee", "rs.", "amount", "advance",
+                                "cost", "price", "rate", "booking", "order", "bill", "invoice", "deal", "quote", "quotation"
+                            ])
+                            if payment_discussed and phone_for_lead:
+                                from app.services.integration_executor import IntegrationExecutor
+                                executor = IntegrationExecutor()
+                                amt_match = re.search(r'(?:rs\.?|inr|₹)\s*([\d,]+)', comb_payment_text)
+                                amount_val = amt_match.group(1).replace(",", "") if amt_match else ""
+                                asyncio.create_task(
+                                    executor.dispatch_payment_request(
+                                        agent_id=target_agent or "default",
+                                        payment_data={
+                                            "contact_phone": phone_for_lead,
+                                            "amount": amount_val,
+                                            "item_description": (final_summary[:100] if final_summary else "Consultation & Service Booking"),
+                                            "organization_id": target_org,
+                                            "user_id": target_user,
+                                            "call_id": call_id
+                                        }
+                                    )
+                                )
+                                logger.info(f"[Sarvam Sync] Dispatched Call-to-Cash payment details to {phone_for_lead}")
+                        except Exception as pay_err:
+                            logger.warning(f"[Sarvam Sync] Call-to-Cash dispatch error: {pay_err}")
+
                         # 7. Token-to-Minute Safe Deduction
                         # Benchmark Metrics for Conversational Hindi/Hinglish TTS:
                         # - Avg Human speech rate: 130-150 words/min
