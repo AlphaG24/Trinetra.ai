@@ -766,9 +766,6 @@ Respond ONLY with valid JSON."""
             "end_datetime": end_str
         }
 
-        target_user = user_id or DEFAULT_USER_ID
-        target_org = org_id or DEFAULT_ORGANIZATION_ID
-        target_agent = agent_id or DEFAULT_AGENT_ID
 
         synced_count = 0
 
