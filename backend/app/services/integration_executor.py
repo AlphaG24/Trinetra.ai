@@ -932,25 +932,42 @@ class IntegrationExecutor:
                 return False
 
         # 2. Meta Cloud API WhatsApp dispatch
-        phone_id = config.get("whatsapp_phone_id")
-        token = config.get("whatsapp_access_token")
+        phone_id = config.get("whatsapp_phone_id") or os.getenv("WHATSAPP_PHONE_ID") or os.getenv("META_WHATSAPP_PHONE_ID")
+        token = config.get("whatsapp_access_token") or os.getenv("WHATSAPP_ACCESS_TOKEN") or os.getenv("META_WHATSAPP_TOKEN")
         if phone_id and token:
             if not to_number:
                 logger.warning("Meta WhatsApp dispatch skipped: no destination contact phone provided.")
                 return False
             clean_to = str(to_number).replace("+", "").replace(" ", "").replace("-", "")
             url = f"https://graph.facebook.com/v18.0/{phone_id}/messages"
+            
+            # Support both approved Meta templates and direct text
+            template_name = (data or {}).get("template_name") or config.get("template_name")
+            if template_name:
+                wa_payload = {
+                    "messaging_product": "whatsapp",
+                    "to": clean_to,
+                    "type": "template",
+                    "template": {
+                        "name": template_name,
+                        "language": {"code": (data or {}).get("template_language") or "en_US"},
+                        "components": (data or {}).get("template_components") or []
+                    }
+                }
+            else:
+                wa_payload = {
+                    "messaging_product": "whatsapp",
+                    "to": clean_to,
+                    "type": "text",
+                    "text": {"body": message}
+                }
+
             try:
                 async with httpx.AsyncClient() as client:
                     res = await client.post(
                         url,
                         headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
-                        json={
-                            "messaging_product": "whatsapp",
-                            "to": clean_to,
-                            "type": "text",
-                            "text": {"body": message}
-                        },
+                        json=wa_payload,
                         timeout=10.0
                     )
                     if res.status_code not in (200, 201):
