@@ -831,7 +831,7 @@ class IntegrationExecutor:
         data = data or {}
         event_type = data.get("event_type", "")
 
-        # Item 2 / Phase 3: Distinguish operational owner alerts from customer communications
+        # Distinguish operational owner alerts from customer communications
         is_owner = (
             data.get("recipient_type") == "owner"
             or data.get("is_owner_notification", False)
@@ -875,94 +875,104 @@ class IntegrationExecutor:
         else:
             logger.info(f"[WhatsApp Safety Guard] Operational owner notification permitted for {to_number} (event: {event_type})")
 
+        # 1. Twilio WhatsApp dispatch (if active and configured)
         twilio_sid = config.get("twilio_sid") or os.getenv("TWILIO_ACCOUNT_SID")
         auth_token = config.get("auth_token") or os.getenv("TWILIO_AUTH_TOKEN")
         from_number = config.get("phone_number") or config.get("from_number") or os.getenv("TWILIO_WHATSAPP_FROM") or os.getenv("TWILIO_PHONE_NUMBER")
 
-        # 1. Twilio WhatsApp dispatch
         if twilio_sid and auth_token and from_number:
             from_whatsapp = format_whatsapp_number(from_number)
             to_whatsapp = format_whatsapp_number(to_number)
-            if not to_whatsapp or to_whatsapp == "whatsapp:+":
-                logger.warning(f"Twilio WhatsApp dispatch skipped: '{to_number}' is not a valid telephone number (e.g. Browser Sandbox test).")
-                return False
+            if to_whatsapp and to_whatsapp != "whatsapp:+":
+                url = f"https://api.twilio.com/2010-04-01/Accounts/{twilio_sid}/Messages.json"
+                try:
+                    async with httpx.AsyncClient() as client:
+                        res = await client.post(
+                            url,
+                            auth=(twilio_sid, auth_token),
+                            data={
+                                "From": from_whatsapp,
+                                "To": to_whatsapp,
+                                "Body": message
+                            },
+                            timeout=10.0
+                        )
+                        if res.status_code in (200, 201):
+                            msg_data = res.json()
+                            msg_sid = msg_data.get("sid")
+                            logger.info(f"Twilio WhatsApp message sent successfully to {to_whatsapp} (SID: {msg_sid})")
+                            return True
+                        else:
+                            logger.warning(f"Twilio WhatsApp dispatch failed: status={res.status_code} response={res.text}. Falling back to Meta Cloud API...")
+                except Exception as exc:
+                    logger.warning(f"Twilio WhatsApp request error: {exc}. Falling back to Meta Cloud API...")
 
-            url = f"https://api.twilio.com/2010-04-01/Accounts/{twilio_sid}/Messages.json"
-            try:
-                async with httpx.AsyncClient() as client:
-                    res = await client.post(
-                        url,
-                        auth=(twilio_sid, auth_token),
-                        data={
-                            "From": from_whatsapp,
-                            "To": to_whatsapp,
-                            "Body": message
-                        },
-                        timeout=10.0
-                    )
-                    if res.status_code not in (200, 201):
-                        logger.error(f"Twilio WhatsApp API error: status={res.status_code} response={res.text}")
-                        return False
-                    else:
-                        msg_data = res.json()
-                        msg_sid = msg_data.get("sid")
-                        # Inspect downstream delivery status to detect sandbox opt-in expiration (error 63015)
-                        if msg_sid:
-                            await asyncio.sleep(1.0)
-                            try:
-                                status_res = await client.get(
-                                    f"https://api.twilio.com/2010-04-01/Accounts/{twilio_sid}/Messages/{msg_sid}.json",
-                                    auth=(twilio_sid, auth_token),
-                                    timeout=5.0
-                                )
-                                if status_res.status_code == 200:
-                                    s_data = status_res.json()
-                                    s_status = s_data.get("status")
-                                    s_err = s_data.get("error_code")
-                                    if s_status in ("failed", "undelivered") or s_err:
-                                        if s_err == 63015:
-                                            logger.error(
-                                                f"[Twilio WhatsApp] Sandbox session expired (Error 63015) for {to_whatsapp}. "
-                                                f"To receive messages, send 'join happen-entire' to +1 415 523 8886 on WhatsApp."
-                                            )
-                                        else:
-                                            logger.error(f"[Twilio WhatsApp] Delivery failed for {to_whatsapp}: status={s_status}, error_code={s_err}")
-                                        return False
-                            except Exception as poll_err:
-                                logger.warning(f"Error checking message delivery status: {poll_err}")
+        # 2. Meta Cloud API WhatsApp dispatch (Primary Enterprise Channel)
+        phone_id = config.get("whatsapp_phone_id")
+        if not phone_id or str(phone_id).strip().startswith("{"):
+            phone_id = os.getenv("WHATSAPP_PHONE_ID") or os.getenv("META_WHATSAPP_PHONE_ID")
 
-                        logger.info(f"Twilio WhatsApp message sent successfully to {to_whatsapp} (SID: {msg_sid})")
-                        return True
-            except Exception as exc:
-                logger.error(f"Twilio WhatsApp request failed: {exc}")
-                return False
+        token = config.get("whatsapp_access_token")
+        if not token or str(token).strip().startswith("{") or "twilio" in str(token).lower():
+            token = os.getenv("WHATSAPP_ACCESS_TOKEN") or os.getenv("META_WHATSAPP_TOKEN")
 
-        # 2. Meta Cloud API WhatsApp dispatch
-        phone_id = config.get("whatsapp_phone_id") or os.getenv("WHATSAPP_PHONE_ID") or os.getenv("META_WHATSAPP_PHONE_ID")
-        token = config.get("whatsapp_access_token") or os.getenv("WHATSAPP_ACCESS_TOKEN") or os.getenv("META_WHATSAPP_TOKEN")
         if phone_id and token:
-            if not to_number:
-                logger.warning("Meta WhatsApp dispatch skipped: no destination contact phone provided.")
-                return False
             clean_to = str(to_number).replace("+", "").replace(" ", "").replace("-", "")
-            url = f"https://graph.facebook.com/v18.0/{phone_id}/messages"
+            url = f"https://graph.facebook.com/v21.0/{phone_id}/messages"
             
-            # Support both approved Meta templates and direct text
-            template_name = (data or {}).get("template_name") or config.get("template_name")
-            if template_name:
-                wa_payload = {
+            # Helper to construct vaakriti template payload
+            def _build_vaakriti_template_payload(tmpl_name: str = "vaakriti"):
+                c_name = str(data.get("contact_name") or data.get("prospect_name") or data.get("customer_name") or "there").strip()
+                b_name = str(data.get("company_name") or data.get("business_name") or "Vaakriti AI").strip()
+                d_text = str(data.get("details") or data.get("notes") or message or "Here are your requested details and next steps.").strip()
+                if not d_text:
+                    d_text = "Here are your requested details."
+                # Meta body parameter character limit safety
+                if len(d_text) > 1024:
+                    d_text = d_text[:1020] + "..."
+                return {
                     "messaging_product": "whatsapp",
+                    "recipient_type": "individual",
                     "to": clean_to,
                     "type": "template",
                     "template": {
-                        "name": template_name,
-                        "language": {"code": (data or {}).get("template_language") or "en_US"},
-                        "components": (data or {}).get("template_components") or []
+                        "name": tmpl_name,
+                        "language": {"code": data.get("template_language") or "en"},
+                        "components": [
+                            {
+                                "type": "body",
+                                "parameters": [
+                                    {"type": "text", "text": c_name},
+                                    {"type": "text", "text": b_name},
+                                    {"type": "text", "text": d_text}
+                                ]
+                            }
+                        ]
                     }
                 }
+
+            template_name = data.get("template_name") or config.get("template_name")
+            template_components = data.get("template_components")
+
+            if template_name:
+                if template_name in ("vaakriti", "vaakriti_followup") and not template_components:
+                    wa_payload = _build_vaakriti_template_payload(template_name)
+                else:
+                    wa_payload = {
+                        "messaging_product": "whatsapp",
+                        "recipient_type": "individual",
+                        "to": clean_to,
+                        "type": "template",
+                        "template": {
+                            "name": template_name,
+                            "language": {"code": data.get("template_language") or "en"},
+                            "components": template_components or []
+                        }
+                    }
             else:
                 wa_payload = {
                     "messaging_product": "whatsapp",
+                    "recipient_type": "individual",
                     "to": clean_to,
                     "type": "text",
                     "text": {"body": message}
@@ -974,14 +984,37 @@ class IntegrationExecutor:
                         url,
                         headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
                         json=wa_payload,
-                        timeout=10.0
+                        timeout=12.0
                     )
-                    if res.status_code not in (200, 201):
-                        logger.error(f"Meta WhatsApp API error: status={res.status_code} response={res.text}")
-                        return False
-                    else:
-                        logger.info(f"Meta WhatsApp message sent successfully to {clean_to}")
+                    if res.status_code in (200, 201):
+                        resp_data = res.json()
+                        wamid = (resp_data.get("messages") or [{}])[0].get("id")
+                        logger.info(f"Meta WhatsApp message sent successfully to {clean_to} (WAMID: {wamid})")
                         return True
+                    
+                    err_json = res.json().get("error", {})
+                    err_code = err_json.get("code")
+                    logger.warning(f"Meta WhatsApp API returned status={res.status_code}, code={err_code}: {res.text}")
+
+                    # Fallback on 131047 (outside 24-hr customer service window): retry with active utility template
+                    if err_code == 131047 and wa_payload.get("type") == "text":
+                        logger.info(f"[Meta WhatsApp] 24-hr window expired for {clean_to}. Retrying with approved 'vaakriti' utility template...")
+                        fallback_payload = _build_vaakriti_template_payload("vaakriti")
+                        fallback_res = await client.post(
+                            url,
+                            headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+                            json=fallback_payload,
+                            timeout=12.0
+                        )
+                        if fallback_res.status_code in (200, 201):
+                            fb_wamid = (fallback_res.json().get("messages") or [{}])[0].get("id")
+                            logger.info(f"Meta WhatsApp utility template fallback sent successfully to {clean_to} (WAMID: {fb_wamid})")
+                            return True
+                        else:
+                            logger.error(f"Meta WhatsApp template fallback failed: {fallback_res.text}")
+                            return False
+
+                    return False
             except Exception as exc:
                 logger.error(f"Meta WhatsApp request failed: {exc}")
                 return False

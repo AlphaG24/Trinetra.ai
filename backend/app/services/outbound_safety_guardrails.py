@@ -57,6 +57,16 @@ VALID_CAMPAIGN_PURPOSES = {"promotional", "service", "transactional"}
 
 # Standard registered WhatsApp templates approved for proactive communications
 APPROVED_WHATSAPP_TEMPLATES = {
+    "vaakriti": {
+        "category": "UTILITY",
+        "description": "Active Meta-approved utility notification template for customer followups, confirmations, and alerts",
+        "required_vars": ["customer_name", "business_name", "details"]
+    },
+    "vaakriti_followup": {
+        "category": "UTILITY",
+        "description": "Utility followup template for post-call details and appointments",
+        "required_vars": ["customer_name", "business_name", "details"]
+    },
     "service_appointment_reminder": {
         "category": "UTILITY",
         "description": "Appointment reminder and confirmation prompt",
@@ -204,7 +214,7 @@ def is_allowed_calling_time(
     if is_requested_callback and requested_callback_time:
         log_note = (
             f"Requested callback permitted at {local_time.strftime('%H:%M:%S')} {resolved_tz} "
-            f"(requested for {requested_callback_time.isoformat()})."
+            f"(requested for {requested_callback_time.isoformat()}) [CONFIRM WITH A LAWYER: TRAI TCCCPR 2018 Reg 12]."
         )
         return True, log_note, {
             "timezone": resolved_tz,
