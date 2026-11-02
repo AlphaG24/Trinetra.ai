@@ -538,21 +538,16 @@ Respond ONLY with valid JSON."""
             if custom_metadata and custom_metadata.get("contact_id"):
                 webhook_url += f"&contact_id={custom_metadata['contact_id']}"
 
-        # Resolve required app_version for Sarvam outbounds API
+        # Resolve required app_version for Sarvam outbounds API dynamically
         resolved_version = None
+        # 1. Explicit caller override via metadata
         if custom_metadata and custom_metadata.get("app_version"):
             try:
                 resolved_version = int(custom_metadata["app_version"])
             except Exception:
                 pass
-        if not resolved_version:
-            env_ver = os.getenv("SARVAM_APP_VERSION")
-            if env_ver:
-                try:
-                    resolved_version = int(env_ver)
-                except Exception:
-                    pass
 
+        # 2. Agent-specific database config
         if not resolved_version and agent_data:
             ag_cfg = agent_data.get("config") or {}
             if ag_cfg.get("app_version"):
@@ -561,11 +556,30 @@ Respond ONLY with valid JSON."""
                 except Exception:
                     pass
 
+        # 3. Dynamic Auto-Discovery from Sarvam Active Deployments API
+        if not resolved_version:
+            try:
+                from app.services.sarvam_agent_manager import SarvamAgentManager
+                mgr = SarvamAgentManager()
+                st, dep_data = mgr._make_request("deployments", "GET")
+                if st == 200 and isinstance(dep_data, dict):
+                    for dep in dep_data.get("items", []):
+                        if dep.get("app_id") == target_app_id and dep.get("status") == "active":
+                            if dep.get("app_version"):
+                                resolved_version = int(dep["app_version"])
+                                logger.info(f"[SarvamOutboundService] Auto-discovered live deployed version {resolved_version} for app {target_app_id}")
+                                break
+            except Exception as dep_err:
+                logger.warning(f"[SarvamOutboundService] Deployments auto-discovery notice: {dep_err}")
+
+        # 4. Agent-specific environment variable or verified fallback
         if not resolved_version:
             if "purvi" in str(target_app_id).lower():
-                resolved_version = 4
+                env_purvi = os.getenv("SARVAM_RITU_VERSION") or os.getenv("SARVAM_PURVI_VERSION")
+                resolved_version = int(env_purvi) if env_purvi else 8
             else:
-                resolved_version = 18
+                env_ver = os.getenv("SARVAM_APP_VERSION")
+                resolved_version = int(env_ver) if env_ver else 18
 
         # Build comprehensive context-rich user_name string that carries all prospect details into Sarvam apps
         enriched_user_name = c_name or "Customer"

@@ -20,6 +20,8 @@ class SarvamAgentManager:
     def __init__(self):
         try:
             from dotenv import load_dotenv
+            if os.path.exists("backend/.env"):
+                load_dotenv("backend/.env")
             load_dotenv()
         except Exception:
             pass
