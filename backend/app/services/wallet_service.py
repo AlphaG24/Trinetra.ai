@@ -321,11 +321,29 @@ class WalletService:
     # -------------------------------------------------------------------------
     # 4. Emergency Minutes Subsystem (Sec 18.9)
     # -------------------------------------------------------------------------
-    def claim_emergency_minutes(self, organization_id: str) -> Tuple[bool, str, Dict[str, Any]]:
+    def claim_emergency_minutes(self, organization_id: str, plan_tier: Optional[str] = None) -> Tuple[bool, str, Dict[str, Any]]:
         """
         Grants free overdraft buffer minutes to eligible organizations when quota hits 100%,
         strictly requiring Reliability Score > 80 (admin-configurable) and enforcing a 30-day cooldown.
+        Phase 4 Rule: Buffer limits are closed during Free Tier and ₹99 Trial.
+        Upon claim, Reliability/Credit score is decreased so the user must power it up.
         """
+        # 0. Tier Gating Check (Phase 4): Buffer limits closed on Free Tier and ₹99 Trial
+        resolved_tier = (plan_tier or "").lower()
+        if not resolved_tier:
+            try:
+                prof_res = self.supabase.table("profiles").select("plan_tier").eq("organization_id", organization_id).limit(1).execute()
+                if prof_res.data and len(prof_res.data) > 0:
+                    resolved_tier = (prof_res.data[0].get("plan_tier") or "free").lower()
+            except Exception as e:
+                logger.debug(f"Could not resolve profile plan_tier for {organization_id}: {e}")
+
+        if resolved_tier in ("free", "free_demo", "trial"):
+            return False, "TIER_LOCKED", {
+                "error": "Buffer overdraft minutes cannot be claimed during Free Tier or the ₹99 Trial. They require an active verified paid plan.",
+                "plan_tier": resolved_tier,
+            }
+
         wallet = self.get_or_create_wallet(organization_id)
         reliability_score = wallet.get("reliability_score", DEFAULT_RELIABILITY_SCORE)
 
@@ -358,9 +376,13 @@ class WalletService:
                 pass
 
         now_iso = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+        # Deduct 25 points from reliability/credit score upon claiming buffer (Phase 4 requirement)
+        new_score = max(0, reliability_score - 25)
+
         self.supabase.table("wallets").update({
             "emergency_minutes_available": max_minutes,
             "emergency_minutes_claimed_at": now_iso,
+            "reliability_score": new_score,
             "updated_at": now_iso,
         }).eq("organization_id", organization_id).execute()
 
@@ -370,12 +392,14 @@ class WalletService:
             action="wallet.emergency_minutes_credited",
             details={
                 "minutes_credited": max_minutes,
-                "reliability_score": reliability_score,
+                "previous_reliability_score": reliability_score,
+                "new_reliability_score": new_score,
             },
         )
 
         wallet["emergency_minutes_available"] = max_minutes
         wallet["emergency_minutes_claimed_at"] = now_iso
+        wallet["reliability_score"] = new_score
         return True, "EMERGENCY_MINUTES_GRANTED", wallet
 
     # -------------------------------------------------------------------------

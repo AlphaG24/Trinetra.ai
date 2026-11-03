@@ -73,7 +73,7 @@ class UsageService:
             elif plan_tier == 'starter':
                 tier_limit = 500
             elif plan_tier == 'trial':
-                tier_limit = await self._get_config("trial_minutes", 50)
+                tier_limit = await self._get_config("trial_minutes", 25)
             elif plan_tier == 'enterprise':
                 tier_limit = 10000
             else:
@@ -207,18 +207,21 @@ class UsageService:
             additional_agents = sum(p.get("additional_agents", 0) or 0 for p in prof_res.data)
             additional_phone_numbers = sum(p.get("additional_phone_numbers", 0) or 0 for p in prof_res.data)
         
-        # Base limits based on tier
+        # Base limits based on tier (Phase 4 rules)
         base_agents = 1
         base_numbers = 0
         if plan_tier == 'trial':
-            base_agents = 2
+            base_agents = 1  # ₹99 Trial: 1 agent only
             base_numbers = 1
         elif plan_tier == 'starter':
-            base_agents = 5
+            base_agents = 2  # Starter: limit of 2 agents
             base_numbers = 2
         elif plan_tier == 'professional':
-            base_agents = 20
+            base_agents = 5  # Professional: limit of 5 agents
             base_numbers = 5
+        elif plan_tier in ('custom', 'enterprise'):
+            base_agents = 999999  # Custom / Enterprise: unlimited
+            base_numbers = 999999
             
         # Get limits from system_config with fallback defaults
         max_agents = await self._get_config(f"max_agents_{plan_tier}", base_agents) + additional_agents
@@ -234,7 +237,7 @@ class UsageService:
         monthly_minutes = await self._get_config(f"{plan_tier}_minutes", 0)
         if monthly_minutes == 0:
             if plan_tier == 'trial':
-                monthly_minutes = await self._get_config("trial_minutes", 50)
+                monthly_minutes = await self._get_config("trial_minutes", 25)
             elif plan_tier == 'starter':
                 monthly_minutes = 500
             elif plan_tier == 'professional':

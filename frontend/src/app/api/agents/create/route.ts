@@ -381,13 +381,21 @@ export async function POST(request: Request) {
         const rawTier = userPlanTier.toLowerCase();
         const normalizedTier = rawTier === 'free_demo' ? 'free' : (rawTier === 'pro' ? 'professional' : rawTier);
         
+        // Phase 4 Agent Tier Limits:
+        // Free: 1 agent (1 time per account)
+        // ₹99 Trial: 1 agent only
+        // Starter: 2 agents
+        // Professional: 5 agents
+        // Custom / Enterprise: unlimited
         let limit = 1; // Default Free: 1 agent
         if (normalizedTier === 'trial') {
-            limit = 2; // Trial: 2 agents (Decision P2)
+            limit = 1; // ₹99 Trial: 1 agent only
         } else if (normalizedTier === 'starter') {
-            limit = 5; // Starter: 5 agents
+            limit = 2; // Starter: 2 agents limit
         } else if (normalizedTier === 'professional') {
-            limit = 20; // Professional: 20 agents
+            limit = 5; // Professional: 5 agents limit
+        } else if (normalizedTier === 'custom' || normalizedTier === 'enterprise') {
+            limit = 999999; // Enterprise: unlimited
         }
         
         // Add purchased slots
@@ -412,8 +420,11 @@ export async function POST(request: Request) {
 
         // Bypass limit checks entirely if user has developer_tester role
         if (profile?.role !== 'developer_tester' && currentAgentCount >= limit) {
+            const upgradeMessage = normalizedTier === 'trial'
+                ? "The ₹99 Trial allows only 1 agent. Please upgrade to Starter, Professional, or Enterprise to create more agents."
+                : `You've reached the maximum number of agents (${limit}) for your ${normalizedTier.toUpperCase()} plan. Please upgrade to add more agents.`;
             return NextResponse.json(
-                { error: "You've reached the maximum number of agents for your plan. Please upgrade to add more." },
+                { error: upgradeMessage },
                 { status: 403 }
             );
         }
@@ -561,11 +572,12 @@ Industry: ${profile?.business_type || 'General'}
         // voice_id is the actual Sarvam voice name (shubh, anushka, etc.).
         const safeVoiceId = selectedVoice;
 
-        // Calculate trial parameters if this agent is a trial agent
-        let agentConfig = {};
-        if (is_trial) {
-            let trialMinutes = 50; // Decision P2: 50 min quota
-            let trialDays = 7;
+        // Calculate trial and tier parameters (Phase 4 rules)
+        let agentConfig: Record<string, any> = {};
+        const nowMs = Date.now();
+        if (normalizedTier === 'trial' || is_trial) {
+            let trialMinutes = 25; // Phase 4: 25 min quota for ₹99 trial (admin editable)
+            let trialDays = 7;     // Phase 4: 7 days validity
             try {
                 const { data: configMinutes } = await supabaseAdmin
                     .from('system_config')
@@ -587,8 +599,29 @@ Industry: ${profile?.business_type || 'General'}
             agentConfig = {
                 plan_tier: 'trial',
                 trial_started_at: new Date().toISOString(),
-                trial_ends_at: new Date(Date.now() + trialDays * 24 * 60 * 60 * 1000).toISOString(),
-                minutes_limit: trialMinutes
+                trial_ends_at: new Date(nowMs + trialDays * 24 * 60 * 60 * 1000).toISOString(),
+                valid_until: new Date(nowMs + trialDays * 24 * 60 * 60 * 1000).toISOString(),
+                minutes_limit: trialMinutes,
+                quota_minutes_remaining: trialMinutes,
+                campaigns_allowed: 1,
+                buffer_allowed: false,
+                credit_score: 0
+            };
+        } else if (normalizedTier === 'free' || is_demo) {
+            agentConfig = {
+                plan_tier: 'free',
+                valid_until: new Date(nowMs + 5 * 24 * 60 * 60 * 1000).toISOString(),
+                trial_ends_at: new Date(nowMs + 5 * 24 * 60 * 60 * 1000).toISOString(),
+                minutes_limit: 10,
+                quota_minutes_remaining: 10,
+                web_calls_only: true,
+                buffer_allowed: false,
+                credit_score: 0
+            };
+        } else {
+            agentConfig = {
+                plan_tier: normalizedTier,
+                buffer_allowed: true,
             };
         }
 
@@ -679,23 +712,24 @@ Industry: ${profile?.business_type || 'General'}
             console.error("[Vaakriti] Profile update failed:", JSON.stringify(updateError));
         }
 
-        // If this is a demo agent, initialize/add it to demo_usage in profiles to lock it forever
-        if (is_demo || insertedAgent?.is_demo) {
+        // If this is a free or demo agent, mark free_agent_claimed and update demo_usage to lock 1-per-account rule
+        if (normalizedTier === 'free' || is_demo || insertedAgent?.is_demo) {
             const currentDemoUsage = (profile as any)?.demo_usage || {};
-            if (!currentDemoUsage[requestedAgentType]) {
-                const updatedDemoUsage = {
-                    ...currentDemoUsage,
-                    [requestedAgentType]: {
-                        minutes_used: 0,
-                        limit: 10,
-                        created_at: new Date().toISOString()
-                    }
-                };
-                await supabaseAdmin
-                    .from('profiles')
-                    .update({ demo_usage: updatedDemoUsage })
-                    .eq('id', user.id);
-            }
+            const updatedDemoUsage = {
+                ...currentDemoUsage,
+                [requestedAgentType]: {
+                    minutes_used: 0,
+                    limit: 10,
+                    created_at: new Date().toISOString()
+                }
+            };
+            await supabaseAdmin
+                .from('profiles')
+                .update({ 
+                    demo_usage: updatedDemoUsage,
+                    free_agent_claimed: true 
+                })
+                .eq('id', user.id);
         }
 
         return NextResponse.json({

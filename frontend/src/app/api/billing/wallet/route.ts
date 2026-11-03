@@ -510,6 +510,72 @@ export async function POST(req: Request) {
       })
     }
 
+    // Phase 4: Claim Buffer / Emergency Overdraft Minutes
+    if (action === 'claim_emergency_minutes' || action === 'claim_buffer_minutes') {
+      const userPlanTier = (profile.plan_tier || 'free').toLowerCase()
+      if (userPlanTier === 'free' || userPlanTier === 'free_demo' || userPlanTier === 'trial') {
+        return NextResponse.json({
+          error: 'Buffer minutes cannot be claimed during Free Tier or ₹99 Trial. They require an active verified paid plan (Starter, Professional, or Enterprise).',
+          code: 'PLAN_NOT_ELIGIBLE'
+        }, { status: 403 })
+      }
+
+      // Fetch wallet
+      const { data: wallet } = await adminClient
+        .from('wallets')
+        .select('*')
+        .eq('organization_id', orgId)
+        .maybeSingle()
+
+      const reliabilityScore = wallet?.reliability_score ?? 85
+      if (reliabilityScore <= 80) {
+        return NextResponse.json({
+          error: `Reliability score must be greater than 80 to unlock free buffer overdraft minutes (current score: ${reliabilityScore}).`,
+          code: 'SCORE_INSUFFICIENT'
+        }, { status: 403 })
+      }
+
+      // Check 30-day cooldown
+      const lastClaimed = wallet?.emergency_minutes_claimed_at
+      if (lastClaimed) {
+        const daysSince = (Date.now() - new Date(lastClaimed).getTime()) / (1000 * 86400)
+        if (daysSince < 30) {
+          return NextResponse.json({
+            error: `Buffer overdraft minutes can only be claimed once every 30 days. Please wait ${Math.ceil(30 - daysSince)} more days.`,
+            code: 'COOLDOWN_ACTIVE'
+          }, { status: 429 })
+        }
+      }
+
+      const nowIso = new Date().toISOString()
+      const newScore = Math.max(0, reliabilityScore - 25)
+      const bufferMinutes = 50
+
+      await adminClient.from('wallets').upsert({
+        organization_id: orgId,
+        emergency_minutes_available: bufferMinutes,
+        emergency_minutes_claimed_at: nowIso,
+        reliability_score: newScore,
+        updated_at: nowIso
+      }, { onConflict: 'organization_id' })
+
+      // Audit log entry
+      await adminClient.from('activity_log').insert({
+        user_id: user.id,
+        organization_id: orgId,
+        activity_type: 'buffer_minutes_claimed',
+        title: 'Buffer Minutes Claimed',
+        description: `Claimed ${bufferMinutes} overdraft buffer minutes. Reliability score adjusted to ${newScore}.`
+      })
+
+      return NextResponse.json({
+        success: true,
+        message: `Claimed ${bufferMinutes} buffer minutes successfully! Your reliability score is now ${newScore}.`,
+        buffer_minutes: bufferMinutes,
+        reliability_score: newScore
+      })
+    }
+
     if (action === 'update_spend_limit') {
       const limitInr = Number(body.spend_limit_inr)
       if (limitInr === undefined || limitInr < 0) {
