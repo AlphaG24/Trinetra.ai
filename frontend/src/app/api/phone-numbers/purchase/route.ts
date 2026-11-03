@@ -54,6 +54,26 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "This phone number is already assigned to another organization" }, { status: 409 });
     }
 
+    // 1a. Maximum 5 Phone Numbers Cap per Organization (Rule 8)
+    const baseLimit = 5;
+    const maxLimit = baseLimit + ((profile as any).additional_phone_numbers || 0);
+
+    const { count: currentNumbersCount, error: countErr } = await adminClient
+      .from("phone_numbers")
+      .select("id", { count: "exact", head: true })
+      .eq("organization_id", profile.organization_id)
+      .in("status", ["active", "provisioning", "grace_period"]);
+
+    if (!countErr && profile.role !== "developer_tester" && currentNumbersCount !== null && currentNumbersCount >= maxLimit) {
+      return NextResponse.json(
+        {
+          error: `Maximum limit of ${maxLimit} phone numbers reached (${currentNumbersCount}/${maxLimit}). To allocate additional lines, please submit an enterprise request or contact support.`,
+          code: "LIMIT_REACHED"
+        },
+        { status: 403 }
+      );
+    }
+
     // 1b. Statutory Telecom KYC Gate (TRAI & DoT regulations)
     if (profile.role !== "developer_tester") {
       const { data: kycDocs } = await adminClient

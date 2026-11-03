@@ -26,6 +26,15 @@ export async function POST(
             return NextResponse.json({ error: "No organization found" }, { status: 400 });
         }
 
+        // Rule 3: Numbers can be assigned only to agents that have paid plans (₹99 trial or paid plans)
+        const planTier = (profile.plan_tier || "free").toLowerCase();
+        if (planTier === "free" && profile.role !== "developer_tester" && profile.role !== "admin") {
+            return NextResponse.json({
+                error: "Phone numbers can only be assigned on the ₹99 Trial or a paid plan. Free tier accounts support web-calls only.",
+                code: "UPGRADE_REQUIRED"
+            }, { status: 403 });
+        }
+
         const body = await request.json();
         const { agent_id, is_primary = false } = body;
 
@@ -75,10 +84,10 @@ export async function POST(
             }, { status: 400 });
         }
 
-        // Verify agent ownership
+        // Verify agent ownership and operational status
         const { data: agent, error: agentError } = await supabase
             .from("agents")
-            .select("organization_id, name")
+            .select("organization_id, name, status, quota_minutes_remaining")
             .eq("id", agent_id)
             .single();
 
@@ -88,6 +97,13 @@ export async function POST(
 
         if (agent.organization_id !== orgId) {
             return NextResponse.json({ error: "Forbidden: You do not own this agent" }, { status: 403 });
+        }
+
+        // Rule 4 & 5: Expired agents with zero quota minutes cannot be assigned phone numbers
+        if (agent.status === "expired" && (agent.quota_minutes_remaining || 0) <= 0) {
+            return NextResponse.json({
+                error: "Cannot assign number to an expired agent with 0 quota minutes remaining. Please renew the agent quota or plan first."
+            }, { status: 400 });
         }
 
         const targetPhoneId = phoneNumberRecord.id;

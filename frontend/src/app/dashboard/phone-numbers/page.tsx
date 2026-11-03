@@ -82,6 +82,22 @@ export default function PhoneNumbersPage() {
   // Pre-loaded agents for instant modal rendering
   const [agents, setAgents] = useState<any[]>([]);
 
+  // My Numbers Tab State ('all' | 'active' | 'grace')
+  const [myNumbersTab, setMyNumbersTab] = useState<"all" | "active" | "grace">("all");
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("tab") === "grace") {
+        setMyNumbersTab("grace");
+        setTimeout(() => {
+          const el = document.getElementById("purchased-numbers-section");
+          if (el) el.scrollIntoView({ behavior: "smooth" });
+        }, 300);
+      }
+    }
+  }, []);
+
   // Immediate Invoice Modal State
   const [invoiceModal, setInvoiceModal] = useState<{
     isOpen: boolean;
@@ -802,75 +818,135 @@ export default function PhoneNumbersPage() {
 
       {/* SECTION 2: MY NUMBERS */}
       <div id="purchased-numbers-section">
-        <div className="border-b border-[var(--border)] pb-3 mb-6 flex items-center justify-between">
-          <h2 className="font-playfair text-xl font-bold text-[var(--heading)] flex items-center gap-2">
-            <Phone className="w-5 h-5 text-emerald-400" />
-            My Numbers ({numbers.length})
-          </h2>
-          <button 
-            onClick={fetchPurchasedNumbers}
-            className="text-xs font-bold text-[var(--muted)] hover:text-[var(--heading)] flex items-center gap-1 cursor-pointer"
-          >
-            <RefreshCw size={12} className={purchasedLoading ? "animate-spin" : ""} /> Refresh
-          </button>
-        </div>
+        {(() => {
+          const activeList = numbers.filter((n: any) => n.status === "active");
+          const graceList = numbers.filter((n: any) => n.status === "grace_period" || n.status === "hold_period");
+          const displayedList = myNumbersTab === "active" ? activeList : myNumbersTab === "grace" ? graceList : numbers;
 
-        {purchasedLoading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {[1, 2].map((i) => (
-              <div key={i} className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-5 h-44 animate-pulse"></div>
-            ))}
-          </div>
-        ) : purchasedError ? (
-          <div className="rounded-xl bg-red-500/10 border border-red-500/20 p-4 text-red-500 flex items-center justify-between text-xs font-medium">
-            <p>{purchasedError}</p>
-            <button onClick={fetchPurchasedNumbers} className="underline cursor-pointer">Retry</button>
-          </div>
-        ) : numbers.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-12 text-center bg-white dark:bg-zinc-900/50 border border-zinc-200 dark:border-white/10 rounded-2xl p-8 shadow-xs">
-            <PhoneCall size={36} className="text-[var(--muted)] mb-3" />
-            <h3 className="text-base font-bold text-[var(--heading)] mb-1">No purchased numbers</h3>
-            <p className="text-xs text-[var(--muted)] max-w-xs mb-1 font-medium">
-              You haven't acquired any phone lines yet.
-            </p>
-            <p className="text-xs text-[var(--muted)] max-w-xs font-medium">
-              Browse available numbers above or click "Express Setup" to register a line instantly.
-            </p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 font-[family-name:var(--font-montserrat)]">
-            {numbers.map((number: any) => (
-              <div key={number.id} className="space-y-2">
-                {number.bidding_enabled && number.bid_count > 0 && (
-                  <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl text-xs space-y-1">
-                    <p className="font-bold text-amber-400 flex items-center gap-1.5">
-                      <AlertCircle size={14} />
-                      ⚠️ You have {number.bid_count} active bid(s) on this number
-                    </p>
-                    {number.current_bid_paisa && (
-                      <p className="text-[11px] text-[var(--muted)]">
-                        Highest bid: <span className="font-mono font-bold text-emerald-400">₹{(number.current_bid_paisa / 100).toFixed(2)}</span>
-                      </p>
-                    )}
-                    <p className="text-[10px] text-[var(--muted)] italic">
-                      If you renew before your expiration date, your line remains safe.
+          return (
+            <>
+              <div className="border-b border-[var(--border)] pb-3 mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <h2 className="font-playfair text-xl font-bold text-[var(--heading)] flex items-center gap-2">
+                  <Phone className="w-5 h-5 text-emerald-400" />
+                  My Numbers ({numbers.length})
+                </h2>
+
+                <div className="flex items-center gap-2 flex-wrap">
+                  <div className="flex items-center bg-zinc-100 dark:bg-zinc-800/80 p-1 rounded-xl border border-zinc-200 dark:border-white/10 text-xs">
+                    <button
+                      onClick={() => setMyNumbersTab("all")}
+                      className={`px-3 py-1 rounded-lg font-bold transition-all ${
+                        myNumbersTab === "all"
+                          ? "bg-zinc-900 text-white dark:bg-white dark:text-zinc-950 shadow-xs"
+                          : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white"
+                      }`}
+                    >
+                      All ({numbers.length})
+                    </button>
+                    <button
+                      onClick={() => setMyNumbersTab("active")}
+                      className={`px-3 py-1 rounded-lg font-bold transition-all ${
+                        myNumbersTab === "active"
+                          ? "bg-zinc-900 text-white dark:bg-white dark:text-zinc-950 shadow-xs"
+                          : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white"
+                      }`}
+                    >
+                      Active ({activeList.length})
+                    </button>
+                    <button
+                      onClick={() => setMyNumbersTab("grace")}
+                      className={`px-3 py-1 rounded-lg font-bold transition-all flex items-center gap-1.5 ${
+                        myNumbersTab === "grace"
+                          ? "bg-amber-500 text-black shadow-xs font-extrabold"
+                          : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white"
+                      }`}
+                    >
+                      Grace Period ({graceList.length})
+                    </button>
+                  </div>
+
+                  <button 
+                    onClick={fetchPurchasedNumbers}
+                    className="text-xs font-bold text-[var(--muted)] hover:text-[var(--heading)] flex items-center gap-1 cursor-pointer ml-auto"
+                  >
+                    <RefreshCw size={12} className={purchasedLoading ? "animate-spin" : ""} /> Refresh
+                  </button>
+                </div>
+              </div>
+
+              {myNumbersTab === "grace" && graceList.length > 0 && (
+                <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <h4 className="text-sm font-bold text-amber-500 flex items-center gap-1.5">
+                      <AlertCircle size={16} /> Exclusive 15-Day Grace Period Reservation
+                    </h4>
+                    <p className="text-xs text-[var(--muted)] mt-1 max-w-3xl leading-relaxed">
+                      These numbers have expired but remain exclusively reserved for your organization for 15 days before returning to the public pool. Callers receive a polite unavailable announcement without exposing disruption. Click <strong>&quot;Renew Line&quot;</strong> to reactivate immediately.
                     </p>
                   </div>
-                )}
-                <NumberCard 
-                  phoneNumber={{
-                    ...number,
-                    display_price: number.retail_price_paisa
-                      ? `₹${(number.retail_price_paisa / 100).toFixed(0)}/mo`
-                      : "₹299/mo"
-                  }} 
-                  onManage={handleManage}
-                  onRenew={handleRenewNumber}
-                />
-              </div>
-            ))}
-          </div>
-        )}
+                </div>
+              )}
+
+              {purchasedLoading ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {[1, 2].map((i) => (
+                    <div key={i} className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-5 h-44 animate-pulse"></div>
+                  ))}
+                </div>
+              ) : purchasedError ? (
+                <div className="rounded-xl bg-red-500/10 border border-red-500/20 p-4 text-red-500 flex items-center justify-between text-xs font-medium">
+                  <p>{purchasedError}</p>
+                  <button onClick={fetchPurchasedNumbers} className="underline cursor-pointer">Retry</button>
+                </div>
+              ) : displayedList.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12 text-center bg-white dark:bg-zinc-900/50 border border-zinc-200 dark:border-white/10 rounded-2xl p-8 shadow-xs">
+                  <PhoneCall size={36} className="text-[var(--muted)] mb-3" />
+                  <h3 className="text-base font-bold text-[var(--heading)] mb-1">
+                    {myNumbersTab === "grace" ? "No numbers in grace period" : "No purchased numbers"}
+                  </h3>
+                  <p className="text-xs text-[var(--muted)] max-w-xs mb-1 font-medium">
+                    {myNumbersTab === "grace" 
+                      ? "All your virtual phone lines are currently active and in good standing." 
+                      : "You haven't acquired any phone lines yet."}
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 font-[family-name:var(--font-montserrat)]">
+                  {displayedList.map((number: any) => (
+                    <div key={number.id} className="space-y-2">
+                      {number.bidding_enabled && number.bid_count > 0 && (
+                        <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl text-xs space-y-1">
+                          <p className="font-bold text-amber-400 flex items-center gap-1.5">
+                            <AlertCircle size={14} />
+                            ⚠️ You have {number.bid_count} active bid(s) on this number
+                          </p>
+                          {number.current_bid_paisa && (
+                            <p className="text-[11px] text-[var(--muted)]">
+                              Highest bid: <span className="font-mono font-bold text-emerald-400">₹{(number.current_bid_paisa / 100).toFixed(2)}</span>
+                            </p>
+                          )}
+                          <p className="text-[10px] text-[var(--muted)] italic">
+                            If you renew before your expiration date, your line remains safe.
+                          </p>
+                        </div>
+                      )}
+                      <NumberCard 
+                        phoneNumber={{
+                          ...number,
+                          display_price: number.retail_price_paisa
+                            ? `₹${(number.retail_price_paisa / 100).toFixed(0)}/mo`
+                            : "₹299/mo"
+                        }} 
+                        onManage={handleManage}
+                        onRenew={handleRenewNumber}
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          );
+        })()}
       </div>
 
       {/* Modals */}

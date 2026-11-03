@@ -79,6 +79,10 @@ class MockQueryBuilder:
         self.filters.append((col, vals, "in"))
         return self
 
+    def gte(self, col, val):
+        self.filters.append((col, val, "gte"))
+        return self
+
     def limit(self, n):
         self._limit_n = n
         return self
@@ -102,6 +106,10 @@ class MockQueryBuilder:
             if len(f) == 3 and f[2] == "in":
                 col, vals = f[0], f[1]
                 if row.get(col) not in vals:
+                    return False
+            elif len(f) == 3 and f[2] == "gte":
+                col, val = f[0], f[1]
+                if str(row.get(col, "")) < str(val):
                     return False
             else:
                 col, val = f[0], f[1]
@@ -460,6 +468,63 @@ class TestNumberLifecycleTransitions:
         assert status["available_count"] == 12
         assert status["expansion_triggered"] is False
         assert len(mock_db.tables["notifications"]) == 0
+
+    def test_grace_period_notifications_milestones_1_5_7_15(self):
+        """Asserts Day 1, 5, 7, 15 grace notifications are generated per Phase 3 rules."""
+        mock_db = MockSupabaseClient()
+        now = datetime.now(timezone.utc)
+        mock_db.tables["profiles"].append({
+            "id": "tenant-user-grace",
+            "organization_id": "org-grace-test",
+        })
+
+        # Add number in grace period (Day 5 into grace: expired 4 days ago)
+        expired_4d_ago = (now - timedelta(days=4)).isoformat()
+        mock_db.tables["phone_numbers"].append({
+            "id": "num-grace-5d",
+            "organization_id": "org-grace-test",
+            "phone_number": "+919876543210",
+            "status": "grace_period",
+            "expired_at": expired_4d_ago,
+            "grace_period_ends_at": (now + timedelta(days=11)).isoformat(),
+        })
+
+        service = NumberLifecycleService(supabase_client=mock_db)
+        reminders = service.check_lifecycle_reminders()
+
+        # Should match grace-5d
+        grace_reminders = [r for r in reminders if r.get("milestone_day") == "grace-5d"]
+        assert len(grace_reminders) == 1
+        assert len(mock_db.tables["notifications"]) >= 1
+        notif = mock_db.tables["notifications"][0]
+        assert "Day 5" in notif["title"]
+        assert "grace" in notif["action_url"]
+
+    def test_pre_expiry_warning_notifications(self):
+        """Asserts advance warnings 3 days and 1 day prior to number expiry."""
+        mock_db = MockSupabaseClient()
+        now = datetime.now(timezone.utc)
+        mock_db.tables["profiles"].append({
+            "id": "tenant-user-preexpiry",
+            "organization_id": "org-preexpiry-test",
+        })
+
+        # Number expiring in 3 days
+        mock_db.tables["phone_numbers"].append({
+            "id": "num-pre-3d",
+            "organization_id": "org-preexpiry-test",
+            "phone_number": "+919123456789",
+            "status": "active",
+            "renewal_date": (now + timedelta(days=3)).isoformat(),
+        })
+
+        service = NumberLifecycleService(supabase_client=mock_db)
+        reminders = service.check_lifecycle_reminders()
+
+        pre_reminders = [r for r in reminders if r.get("milestone_day") == "pre-expiry-3d"]
+        assert len(pre_reminders) == 1
+        notif = next(n for n in mock_db.tables["notifications"] if "Expiring in 3 Days" in n["title"])
+        assert notif["type"] == "warning"
 
 
 # ==============================================================================

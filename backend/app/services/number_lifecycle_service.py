@@ -477,16 +477,20 @@ class NumberLifecycleService:
         }
 
     # -------------------------------------------------------------------------
-    # 3b. Active Period Reminder Scheduler (Decision N4)
+    # -------------------------------------------------------------------------
+    # 3b. Active Period & Grace Period Milestone Reminder Scheduler
     # -------------------------------------------------------------------------
     def check_lifecycle_reminders(self) -> List[Dict[str, Any]]:
         """
-        Evaluates active virtual numbers along the 30-day active period milestone schedule:
-        Day 1, 7, 14, 21, and 28. Dispatches renewal notices via email + WhatsApp audit logs.
+        Evaluates active virtual numbers along the 30-day active period milestone schedule
+        (Day 1, 7, 14, 21, 28) and pre-expiry alerts (3 days and 1 day before renewal).
+        Also evaluates grace-period virtual numbers on Day 1, 5, 7, and 15.
+        Dispatches notices via in-app notifications and email + WhatsApp channels.
         """
         now = datetime.now(timezone.utc)
         reminders_dispatched = []
 
+        # 1. Active numbers (Milestones: 1, 7, 14, 21, 28 + Pre-expiry warnings)
         res_active = (
             self.supabase.table("phone_numbers")
             .select("id, organization_id, phone_number, provisioned_at, renewal_date")
@@ -494,15 +498,65 @@ class NumberLifecycleService:
             .execute()
         )
         active_numbers = res_active.data or []
-
-        # Only alert for renewal approaching (Day 28 of 30-day cycle). No daily spam.
-        REMINDER_DAYS = (28,)
+        ACTIVE_MILESTONE_DAYS = (1, 7, 14, 21, 28)
 
         for num in active_numbers:
             org_id = num.get("organization_id")
             if not org_id:
                 continue
 
+            target_user_ids = []
+            try:
+                prof_res = self.supabase.table("profiles").select("id").eq("organization_id", org_id).execute()
+                target_user_ids = [p["id"] for p in (prof_res.data or [])]
+            except Exception as e:
+                logger.warning(f"Error querying profiles for org {org_id}: {e}")
+
+            # 1a. Pre-expiry warning (3 days and 1 day before renewal)
+            renewal_str = num.get("renewal_date")
+            if renewal_str:
+                try:
+                    renewal_dt = datetime.fromisoformat(renewal_str.replace("Z", "+00:00"))
+                    days_until_renewal = (renewal_dt.date() - now.date()).days
+                    if days_until_renewal in (1, 3):
+                        pre_title = f"Action Required: Virtual Number Expiring in {days_until_renewal} Day{'s' if days_until_renewal > 1 else ''}"
+                        pre_msg = (
+                            f"Your virtual number {num.get('phone_number')} will expire on {renewal_dt.strftime('%d %b %Y')}. "
+                            "Please renew your plan to prevent call disruption and number dissociation."
+                        )
+                        for uid in target_user_ids:
+                            try:
+                                existing = self.supabase.table("notifications").select("id")\
+                                    .eq("user_id", uid)\
+                                    .eq("title", pre_title)\
+                                    .limit(1)\
+                                    .execute()
+                                if not existing.data or len(existing.data) == 0:
+                                    self.supabase.table("notifications").insert({
+                                        "user_id": uid,
+                                        "title": pre_title,
+                                        "message": pre_msg,
+                                        "type": "warning",
+                                        "action_url": "/dashboard/phone-numbers",
+                                        "action_label": "Renew Number",
+                                        "is_read": False,
+                                        "created_at": now.isoformat(),
+                                    }).execute()
+                            except Exception as e:
+                                logger.warning(f"Error inserting pre-expiry notification: {e}")
+
+                        reminders_dispatched.append({
+                            "phone_number_id": num["id"],
+                            "phone_number": num.get("phone_number"),
+                            "organization_id": org_id,
+                            "milestone_day": f"pre-expiry-{days_until_renewal}d",
+                            "channels": ["email", "whatsapp"],
+                            "dispatched_at": now.isoformat(),
+                        })
+                except Exception as e:
+                    logger.debug(f"Error evaluating renewal_date for {num.get('phone_number')}: {e}")
+
+            # 1b. Milestone schedule (Day 1, 7, 14, 21, 28)
             prov_str = num.get("provisioned_at")
             if not prov_str:
                 continue
@@ -513,14 +567,7 @@ class NumberLifecycleService:
             except Exception:
                 continue
 
-            if days_active in REMINDER_DAYS:
-                target_user_ids = []
-                try:
-                    prof_res = self.supabase.table("profiles").select("id").eq("organization_id", org_id).execute()
-                    target_user_ids = [p["id"] for p in (prof_res.data or [])]
-                except Exception as e:
-                    logger.warning(f"Error querying profiles for org {org_id}: {e}")
-
+            if days_active in ACTIVE_MILESTONE_DAYS:
                 reminder_title = f"Virtual Number Renewal: Day {days_active} of 30"
                 reminder_msg = (
                     f"Virtual number {num.get('phone_number')} renewal is scheduled for {num.get('renewal_date') or 'the end of cycle'}. "
@@ -529,7 +576,6 @@ class NumberLifecycleService:
 
                 for uid in target_user_ids:
                     try:
-                        # Prevent duplicate milestone notifications permanently for this cycle
                         existing = self.supabase.table("notifications").select("id")\
                             .eq("user_id", uid)\
                             .eq("title", reminder_title)\
@@ -560,6 +606,88 @@ class NumberLifecycleService:
                     "dispatched_at": now.isoformat(),
                 })
                 logger.info(f"[Reminder] Day {days_active} lifecycle reminder recorded for {num.get('phone_number')}.")
+
+        # 2. Grace Period numbers (Milestones: Day 1, 5, 7, 15)
+        res_grace = (
+            self.supabase.table("phone_numbers")
+            .select("id, organization_id, phone_number, expired_at, grace_period_ends_at")
+            .eq("status", "grace_period")
+            .execute()
+        )
+        grace_numbers = res_grace.data or []
+        GRACE_NOTIFICATION_DAYS = (1, 5, 7, 15)
+
+        for num in grace_numbers:
+            org_id = num.get("organization_id")
+            if not org_id:
+                continue
+
+            expired_str = num.get("expired_at")
+            if not expired_str:
+                continue
+
+            try:
+                expired_dt = datetime.fromisoformat(expired_str.replace("Z", "+00:00"))
+                days_in_grace = max(1, (now.date() - expired_dt.date()).days + 1)
+            except Exception:
+                continue
+
+            if days_in_grace in GRACE_NOTIFICATION_DAYS:
+                target_user_ids = []
+                try:
+                    prof_res = self.supabase.table("profiles").select("id").eq("organization_id", org_id).execute()
+                    target_user_ids = [p["id"] for p in (prof_res.data or [])]
+                except Exception as e:
+                    logger.warning(f"Error querying profiles for org {org_id}: {e}")
+
+                if days_in_grace == 15:
+                    grace_title = "Grace Period Final Notice: Number Releases Today"
+                    grace_msg = (
+                        f"Today is Day 15 (Final Day) of the grace period for virtual number {num.get('phone_number')}. "
+                        "If not reactivated today, this number will return to the general pool and be reallocated to another user."
+                    )
+                    notif_type = "error"
+                else:
+                    days_left = 15 - days_in_grace
+                    grace_title = f"Grace Period Notice: Day {days_in_grace} of 15"
+                    grace_msg = (
+                        f"Your virtual number {num.get('phone_number')} is currently in grace period ({days_left} day{'s' if days_left != 1 else ''} remaining). "
+                        "Reactivate your number in the Grace Period section to restore voice calling."
+                    )
+                    notif_type = "warning"
+
+                for uid in target_user_ids:
+                    try:
+                        existing = self.supabase.table("notifications").select("id")\
+                            .eq("user_id", uid)\
+                            .eq("title", grace_title)\
+                            .limit(1)\
+                            .execute()
+                        if existing.data and len(existing.data) > 0:
+                            continue
+
+                        self.supabase.table("notifications").insert({
+                            "user_id": uid,
+                            "title": grace_title,
+                            "message": grace_msg,
+                            "type": notif_type,
+                            "action_url": "/dashboard/phone-numbers?tab=grace",
+                            "action_label": "Rebuy / Reactivate",
+                            "is_read": False,
+                            "created_at": now.isoformat(),
+                        }).execute()
+                    except Exception as e:
+                        logger.warning(f"Error recording grace notification for {uid}: {e}")
+
+                reminders_dispatched.append({
+                    "phone_number_id": num["id"],
+                    "phone_number": num.get("phone_number"),
+                    "organization_id": org_id,
+                    "milestone_day": f"grace-{days_in_grace}d",
+                    "channels": ["email", "whatsapp"],
+                    "dispatched_at": now.isoformat(),
+                })
+                logger.info(f"[Grace Reminder] Day {days_in_grace} reminder recorded for {num.get('phone_number')}.")
 
         return reminders_dispatched
 
