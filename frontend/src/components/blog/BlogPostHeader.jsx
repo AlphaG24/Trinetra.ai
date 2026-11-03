@@ -80,7 +80,7 @@ export default function BlogPostHeader({ post }) {
               </div>
             )}
           </div>
-          <span className="font-medium text-trinetra-text">{post.author_name || "Trinetra AI"}</span>
+          <span className="font-medium text-trinetra-text">{post.author_name || "Vaakriti AI"}</span>
         </div>
         <span className="text-trinetra-subtle">|</span>
         <span>{formatDate(post.created_at)}</span>

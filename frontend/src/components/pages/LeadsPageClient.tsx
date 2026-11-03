@@ -882,7 +882,7 @@ export function LeadsPageClient({ initialLeads, agents = [], services = [], init
                       </div>
                       <div>
                         <span className="text-[11px] font-bold text-[var(--heading)] block">Revenue & Deal Status</span>
-                        <span className="text-[10px] text-[var(--muted)]">Attributed via Trinetra Voice AI</span>
+                        <span className="text-[10px] text-[var(--muted)]">Attributed via Vaakriti Voice AI</span>
                       </div>
                     </div>
                     {selectedRev?.deal_status === 'won' ? (
@@ -1012,7 +1012,7 @@ export function LeadsPageClient({ initialLeads, agents = [], services = [], init
             </div>
 
             <p className="text-xs text-[var(--body)] leading-relaxed">
-              Confirm the final revenue brought in by this lead to calculate your business ROI and net return from Trinetra AI.
+              Confirm the final revenue brought in by this lead to calculate your business ROI and net return from Vaakriti AI.
             </p>
 
             <div className="space-y-1.5">

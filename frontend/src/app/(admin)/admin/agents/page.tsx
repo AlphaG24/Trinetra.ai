@@ -923,7 +923,7 @@ COMPLIANCE MANDATE (SEC-011)
                   )}
                 </select>
                 <p className="text-[11px] text-[var(--muted)]">
-                  This number will be bound to this agent in Trinetra and used as the outgoing Caller ID.
+                  This number will be bound to this agent in Vaakriti and used as the outgoing Caller ID.
                 </p>
               </div>
             </div>

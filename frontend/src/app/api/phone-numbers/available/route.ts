@@ -34,7 +34,7 @@ export async function GET(request: Request) {
             const available_numbers = poolNumbers.map((num: any) => ({
                 did_id: num.id,
                 phone_number: num.phone_number,
-                city: 'Trinetra Pool',
+                city: 'Vaakriti Pool',
                 area_code: num.phone_number.substring(1, 4),
                 did_type: 'mobile',
                 provider: 'twilio'

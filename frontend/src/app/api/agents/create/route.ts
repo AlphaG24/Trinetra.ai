@@ -76,7 +76,7 @@ function loadPromptTemplate(
         try {
             if (fs.existsSync(filePath)) {
                 rawTemplate = fs.readFileSync(filePath, "utf-8");
-                console.log(`[Trinetra] Loaded prompt template: ${fileName} from ${filePath}`);
+                console.log(`[Vaakriti] Loaded prompt template: ${fileName} from ${filePath}`);
                 break;
             }
         } catch (_e) {
@@ -85,7 +85,7 @@ function loadPromptTemplate(
     }
 
     if (!rawTemplate) {
-        console.warn(`[Trinetra] Prompt template not found for key '${templateKey}' (file: ${fileName})`);
+        console.warn(`[Vaakriti] Prompt template not found for key '${templateKey}' (file: ${fileName})`);
         return null;
     }
 
@@ -262,7 +262,7 @@ export async function POST(request: Request) {
         }
 
         if (existingAgent) {
-            console.log(`[Trinetra] Reusing existing agent ${existingAgent.id} for slug '${requestedAgentType}'`);
+            console.log(`[Vaakriti] Reusing existing agent ${existingAgent.id} for slug '${requestedAgentType}'`);
             return NextResponse.json({
                 success: true,
                 agent: { id: existingAgent.id },
@@ -281,7 +281,7 @@ export async function POST(request: Request) {
  
         if (profileError || !profile) {
             // Auto-heal: Create default profile if missing
-            console.log(`[Trinetra] Profile missing for ${user.id}. Creating default.`);
+            console.log(`[Vaakriti] Profile missing for ${user.id}. Creating default.`);
  
             const { data: newProfile, error: createError } = await supabaseAdmin
                 .from('profiles')
@@ -295,7 +295,7 @@ export async function POST(request: Request) {
                 .single();
  
             if (createError || !newProfile) {
-                console.error("[Trinetra] Failed to create default profile:", createError);
+                console.error("[Vaakriti] Failed to create default profile:", createError);
                 return NextResponse.json(
                     { error: "Profile creation failed. Contact support.", debug: createError?.message },
                     { status: 500 }
@@ -320,7 +320,7 @@ export async function POST(request: Request) {
         let organizationId = profile?.organization_id;
 
         if (!organizationId) {
-            console.log(`[Trinetra] No organization_id found for user ${user.id}. Creating organization first.`);
+            console.log(`[Vaakriti] No organization_id found for user ${user.id}. Creating organization first.`);
             
             const orgName = company_name || `${profile?.full_name || user.email?.split('@')[0] || 'My'}'s Company`;
             // Simple slug generation: lower case, replace non-alphanumeric with hyphens
@@ -340,7 +340,7 @@ export async function POST(request: Request) {
                 .single();
 
             if (orgError || !newOrg) {
-                console.error("[Trinetra] Failed to create organization:", orgError);
+                console.error("[Vaakriti] Failed to create organization:", orgError);
                 return NextResponse.json(
                     { error: "Failed to create organization.", debug: orgError?.message },
                     { status: 500 }
@@ -348,7 +348,7 @@ export async function POST(request: Request) {
             }
 
             organizationId = newOrg.id;
-            console.log(`[Trinetra] Organization created successfully: ${organizationId} with slug: ${orgSlug}`);
+            console.log(`[Vaakriti] Organization created successfully: ${organizationId} with slug: ${orgSlug}`);
 
             // Update profile with this organization_id using admin client (bypasses RLS)
             const { error: profileOrgUpdateError } = await supabaseAdmin
@@ -357,7 +357,7 @@ export async function POST(request: Request) {
                 .eq('id', user.id);
 
             if (profileOrgUpdateError) {
-                console.error("[Trinetra] Failed to update profile with organization_id:", profileOrgUpdateError);
+                console.error("[Vaakriti] Failed to update profile with organization_id:", profileOrgUpdateError);
                 return NextResponse.json(
                     { error: "Failed to link organization to profile.", debug: profileOrgUpdateError?.message },
                     { status: 500 }
@@ -373,7 +373,7 @@ export async function POST(request: Request) {
             .neq('status', 'deleted');
 
         if (countError) {
-            console.error("[Trinetra] Agent count query failed:", countError);
+            console.error("[Vaakriti] Agent count query failed:", countError);
         }
 
         const currentAgentCount = agentCount ?? 0;
@@ -407,7 +407,7 @@ export async function POST(request: Request) {
                 limit = parseInt(configLimit.config_value, 10);
             }
         } catch (err) {
-            console.error("[Trinetra] Error fetching dynamic agent limit:", err);
+            console.error("[Vaakriti] Error fetching dynamic agent limit:", err);
         }
 
         // Bypass limit checks entirely if user has developer_tester role
@@ -434,7 +434,7 @@ export async function POST(request: Request) {
                 blueprints = JSON.parse(configData.config_value);
             }
         } catch (e) {
-            console.error("[Trinetra] Error fetching dynamic blueprints:", e);
+            console.error("[Vaakriti] Error fetching dynamic blueprints:", e);
         }
 
         const blueprint = blueprints[role] || blueprints["Custom"] || BLUEPRINTS["Custom"];
@@ -443,7 +443,7 @@ export async function POST(request: Request) {
         const rawAgentName = name || (platformService?.name || "Neural Unit");
         const agentName = rawAgentName.replace(/^\[[^\]]+\]\s*/, '').trim();
 
-        const userName = user.user_metadata?.full_name || user.email?.split('@')[0] || "Trinetra User";
+        const userName = user.user_metadata?.full_name || user.email?.split('@')[0] || "Vaakriti User";
         const companyDisplayName = company_name || profile?.company_name || userName;
 
         // --- TEMPLATE-BASED PROMPT LOADING ---
@@ -462,13 +462,13 @@ export async function POST(request: Request) {
 
             if (templatePrompt) {
                 systemPrompt = templatePrompt;
-                console.log(`[Trinetra] Applied template '${primaryKey}' for agent '${agentName}'`);
+                console.log(`[Vaakriti] Applied template '${primaryKey}' for agent '${agentName}'`);
             } else {
                 // Fallback: blueprint
                 systemPrompt = blueprint.systemPrompt
                     .replace("{userName}", userName)
                     .replace("{agentName}", agentName);
-                console.log(`[Trinetra] Used blueprint for agent '${agentName}' (no template match for '${primaryKey}')`);
+                console.log(`[Vaakriti] Used blueprint for agent '${agentName}' (no template match for '${primaryKey}')`);
             }
         }
 
@@ -481,9 +481,9 @@ Company Name: ${companyDisplayName}
 Industry: ${profile?.business_type || 'General'}
 ========================\n\n`;
             systemPrompt = contextBlock + systemPrompt;
-            console.log(`[Trinetra] Successfully injected business context with description: "${businessDescription}"`);
+            console.log(`[Vaakriti] Successfully injected business context with description: "${businessDescription}"`);
         } catch (contextError: any) {
-            console.error(`[Trinetra] Failed to inject business context:`, contextError);
+            console.error(`[Vaakriti] Failed to inject business context:`, contextError);
         }
 
         // --- GREETING MESSAGE ---
@@ -581,7 +581,7 @@ Industry: ${profile?.business_type || 'General'}
                     .maybeSingle();
                 if (configDays?.config_value) trialDays = parseInt(configDays.config_value, 10);
             } catch (e) {
-                console.error("[Trinetra] Error loading trial config parameters:", e);
+                console.error("[Vaakriti] Error loading trial config parameters:", e);
             }
 
             agentConfig = {
@@ -625,7 +625,7 @@ Industry: ${profile?.business_type || 'General'}
 
         // If PGRST204 (column not in schema cache), retry with minimal safe columns
         if (dbError && (dbError.code === 'PGRST204' || dbError.message?.includes('column'))) {
-            console.warn(`[Trinetra] Column error on full insert (${dbError.message}), retrying with minimal columns`);
+            console.warn(`[Vaakriti] Column error on full insert (${dbError.message}), retrying with minimal columns`);
             const minimalPayload: Record<string, any> = {
                 user_id: user.id,
                 organization_id: organizationId,
@@ -646,7 +646,7 @@ Industry: ${profile?.business_type || 'General'}
         }
 
         if (dbError) {
-            console.error("[Trinetra] FULL DB ERROR:", JSON.stringify(dbError, null, 2));
+            console.error("[Vaakriti] FULL DB ERROR:", JSON.stringify(dbError, null, 2));
             return NextResponse.json(
                 {
                     error: "Database creation failed",
@@ -676,7 +676,7 @@ Industry: ${profile?.business_type || 'General'}
             .eq('id', user.id);
 
         if (updateError) {
-            console.error("[Trinetra] Profile update failed:", JSON.stringify(updateError));
+            console.error("[Vaakriti] Profile update failed:", JSON.stringify(updateError));
         }
 
         // If this is a demo agent, initialize/add it to demo_usage in profiles to lock it forever
@@ -706,7 +706,7 @@ Industry: ${profile?.business_type || 'General'}
         });
 
     } catch (error: any) {
-        console.error("[Trinetra] Agent Creation Error:", error);
+        console.error("[Vaakriti] Agent Creation Error:", error);
         return NextResponse.json(
             { error: "Internal Server Error", details: error.message },
             { status: 500 }

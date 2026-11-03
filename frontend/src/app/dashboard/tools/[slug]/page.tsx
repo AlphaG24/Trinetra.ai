@@ -143,7 +143,7 @@ export default async function ToolGatekeeperPage({ params }: PageProps) {
     redirect('/dashboard/agents')
   }
 
-  const displayName = service.name === 'Trinetra Structurer' ? 'Triscrap' : service.name
+  const displayName = service.name === 'Vaakriti Structurer' ? 'Triscrap' : service.name
 
   const quotaUsed = quota.quota_used || 0
   const quotaAllocated = quota.quota_allocated || 0

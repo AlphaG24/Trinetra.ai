@@ -368,7 +368,7 @@ export default function AdminDashboard({ onCreateNew, onEdit }) {
       <div className="mb-12 flex flex-col gap-8 md:flex-row md:items-center md:justify-between">
         <div>
           <h2 className="text-5xl font-black text-white tracking-tighter">Admin Dashboard</h2>
-          <p className="mt-4 text-xl text-gray-500">Premium high-resolution control center for Trinetra Blog.</p>
+          <p className="mt-4 text-xl text-gray-500">Premium high-resolution control center for Vaakriti Blog.</p>
         </div>
 
         <div className="flex flex-wrap items-center gap-3">

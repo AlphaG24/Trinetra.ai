@@ -278,7 +278,7 @@ function BillingContent() {
         key: data.key,
         amount: data.amount,
         currency: data.currency || 'INR',
-        name: 'Trinetra AI',
+        name: 'Vaakriti AI',
         description: `Prepaid Wallet Recharge (₹${amount.toLocaleString('en-IN')})`,
         order_id: data.order_id,
         prefill: {
@@ -482,7 +482,7 @@ function BillingContent() {
         key: data.key,
         amount: data.amount,
         currency: data.currency || 'INR',
-        name: 'Trinetra AI',
+        name: 'Vaakriti AI',
         description: `7-Day All-Access Trial (${trialPayload.agentCount} Agents)`,
         order_id: data.order_id,
         subscription_id: data.subscription_id || undefined,
@@ -898,7 +898,7 @@ function BillingContent() {
         key: data.key,
         amount: data.amount,
         currency: data.currency,
-        name: 'Trinetra AI',
+        name: 'Vaakriti AI',
         description: 'Provision voice agents & lines',
         order_id: data.order_id,
         prefill: {

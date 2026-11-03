@@ -84,7 +84,7 @@ export default function PartnerSignupPage() {
               >
                 <div className="flex flex-col items-center text-center mb-8">
                   <Link href="/" className="mb-6 hover:opacity-80 transition-opacity">
-                    <img src="/trident.png" alt="Trinetra Trident" className="h-16 md:h-20 object-contain drop-shadow-[0_0_15px_rgba(255,255,255,0.1)]" />
+                    <img src="/trident.png" alt="Vaakriti Trident" className="h-16 md:h-20 object-contain drop-shadow-[0_0_15px_rgba(255,255,255,0.1)]" />
                   </Link>
                   <h1 className="font-display font-bold text-3xl text-white tracking-tight mb-2">Create Account</h1>
                   <p className="text-zinc-400 text-sm leading-relaxed">

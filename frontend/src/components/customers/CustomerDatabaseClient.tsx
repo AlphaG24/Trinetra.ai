@@ -720,7 +720,7 @@ export function CustomerDatabaseClient() {
                   type="text" 
                   value={formCompany}
                   onChange={(e) => setFormCompany(e.target.value)}
-                  placeholder="e.g. Trinetra Inc."
+                  placeholder="e.g. Vaakriti Inc."
                   className="w-full bg-[var(--background)] border border-[var(--border)] rounded-xl px-4 py-3 text-xs focus:outline-none focus:ring-1 focus:ring-[var(--heading)]/25 text-[var(--heading)]"
                 />
               </div>

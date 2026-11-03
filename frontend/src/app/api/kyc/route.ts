@@ -272,7 +272,7 @@ export async function POST(req: Request) {
 
     const encryptedPath = `kyc_vault/${orgId}/${document_type}_${Date.now()}.enc`
 
-    const statutoryConsentText = 'I affirmatively consent to the verification and encrypted vault storage of this identity document in accordance with the Digital Personal Data Protection Act (DPDP), UIDAI statutory masking guidelines, and Trinetra AI Telephony Compliance.'
+    const statutoryConsentText = 'I affirmatively consent to the verification and encrypted vault storage of this identity document in accordance with the Digital Personal Data Protection Act (DPDP), UIDAI statutory masking guidelines, and Vaakriti AI Telephony Compliance.'
 
     // Master Plan Section 18.6: AES-256-GCM Encrypted Storage in private_bucket
     try {

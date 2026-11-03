@@ -20,13 +20,13 @@ export default function AdminNavbar({ currentView, onLogout, autoSaveStatus }) {
           <div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-zinc-100 dark:bg-white/5 p-3 shadow-sm border border-[var(--border)]">
             <img 
               src="/trident.png"
-              alt="Trinetra AI"
+              alt="Vaakriti AI"
               className="h-full w-full object-contain dynamic-logo"
             />
           </div>
           <div className="flex flex-col">
             <span className="text-3xl font-bold tracking-tight text-[var(--heading)] font-playfair">
-              Trinetra
+              Vaakriti
             </span>
             <span className="text-xs font-bold uppercase tracking-[0.2em] text-emerald-600 dark:text-emerald-400 font-playfair">
               Admin Console

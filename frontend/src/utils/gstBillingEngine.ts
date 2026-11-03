@@ -1,5 +1,5 @@
 /**
- * GST Billing Engine for Vaakriti / Trinetra AI
+ * GST Billing Engine for Vaakriti / Vaakriti AI
  * Ported from and compliant with open-source Indian GST Billing Architecture
  * (IamRamgarhia/Free-GST-Billing-Software)
  * 

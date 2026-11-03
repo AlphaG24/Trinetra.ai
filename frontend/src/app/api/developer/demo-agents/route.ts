@@ -240,7 +240,7 @@ export async function POST(req: Request) {
             organization_id: profile.organization_id || null,
             status: 'active',
             is_demo: true,
-            system_prompt: item.system_prompt || `You are ${item.name}, an AI assistant for Trinetra AI. Personality: ${item.personality || 'Warm & Professional'}.`,
+            system_prompt: item.system_prompt || `You are ${item.name}, an AI assistant for Vaakriti AI. Personality: ${item.personality || 'Warm & Professional'}.`,
             campaign_purpose: item.campaign_purpose || 'General AI Operations',
             industry_domain: item.industry_domain || 'Enterprise AI',
             created_at: new Date().toISOString(),

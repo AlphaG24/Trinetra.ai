@@ -66,7 +66,7 @@ export function SubscribeWidget({ variant = 'sidebar' }: SubscribeWidgetProps) {
             {' '}weekly
           </h3>
           <p className="text-sm text-white/50 mt-2">
-            Join 10,000+ business leaders reading Trinetra newsletter.
+            Join 10,000+ business leaders reading Vaakriti newsletter.
           </p>
         </div>
 

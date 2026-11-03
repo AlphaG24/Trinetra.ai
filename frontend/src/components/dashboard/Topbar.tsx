@@ -423,13 +423,7 @@ export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
                   >
                     <User className="w-4 h-4 text-[var(--muted)]" /> My Profile
                   </Link>
-                  <Link
-                    href="/"
-                    onClick={() => setIsDropdownOpen(false)}
-                    className="flex items-center gap-2.5 px-4 py-3 text-[13px] text-[var(--body)] hover:bg-[var(--hover-bg)] hover:text-[var(--heading)] transition-colors font-playfair font-extrabold"
-                  >
-                    <Globe className="w-4 h-4 text-[var(--muted)]" /> View Website
-                  </Link>
+
                   <button
                     suppressHydrationWarning
                     onClick={() => { setIsDropdownOpen(false); handleSignOut() }}

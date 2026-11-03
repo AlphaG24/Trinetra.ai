@@ -209,7 +209,7 @@ export default async function BlogPostDetailPage({ params }: PageProps) {
                   className="w-full h-full object-contain"
                 />
               </div>
-              <span className="font-semibold text-white">{post.author_name || 'Trinetra AI'}</span>
+              <span className="font-semibold text-white">{post.author_name || 'Vaakriti AI'}</span>
               <span>·</span>
               <span className="flex items-center gap-1.5 text-slate-300">
                 <Calendar size={13} className="text-[#60A5FA]" />

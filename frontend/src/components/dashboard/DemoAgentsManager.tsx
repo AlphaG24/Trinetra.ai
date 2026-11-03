@@ -91,7 +91,7 @@ export function DemoAgentsManager() {
         language: foundAgent.language || 'Hinglish & English',
         gender: resolvedGender,
         description: foundAgent.description || copy[selectedAgentIndex].description || `Agent managed by your workspace.`,
-        greeting_message: foundAgent.greeting_message || copy[selectedAgentIndex].greeting_message || `Namaste! Main Trinetra AI se bol raha hoon. Kaise madad kar sakta hoon?`,
+        greeting_message: foundAgent.greeting_message || copy[selectedAgentIndex].greeting_message || `Namaste! Main Vaakriti AI se bol raha hoon. Kaise madad kar sakta hoon?`,
         system_prompt: foundAgent.system_prompt || '',
         campaign_purpose: foundAgent.campaign_purpose || '',
         industry_domain: foundAgent.industry_domain || '',
@@ -117,7 +117,7 @@ export function DemoAgentsManager() {
       language: defaultAgent.language || 'Hinglish & English',
       gender: defaultAgent.gender || 'female',
       description: defaultAgent.description || 'Configured via your workspace agents.',
-      greeting_message: defaultAgent.greeting_message || 'Namaste! Main Trinetra AI se bol rahi hoon. Kaise madad kar sakti hoon?',
+      greeting_message: defaultAgent.greeting_message || 'Namaste! Main Vaakriti AI se bol rahi hoon. Kaise madad kar sakti hoon?',
       accent_color: '#0D9488',
       badge_color: 'bg-teal-500/10 text-teal-400 border-teal-500/20',
       suggested_prompts: [

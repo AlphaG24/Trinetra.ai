@@ -90,7 +90,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       const msgs = Array.isArray(ticket.messages) ? ticket.messages : []
       msgs.push({
         sender: 'admin',
-        sender_name: profile?.full_name || 'Trinetra Support',
+        sender_name: profile?.full_name || 'Vaakriti Support',
         message: message,
         timestamp: now
       })

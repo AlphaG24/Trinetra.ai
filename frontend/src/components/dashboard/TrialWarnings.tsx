@@ -68,7 +68,7 @@ export function TrialWarnings({
                 {isFree ? 'Demo minutes exhausted' : 'Monthly limit reached. Your agent is paused.'}
               </span>
               <p className="text-[10px] text-zinc-650 dark:text-zinc-300 mt-0.5 leading-none">
-                You have used {used}/{limit} {isFree ? 'free test' : 'production'} minutes. Upgrade to continue using Trinetra AI.
+                You have used {used}/{limit} {isFree ? 'free test' : 'production'} minutes. Upgrade to continue using Vaakriti AI.
               </p>
             </div>
           </div>

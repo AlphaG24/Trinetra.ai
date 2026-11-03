@@ -7,7 +7,7 @@ interface AuthorCardProps {
 }
 
 export default function AuthorCard({ name, avatarUrl, bio }: AuthorCardProps) {
-  const defaultBio = 'Principal Technical Writer and AI Analyst at Trinetra AI. Writing about voice AI agents, conversational technology, automation, and system integrations.'
+  const defaultBio = 'Principal Technical Writer and AI Analyst at Vaakriti AI. Writing about voice AI agents, conversational technology, automation, and system integrations.'
 
   return (
     <div className="rounded-3xl border border-white/[0.06] bg-gradient-to-br from-[#130324]/50 to-[#070010]/80 p-6 backdrop-blur-xl">

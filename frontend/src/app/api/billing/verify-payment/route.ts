@@ -1197,7 +1197,7 @@ export async function POST(request: Request) {
     if (profile.telegram_chat_id) {
       const botToken = process.env.TELEGRAM_BOT_TOKEN
       if (botToken) {
-        const textMessage = `✅ Payment verified successfully!\nInvoice: ${invoiceRecord.invoice_number}\nAmount Paid: ₹${(finalTotalPaisa / 100).toFixed(2)}\nActive plan: ${planTierToSet.toUpperCase()}.\nThank you for choosing Trinetra AI!`
+        const textMessage = `✅ Payment verified successfully!\nInvoice: ${invoiceRecord.invoice_number}\nAmount Paid: ₹${(finalTotalPaisa / 100).toFixed(2)}\nActive plan: ${planTierToSet.toUpperCase()}.\nThank you for choosing Vaakriti AI!`
         try {
           await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
             method: 'POST',

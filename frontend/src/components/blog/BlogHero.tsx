@@ -53,7 +53,7 @@ export default function BlogHero({ post }: BlogHeroProps) {
             Insights & Guides
           </span>
           <h1 className="mt-4 font-display text-4xl font-extrabold tracking-tight text-white sm:text-6xl md:text-7xl">
-            Trinetra <span className="bg-gradient-to-r from-violet-400 via-fuchsia-400 to-amber-300 bg-clip-text text-transparent">AI Blog</span>
+            Vaakriti <span className="bg-gradient-to-r from-violet-400 via-fuchsia-400 to-amber-300 bg-clip-text text-transparent">AI Blog</span>
           </h1>
           <p className="mx-auto mt-6 max-w-2xl text-lg md:text-xl text-zinc-400 font-medium">
             Insights on AI Voice Agents, Automation & Business Growth
@@ -144,7 +144,7 @@ export default function BlogHero({ post }: BlogHeroProps) {
                     )}
                     <div>
                       <div className="text-sm font-bold text-zinc-100">{post.author_name}</div>
-                      <div className="text-[11px] text-zinc-500 font-medium">Trinetra Author</div>
+                      <div className="text-[11px] text-zinc-500 font-medium">Vaakriti Author</div>
                     </div>
                   </div>
 

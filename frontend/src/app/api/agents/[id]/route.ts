@@ -128,7 +128,7 @@ export async function PATCH(
 
             const rawName = existingAgent?.name || 'Agent';
             const cleanName = rawName.replace(/^\[[^\]]+\]\s*/, '').replace(/\s*-\s*(Demo|Trial)\s*$/i, '');
-            const companyName = existingAgent?.business_name || 'Trinetra';
+            const companyName = existingAgent?.business_name || 'Vaakriti';
 
             promptContent = promptContent
               .replace(/\{\{agent_name\}\}/g, cleanName)

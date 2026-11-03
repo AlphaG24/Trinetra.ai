@@ -133,7 +133,7 @@ export async function POST(request: Request) {
 
         // 4. AI Analysis
         const prompt = `
-        You are an elite Lead Compliance Auditor (Trinetra AI).
+        You are an elite Lead Compliance Auditor (Vaakriti AI).
         
         --- KNOWLEDGE VAULT STANDARDS (GROUND TRUTH) ---
         ${contextText}

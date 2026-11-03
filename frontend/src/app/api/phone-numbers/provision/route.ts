@@ -148,7 +148,7 @@ export async function POST(request: Request) {
                         organization_id: profile.organization_id,
                         activity_type: 'number_provisioned',
                         title: 'Phone Number Provisioned (Pool)',
-                        description: `Provisioned pre-purchased number ${phoneRow.phone_number} from Trinetra pool`
+                        description: `Provisioned pre-purchased number ${phoneRow.phone_number} from Vaakriti pool`
                     });
 
                     return NextResponse.json({

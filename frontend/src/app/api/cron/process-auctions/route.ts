@@ -14,7 +14,7 @@ function getAdminClient() {
 // 2. Pre-expiration alerts (3 days & 24 hours) for assigned phone numbers
 // 3. Expired phone numbers (bidding priority winner or auto-release to pool)
 // 4. Pre-expiration alerts (3 days & 24 hours) for voice agents
-// 5. Expired agent subscriptions (Trinetra Dignity Quota Guarantee: keep active if minutes remain)
+// 5. Expired agent subscriptions (Vaakriti Dignity Quota Guarantee: keep active if minutes remain)
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -336,7 +336,7 @@ export async function GET(request: Request) {
           await adminClient.from("notifications").insert({
             user_id: targetUserId,
             title: `Agent Plan Expiring in 24h: "${agent.name}" ⏳`,
-            message: `The subscription timeline for agent "${agent.name}" expires in 24 hours. Trinetra Dignity Guarantee: Any remaining call minutes will stay fully active until you consume them!`,
+            message: `The subscription timeline for agent "${agent.name}" expires in 24 hours. Vaakriti Dignity Guarantee: Any remaining call minutes will stay fully active until you consume them!`,
             type: "warning",
             action_url: "/dashboard/billing",
             action_label: "Extend Plan",
@@ -385,7 +385,7 @@ export async function GET(request: Request) {
     }
 
     // =========================================================================
-    // 5. Expired Agent Subscriptions (Trinetra Dignity Quota Guarantee)
+    // 5. Expired Agent Subscriptions (Vaakriti Dignity Quota Guarantee)
     // =========================================================================
     const { data: expiredAgents } = await adminClient
       .from("agents")
@@ -416,7 +416,7 @@ export async function GET(request: Request) {
             await adminClient.from("notifications").insert({
               user_id: targetUserId,
               title: `Dignity Quota Active: "${agent.name}" ✨`,
-              message: `Your subscription duration for "${agent.name}" has completed, but you still have ${remainingMinutes} unused call minutes. As promised by Trinetra AI, your agent stays fully operational until your minutes are finished!`,
+              message: `Your subscription duration for "${agent.name}" has completed, but you still have ${remainingMinutes} unused call minutes. As promised by Vaakriti AI, your agent stays fully operational until your minutes are finished!`,
               type: "info",
               action_url: "/dashboard/billing",
               action_label: "Top-Up Minutes",

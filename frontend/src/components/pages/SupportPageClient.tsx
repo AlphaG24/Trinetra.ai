@@ -11,7 +11,7 @@ const FAQ = [
   },
   {
     q: 'Can my AI agent speak in Hindi?',
-    a: 'Yes! Trinetra AI supports Hindi, Hinglish (Hindi + English mix), and English. You can configure the preferred language in Settings → Agent Settings under your agent\'s language preferences.',
+    a: 'Yes! Vaakriti AI supports Hindi, Hinglish (Hindi + English mix), and English. You can configure the preferred language in Settings → Agent Settings under your agent\'s language preferences.',
   },
   {
     q: 'What happens if my plan runs out of minutes?',
@@ -67,7 +67,7 @@ export function SupportPageClient({ user }: { user: any }) {
       {/* Quick contact cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <a
-          href="https://wa.me/918047483921?text=Hi%2C+I+need+help+with+my+Trinetra+AI+dashboard"
+          href="https://wa.me/918047483921?text=Hi%2C+I+need+help+with+my+Vaakriti+AI+dashboard"
           target="_blank"
           rel="noopener noreferrer"
           className="group flex flex-col items-center gap-3 p-6 bg-green-500/10 border border-green-500/30 hover:border-green-500/60 rounded-2xl transition-all cursor-pointer"

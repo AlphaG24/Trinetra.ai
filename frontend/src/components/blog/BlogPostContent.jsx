@@ -25,7 +25,7 @@ function ensureHeadingIds(container) {
 function AuthorBox({ post }) {
   if (!post) return null;
 
-  const name = post.author_name || "Trinetra AI";
+  const name = post.author_name || "Vaakriti AI";
   const avatar = post.author_avatar || "";
   const category = post.category ? `Writing about ${post.category}.` : "";
   const bio = `${name} shares insights on AI, automation, and building smarter businesses. ${category}`.trim();

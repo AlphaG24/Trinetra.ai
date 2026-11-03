@@ -144,7 +144,7 @@ export async function GET(
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Decrypted KYC Document - ${doc.document_type} | Trinetra AI Vault</title>
+  <title>Decrypted KYC Document - ${doc.document_type} | Vaakriti AI Vault</title>
   <style>
     body {
       background-color: #050508;

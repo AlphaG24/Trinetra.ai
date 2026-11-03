@@ -25,7 +25,7 @@ export async function POST(req: Request) {
     if (existing) {
       return NextResponse.json({
         success: true,
-        message: 'You are already subscribed to Trinetra AI publications!',
+        message: 'You are already subscribed to Vaakriti AI publications!',
         alreadySubscribed: true
       })
     }
@@ -47,7 +47,7 @@ export async function POST(req: Request) {
     try {
       await sendEmailTemplate({
         to: email,
-        subject: '✨ Welcome to Trinetra AI Publications',
+        subject: '✨ Welcome to Vaakriti AI Publications',
         templateName: 'welcome-subscriber',
         variables: {
           site_url: siteUrl,

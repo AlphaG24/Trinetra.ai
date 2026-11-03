@@ -62,7 +62,7 @@ export async function GET() {
         console.log(`[Usage Monitor] User ${profile.email} reached 100% quota (${used}/${limit}). Sending paused email...`)
         const success = await sendEmailTemplate({
           to: profile.email,
-          subject: '🛑 Action Required: Trinetra AI calls quota exceeded',
+          subject: '🛑 Action Required: Vaakriti AI calls quota exceeded',
           templateName: 'agent-paused',
           variables: {
             recipient_name: profile.full_name || 'there',
@@ -103,7 +103,7 @@ export async function GET() {
         console.log(`[Usage Monitor] User ${profile.email} reached 80% quota (${used}/${limit}). Sending warning email...`)
         const success = await sendEmailTemplate({
           to: profile.email,
-          subject: '⚠️ Usage Alert: 80% Trinetra AI call minutes quota reached',
+          subject: '⚠️ Usage Alert: 80% Vaakriti AI call minutes quota reached',
           templateName: 'usage-warning',
           variables: {
             recipient_name: profile.full_name || 'there',

@@ -86,7 +86,7 @@ export default function FeaturedPost({ post }) {
                 )}
               </div>
               <div className="flex flex-col">
-                <span className="text-[13px] font-medium text-gray-300">{post.author_name || 'Trinetra'}</span>
+                <span className="text-[13px] font-medium text-gray-300">{post.author_name || 'Vaakriti'}</span>
                 <div className="flex items-center gap-2 text-[11px] text-gray-500 mt-0.5">
                   <span>{new Date(post.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</span>
                   <span>·</span>

@@ -5,7 +5,7 @@ import {
   Tooltip, Legend, ResponsiveContainer
 } from 'recharts'
 
-// Harmonious UI theme colors matching Trinetra's premium aesthetics
+// Harmonious UI theme colors matching Vaakriti's premium aesthetics
 const DEFAULT_COLOR = '#7c3aed' // Violet
 const PIE_COLORS = ['#7c3aed', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#ec4899']
 

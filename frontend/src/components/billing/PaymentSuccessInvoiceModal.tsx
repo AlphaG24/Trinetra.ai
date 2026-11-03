@@ -528,7 +528,7 @@ function formatSafeString(val: any, fallback = ''): string {
                         <td className="py-2.5 px-3 text-stone-400 font-mono text-[11px]">1</td>
                         <td className="py-2.5 px-3">
                           <span className="font-medium text-stone-900 block">
-                            {invoice?.plan_tier ? `${invoice.plan_tier} Plan Subscription` : 'Trinetra Platform Services'}
+                            {invoice?.plan_tier ? `${invoice.plan_tier} Plan Subscription` : 'Vaakriti Platform Services'}
                           </span>
                           <span className="text-[10px] text-stone-400 font-mono">SAC: 998311</span>
                         </td>

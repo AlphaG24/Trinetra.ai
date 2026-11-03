@@ -58,7 +58,7 @@ export function ShareDemoModal({ isOpen, onClose, shareToken }: ShareDemoModalPr
                     <Bot className="w-4 h-4" />
                   </div>
                   <div>
-                    <div className="font-semibold text-amber-500">Trinetra AI Demo</div>
+                    <div className="font-semibold text-amber-500">Vaakriti AI Demo</div>
                     <div className="text-xs text-white/50">Interactive AI Agent Preview</div>
                   </div>
                 </div>

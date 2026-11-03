@@ -69,7 +69,7 @@ export const DEFAULT_PUBLIC_CONFIGS: Record<string, string> = {
 }
 
 // In-memory cache for public system configs (TTL: 60 seconds)
-let cachedConfigs: Record<string, string> = DEFAULT_PUBLIC_CONFIGS
+let cachedConfigs: Record<string, string> | null = DEFAULT_PUBLIC_CONFIGS
 let cacheExpiresAt = 0
 export async function GET() {
   const now = Date.now()

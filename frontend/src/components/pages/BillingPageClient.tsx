@@ -209,7 +209,7 @@ export function BillingPageClient({ subscription, invoices, profile }: {
         </div>
         <div className="flex items-center justify-between flex-wrap gap-4 pt-2 border-t border-white/5">
           <div className="text-xs text-white/40 space-y-1">
-            <p>Trinetra AI GST: <span className="font-mono text-white/60">07AAAAA0000A1Z5</span></p>
+            <p>Vaakriti AI GST: <span className="font-mono text-white/60">07AAAAA0000A1Z5</span></p>
             <p>SAC Code: <span className="font-mono text-white/60">998314</span></p>
           </div>
           <button

@@ -97,7 +97,7 @@ async function sendAppointmentCustomerNotification({
   let emailBody = "";
 
   if (action === "accept") {
-    emailSubject = `✅ Appointment Confirmed: ${meetingType} | Trinetra AI`;
+    emailSubject = `✅ Appointment Confirmed: ${meetingType} | Vaakriti AI`;
     emailBody = 
       `Hello ${firstName} ji,\n\n` +
       `Your appointment has been accepted and confirmed by our team.\n\n` +
@@ -108,18 +108,18 @@ async function sendAppointmentCustomerNotification({
       `• Status: Confirmed\n\n` +
       `We look forward to speaking with you! If you need to make any changes, please feel free to reply to this email.\n\n` +
       `Best regards,\n` +
-      `Trinetra AI Operations Team\nhttps://trinetraedu-ai.com`;
+      `Vaakriti AI Operations Team\nhttps://trinetraedu-ai.com`;
 
     waBody = 
-      `✅ *Appointment Confirmed* | *Trinetra AI*\n\n` +
+      `✅ *Appointment Confirmed* | *Vaakriti AI*\n\n` +
       `Hello ${firstName} ji,\n\n` +
       `Your appointment for *${meetingType}* has been accepted and confirmed.\n\n` +
       `⏰ *Time:* ${scheduledDateStr} IST\n` +
       `👤 *Client:* ${contactName}\n\n` +
       `We look forward to speaking with you! Feel free to reply directly to this message if you have any questions.\n\n` +
-      `Warm regards,\n*Trinetra AI Team*`;
+      `Warm regards,\n*Vaakriti AI Team*`;
   } else if (action === "reject") {
-    emailSubject = `Appointment Update: ${meetingType} | Trinetra AI`;
+    emailSubject = `Appointment Update: ${meetingType} | Vaakriti AI`;
     emailBody = 
       `Hello ${firstName} ji,\n\n` +
       `Regarding your appointment request for ${meetingType} scheduled for ${scheduledDateStr} IST:\n\n` +
@@ -127,18 +127,18 @@ async function sendAppointmentCustomerNotification({
       (reason ? `Reason: ${reason}\n\n` : `\n`) +
       `If you would like to book a different date and time that works better for you, please visit https://trinetraedu-ai.com or reply directly to this email.\n\n` +
       `Best regards,\n` +
-      `Trinetra AI Operations Team`;
+      `Vaakriti AI Operations Team`;
 
     waBody = 
-      `❌ *Appointment Update* | *Trinetra AI*\n\n` +
+      `❌ *Appointment Update* | *Vaakriti AI*\n\n` +
       `Hello ${firstName} ji,\n\n` +
       `Regarding your appointment for *${meetingType}* on ${scheduledDateStr} IST:\n\n` +
       `Unfortunately, our team is unable to accommodate this slot at this time and the appointment has been cancelled.\n` +
       (reason ? `_Note: ${reason}_\n\n` : `\n`) +
       `Please reply to this message if you would like to reschedule for an alternate time.\n\n` +
-      `Warm regards,\n*Trinetra AI Team*`;
+      `Warm regards,\n*Vaakriti AI Team*`;
   } else if (action === "reschedule") {
-    emailSubject = `🗓️ Appointment Rescheduled: ${meetingType} | Trinetra AI`;
+    emailSubject = `🗓️ Appointment Rescheduled: ${meetingType} | Vaakriti AI`;
     emailBody = 
       `Hello ${firstName} ji,\n\n` +
       `Your appointment for ${meetingType} has been rescheduled to a new time.\n\n` +
@@ -146,16 +146,16 @@ async function sendAppointmentCustomerNotification({
       (reason ? `Reason / Note: ${reason}\n\n` : `\n`) +
       `If this new slot works for you, no further action is needed. If you would like to request another time, simply reply to this email.\n\n` +
       `Best regards,\n` +
-      `Trinetra AI Operations Team\nhttps://trinetraedu-ai.com`;
+      `Vaakriti AI Operations Team\nhttps://trinetraedu-ai.com`;
 
     waBody = 
-      `🗓️ *Appointment Rescheduled* | *Trinetra AI*\n\n` +
+      `🗓️ *Appointment Rescheduled* | *Vaakriti AI*\n\n` +
       `Hello ${firstName} ji,\n\n` +
       `Your appointment for *${meetingType}* has been rescheduled.\n\n` +
       `⏰ *New Date & Time:* ${newDateStr} IST\n` +
       (reason ? `_Note: ${reason}_\n\n` : `\n`) +
       `If this new time works for you, no action is needed. Reply to this message if you need any adjustments.\n\n` +
-      `Warm regards,\n*Trinetra AI Team*`;
+      `Warm regards,\n*Vaakriti AI Team*`;
   }
 
   // 1. Send Email via Resend
@@ -169,7 +169,7 @@ async function sendAppointmentCustomerNotification({
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
-          from: "Trinetra AI <alerts@trinetraedu-ai.com>",
+          from: "Vaakriti AI <alerts@trinetraedu-ai.com>",
           to: [contactEmail],
           subject: emailSubject,
           text: emailBody

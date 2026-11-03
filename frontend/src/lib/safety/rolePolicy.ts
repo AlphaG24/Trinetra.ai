@@ -1,7 +1,7 @@
 /**
  * frontend/src/lib/safety/rolePolicy.ts
  * 
- * Centralized Role and Exemption Policy for Trinetra AI.
+ * Centralized Role and Exemption Policy for Vaakriti AI.
  * Implements Master Plan Section 18.3 & 18.4 (Authoritative Overrides).
  */
 

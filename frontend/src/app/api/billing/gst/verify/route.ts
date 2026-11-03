@@ -20,7 +20,7 @@ const ENTITY_TYPE_MAP: Record<string, string> = {
 const KNOWN_GST_DIRECTORY: Record<string, { legalName: string; tradeName: string }> = {
   '07AAAAA0000A1Z5': {
     legalName: 'Vaakriti Technologies Private Limited',
-    tradeName: 'Trinetra AI'
+    tradeName: 'Vaakriti AI'
   },
   '27AAPFU0939F1ZV': {
     legalName: 'Tata Consultancy Services Limited',

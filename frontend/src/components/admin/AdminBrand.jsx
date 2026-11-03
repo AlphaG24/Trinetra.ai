@@ -8,7 +8,7 @@ export default function AdminBrand({ size = "md", showText = true }) {
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src="/logo-transparent.png"
-        alt="Trinetra AI"
+        alt="Vaakriti AI"
         className={`${heightClass} w-auto object-contain dynamic-logo`}
       />
       {showText ? (

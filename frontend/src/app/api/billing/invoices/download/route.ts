@@ -249,7 +249,7 @@ export async function GET(request: NextRequest) {
       }
     }) : [{
       quantity: 1,
-      description: invoice.plan_tier ? `${invoice.plan_tier} Plan Subscription` : 'Trinetra Platform Services',
+      description: invoice.plan_tier ? `${invoice.plan_tier} Plan Subscription` : 'Vaakriti Platform Services',
       sac: '998311',
       rate: (subtotalPaisa / 100).toFixed(2),
       amount: (finalTotalPaisa / 100).toFixed(2)

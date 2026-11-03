@@ -125,7 +125,7 @@ export async function POST(
             .eq('id', user.id)
             .single();
 
-        const userName = profile?.full_name || user.email?.split('@')[0] || "Trinetra User";
+        const userName = profile?.full_name || user.email?.split('@')[0] || "Vaakriti User";
         const companyDisplayName = profile?.company_name || userName;
 
         // Load blueprint templates for fallback

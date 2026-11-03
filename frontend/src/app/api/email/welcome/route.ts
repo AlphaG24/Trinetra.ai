@@ -17,7 +17,7 @@ export const POST = safeApiHandler(async (req: Request) => {
 
   const success = await sendEmailTemplate({
     to: user.email,
-    subject: 'Welcome to Trinetra AI 🎉',
+    subject: 'Welcome to Vaakriti AI 🎉',
     templateName: 'welcome',
     variables: {
       recipient_name: (user as any).user_metadata?.full_name || 'there',

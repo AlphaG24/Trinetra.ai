@@ -237,7 +237,7 @@ export function DynamicProductPage({ slug }: { slug: string }) {
   const [chatOpenRequest, setChatOpenRequest] = useState(0);
 
   const demoPhoneNumber = getConfigString(siteConfig, "demo_phone_number");
-  const companyName = getConfigString(siteConfig, "company_name") || "Trinetra AI";
+  const companyName = getConfigString(siteConfig, "company_name") || "Vaakriti AI";
   const isVoiceProduct = product?.agentType === "voice" || product?.slug === "voice-agent";
   const isChatProduct = product?.agentType === "chat" || product?.slug === "chat-agent";
 

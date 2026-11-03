@@ -178,7 +178,7 @@ export async function POST(request: NextRequest) {
 
     if (botToken && chatId) {
       try {
-        const text = `🚨 *[TEST ALERT] Trinetra AI Incident Dispatch*\n\n*Severity:* P1 Verification\n*Status:* Operational\n*Time:* \`${timestamp}\`\n\n${testMessage}\n\n_Dispatched by admin ${auth.profile?.email}_`
+        const text = `🚨 *[TEST ALERT] Vaakriti AI Incident Dispatch*\n\n*Severity:* P1 Verification\n*Status:* Operational\n*Time:* \`${timestamp}\`\n\n${testMessage}\n\n_Dispatched by admin ${auth.profile?.email}_`
         const tgRes = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -208,7 +208,7 @@ export async function POST(request: NextRequest) {
       try {
         await sendEmailTemplate({
           to: email,
-          subject: '[TEST ALERT] Trinetra AI Incident Monitoring System Verification',
+          subject: '[TEST ALERT] Vaakriti AI Incident Monitoring System Verification',
           templateName: 'usage-warning',
           variables: {
             title: 'P1 Incident Test Alert Received',

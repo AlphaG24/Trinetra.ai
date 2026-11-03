@@ -82,7 +82,7 @@ export default function NewsletterBox({ compact = false }) {
         </h2>
         
         <p className="text-[16px] text-gray-400 mb-10 max-w-[500px]">
-          Join 10,000+ business leaders reading the Trinetra newsletter for cutting-edge automation strategies.
+          Join 10,000+ business leaders reading the Vaakriti newsletter for cutting-edge automation strategies.
         </p>
         
         <form onSubmit={handleSubscribe} className="flex w-full max-w-[600px] flex-col gap-4 sm:flex-row">

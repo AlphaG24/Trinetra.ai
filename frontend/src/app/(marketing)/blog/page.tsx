@@ -192,7 +192,7 @@ export default async function BlogListingPage({
                       className="w-full h-full object-contain"
                     />
                   </div>
-                  <span className="font-semibold text-white">{featured.author_name || 'Trinetra AI'}</span>
+                  <span className="font-semibold text-white">{featured.author_name || 'Vaakriti AI'}</span>
                   <span>·</span>
                   <span>{formatDate(featured.published_at || featured.created_at)}</span>
                   <span>·</span>
@@ -321,7 +321,7 @@ export default async function BlogListingPage({
                           className="w-full h-full object-contain"
                         />
                       </div>
-                      <span className="font-semibold text-[#0F172A] truncate">{post.author_name || 'Trinetra AI'}</span>
+                      <span className="font-semibold text-[#0F172A] truncate">{post.author_name || 'Vaakriti AI'}</span>
                       <span>·</span>
                       <span className="shrink-0">{formatDate(post.published_at || post.created_at)}</span>
                       <span>·</span>

@@ -66,12 +66,12 @@ export default function AdminLogin({ onLogin }) {
               <div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-600/20 to-violet-900/40 p-4 shadow-[0_20px_40px_rgba(139,92,246,0.2)] mb-6 border border-white/10">
                 <img 
                    src="/trident.png"
-                   alt="Trinetra AI"
+                   alt="Vaakriti AI"
                    className="h-full w-full object-contain"
                 />
               </div>
               <h1 className="text-3xl font-black uppercase tracking-widest text-[#FAF7FF] mb-2">
-                Trinetra
+                Vaakriti
               </h1>
               <p className="text-xs font-bold tracking-[0.4em] uppercase text-violet-400">
                 Secure Admin Access

@@ -261,7 +261,7 @@ export function OnboardingClient() {
         throw new Error(data.error || 'Failed to complete registration')
       }
 
-      toast.success('Registration complete! Welcome to Trinetra AI.')
+      toast.success('Registration complete! Welcome to Vaakriti AI.')
       router.push('/dashboard/marketplace')
       router.refresh()
     } catch (err: any) {
@@ -296,7 +296,7 @@ export function OnboardingClient() {
               <h1 className={`text-xl font-bold font-heading mt-4 ${
                 isDark ? 'text-white' : 'text-zinc-950 font-black'
               }`}>
-                Trinetra Onboarding
+                Vaakriti Onboarding
               </h1>
               <p className={`text-[11px] mt-1 ${
                 isDark ? 'text-zinc-400' : 'text-zinc-600 font-semibold'
@@ -338,7 +338,7 @@ export function OnboardingClient() {
           <div className={`text-[10px] font-mono mt-8 ${
             isDark ? 'text-zinc-600' : 'text-zinc-500 font-bold'
           }`}>
-            Trinetra v3.0 Compliance OS
+            Vaakriti v3.0 Compliance OS
           </div>
         </div>
 

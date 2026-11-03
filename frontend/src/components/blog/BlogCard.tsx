@@ -116,7 +116,7 @@ export default function BlogCard({ post }: BlogCardProps) {
               </div>
             )}
             <span className="truncate text-xs font-bold text-zinc-200">
-              {post.author_name || 'Trinetra AI'}
+              {post.author_name || 'Vaakriti AI'}
             </span>
           </div>
 

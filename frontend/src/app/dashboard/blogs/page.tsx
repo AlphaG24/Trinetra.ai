@@ -71,7 +71,7 @@ export default function UserBlogDashboard() {
             <BookOpen size={28} className="text-violet-500" /> Community Blogs
           </h1>
           <p className="text-zinc-400 text-sm mt-1">
-            Write, share, and discover articles within the Trinetra community.
+            Write, share, and discover articles within the Vaakriti community.
           </p>
         </div>
         

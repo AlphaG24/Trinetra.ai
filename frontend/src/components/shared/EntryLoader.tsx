@@ -3,33 +3,35 @@
 import { useEffect, useState } from 'react'
 import { VaakritiWordmark } from '@/components/ui/VaakritiWordmark'
 
-export function EntryLoader() {
+export function EntryLoader({ showOnMount = false, duration = 2200 }: { showOnMount?: boolean; duration?: number } = {}) {
   const [visible, setVisible] = useState(false)
   const [fadeOut, setFadeOut] = useState(false)
 
   useEffect(() => {
-    // Only run on initial entrance to the dashboard in this session
     try {
-      const alreadyLoaded = sessionStorage.getItem('vaakriti_dashboard_entry_seen')
-      if (alreadyLoaded) {
-        return
+      if (!showOnMount) {
+        const alreadyLoaded = sessionStorage.getItem('vaakriti_dashboard_entry_seen')
+        if (alreadyLoaded) {
+          return
+        }
       }
 
-      // Show loader immediately
       setVisible(true)
+      setFadeOut(false)
 
-      // Start smooth fade out at 2.4s so the entire revealing animation is fully appreciated
+      const fadeTime = Math.max(800, duration - 500)
       const fadeTimer = setTimeout(() => {
         setFadeOut(true)
-      }, 2400)
+      }, fadeTime)
 
-      // Unmount completely at 2.9s and flag session
       const unmountTimer = setTimeout(() => {
         setVisible(false)
-        try {
-          sessionStorage.setItem('vaakriti_dashboard_entry_seen', 'true')
-        } catch {}
-      }, 2900)
+        if (!showOnMount) {
+          try {
+            sessionStorage.setItem('vaakriti_dashboard_entry_seen', 'true')
+          } catch {}
+        }
+      }, duration)
 
       return () => {
         clearTimeout(fadeTimer)
@@ -38,7 +40,7 @@ export function EntryLoader() {
     } catch {
       setVisible(false)
     }
-  }, [])
+  }, [showOnMount, duration])
 
   if (!visible) return null
 

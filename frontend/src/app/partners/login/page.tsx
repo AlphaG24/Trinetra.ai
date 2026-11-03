@@ -139,7 +139,7 @@ export default function PartnerLoginPage() {
               >
                 <Image
                   src="/trident.png"
-                  alt="Trinetra AI"
+                  alt="Vaakriti AI"
                   width={100}
                   height={100}
                   className="h-24 md:h-28 w-auto object-contain drop-shadow-[0_0_25px_rgba(245,197,24,0.15)]"

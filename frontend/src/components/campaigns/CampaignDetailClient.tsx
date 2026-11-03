@@ -153,7 +153,7 @@ export function CampaignDetailClient({ campaignId }: CampaignDetailClientProps) 
   useEffect(() => {
     if (campaign?.agents) {
       if (campaign.agents.phone_number) {
-        setAgentPhone(prev => prev || campaign.agents.phone_number)
+        setAgentPhone(prev => prev || (campaign?.agents?.phone_number ?? null))
       }
       if (campaign.agents.telephony_provider && campaign.agents.telephony_provider !== 'simulated') {
         setAgentProvider(campaign.agents.telephony_provider)

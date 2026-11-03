@@ -97,7 +97,7 @@ export async function POST(
       try {
         const emailSent = await sendEmailTemplate({
           to: customerEmail,
-          subject: `Tax Invoice ${invoiceNumber} from Trinetra AI`,
+          subject: `Tax Invoice ${invoiceNumber} from Vaakriti AI`,
           templateName: 'invoice',
           variables: {
             customer_name: customerName,
@@ -123,7 +123,7 @@ export async function POST(
       }
 
       // Format WhatsApp notification payload
-      const waMessage = `🧾 *Trinetra AI - Tax Invoice Alert*\n\nHello ${customerName},\nYour invoice *${invoiceNumber}* for *₹${grandTotalInr}* dated ${invoiceDate} has been processed.\n\nYou can view and download your full statutory GST invoice here:\n${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/dashboard/billing\n\nThank you for choosing Trinetra AI!`
+      const waMessage = `🧾 *Vaakriti AI - Tax Invoice Alert*\n\nHello ${customerName},\nYour invoice *${invoiceNumber}* for *₹${grandTotalInr}* dated ${invoiceDate} has been processed.\n\nYou can view and download your full statutory GST invoice here:\n${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/dashboard/billing\n\nThank you for choosing Vaakriti AI!`
 
       try {
         const twilioSid = process.env.TWILIO_ACCOUNT_SID
