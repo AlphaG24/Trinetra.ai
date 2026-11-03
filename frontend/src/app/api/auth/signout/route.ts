@@ -43,3 +43,4 @@ export async function GET(req: Request) {
   const res = await POST(req)
   return NextResponse.redirect(new URL('/login?signed_out=true', req.url))
 }
+
