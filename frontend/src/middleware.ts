@@ -87,8 +87,8 @@ export async function middleware(request: NextRequest) {
     c => c.name.includes('auth-token') || c.name.startsWith('sb-')
   )
 
-  // Fast path: If user has explicitly requested signed_out on login, clear cookies and allow login access
-  if (isAuthRoute && request.nextUrl.searchParams.has('signed_out')) {
+  // Fast path: If user has explicitly requested signed_out or session expired on login, clear cookies and allow login access
+  if (isAuthRoute && (request.nextUrl.searchParams.has('signed_out') || request.nextUrl.searchParams.has('expired'))) {
     const clearResponse = NextResponse.next({
       request: { headers: request.headers }
     })

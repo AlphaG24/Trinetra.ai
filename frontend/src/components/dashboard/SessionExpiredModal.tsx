@@ -1,12 +1,12 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { useRouter, usePathname } from 'next/navigation'
-import { Lock, ArrowRight, ShieldAlert } from 'lucide-react'
+import { usePathname } from 'next/navigation'
+import { Lock, ArrowRight, ShieldAlert, Loader2 } from 'lucide-react'
 
 export function SessionExpiredModal() {
   const [isOpen, setIsOpen] = useState(false)
-  const router = useRouter()
+  const [isSigningOut, setIsSigningOut] = useState(false)
   const pathname = usePathname()
 
   useEffect(() => {
@@ -24,8 +24,12 @@ export function SessionExpiredModal() {
         const response = await originalFetch(...args)
         if (response.status === 401) {
           const urlStr = typeof args[0] === 'string' ? args[0] : (args[0] as Request)?.url || ''
-          // Only trigger for dashboard / workspace APIs, not external webhooks or public auth endpoints
-          if (urlStr.includes('/api/') && !urlStr.includes('/api/auth/login') && !urlStr.includes('/api/auth/signout')) {
+          
+          // Only trigger for primary protected APIs, never background notification polling or public routes
+          const isBackgroundPoll = urlStr.includes('/api/notifications') || urlStr.includes('/api/telemetry') || urlStr.includes('/api/public')
+          const isAuthEndpoint = urlStr.includes('/api/auth/login') || urlStr.includes('/api/auth/signout')
+          
+          if (urlStr.includes('/api/') && !isBackgroundPoll && !isAuthEndpoint) {
             window.dispatchEvent(new CustomEvent('trinetra:session_expired'))
           }
         }
@@ -43,9 +47,20 @@ export function SessionExpiredModal() {
 
   if (!isOpen) return null
 
-  const handleSignInRedirect = () => {
-    const redirectUrl = pathname ? `/login?redirect=${encodeURIComponent(pathname)}&expired=true` : '/login?expired=true'
-    window.location.replace(redirectUrl)
+  const handleSignInRedirect = async () => {
+    try {
+      setIsSigningOut(true)
+      // Authoritatively clear server-side HttpOnly session cookies
+      await fetch('/api/auth/signout', { method: 'POST' }).catch(() => {})
+      if (typeof window !== 'undefined') {
+        sessionStorage.clear()
+      }
+    } catch (_) {
+      // Continue to redirect even on fetch failure
+    } finally {
+      // Full browser hard-redirect to /login with signed_out=true & expired=true to avoid middleware bounce
+      window.location.href = '/login?signed_out=true&expired=true'
+    }
   }
 
   return (
@@ -78,11 +93,21 @@ export function SessionExpiredModal() {
         <div className="pt-2">
           <button
             onClick={handleSignInRedirect}
-            className="w-full py-3.5 px-5 bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 font-bold text-xs uppercase tracking-wider rounded-xl transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer active:scale-[0.98]"
+            disabled={isSigningOut}
+            className="w-full py-3.5 px-5 bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 font-bold text-xs uppercase tracking-wider rounded-xl transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer active:scale-[0.98] disabled:opacity-60"
           >
-            <Lock className="w-4 h-4" />
-            <span>Sign In Again</span>
-            <ArrowRight className="w-4 h-4 ml-1" />
+            {isSigningOut ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>Signing Out...</span>
+              </>
+            ) : (
+              <>
+                <Lock className="w-4 h-4" />
+                <span>Sign In Again</span>
+                <ArrowRight className="w-4 h-4 ml-1" />
+              </>
+            )}
           </button>
         </div>
       </div>
@@ -91,4 +116,3 @@ export function SessionExpiredModal() {
 }
 
 export default SessionExpiredModal
-

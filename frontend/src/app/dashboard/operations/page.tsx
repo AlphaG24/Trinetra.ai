@@ -101,6 +101,7 @@ export default function OperationsBrainPage() {
   const [isRecording, setIsRecording] = useState(false)
   const [voiceTranscript, setVoiceTranscript] = useState('')
   const [isProcessingVoice, setIsProcessingVoice] = useState(false)
+  const [generatingSlotsId, setGeneratingSlotsId] = useState<string | null>(null)
   const recognitionRef = useRef<any>(null)
 
   // Dynamic Custom Key-Values for General category
@@ -299,6 +300,28 @@ export default function OperationsBrainPage() {
       }
     } catch (err) {
       toast.error('Failed to toggle directive')
+    }
+  }
+
+  const handleAutoPopulateSlots = async (id: string) => {
+    try {
+      setGeneratingSlotsId(id)
+      const res = await fetch('/api/business-catalog/voice-directive', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id })
+      })
+      const json = await res.json()
+      if (json.success) {
+        toast.success(`Successfully auto-populated ${json.data?.count || 0} appointment slots!`)
+        fetchItems()
+      } else {
+        toast.error(json.error || 'Failed to auto-populate slots')
+      }
+    } catch (err) {
+      toast.error('Network error auto-populating slots')
+    } finally {
+      setGeneratingSlotsId(null)
     }
   }
 
@@ -767,15 +790,6 @@ export default function OperationsBrainPage() {
                           <h3 className="text-sm font-bold text-[var(--heading)] line-clamp-1">{item.title}</h3>
                         </div>
                       </div>
-                      <span
-                        className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
-                          isActive
-                            ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-950'
-                            : 'bg-[var(--hover-bg)] text-[var(--muted)] border border-[var(--border)]'
-                        }`}
-                      >
-                        {isActive ? 'Active in Calls' : 'Paused'}
-                      </span>
                     </div>
 
                     {meta.voice_transcript && (
@@ -801,6 +815,24 @@ export default function OperationsBrainPage() {
                       {new Date(item.updated_at).toLocaleDateString()}
                     </span>
                     <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => handleAutoPopulateSlots(item.id)}
+                        disabled={generatingSlotsId === item.id}
+                        className="px-2.5 py-1 rounded-lg bg-[var(--hover-bg)] hover:bg-[var(--card-bg)] border border-[var(--border)] text-[var(--heading)] cursor-pointer text-xs font-semibold shadow-xs transition-colors flex items-center gap-1.5"
+                        title="Auto-generate appointment slots from this rule"
+                      >
+                        {generatingSlotsId === item.id ? (
+                          <>
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                            <span>Generating...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Calendar className="w-3 h-3 text-[var(--muted)]" />
+                            <span>Auto-Populate Slots</span>
+                          </>
+                        )}
+                      </button>
                       <button
                         onClick={() => handleToggleVoiceDirective(item.id, item.status)}
                         className="px-3 py-1 rounded-lg bg-[var(--card-bg)] hover:bg-[var(--hover-bg)] border border-[var(--border)] text-[var(--heading)] cursor-pointer text-xs font-semibold shadow-xs transition-colors"
@@ -834,7 +866,14 @@ export default function OperationsBrainPage() {
                         {getCategoryIcon(item.category)}
                       </div>
                       <div>
-                        <h3 className="text-sm font-bold text-[var(--heading)] line-clamp-1">{item.title}</h3>
+                        <div className="flex items-center gap-1.5">
+                          <h3 className="text-sm font-bold text-[var(--heading)] line-clamp-1">{item.title}</h3>
+                          {meta.auto_generated_from_directive_id && (
+                            <span className="text-[9px] font-semibold text-[var(--muted)] bg-[var(--hover-bg)] px-1.5 py-0.5 rounded border border-[var(--border)]">
+                              Auto-Generated
+                            </span>
+                          )}
+                        </div>
                         {item.identifier_code && (
                           <span className="text-[10px] font-mono text-[var(--muted)] bg-[var(--hover-bg)] px-1.5 py-0.5 rounded border border-[var(--border)]">
                             {item.identifier_code}

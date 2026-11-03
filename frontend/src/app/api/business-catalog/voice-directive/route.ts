@@ -289,6 +289,80 @@ export async function POST(request: Request) {
   }
 }
 
+export async function PUT(request: Request) {
+  try {
+    const { authenticated, profile, user, error } = await authenticateRequest();
+    if (!authenticated || !profile || !user) {
+      return NextResponse.json({ error: error || "Unauthorized" }, { status: 401 });
+    }
+
+    const body = await request.json().catch(() => null);
+    const { id } = body || {};
+
+    if (!id) {
+      return NextResponse.json({ error: "Directive ID required" }, { status: 400 });
+    }
+
+    const admin = getAdminClient();
+    const { data: directive, error: fetchErr } = await admin
+      .from("business_operations_catalog")
+      .select("*")
+      .eq("id", id)
+      .single();
+
+    if (fetchErr || !directive) {
+      return NextResponse.json({ error: "Directive not found" }, { status: 404 });
+    }
+
+    const transcript = directive.metadata?.voice_transcript || directive.title;
+    const analysis = await analyzeVoiceDirectiveWithLLM(transcript);
+
+    const orgId = profile.organization_id || null;
+    let autoPopulatedRows: any[] = [];
+
+    if (Array.isArray(analysis.auto_populated_items) && analysis.auto_populated_items.length > 0) {
+      const itemsToInsert = analysis.auto_populated_items.map((raw: any, idx: number) => ({
+        user_id: user.id,
+        organization_id: orgId,
+        title: raw.title || `Operational Slot ${idx + 1}`,
+        category: raw.category || "appointment_slots",
+        identifier_code: raw.identifier_code || `AUTO-${Date.now().toString().slice(-4)}-${idx + 1}`,
+        available_units: Number(raw.available_units) || 1,
+        base_price_inr: raw.base_price_inr !== undefined && raw.base_price_inr !== null ? Number(raw.base_price_inr) : null,
+        minimum_price_inr: raw.minimum_price_inr !== undefined && raw.minimum_price_inr !== null ? Number(raw.minimum_price_inr) : null,
+        booking_slot_start: raw.booking_slot_start || null,
+        booking_slot_end: raw.booking_slot_end || null,
+        status: "available",
+        metadata: {
+          ...(raw.metadata || {}),
+          auto_generated_from_directive_id: directive.id,
+          source_voice_transcript: transcript
+        }
+      }));
+
+      const { data: insertedSlots, error: slotsError } = await admin
+        .from("business_operations_catalog")
+        .insert(itemsToInsert)
+        .select();
+
+      if (!slotsError && insertedSlots) {
+        autoPopulatedRows = insertedSlots;
+      }
+    }
+
+    return NextResponse.json({
+      success: true,
+      data: {
+        directive,
+        auto_populated_items: autoPopulatedRows,
+        count: autoPopulatedRows.length
+      }
+    });
+  } catch (err: any) {
+    return NextResponse.json({ error: err?.message || "Failed to auto-populate slots" }, { status: 500 });
+  }
+}
+
 export async function PATCH(request: Request) {
   try {
     const { authenticated, profile, user, error } = await authenticateRequest();
