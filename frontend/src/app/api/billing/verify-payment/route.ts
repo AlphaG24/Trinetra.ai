@@ -106,6 +106,25 @@ export async function POST(request: Request) {
     }
     console.log('[Verify Payment] 1F LOG: Signature verified successfully for order:', razorpay_order_id)
 
+    // 2b. Idempotency Guard (Anti-Double-Click / Replay Protection)
+    const { data: existingInvoice } = await adminClient
+      .from('invoices')
+      .select('id, invoice_number, total_amount, pdf_url, customer_address')
+      .or(`payment_id.eq.${razorpay_payment_id},payment_reference_id.eq.${razorpay_payment_id}`)
+      .limit(1)
+      .maybeSingle()
+
+    if (existingInvoice) {
+      console.log('[Verify Payment] Idempotent hit: Payment already processed for ID:', razorpay_payment_id)
+      return NextResponse.json({
+        success: true,
+        invoice_id: existingInvoice.id,
+        invoice_number: existingInvoice.invoice_number,
+        invoice: existingInvoice,
+        already_processed: true
+      })
+    }
+
     // 3. Load active bundles
     const { data: activeBundles } = await adminClient
       .from('product_bundles')

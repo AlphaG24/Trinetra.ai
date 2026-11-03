@@ -355,14 +355,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(null)
       setProfile(null)
       setRole(null)
+      await fetch('/api/auth/signout', { method: 'POST' }).catch(() => {})
       await Promise.race([
         supabase.auth.signOut(),
-        new Promise((resolve) => setTimeout(resolve, 600))
-      ])
-      window.location.href = '/login?signed_out=true'
+        new Promise((resolve) => setTimeout(resolve, 800))
+      ]).catch(() => {})
+      window.location.replace('/login?signed_out=true')
     } catch (err) {
       console.error('[AuthProvider] Signout error:', err)
-      window.location.href = '/login?signed_out=true'
+      window.location.replace('/login?signed_out=true')
     }
   }, [supabase])
 

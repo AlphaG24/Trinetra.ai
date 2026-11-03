@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, Suspense } from 'react'
+import { useState, useEffect, useRef, Suspense } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Script from 'next/script'
@@ -117,6 +117,7 @@ function BillingContent() {
   })
   const [configs, setConfigs] = useState<Record<string, string>>({})
   const [updatingPlan, setUpdatingPlan] = useState<boolean>(false)
+  const isCheckoutLocked = useRef<boolean>(false)
   const [invoices, setInvoices] = useState<Invoice[]>([])
   const [showAllInvoices, setShowAllInvoices] = useState(false)
   const [availableBundles, setAvailableBundles] = useState<Bundle[]>([])
@@ -458,6 +459,8 @@ function BillingContent() {
     selectedPersonalities: string[]
     renewalDate: string
   }) => {
+    if (isCheckoutLocked.current || updatingPlan) return
+    isCheckoutLocked.current = true
     try {
       setUpdatingPlan(true)
       const trialItems = [{
@@ -570,6 +573,7 @@ function BillingContent() {
       toast.error(err.message || 'Trial activation initiation failed')
     } finally {
       setUpdatingPlan(false)
+      isCheckoutLocked.current = false
     }
   }
 
@@ -861,8 +865,11 @@ function BillingContent() {
   }
 
   const handleCartCheckout = async () => {
+    if (isCheckoutLocked.current || updatingPlan) return
+    isCheckoutLocked.current = true
     if (cart.length === 0) {
       toast.error('Your cart is empty')
+      isCheckoutLocked.current = false
       return
     }
 
@@ -1011,6 +1018,7 @@ function BillingContent() {
       toast.error(err.message || 'Payment initiation failed')
     } finally {
       setUpdatingPlan(false)
+      isCheckoutLocked.current = false
     }
   }
 

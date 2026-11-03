@@ -13,7 +13,6 @@ import { AgentComparisonWidget } from '@/src/components/agents/AgentComparisonWi
 import { useDashboardStore } from '@/src/store/dashboardStore'
 import { useAuth } from '@/src/components/providers/AuthProvider'
 import { AlertTriangle, RefreshCw } from 'lucide-react'
-import { EntryLoader } from '@/src/components/shared/EntryLoader'
 
 const fetcher = async (url: string) => {
   try {
@@ -234,7 +233,6 @@ export default function DashboardPage() {
 
   return (
     <div suppressHydrationWarning className="space-y-6 max-w-7xl mx-auto">
-      <EntryLoader showOnMount={true} duration={1400} />
       {/* 1. Welcome Header */}
       <WelcomeHeader
         fullName={profile?.full_name || authProfile?.full_name || authUser?.email?.split('@')[0] || 'Partner'}

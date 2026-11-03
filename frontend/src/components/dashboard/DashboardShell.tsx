@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Sidebar } from '@/src/components/dashboard/Sidebar'
 import { Topbar } from '@/src/components/dashboard/Topbar'
+import { SessionExpiredModal } from '@/src/components/dashboard/SessionExpiredModal'
 import { useDashboardStore } from '@/src/store/dashboardStore'
 import { useAuth } from '@/src/components/providers/AuthProvider'
 
@@ -27,6 +28,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
 
   return (
     <>
+      <SessionExpiredModal />
       <Sidebar />
       <Topbar />
       <main

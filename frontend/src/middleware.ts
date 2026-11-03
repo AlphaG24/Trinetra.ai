@@ -87,6 +87,19 @@ export async function middleware(request: NextRequest) {
     c => c.name.includes('auth-token') || c.name.startsWith('sb-')
   )
 
+  // Fast path: If user has explicitly requested signed_out on login, clear cookies and allow login access
+  if (isAuthRoute && request.nextUrl.searchParams.has('signed_out')) {
+    const clearResponse = NextResponse.next({
+      request: { headers: request.headers }
+    })
+    allCookies.forEach(c => {
+      if (c.name.startsWith('sb-') || c.name.includes('auth-token') || c.name.includes('supabase')) {
+        clearResponse.cookies.set(c.name, '', { path: '/', maxAge: 0, expires: new Date(0) })
+      }
+    })
+    return clearResponse
+  }
+
   if (isAuthRoute && !hasAuthCookie) {
     return supabaseResponse
   }

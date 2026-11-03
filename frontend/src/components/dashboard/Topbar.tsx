@@ -223,26 +223,27 @@ export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
 
   const handleSignOut = async () => {
     try {
+      // 1. Authoritative server-side sign out (expires all auth cookies immediately)
+      await fetch('/api/auth/signout', { method: 'POST' }).catch(() => {})
+      // 2. Client supabase signout
       const supabase = createClient()
-      // Enforce a 600ms ceiling on supabase.auth.signOut() so it NEVER hangs
       await Promise.race([
         supabase.auth.signOut(),
-        new Promise((resolve) => setTimeout(resolve, 600))
-      ])
+        new Promise((resolve) => setTimeout(resolve, 800))
+      ]).catch(() => {})
     } catch {}
     try {
       sessionStorage.clear()
       localStorage.removeItem('trinetra_auth_profile_cache')
       localStorage.removeItem('trinetra_user_role')
       localStorage.removeItem('supabase.auth.token')
-      // Clear cookies
       document.cookie.split(";").forEach((c) => {
         document.cookie = c
           .replace(/^ +/, "")
-          .replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
+          .replace(/=.*/, "=;expires=" + new Date(0).toUTCString() + ";path=/");
       });
     } catch {}
-    window.location.href = '/login?signed_out=true'
+    window.location.replace('/login?signed_out=true')
   }
 
   const [mounted, setMounted] = useState(false)

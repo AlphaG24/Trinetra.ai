@@ -212,6 +212,13 @@ export async function POST() {
       { data: agentDeployments },
       { data: billingHistory },
       { data: apiKeys },
+      { data: leads },
+      { data: customers },
+      { data: appointments },
+      { data: campaigns },
+      { data: campaignContacts },
+      { data: operationsCatalog },
+      { data: invoices },
     ] = await Promise.all([
       supabase.from('profiles').select('*').eq('id', user.id).single(),
       supabase.from('agents').select('*').eq('user_id', user.id),
@@ -226,6 +233,13 @@ export async function POST() {
       supabase.from('agent_deployments').select('*').eq('user_id', user.id),
       supabase.from('billing_history').select('*').eq('user_id', user.id),
       supabase.from('api_keys').select('*').eq('user_id', user.id),
+      supabase.from('leads').select('*').eq('user_id', user.id),
+      supabase.from('customers').select('*').eq('user_id', user.id),
+      supabase.from('appointments').select('*').eq('user_id', user.id),
+      supabase.from('campaigns').select('*').eq('user_id', user.id),
+      supabase.from('campaign_contacts').select('*').eq('user_id', user.id),
+      supabase.from('business_operations_catalog').select('*').eq('user_id', user.id),
+      supabase.from('invoices').select('*').or(`organization_id.eq.${user.id}`),
     ])
 
     // 3. Build the exportable data bundle
@@ -243,6 +257,13 @@ export async function POST() {
       consent_records: consentRecords ?? [],
       voice_calls: voiceCalls ?? [],
       callbacks: callbacks ?? [],
+      leads: leads ?? [],
+      customers: customers ?? [],
+      appointments: appointments ?? [],
+      campaigns: campaigns ?? [],
+      campaign_contacts: campaignContacts ?? [],
+      operations_catalog: operationsCatalog ?? [],
+      invoices: invoices ?? [],
       voice_library: voiceLibrary ?? [],
       telegram_connections: telegramConnections ?? [],
       agent_call_logs: agentCallLogs ?? [],
@@ -330,7 +351,12 @@ export async function POST() {
       console.error('[gdpr] Failed to upload or email data export:', exportErr.message)
     }
 
-    return NextResponse.json({ success: true, message: 'Data export package has been processed and emailed.' })
+    return NextResponse.json({
+      success: true,
+      data: exportPayload,
+      downloadUrl: downloadUrl || null,
+      message: 'Data export package has been processed and downloaded.'
+    })
   } catch (error: any) {
     // SEC-007: Generic error message to client
     console.error('[export-data] Unhandled error:', error)
