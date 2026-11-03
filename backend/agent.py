@@ -1783,6 +1783,108 @@ def create_appointment_tools(
             return await tool_guard.execute_tool("reserve_business_inventory", _execute)
         return await _execute()
 
+    @llm.function_tool(
+        description="Dispatch a product demo link, company brochure, or business details to the customer's phone on WhatsApp during or after the call when agreed."
+    )
+    async def dispatch_demo_or_business_link(phone_number: str = "", link_type: str = "demo", custom_note: str = "") -> str:
+        """
+        Dispatches demo link or business details to the customer via WhatsApp.
+        Args:
+            phone_number: Customer's 10-digit mobile number or international format.
+            link_type: 'demo' for live product demo, 'brochure' for company catalog, 'business_details' for company info.
+            custom_note: Optional custom message or note to include.
+        """
+        async def _execute() -> str:
+            if timing_tracker:
+                timing_tracker.mark("tool_start", extra="tool=dispatch_demo_or_business_link")
+            try:
+                from app.services.integration_executor import IntegrationExecutor
+                executor = IntegrationExecutor()
+                await executor.dispatch_demo_or_link(
+                    organization_id=organization_id,
+                    user_id=user_id,
+                    phone_number=phone_number,
+                    link_type=link_type,
+                    note=custom_note,
+                    call_id=call_id
+                )
+                return f"LINK_SENT_SUCCESS: {link_type.replace('_', ' ').capitalize()} link has been dispatched to {phone_number} on WhatsApp. Let the caller know that you have sent it right now so they can verify."
+            except Exception as e:
+                logger.error(f"[dispatch_demo_or_business_link] Error: {e}")
+                return "LINK_SENT_QUEUED: The requested details have been queued and are being sent to the customer's WhatsApp."
+            finally:
+                if timing_tracker:
+                    timing_tracker.mark("tool_end", extra="tool=dispatch_demo_or_business_link")
+
+        if tool_guard:
+            return await tool_guard.execute_tool("dispatch_demo_or_business_link", _execute)
+        return await _execute()
+
+    @llm.function_tool(
+        description="Record call outcome: schedule a callback if caller is busy/unavailable, mark not interested/rejected, or register interest."
+    )
+    async def update_call_disposition_or_reschedule(
+        disposition: str = "reschedule",
+        reschedule_time: str = "",
+        reason_or_notes: str = "",
+        customer_name: str = "",
+        phone_number: str = ""
+    ) -> str:
+        """
+        Record call outcome or schedule an agreed callback.
+        Args:
+            disposition: Outcome: 'reschedule' (for callback), 'not_interested', 'rejected', 'interested'.
+            reschedule_time: Date and time for the callback (e.g., 'Today 5 PM', 'Tomorrow 11 AM').
+            reason_or_notes: Specific reason for the callback or objection note.
+            customer_name: Customer's name.
+            phone_number: Customer's phone number.
+        """
+        async def _execute() -> str:
+            if timing_tracker:
+                timing_tracker.mark("tool_start", extra="tool=update_call_disposition_or_reschedule")
+            try:
+                cleaned = re.sub(r'\D', '', phone_number) if phone_number else ""
+                disp = disposition.lower().strip()
+
+                if disp == "reschedule" and reschedule_time:
+                    cb_payload = {
+                        "organization_id": organization_id,
+                        "user_id": user_id,
+                        "agent_id": agent_id,
+                        "contact_name": customer_name or "Client",
+                        "contact_phone": cleaned or phone_number or "Online Caller",
+                        "scheduled_time": parse_datetime_to_iso(reschedule_time) if reschedule_time else parse_datetime_to_iso("Tomorrow 10 AM"),
+                        "reason": reason_or_notes or "Follow-up requested by client",
+                        "status": "pending",
+                        "source": "voice_call",
+                        "notes": f"Scheduled during call: {reason_or_notes}",
+                        "created_at": datetime.utcnow().isoformat()
+                    }
+                    await asyncio.to_thread(supabase_admin.table("callbacks").insert(cb_payload).execute)
+                    return f"CALLBACK_CONFIRMED: Callback scheduled for {customer_name or 'the customer'} at {reschedule_time}. Tell the caller that we have locked in their callback at {reschedule_time} and will call back then."
+
+                elif disp in ("not_interested", "rejected", "dnd"):
+                    if call_id:
+                        await asyncio.to_thread(
+                            supabase_admin.table("voice_calls")
+                            .update({"call_status": "rejected", "notes": f"Customer opted out: {reason_or_notes}"})
+                            .eq("metadata->>room_name", call_id)
+                            .execute
+                        )
+                    return "DISPOSITION_RECORDED: Customer marked as not interested. Conclude call politely and professionally without pushiness."
+
+                return f"DISPOSITION_SAVED: Outcome '{disposition}' recorded."
+            except Exception as e:
+                logger.error(f"[update_call_disposition_or_reschedule] Error: {e}")
+                return "DISPOSITION_SAVED: Outcome noted."
+            finally:
+                if timing_tracker:
+                    timing_tracker.mark("tool_end", extra="tool=update_call_disposition_or_reschedule")
+
+        if tool_guard:
+            return await tool_guard.execute_tool("update_call_disposition_or_reschedule", _execute)
+        return await _execute()
+
     return [
         check_existing_appointment,
         book_appointment_slot,
@@ -1791,7 +1893,9 @@ def create_appointment_tools(
         transfer_to_human,
         dispatch_payment_request,
         query_live_inventory,
-        reserve_business_inventory
+        reserve_business_inventory,
+        dispatch_demo_or_business_link,
+        update_call_disposition_or_reschedule,
     ]
 
 class VikramAgent(Agent):
@@ -3976,6 +4080,50 @@ async def entrypoint(ctx: JobContext):
                         system_prompt += f"\n\n## EXISTING APPOINTMENT RECORDS IN DATABASE\n- NO existing appointments found for this caller.\n- INSTRUCTION: If caller asks to check an appointment, truthfully tell them that no booking was found for their number, and offer to schedule a new appointment for their requested date/time.\n"
                 except Exception as apt_lookup_err:
                     logger.warning(f"Could not load appointment records in EP: {apt_lookup_err}")
+
+                # 10b. Live Business Operations Brain Injection (Real-Time Catalog, Routes, Inventory & Pricing Floors)
+                try:
+                    cat_query = supabase_admin.table("business_operations_catalog").select(
+                        "identifier_code, title, category, route_origin, route_destination, available_units, base_price_inr, minimum_price_inr, booking_slot_start, metadata"
+                    ).eq("status", "available")
+                    if organization_id:
+                        cat_query = cat_query.eq("organization_id", organization_id)
+                    elif user_id:
+                        cat_query = cat_query.eq("user_id", user_id)
+
+                    cat_res = await asyncio.to_thread(cat_query.limit(10).execute)
+                    if cat_res.data and len(cat_res.data) > 0:
+                        cat_lines = []
+                        for item in cat_res.data:
+                            code = item.get("identifier_code") or "ITEM"
+                            title = item.get("title") or "Item"
+                            cat = item.get("category") or "general"
+                            orig = item.get("route_origin")
+                            dest = item.get("route_destination")
+                            units = item.get("available_units", 1)
+                            base_p = item.get("base_price_inr")
+                            min_p = item.get("minimum_price_inr")
+
+                            desc = f"- [{code}] {title} ({cat}, Units/Slots: {units})"
+                            if orig and dest:
+                                desc += f", Route: {orig} -> {dest}"
+                            if base_p is not None:
+                                desc += f", Quoted Price: Rs. {base_p}"
+                            if min_p is not None:
+                                desc += f", Strict Floor Limit: Rs. {min_p}"
+                            cat_lines.append(desc)
+
+                        system_prompt += (
+                            f"\n\n## LIVE BUSINESS OPERATIONS BRAIN (REAL-TIME CATALOG, INVENTORY & PRICING)\n"
+                            + "\n".join(cat_lines) +
+                            "\n- REAL-TIME INVENTORY & PRICING DIRECTIVES:\n"
+                            "  1. Use this real data directly during the call to quote routes, vehicle types, container fleet, or open appointment slots.\n"
+                            "  2. First quote the base Quoted Price. If the caller asks for discount or negotiates, you may offer a discount down to the Strict Floor Limit, but NEVER accept or quote below the Floor Limit.\n"
+                            "  3. Use 'reserve_business_inventory' to lock in any confirmed booking so slots/routes never overlap.\n"
+                            "  4. If the customer requests demo links or payment details, use 'dispatch_demo_or_business_link' or 'dispatch_payment_request' immediately during the call.\n"
+                        )
+                except Exception as cat_err:
+                    logger.debug(f"Catalog prompt injection note: {cat_err}")
 
                 raw_greeting = agent_data.get('greeting_message') or default_greeting
                 is_inbound_call = not bool(campaign_contact)

@@ -291,3 +291,4 @@ class AgentLifecycleService:
             "purged_count": purged_count,
             "checked_at": now.isoformat(),
         }
+

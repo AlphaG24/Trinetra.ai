@@ -618,6 +618,76 @@ class IntegrationExecutor:
 
         return wa_sent
 
+    async def dispatch_demo_or_link(
+        self,
+        organization_id: str | None = None,
+        user_id: str | None = None,
+        phone_number: str = "",
+        link_type: str = "demo",
+        note: str = "",
+        call_id: str | None = None,
+    ) -> bool:
+        """
+        Dispatches product demo links, business brochures, or catalog details to callers via WhatsApp.
+        """
+        cleaned_phone = format_whatsapp_number(phone_number)
+        if not cleaned_phone:
+            logger.warning("[Demo/Link Dispatch] Discarded: invalid or missing phone number.")
+            return False
+
+        raw_phone = cleaned_phone.replace("whatsapp:", "")
+        
+        # Link resolution
+        if link_type == "demo":
+            url = os.getenv("DEMO_LINK_URL", "https://vaakriti.com/demo")
+            type_title = "Product Demo Link"
+            body_text = f"As requested during our call, here is the live demo link to experience our AI voice platform:\n{url}"
+        elif link_type == "brochure":
+            url = os.getenv("BROCHURE_URL", "https://vaakriti.com/brochure")
+            type_title = "Business Brochure & Catalog"
+            body_text = f"Here is our business brochure and services catalog:\n{url}"
+        else:
+            url = "https://vaakriti.com"
+            type_title = "Business Details"
+            body_text = f"Here are the business and contact details you requested:\n{url}"
+
+        if note:
+            body_text += f"\n\nAdditional Note: {note}"
+
+        message_text = (
+            f"Namaste! 🙏\n\n"
+            f"*{type_title}*\n"
+            f"{body_text}\n\n"
+            f"Feel free to reply to this message if you have any questions or need further assistance."
+        )
+
+        sent = False
+        try:
+            sent = await self._send_whatsapp({}, message_text, {"contact_phone": raw_phone})
+        except Exception as e:
+            logger.warning(f"[Demo/Link Dispatch] WhatsApp send error: {e}")
+
+        # Audit log
+        try:
+            audit_entry = {
+                "user_id": user_id,
+                "organization_id": organization_id,
+                "action": "demo_link.dispatched",
+                "resource_type": "call_records",
+                "resource_id": call_id or raw_phone,
+                "new_values": {
+                    "phone": raw_phone,
+                    "link_type": link_type,
+                    "url": url,
+                    "dispatched_successfully": sent
+                }
+            }
+            await asyncio.to_thread(supabase_admin.table("audit_logs").insert(audit_entry).execute)
+        except Exception as log_err:
+            logger.debug(f"[Demo/Link Dispatch] Audit log note: {log_err}")
+
+        return sent
+
     async def _dispatch(self, slug: str, event_type: str, config: dict, data: dict):
         try:
             # Merge event_type into template context

@@ -298,3 +298,4 @@ class TestAgentLifecyclePhase4:
         # Verify purge notification
         assert len(mock_db.tables["notifications"]) == 1
         assert "Purged After 30 Days" in mock_db.tables["notifications"][0]["title"]
+
