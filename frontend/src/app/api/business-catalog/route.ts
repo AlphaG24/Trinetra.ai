@@ -86,57 +86,49 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Invalid JSON payload" }, { status: 400 });
     }
 
-    const {
-      title,
-      category = "general",
-      identifier_code,
-      route_origin,
-      route_destination,
-      available_units = 1,
-      base_price_inr,
-      minimum_price_inr,
-      booking_slot_start,
-      booking_slot_end,
-      status = "available",
-      metadata = {}
-    } = payload;
+    const isBulk = Array.isArray(payload) || Array.isArray(payload.items);
+    const rawItems: any[] = Array.isArray(payload) ? payload : (Array.isArray(payload.items) ? payload.items : [payload]);
 
-    if (!title || typeof title !== "string" || !title.trim()) {
-      return NextResponse.json({ error: "Item title is required" }, { status: 400 });
+    if (rawItems.length === 0) {
+      return NextResponse.json({ error: "At least one item is required" }, { status: 400 });
     }
 
     const admin = getAdminClient();
     const orgId = profile.organization_id || null;
 
-    const { data: newItem, error: insertError } = await admin
-      .from("business_operations_catalog")
-      .insert({
+    const formattedRows = rawItems.map((raw: any) => {
+      const title = (raw.title || raw.name || raw.item || raw.route || "").toString().trim();
+      return {
         user_id: user.id,
         organization_id: orgId,
-        title: title.trim(),
-        category: category.toLowerCase().trim(),
-        identifier_code: identifier_code ? identifier_code.trim() : null,
-        route_origin: route_origin ? route_origin.trim() : null,
-        route_destination: route_destination ? route_destination.trim() : null,
-        available_units: Number(available_units) || 1,
-        base_price_inr: base_price_inr !== undefined && base_price_inr !== null ? Number(base_price_inr) : null,
-        minimum_price_inr: minimum_price_inr !== undefined && minimum_price_inr !== null ? Number(minimum_price_inr) : null,
-        booking_slot_start: booking_slot_start || null,
-        booking_slot_end: booking_slot_end || null,
-        status: status.toLowerCase().trim(),
-        metadata: metadata || {}
-      })
-      .select()
-      .single();
+        title: title || "Untitled Business Offering",
+        category: (raw.category || "general").toString().toLowerCase().trim(),
+        identifier_code: raw.identifier_code ? raw.identifier_code.toString().trim() : (raw.code ? raw.code.toString().trim() : null),
+        route_origin: raw.route_origin ? raw.route_origin.toString().trim() : (raw.origin || raw.from ? (raw.origin || raw.from).toString().trim() : null),
+        route_destination: raw.route_destination ? raw.route_destination.toString().trim() : (raw.destination || raw.to ? (raw.destination || raw.to).toString().trim() : null),
+        available_units: Number(raw.available_units !== undefined ? raw.available_units : (raw.units || raw.qty || raw.stock || 1)) || 1,
+        base_price_inr: raw.base_price_inr !== undefined && raw.base_price_inr !== null ? Number(raw.base_price_inr) : (raw.price || raw.rate ? Number(raw.price || raw.rate) : null),
+        minimum_price_inr: raw.minimum_price_inr !== undefined && raw.minimum_price_inr !== null ? Number(raw.minimum_price_inr) : (raw.min_price || raw.floor_price ? Number(raw.min_price || raw.floor_price) : null),
+        booking_slot_start: raw.booking_slot_start || raw.slot_start || null,
+        booking_slot_end: raw.booking_slot_end || raw.slot_end || null,
+        status: (raw.status || "available").toString().toLowerCase().trim(),
+        metadata: raw.metadata || {}
+      };
+    });
+
+    const { data: newItems, error: insertError } = await admin
+      .from("business_operations_catalog")
+      .insert(formattedRows)
+      .select();
 
     if (insertError) {
       console.error("[API] Error inserting into business_operations_catalog:", insertError);
-      return NextResponse.json({ error: "Failed to create catalog entry" }, { status: 500 });
+      return NextResponse.json({ error: "Failed to create catalog entries" }, { status: 500 });
     }
 
     return NextResponse.json({
       success: true,
-      data: newItem
+      data: isBulk ? { items: newItems, count: newItems?.length || 0 } : (newItems ? newItems[0] : null)
     });
   } catch (err: any) {
     console.error("[API] Error in POST /api/business-catalog:", err);
