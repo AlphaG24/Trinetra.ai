@@ -98,21 +98,29 @@ export async function POST(request: Request) {
 
     const formattedRows = rawItems.map((raw: any) => {
       const title = (raw.title || raw.name || raw.item || raw.route || "").toString().trim();
+      const initialUnits = Number(raw.initial_units !== undefined ? raw.initial_units : (raw.available_units !== undefined ? raw.available_units : (raw.units || raw.qty || raw.stock || 1))) || 1;
+      const soldUnits = Number(raw.sold_units !== undefined ? raw.sold_units : (raw.sold || 0)) || 0;
+      const availableUnits = Number(raw.available_units !== undefined ? raw.available_units : Math.max(0, initialUnits - soldUnits));
+
       return {
         user_id: user.id,
         organization_id: orgId,
         title: title || "Untitled Business Offering",
-        category: (raw.category || "general").toString().toLowerCase().trim(),
+        category: (raw.category || "inventory").toString().toLowerCase().trim(),
         identifier_code: raw.identifier_code ? raw.identifier_code.toString().trim() : (raw.code ? raw.code.toString().trim() : null),
         route_origin: raw.route_origin ? raw.route_origin.toString().trim() : (raw.origin || raw.from ? (raw.origin || raw.from).toString().trim() : null),
         route_destination: raw.route_destination ? raw.route_destination.toString().trim() : (raw.destination || raw.to ? (raw.destination || raw.to).toString().trim() : null),
-        available_units: Number(raw.available_units !== undefined ? raw.available_units : (raw.units || raw.qty || raw.stock || 1)) || 1,
+        available_units: availableUnits,
         base_price_inr: raw.base_price_inr !== undefined && raw.base_price_inr !== null ? Number(raw.base_price_inr) : (raw.price || raw.rate ? Number(raw.price || raw.rate) : null),
         minimum_price_inr: raw.minimum_price_inr !== undefined && raw.minimum_price_inr !== null ? Number(raw.minimum_price_inr) : (raw.min_price || raw.floor_price ? Number(raw.min_price || raw.floor_price) : null),
         booking_slot_start: raw.booking_slot_start || raw.slot_start || null,
         booking_slot_end: raw.booking_slot_end || raw.slot_end || null,
         status: (raw.status || "available").toString().toLowerCase().trim(),
-        metadata: raw.metadata || {}
+        metadata: {
+          ...(raw.metadata || {}),
+          initial_units: initialUnits,
+          sold_units: soldUnits
+        }
       };
     });
 
@@ -187,6 +195,17 @@ export async function PUT(request: Request) {
     if (fieldsToUpdate.booking_slot_end !== undefined) updatePayload.booking_slot_end = fieldsToUpdate.booking_slot_end;
     if (fieldsToUpdate.status !== undefined) updatePayload.status = fieldsToUpdate.status.toLowerCase().trim();
     if (fieldsToUpdate.metadata !== undefined) updatePayload.metadata = fieldsToUpdate.metadata;
+
+    // Dynamic sales & inventory stock recalculation (e.g. 10 t-shirts initial, 3 sold -> 7 available)
+    if (fieldsToUpdate.initial_units !== undefined || fieldsToUpdate.sold_units !== undefined) {
+      const meta = { ...((existing as any)?.metadata || {}), ...(fieldsToUpdate.metadata || {}) };
+      if (fieldsToUpdate.initial_units !== undefined) meta.initial_units = Number(fieldsToUpdate.initial_units);
+      if (fieldsToUpdate.sold_units !== undefined) meta.sold_units = Number(fieldsToUpdate.sold_units);
+      updatePayload.metadata = meta;
+      if (fieldsToUpdate.available_units === undefined) {
+        updatePayload.available_units = Math.max(0, (meta.initial_units || 0) - (meta.sold_units || 0));
+      }
+    }
 
     const { data: updatedItem, error: updateErr } = await admin
       .from("business_operations_catalog")

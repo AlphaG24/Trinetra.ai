@@ -25,39 +25,16 @@ Analyze the user's spoken words and return a structured JSON response:
 {
   "title": "Short, clear human-readable title (e.g. 'Operating Hours: Open After 10:00 AM Today' or 'Shop Closed Today - Reschedule to Tomorrow')",
   "prompt_override": "A direct, imperative instruction for the AI voice agent answering live calls. State clearly what the bot must tell callers, what slots to book, and what limits to enforce.",
-  "category": "appointment_slots | inventory | logistics | general",
+  "category": "voice_directive",
   "action_type": "hours_update | closure_reschedule | inventory_zero | rule_override",
   "summary_hindi": "One sentence summary in simple Hindi/Hinglish",
   "mutations": {
     "zero_out_category": "logistics | inventory | null",
     "mark_closed": boolean,
-    "slot_start": "string or null",
-    "slot_end": "string or null"
-  },
-  "auto_populated_items": [
-    {
-      "title": "Clear offering or slot name (e.g. 'Appointment Slot: 10:00 AM - 12:00 PM' or 'Afternoon Consultation Slot: 02:00 PM - 04:00 PM')",
-      "category": "appointment_slots | inventory | logistics | general",
-      "identifier_code": "e.g. SLOT-10AM",
-      "available_units": 3,
-      "base_price_inr": 500,
-      "minimum_price_inr": 400,
-      "booking_slot_start": "${dateIso}T10:00:00Z",
-      "booking_slot_end": "${dateIso}T12:00:00Z",
-      "metadata": {
-        "notes": "Smart auto-populated from owner spoken instruction"
-      }
-    }
-  ]
+    "slot_start": "e.g. 10:00 AM or 10:00",
+    "slot_end": "e.g. 08:00 PM or 20:00"
+  }
 }
-
-RULES FOR AUTO-POPULATED ITEMS:
-1. If the owner mentions open hours or appointment booking (e.g., "10 baje tak band rahega to uske baad appointment lena" or "10 baje se 4 bje tak salon open rakhunga"):
-   - Generate 2 to 4 bookable appointment slots within that open window for today (e.g. 10:00-12:00, 12:00-14:00, 14:00-16:00, etc.) so customers calling the AI agent can book actual confirmed times.
-2. If the owner says the shop is closed today ("aaj shop close rakhunga"):
-   - auto_populated_items can be an empty array [] or tomorrow's first available slot.
-3. If the owner mentions specific products or discounts, create or update those items.
-4. If no specific slots are implied, return "auto_populated_items": [].
 
 OUTPUT RULES:
 - Output ONLY valid JSON. No markdown codeblocks. No conversational introduction.`;
@@ -243,44 +220,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Failed to save voice directive" }, { status: 500 });
     }
 
-    // Smart Auto-Population: If slots or offerings were generated from the voice instruction
-    let autoPopulatedRows: any[] = [];
-    if (Array.isArray(analysis.auto_populated_items) && analysis.auto_populated_items.length > 0) {
-      const itemsToInsert = analysis.auto_populated_items.map((raw: any, idx: number) => ({
-        user_id: user.id,
-        organization_id: orgId,
-        title: raw.title || `Operational Slot ${idx + 1}`,
-        category: raw.category || "appointment_slots",
-        identifier_code: raw.identifier_code || `AUTO-${Date.now().toString().slice(-4)}-${idx + 1}`,
-        available_units: Number(raw.available_units) || 1,
-        base_price_inr: raw.base_price_inr !== undefined && raw.base_price_inr !== null ? Number(raw.base_price_inr) : null,
-        minimum_price_inr: raw.minimum_price_inr !== undefined && raw.minimum_price_inr !== null ? Number(raw.minimum_price_inr) : null,
-        booking_slot_start: raw.booking_slot_start || null,
-        booking_slot_end: raw.booking_slot_end || null,
-        status: "available",
-        metadata: {
-          ...(raw.metadata || {}),
-          auto_generated_from_directive_id: newDirective?.id,
-          source_voice_transcript: transcript
-        }
-      }));
-
-      const { data: insertedSlots, error: slotsError } = await admin
-        .from("business_operations_catalog")
-        .insert(itemsToInsert)
-        .select();
-
-      if (!slotsError && insertedSlots) {
-        autoPopulatedRows = insertedSlots;
-      }
-    }
-
     return NextResponse.json({
       success: true,
       data: {
         directive: newDirective,
-        analysis,
-        auto_populated_items: autoPopulatedRows
+        analysis
       }
     });
   } catch (err: any) {
@@ -317,49 +261,33 @@ export async function PUT(request: Request) {
     const transcript = directive.metadata?.voice_transcript || directive.title;
     const analysis = await analyzeVoiceDirectiveWithLLM(transcript);
 
-    const orgId = profile.organization_id || null;
-    let autoPopulatedRows: any[] = [];
-
-    if (Array.isArray(analysis.auto_populated_items) && analysis.auto_populated_items.length > 0) {
-      const itemsToInsert = analysis.auto_populated_items.map((raw: any, idx: number) => ({
-        user_id: user.id,
-        organization_id: orgId,
-        title: raw.title || `Operational Slot ${idx + 1}`,
-        category: raw.category || "appointment_slots",
-        identifier_code: raw.identifier_code || `AUTO-${Date.now().toString().slice(-4)}-${idx + 1}`,
-        available_units: Number(raw.available_units) || 1,
-        base_price_inr: raw.base_price_inr !== undefined && raw.base_price_inr !== null ? Number(raw.base_price_inr) : null,
-        minimum_price_inr: raw.minimum_price_inr !== undefined && raw.minimum_price_inr !== null ? Number(raw.minimum_price_inr) : null,
-        booking_slot_start: raw.booking_slot_start || null,
-        booking_slot_end: raw.booking_slot_end || null,
-        status: "available",
+    // Update existing directive with fresh analysis
+    const { data: updatedDirective, error: updateErr } = await admin
+      .from("business_operations_catalog")
+      .update({
+        title: analysis.title || directive.title,
         metadata: {
-          ...(raw.metadata || {}),
-          auto_generated_from_directive_id: directive.id,
-          source_voice_transcript: transcript
+          ...(directive.metadata || {}),
+          prompt_override: analysis.prompt_override,
+          summary_hindi: analysis.summary_hindi,
+          action_type: analysis.action_type,
+          mutations: analysis.mutations,
+          updated_at: new Date().toISOString()
         }
-      }));
-
-      const { data: insertedSlots, error: slotsError } = await admin
-        .from("business_operations_catalog")
-        .insert(itemsToInsert)
-        .select();
-
-      if (!slotsError && insertedSlots) {
-        autoPopulatedRows = insertedSlots;
-      }
-    }
+      })
+      .eq("id", id)
+      .select()
+      .single();
 
     return NextResponse.json({
       success: true,
       data: {
-        directive,
-        auto_populated_items: autoPopulatedRows,
-        count: autoPopulatedRows.length
+        directive: updatedDirective || directive,
+        analysis
       }
     });
   } catch (err: any) {
-    return NextResponse.json({ error: err?.message || "Failed to auto-populate slots" }, { status: 500 });
+    return NextResponse.json({ error: err?.message || "Failed to update voice directive" }, { status: 500 });
   }
 }
 

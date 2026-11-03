@@ -1,63 +1,51 @@
 'use client'
 
-import React, { useState, useEffect, useMemo, useRef } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
+import Link from 'next/link'
 import {
-  Boxes,
-  Package,
-  Calendar,
-  Layers,
-  Search,
+  Brain,
+  Mic,
+  MicOff,
+  Upload,
   Plus,
   RefreshCw,
   Trash2,
-  Edit2,
-  CheckCircle2,
-  Clock,
-  ArrowRight,
-  TrendingDown,
-  X,
-  Upload,
-  FileSpreadsheet,
   FileText,
-  SlidersHorizontal,
-  Mic,
-  MicOff,
-  Zap,
-  ShieldCheck,
-  Building2,
+  Calendar,
+  Package,
+  ArrowRight,
   Check,
   Loader2,
-  Brain
+  X,
+  FileSpreadsheet
 } from 'lucide-react'
 import { toast } from 'sonner'
 
-interface OperationsItem {
+interface DirectiveItem {
   id: string
   title: string
-  identifier_code: string | null
-  category: 'logistics' | 'containers' | 'appointment_slots' | 'inventory' | 'general' | 'voice_directive'
-  route_origin: string | null
-  route_destination: string | null
-  available_units: number
-  base_price_inr: number | null
-  minimum_price_inr: number | null
-  booking_slot_start: string | null
-  booking_slot_end: string | null
-  status: 'available' | 'reserved' | 'booked' | 'in_transit'
-  metadata: Record<string, any>
+  category: string
+  status: string
   created_at: string
   updated_at: string
+  metadata: {
+    prompt_override?: string
+    voice_transcript?: string
+    summary_hindi?: string
+    action_type?: string
+    is_active?: boolean
+    [key: string]: any
+  }
 }
 
-const CATEGORIES = [
-  { id: 'all', label: 'All Knowledge & Offerings', icon: Boxes },
-  { id: 'voice_directive', label: 'Spoken Rules & Overrides', icon: Mic },
-  { id: 'appointment_slots', label: 'Appointments & Slots', icon: Calendar },
-  { id: 'inventory', label: 'Products & Services', icon: Package },
-  { id: 'logistics', label: 'Routes & Transport', icon: Building2 },
-  { id: 'containers', label: 'Fleet & Assets', icon: Layers },
-  { id: 'general', label: 'Universal / Custom Rules', icon: SlidersHorizontal }
-]
+interface IngestedDocument {
+  id: string
+  name: string
+  size: number
+  type: string
+  extractedSummary?: string
+  uploadedAt: string
+}
 
 const QUICK_VOICE_PROMPTS = [
   {
@@ -79,123 +67,63 @@ const QUICK_VOICE_PROMPTS = [
 ]
 
 export default function OperationsBrainPage() {
-  const [items, setItems] = useState<OperationsItem[]>([])
+  const [directives, setDirectives] = useState<DirectiveItem[]>([])
+  const [documents, setDocuments] = useState<IngestedDocument[]>([])
   const [loading, setLoading] = useState(true)
-  const [searchQuery, setSearchQuery] = useState('')
-  const [selectedCategory, setSelectedCategory] = useState('all')
-  const [statusFilter, setStatusFilter] = useState('all')
+  const [refreshing, setRefreshing] = useState(false)
 
   // Modals
-  const [isModalOpen, setIsModalOpen] = useState(false)
-  const [isDocumentModalOpen, setIsDocumentModalOpen] = useState(false)
   const [isVoiceModalOpen, setIsVoiceModalOpen] = useState(false)
-  const [editingItem, setEditingItem] = useState<OperationsItem | null>(null)
-  const [saving, setSaving] = useState(false)
+  const [isDocumentModalOpen, setIsDocumentModalOpen] = useState(false)
+  const [isRuleModalOpen, setIsRuleModalOpen] = useState(false)
 
-  // Document Ingest State
+  // Voice recording state
+  const [isRecording, setIsRecording] = useState(false)
+  const [voiceTranscript, setVoiceTranscript] = useState('')
+  const [isProcessingVoice, setIsProcessingVoice] = useState(false)
+  const recognitionRef = useRef<any>(null)
+
+  // Document state
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([])
   const [isIngestingDocs, setIsIngestingDocs] = useState(false)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
 
-  // Voice to Brain State
-  const [isRecording, setIsRecording] = useState(false)
-  const [voiceTranscript, setVoiceTranscript] = useState('')
-  const [isProcessingVoice, setIsProcessingVoice] = useState(false)
-  const [generatingSlotsId, setGeneratingSlotsId] = useState<string | null>(null)
-  const recognitionRef = useRef<any>(null)
+  // Custom Rule Form
+  const [ruleTitle, setRuleTitle] = useState('')
+  const [rulePrompt, setRulePrompt] = useState('')
 
-  // Dynamic Custom Key-Values for General category
-  const [customAttributes, setCustomAttributes] = useState<{ key: string; value: string }[]>([
-    { key: '', value: '' }
-  ])
-
-  // Form Fields
-  const [formData, setFormData] = useState({
-    title: '',
-    identifier_code: '',
-    category: 'general',
-    route_origin: '',
-    route_destination: '',
-    vehicle_type: '',
-    container_size: '',
-    yard_location: '',
-    specialist_name: '',
-    booking_slot_start: '',
-    booking_slot_end: '',
-    sku_code: '',
-    department: '',
-    available_units: 1,
-    base_price_inr: '',
-    minimum_price_inr: '',
-    status: 'available',
-    description: ''
-  })
-
-  const fetchItems = async () => {
+  const fetchDirectives = async (isManual = false) => {
     try {
-      setLoading(true)
-      const res = await fetch('/api/business-catalog')
+      if (isManual) setRefreshing(true)
+      const res = await fetch('/api/business-catalog?category=voice_directive')
       const json = await res.json()
       if (json.success && json.data) {
-        setItems(json.data.items || [])
-      } else {
-        toast.error('Failed to load operations brain')
+        setDirectives(json.data.items || [])
       }
     } catch (err) {
-      console.error('Failed to load items:', err)
-      toast.error('Network error loading operations brain')
+      console.error('Failed to load directives:', err)
+      if (isManual) toast.error('Failed to load directives')
     } finally {
       setLoading(false)
+      setRefreshing(false)
     }
   }
 
   useEffect(() => {
-    fetchItems()
+    fetchDirectives()
+    // Load persisted documents from localStorage if any
+    try {
+      const savedDocs = localStorage.getItem('trinetra_ingested_docs')
+      if (savedDocs) setDocuments(JSON.parse(savedDocs))
+    } catch (_) {}
   }, [])
 
-  // Universal Summary Metrics
-  const activeVoiceDirectives = useMemo(() => {
-    return items.filter(i => i.category === 'voice_directive')
-  }, [items])
-
-  const catalogOfferings = useMemo(() => {
-    return items.filter(i => i.category !== 'voice_directive')
-  }, [items])
-
-  const totalCatalogItems = catalogOfferings.length
-  const totalUnitsCapacity = catalogOfferings.reduce((acc, curr) => acc + (curr.available_units || 0), 0)
-  const itemsWithPricingFloor = catalogOfferings.filter(i => i.minimum_price_inr !== null && i.minimum_price_inr > 0).length
-  const activeDirectivesCount = activeVoiceDirectives.filter(i => i.status === 'available').length
-
-  // Unified Filtered Items Stream (Option A: includes voice directives when on "all" or "voice_directive")
-  const filteredItems = useMemo(() => {
-    return items.filter(item => {
-      const meta = item.metadata || {}
-      const matchesSearch =
-        searchQuery === '' ||
-        item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (item.identifier_code && item.identifier_code.toLowerCase().includes(searchQuery.toLowerCase())) ||
-        (item.route_origin && item.route_origin.toLowerCase().includes(searchQuery.toLowerCase())) ||
-        (item.route_destination && item.route_destination.toLowerCase().includes(searchQuery.toLowerCase())) ||
-        (meta.voice_transcript && meta.voice_transcript.toLowerCase().includes(searchQuery.toLowerCase()))
-
-      const matchesCategory =
-        selectedCategory === 'all' || item.category === selectedCategory
-
-      const matchesStatus =
-        statusFilter === 'all' || item.status === statusFilter
-
-      return matchesSearch && matchesCategory && matchesStatus
-    })
-  }, [items, searchQuery, selectedCategory, statusFilter])
-
-  // Voice Recognition Controls
-  const startVoiceRecording = () => {
+  // Web Speech Recognition
+  const startRecording = () => {
     if (typeof window === 'undefined') return
-
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
     if (!SpeechRecognition) {
-      toast.error('Voice recognition is not supported in this browser. Please type your directive.')
+      toast.error('Speech recognition not supported in this browser. Please use Chrome or type your instruction.')
       return
     }
 
@@ -205,41 +133,30 @@ export default function OperationsBrainPage() {
       recognition.interimResults = true
       recognition.lang = 'hi-IN'
 
-      recognition.onstart = () => {
-        setIsRecording(true)
-        toast.info('Listening... Speak your operational instructions.')
-      }
-
+      recognition.onstart = () => setIsRecording(true)
       recognition.onresult = (event: any) => {
-        let currentTranscript = ''
+        let fullTranscript = ''
         for (let i = 0; i < event.results.length; i++) {
-          currentTranscript += event.results[i][0].transcript + ' '
+          fullTranscript += event.results[i][0].transcript + ' '
         }
-        setVoiceTranscript(currentTranscript.trim())
+        setVoiceTranscript(fullTranscript.trim())
       }
-
-      recognition.onerror = (event: any) => {
-        console.warn('Speech recognition error:', event.error)
-        if (event.error !== 'no-speech') {
-          toast.error(`Mic error: ${event.error}`)
-        }
+      recognition.onerror = (err: any) => {
+        console.error('Speech recognition error:', err)
         setIsRecording(false)
       }
-
-      recognition.onend = () => {
-        setIsRecording(false)
-      }
+      recognition.onend = () => setIsRecording(false)
 
       recognition.start()
       recognitionRef.current = recognition
-    } catch (err: any) {
+    } catch (err) {
       console.error('Failed to start speech recognition:', err)
-      toast.error('Could not access microphone')
+      toast.error('Could not activate microphone')
       setIsRecording(false)
     }
   }
 
-  const stopVoiceRecording = () => {
+  const stopRecording = () => {
     if (recognitionRef.current) {
       recognitionRef.current.stop()
       recognitionRef.current = null
@@ -249,7 +166,7 @@ export default function OperationsBrainPage() {
 
   const handleApplyVoiceDirective = async () => {
     if (!voiceTranscript.trim()) {
-      toast.error('Please speak or type an operational instruction first')
+      toast.error('Please speak or type an instruction first.')
       return
     }
 
@@ -263,586 +180,357 @@ export default function OperationsBrainPage() {
 
       const json = await res.json()
       if (json.success) {
-        const autoSlots = json.data?.auto_populated_items?.length || 0
-        if (autoSlots > 0) {
-          toast.success(`Directive applied and smart-generated ${autoSlots} bookable appointment slots!`)
-        } else {
-          toast.success('Spoken directive applied to Brain! Live agents will follow this rule.')
-        }
-        setVoiceTranscript('')
+        toast.success('Spoken instruction successfully added to Brain!')
         setIsVoiceModalOpen(false)
-        fetchItems()
+        setVoiceTranscript('')
+        fetchDirectives()
       } else {
-        toast.error(json.error || 'Failed to apply voice directive')
+        toast.error(json.error || 'Failed to process voice directive')
       }
-    } catch (err: any) {
-      console.error('Voice directive error:', err)
+    } catch (err) {
       toast.error('Network error processing voice directive')
     } finally {
       setIsProcessingVoice(false)
     }
   }
 
-  const handleToggleVoiceDirective = async (id: string, currentStatus: string) => {
+  const handleToggleDirective = async (id: string, currentStatus: string) => {
+    const nextStatus = currentStatus === 'available' ? 'reserved' : 'available'
     try {
-      const newStatus = currentStatus === 'available' ? false : true
-      const res = await fetch('/api/business-catalog/voice-directive', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, is_active: newStatus })
-      })
-      const json = await res.json()
-      if (json.success) {
-        toast.success(newStatus ? 'Directive activated' : 'Directive paused')
-        fetchItems()
-      } else {
-        toast.error(json.error || 'Failed to update directive')
-      }
-    } catch (err) {
-      toast.error('Failed to toggle directive')
-    }
-  }
-
-  const handleAutoPopulateSlots = async (id: string) => {
-    try {
-      setGeneratingSlotsId(id)
-      const res = await fetch('/api/business-catalog/voice-directive', {
+      const res = await fetch('/api/business-catalog', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id })
+        body: JSON.stringify({ id, status: nextStatus })
       })
       const json = await res.json()
       if (json.success) {
-        toast.success(`Successfully auto-populated ${json.data?.count || 0} appointment slots!`)
-        fetchItems()
-      } else {
-        toast.error(json.error || 'Failed to auto-populate slots')
+        toast.success(nextStatus === 'available' ? 'Directive activated for calls' : 'Directive paused')
+        fetchDirectives()
       }
-    } catch (err) {
-      toast.error('Network error auto-populating slots')
-    } finally {
-      setGeneratingSlotsId(null)
+    } catch {
+      toast.error('Failed to update directive status')
     }
   }
 
-  // Multi-Document Ingest
+  const handleDeleteDirective = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this directive?')) return
+    try {
+      const res = await fetch(`/api/business-catalog?id=${id}`, { method: 'DELETE' })
+      const json = await res.json()
+      if (json.success) {
+        toast.success('Directive deleted')
+        fetchDirectives()
+      }
+    } catch {
+      toast.error('Failed to delete directive')
+    }
+  }
+
+  // Document Ingest
   const handleFilesSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files) return
     const newFiles = Array.from(e.target.files)
     setUploadedFiles(prev => [...prev, ...newFiles])
   }
 
-  const handleRemoveFile = (index: number) => {
-    setUploadedFiles(prev => prev.filter((_, idx) => idx !== index))
-  }
-
-  const handleIngestDocuments = async () => {
+  const handleUploadAndProcessDocs = async () => {
     if (uploadedFiles.length === 0) {
-      toast.error('Please select at least one document to upload')
+      toast.error('Please select at least one document.')
       return
     }
 
     try {
       setIsIngestingDocs(true)
-      const formDataUpload = new FormData()
-      uploadedFiles.forEach(file => {
-        formDataUpload.append('files', file)
-      })
+      const formData = new FormData()
+      uploadedFiles.forEach(file => formData.append('files', file))
 
-      const res = await fetch('/api/business-catalog/ingest-document', {
+      const res = await fetch('/api/ingest', {
         method: 'POST',
-        body: formDataUpload
+        body: formData
       })
-
       const json = await res.json()
+
       if (json.success) {
-        toast.success(`AI successfully extracted & saved ${json.data.count} items into the brain!`)
-        setUploadedFiles([])
+        const newDocs: IngestedDocument[] = uploadedFiles.map(file => ({
+          id: Math.random().toString(36).substring(2, 9),
+          name: file.name,
+          size: file.size,
+          type: file.type || 'application/octet-stream',
+          extractedSummary: 'Extracted key business knowledge, pricing limits, and operating rules.',
+          uploadedAt: new Date().toISOString()
+        }))
+
+        const combined = [...newDocs, ...documents]
+        setDocuments(combined)
+        try {
+          localStorage.setItem('trinetra_ingested_docs', JSON.stringify(combined))
+        } catch (_) {}
+
+        toast.success(`Successfully extracted knowledge from ${uploadedFiles.length} file(s)!`)
         setIsDocumentModalOpen(false)
-        fetchItems()
+        setUploadedFiles([])
       } else {
-        toast.error(json.error || 'Failed to parse documents')
+        toast.error(json.error || 'Failed to extract documents')
       }
-    } catch (err: any) {
-      console.error('Document ingestion error:', err)
-      toast.error('Error uploading and processing documents')
+    } catch (err) {
+      toast.error('Network error during document ingest')
     } finally {
       setIsIngestingDocs(false)
     }
   }
 
-  // Manual Add/Edit
-  const handleOpenAdd = (defaultCat?: string) => {
-    setEditingItem(null)
-    const cat = defaultCat && defaultCat !== 'all' && defaultCat !== 'voice_directive' ? defaultCat : 'general'
-    setFormData({
-      title: '',
-      identifier_code: '',
-      category: cat,
-      route_origin: '',
-      route_destination: '',
-      vehicle_type: '',
-      container_size: '',
-      yard_location: '',
-      specialist_name: '',
-      booking_slot_start: '',
-      booking_slot_end: '',
-      sku_code: '',
-      department: '',
-      available_units: 1,
-      base_price_inr: '',
-      minimum_price_inr: '',
-      status: 'available',
-      description: ''
-    })
-    setCustomAttributes([{ key: '', value: '' }])
-    setIsModalOpen(true)
+  const handleDeleteDocument = (id: string) => {
+    const updated = documents.filter(d => d.id !== id)
+    setDocuments(updated)
+    try {
+      localStorage.setItem('trinetra_ingested_docs', JSON.stringify(updated))
+    } catch (_) {}
+    toast.success('Document reference removed')
   }
 
-  const handleOpenEdit = (item: OperationsItem) => {
-    setEditingItem(item)
-    const meta = item.metadata || {}
-    setFormData({
-      title: item.title,
-      identifier_code: item.identifier_code || '',
-      category: item.category,
-      route_origin: item.route_origin || '',
-      route_destination: item.route_destination || '',
-      vehicle_type: meta.vehicle_type || '',
-      container_size: meta.container_size || '',
-      yard_location: meta.yard_location || '',
-      specialist_name: meta.specialist_name || '',
-      booking_slot_start: item.booking_slot_start ? item.booking_slot_start.slice(0, 16) : '',
-      booking_slot_end: item.booking_slot_end ? item.booking_slot_end.slice(0, 16) : '',
-      sku_code: meta.sku_code || '',
-      department: meta.department || '',
-      available_units: item.available_units,
-      base_price_inr: item.base_price_inr !== null ? String(item.base_price_inr) : '',
-      minimum_price_inr: item.minimum_price_inr !== null ? String(item.minimum_price_inr) : '',
-      status: item.status,
-      description: meta.description || ''
-    })
-
-    const customList: { key: string; value: string }[] = []
-    if (meta.custom_attributes && typeof meta.custom_attributes === 'object') {
-      Object.entries(meta.custom_attributes).forEach(([k, v]) => {
-        customList.push({ key: k, value: String(v) })
-      })
-    }
-    setCustomAttributes(customList.length > 0 ? customList : [{ key: '', value: '' }])
-    setIsModalOpen(true)
-  }
-
-  const handleSave = async (e: React.FormEvent) => {
+  // Custom Rule
+  const handleCreateRule = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!formData.title.trim()) {
-      toast.error('Title is required')
+    if (!ruleTitle.trim() || !rulePrompt.trim()) {
+      toast.error('Title and instruction are required')
       return
     }
 
     try {
-      setSaving(true)
-      const meta: Record<string, any> = {
-        description: formData.description.trim() || undefined
-      }
-
-      if (formData.category === 'logistics' && formData.vehicle_type) {
-        meta.vehicle_type = formData.vehicle_type.trim()
-      } else if (formData.category === 'containers') {
-        if (formData.container_size) meta.container_size = formData.container_size.trim()
-        if (formData.yard_location) meta.yard_location = formData.yard_location.trim()
-      } else if (formData.category === 'appointment_slots') {
-        if (formData.specialist_name) meta.specialist_name = formData.specialist_name.trim()
-      } else if (formData.category === 'inventory') {
-        if (formData.sku_code) meta.sku_code = formData.sku_code.trim()
-        if (formData.department) meta.department = formData.department.trim()
-      }
-
-      const customDict: Record<string, string> = {}
-      customAttributes.forEach(attr => {
-        if (attr.key.trim()) {
-          customDict[attr.key.trim()] = attr.value.trim()
-        }
-      })
-      if (Object.keys(customDict).length > 0) {
-        meta.custom_attributes = customDict
-      }
-
-      const payload: Record<string, any> = {
-        title: formData.title.trim(),
-        identifier_code: formData.identifier_code.trim() || null,
-        category: formData.category,
-        route_origin: formData.category === 'logistics' ? (formData.route_origin.trim() || null) : null,
-        route_destination: formData.category === 'logistics' ? (formData.route_destination.trim() || null) : null,
-        available_units: Number(formData.available_units) || 1,
-        base_price_inr: formData.base_price_inr !== '' ? Number(formData.base_price_inr) : null,
-        minimum_price_inr: formData.minimum_price_inr !== '' ? Number(formData.minimum_price_inr) : null,
-        booking_slot_start: formData.booking_slot_start ? new Date(formData.booking_slot_start).toISOString() : null,
-        booking_slot_end: formData.booking_slot_end ? new Date(formData.booking_slot_end).toISOString() : null,
-        status: formData.status,
-        metadata: meta
-      }
-
-      if (editingItem) {
-        payload.id = editingItem.id
-        const res = await fetch('/api/business-catalog', {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
+      const res = await fetch('/api/business-catalog', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: ruleTitle.trim(),
+          category: 'voice_directive',
+          status: 'available',
+          metadata: {
+            prompt_override: rulePrompt.trim(),
+            action_type: 'rule_override',
+            is_active: true
+          }
         })
-        const json = await res.json()
-        if (json.success) {
-          toast.success('Operations item updated')
-          setIsModalOpen(false)
-          fetchItems()
-        } else {
-          toast.error(json.error || 'Failed to update item')
-        }
-      } else {
-        const res = await fetch('/api/business-catalog', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        })
-        const json = await res.json()
-        if (json.success) {
-          toast.success('Item added to AI operations brain')
-          setIsModalOpen(false)
-          fetchItems()
-        } else {
-          toast.error(json.error || 'Failed to add item')
-        }
-      }
-    } catch (err) {
-      console.error('Error saving item:', err)
-      toast.error('Failed to save item')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  const handleDelete = async (id: string, title: string) => {
-    if (!confirm(`Delete "${title}" from AI operations brain?`)) return
-
-    try {
-      const res = await fetch(`/api/business-catalog?id=${id}`, {
-        method: 'DELETE'
       })
+
       const json = await res.json()
       if (json.success) {
-        toast.success('Item deleted')
-        setItems(prev => prev.filter(i => i.id !== id))
+        toast.success('Operating rule created')
+        setIsRuleModalOpen(false)
+        setRuleTitle('')
+        setRulePrompt('')
+        fetchDirectives()
       } else {
-        toast.error(json.error || 'Failed to delete item')
+        toast.error(json.error || 'Failed to save rule')
       }
-    } catch (err) {
-      toast.error('Failed to delete item')
-    }
-  }
-
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'available':
-        return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-[var(--hover-bg)] text-[var(--heading)] border border-[var(--border)]">
-            <CheckCircle2 className="w-3.5 h-3.5" /> Active
-          </span>
-        )
-      case 'reserved':
-        return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-[var(--hover-bg)] text-[var(--muted)] border border-[var(--border)]">
-            <Clock className="w-3.5 h-3.5" /> Paused
-          </span>
-        )
-      case 'booked':
-        return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-[var(--hover-bg)] text-[var(--heading)] border border-[var(--border)]">
-            <Boxes className="w-3.5 h-3.5" /> Booked
-          </span>
-        )
-      default:
-        return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-[var(--hover-bg)] text-[var(--muted)] border border-[var(--border)]">
-            {status}
-          </span>
-        )
-    }
-  }
-
-  const getCategoryIcon = (category: string) => {
-    switch (category) {
-      case 'voice_directive':
-        return <Mic className="w-4 h-4 text-[var(--muted)]" />
-      case 'appointment_slots':
-        return <Calendar className="w-4 h-4 text-[var(--muted)]" />
-      case 'inventory':
-        return <Package className="w-4 h-4 text-[var(--muted)]" />
-      case 'logistics':
-        return <Building2 className="w-4 h-4 text-[var(--muted)]" />
-      case 'containers':
-        return <Layers className="w-4 h-4 text-[var(--muted)]" />
-      default:
-        return <SlidersHorizontal className="w-4 h-4 text-[var(--muted)]" />
+    } catch {
+      toast.error('Network error creating rule')
     }
   }
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto py-2 md:py-4 font-montserrat text-left">
-      {/* Universal Page Header */}
-      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 border-b border-[var(--border)] pb-5">
+    <div className="p-4 sm:p-6 lg:p-8 space-y-8 max-w-7xl mx-auto">
+      {/* Top Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-[var(--heading)] tracking-tight">
-            Operations & Knowledge Brain
+          <h1 className="text-2xl font-black text-[var(--heading)] tracking-tight flex items-center gap-2">
+            <Brain className="w-6 h-6 text-[var(--heading)]" />
+            <span>Operations & Instructions Brain</span>
           </h1>
-          <p className="text-xs sm:text-sm text-[var(--muted)] mt-1.5 max-w-2xl leading-relaxed">
-            Universal real-time knowledge base, catalog items, and daily voice directives referenced live by your AI voice agents during customer calls.
+          <p className="text-xs text-[var(--muted)] mt-1 max-w-2xl">
+            Live business operating rules, daily spoken directives, and uploaded knowledge sources referenced live by your AI voice agents during customer calls.
           </p>
         </div>
 
-        {/* Action Controls */}
-        <div className="flex flex-wrap items-center gap-2.5 sm:gap-3 shrink-0 self-stretch sm:self-auto">
+        <div className="flex items-center gap-2.5 flex-wrap">
+          <button
+            onClick={() => fetchDirectives(true)}
+            disabled={refreshing}
+            className="p-2.5 rounded-xl bg-[var(--card-bg)] hover:bg-[var(--hover-bg)] border border-[var(--border)] text-[var(--heading)] transition-all cursor-pointer shadow-xs disabled:opacity-50"
+            title="Refresh Directives"
+          >
+            <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+          </button>
+
           <button
             onClick={() => setIsVoiceModalOpen(true)}
-            className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 font-bold text-xs tracking-wide transition-all shadow-sm active:scale-[0.98] cursor-pointer"
+            className="inline-flex items-center gap-2 px-4 py-2.5 bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 font-bold text-xs rounded-xl shadow-sm transition-all cursor-pointer active:scale-95"
           >
             <Mic className="w-4 h-4" />
-            <span>Speak to Brain</span>
+            <span>Speak Directive</span>
           </button>
 
           <button
             onClick={() => setIsDocumentModalOpen(true)}
-            className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-[var(--card-bg)] hover:bg-[var(--hover-bg)] border border-[var(--border)] text-[var(--heading)] font-bold text-xs tracking-wide transition-all shadow-sm active:scale-[0.98] cursor-pointer"
+            className="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-[var(--card-bg)] hover:bg-[var(--hover-bg)] border border-[var(--border)] text-[var(--heading)] font-bold text-xs cursor-pointer shadow-xs transition-colors"
           >
             <Upload className="w-4 h-4 text-[var(--muted)]" />
             <span>Upload Documents</span>
           </button>
 
           <button
-            onClick={() => handleOpenAdd(selectedCategory)}
-            className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-[var(--card-bg)] hover:bg-[var(--hover-bg)] border border-[var(--border)] text-[var(--heading)] font-bold text-xs tracking-wide rounded-xl transition-all shadow-sm active:scale-[0.98] cursor-pointer"
+            onClick={() => setIsRuleModalOpen(true)}
+            className="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-[var(--card-bg)] hover:bg-[var(--hover-bg)] border border-[var(--border)] text-[var(--heading)] font-bold text-xs cursor-pointer shadow-xs transition-colors"
           >
             <Plus className="w-4 h-4 text-[var(--muted)]" />
-            <span>Add Item</span>
+            <span>+ Add Rule</span>
           </button>
+        </div>
+      </div>
 
+      {/* Top Specialized Operational Hub Links */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Appointments Schedule Sheet Link Card */}
+        <div className="p-5 rounded-2xl bg-[var(--card-bg)] border border-[var(--border)] shadow-xs flex flex-col justify-between space-y-4">
+          <div className="flex items-start justify-between">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <Calendar className="w-5 h-5 text-[var(--heading)]" />
+                <h3 className="font-bold text-sm text-[var(--heading)]">Live Appointments Schedule Sheet</h3>
+              </div>
+              <p className="text-xs text-[var(--muted)] leading-relaxed">
+                Dynamic Excel-style spreadsheet with time ranges, available slots, and in-call booked appointments updating live during calls.
+              </p>
+            </div>
+          </div>
+          <div className="pt-2">
+            <Link
+              href="/dashboard/appointments"
+              className="inline-flex items-center gap-2 text-xs font-bold text-[var(--heading)] hover:opacity-80 transition-opacity"
+            >
+              <span>Open Schedule Sheet (Excel Grid)</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+          </div>
+        </div>
+
+        {/* Product Inventory & Pricing Sheet Link Card */}
+        <div className="p-5 rounded-2xl bg-[var(--card-bg)] border border-[var(--border)] shadow-xs flex flex-col justify-between space-y-4">
+          <div className="flex items-start justify-between">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <Package className="w-5 h-5 text-[var(--heading)]" />
+                <h3 className="font-bold text-sm text-[var(--heading)]">Live Products, Inventory & Pricing Sheet</h3>
+              </div>
+              <p className="text-xs text-[var(--muted)] leading-relaxed">
+                Real-time spreadsheet tracking initial stock, in-call sold pieces, available units, base prices, and strict AI floor limits.
+              </p>
+            </div>
+          </div>
+          <div className="pt-2">
+            <Link
+              href="/dashboard/inventory"
+              className="inline-flex items-center gap-2 text-xs font-bold text-[var(--heading)] hover:opacity-80 transition-opacity"
+            >
+              <span>Open Inventory & Pricing Sheet (Excel Grid)</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+          </div>
+        </div>
+      </div>
+
+      {/* Section 1: Active Spoken Voice Directives & Daily Overrides */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Mic className="w-4 h-4 text-[var(--heading)]" />
+            <h2 className="text-sm font-bold uppercase tracking-wider text-[var(--heading)]">
+              Active Spoken Voice Directives & Daily Overrides ({directives.length})
+            </h2>
+          </div>
           <button
-            onClick={fetchItems}
-            disabled={loading}
-            className="p-2.5 rounded-xl bg-[var(--card-bg)] hover:bg-[var(--hover-bg)] border border-[var(--border)] text-[var(--muted)] hover:text-[var(--heading)] transition-colors cursor-pointer shrink-0 shadow-sm"
-            title="Refresh Catalog"
+            onClick={() => setIsVoiceModalOpen(true)}
+            className="text-xs font-semibold text-[var(--muted)] hover:text-[var(--heading)] cursor-pointer"
           >
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-[var(--heading)]' : ''}`} />
+            + New Voice Rule
           </button>
         </div>
-      </div>
 
-      {/* Dynamic Summary Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        <div className="p-4 sm:p-5 rounded-2xl bg-[var(--card-bg)] border border-[var(--border)] shadow-sm space-y-1">
-          <div className="flex items-center justify-between text-xs text-[var(--muted)] font-medium">
-            <span>Live Catalog Offerings</span>
-            <Boxes className="w-4 h-4 text-[var(--muted)]" />
+        {loading ? (
+          <div className="p-10 rounded-2xl bg-[var(--card-bg)] border border-[var(--border)] text-center text-[var(--muted)]">
+            <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2 text-[var(--heading)]" />
+            <span className="text-xs">Loading active voice rules...</span>
           </div>
-          <p className="text-2xl sm:text-3xl font-extrabold text-[var(--heading)] font-mono">{totalCatalogItems}</p>
-          <p className="text-[11px] text-[var(--muted)]">Active knowledge items indexed for voice agents</p>
-        </div>
-
-        <div className="p-4 sm:p-5 rounded-2xl bg-[var(--card-bg)] border border-[var(--border)] shadow-sm space-y-1">
-          <div className="flex items-center justify-between text-xs text-[var(--muted)] font-medium">
-            <span>Spoken Voice Directives</span>
-            <Mic className="w-4 h-4 text-[var(--muted)]" />
-          </div>
-          <p className="text-2xl sm:text-3xl font-extrabold text-[var(--heading)] font-mono">{activeDirectivesCount}</p>
-          <p className="text-[11px] text-[var(--muted)]">Daily owner speech overrides currently live</p>
-        </div>
-
-        <div className="p-4 sm:p-5 rounded-2xl bg-[var(--card-bg)] border border-[var(--border)] shadow-sm space-y-1">
-          <div className="flex items-center justify-between text-xs text-[var(--muted)] font-medium">
-            <span>Total Units / Capacity</span>
-            <Layers className="w-4 h-4 text-[var(--muted)]" />
-          </div>
-          <p className="text-2xl sm:text-3xl font-extrabold text-[var(--heading)] font-mono">{totalUnitsCapacity}</p>
-          <p className="text-[11px] text-[var(--muted)]">Bookable appointment slots or product inventory</p>
-        </div>
-
-        <div className="p-4 sm:p-5 rounded-2xl bg-[var(--card-bg)] border border-[var(--border)] shadow-sm space-y-1">
-          <div className="flex items-center justify-between text-xs text-[var(--muted)] font-medium">
-            <span>Pricing Guardrails</span>
-            <ShieldCheck className="w-4 h-4 text-[var(--muted)]" />
-          </div>
-          <p className="text-2xl sm:text-3xl font-extrabold text-[var(--heading)] font-mono">{itemsWithPricingFloor}</p>
-          <p className="text-[11px] text-[var(--muted)]">Offerings with strict AI floor limits enforced</p>
-        </div>
-      </div>
-
-      {/* Filters & Unified Category Tabs (Option A) */}
-      <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-        {/* Category Tabs */}
-        <div className="flex items-center gap-1.5 p-1 bg-[var(--card-bg)] border border-[var(--border)] rounded-xl overflow-x-auto max-w-full shadow-sm [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden w-full md:w-auto">
-          {CATEGORIES.map(cat => {
-            const Icon = cat.icon
-            const active = selectedCategory === cat.id
-            return (
-              <button
-                key={cat.id}
-                onClick={() => setSelectedCategory(cat.id)}
-                className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap cursor-pointer ${
-                  active
-                    ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-950 font-bold shadow-sm'
-                    : 'text-[var(--body)] hover:text-[var(--heading)] hover:bg-[var(--hover-bg)]'
-                }`}
-              >
-                <Icon className="w-3.5 h-3.5 text-[var(--muted)]" />
-                {cat.label}
-              </button>
-            )
-          })}
-        </div>
-
-        {/* Search & Status Filter */}
-        <div className="flex items-center gap-3 w-full md:w-auto">
-          <div className="relative flex-1 md:w-64">
-            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted)]" />
-            <input
-              type="text"
-              placeholder="Search catalog, rule or code..."
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-3 py-2 bg-[var(--card-bg)] border border-[var(--border)] rounded-xl text-xs text-[var(--heading)] placeholder:text-[var(--muted)] focus:outline-none focus:ring-1 focus:ring-zinc-400 dark:focus:ring-zinc-500 shadow-sm"
-            />
-          </div>
-
-          <select
-            value={statusFilter}
-            onChange={e => setStatusFilter(e.target.value)}
-            className="px-3 py-2 bg-[var(--card-bg)] border border-[var(--border)] rounded-xl text-xs text-[var(--heading)] focus:outline-none focus:ring-1 focus:ring-zinc-400 dark:focus:ring-zinc-500 cursor-pointer shadow-sm"
-          >
-            <option value="all">All Statuses</option>
-            <option value="available">Active / Available</option>
-            <option value="reserved">Reserved / Paused</option>
-            <option value="booked">Booked</option>
-          </select>
-        </div>
-      </div>
-
-      {/* Main Unified Items Grid (Option A: Never looks empty when rules or offerings exist!) */}
-      {loading ? (
-        <div className="py-20 flex flex-col items-center justify-center gap-3 text-[var(--muted)]">
-          <RefreshCw className="w-6 h-6 animate-spin text-[var(--heading)]" />
-          <p className="text-sm font-medium">Loading live operations brain...</p>
-        </div>
-      ) : filteredItems.length === 0 ? (
-        <div className="py-16 text-center rounded-2xl bg-[var(--card-bg)] border border-[var(--border)] p-8 space-y-4 shadow-sm">
-          <div className="w-12 h-12 rounded-2xl bg-[var(--hover-bg)] border border-[var(--border)] text-[var(--heading)] flex items-center justify-center mx-auto">
-            <Brain className="w-6 h-6" />
-          </div>
-          <div className="space-y-1">
-            <h3 className="text-base font-bold text-[var(--heading)]">Operations Brain is Ready</h3>
-            <p className="text-xs text-[var(--muted)] max-w-md mx-auto">
-              Upload your price list, product catalog, or appointment schedule, or simply speak into the mic to automatically build your business brain.
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+        ) : directives.length === 0 ? (
+          <div className="p-8 rounded-2xl bg-[var(--card-bg)] border border-[var(--border)] text-center space-y-3">
+            <Mic className="w-8 h-8 mx-auto text-[var(--muted)] stroke-1" />
+            <div>
+              <p className="text-sm font-bold text-[var(--heading)]">No voice directives recorded</p>
+              <p className="text-xs text-[var(--muted)] max-w-md mx-auto mt-0.5">
+                Speak instructions in Hindi, Hinglish, or English (e.g. "Aaj salon 10 baje khulega" or "Aaj store closed hai") and Trinetra will enforce it during live customer calls.
+              </p>
+            </div>
             <button
               onClick={() => setIsVoiceModalOpen(true)}
-              className="inline-flex items-center gap-2 px-4 py-2.5 bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 font-bold text-xs rounded-xl shadow-sm transition-all cursor-pointer"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 font-bold text-xs rounded-xl cursor-pointer"
             >
-              <Mic className="w-4 h-4" /> Speak to Brain
-            </button>
-            <button
-              onClick={() => setIsDocumentModalOpen(true)}
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[var(--card-bg)] hover:bg-[var(--hover-bg)] border border-[var(--border)] text-[var(--heading)] font-bold text-xs cursor-pointer shadow-sm transition-all"
-            >
-              <Upload className="w-4 h-4 text-[var(--muted)]" /> Upload Documents
-            </button>
-            <button
-              onClick={() => handleOpenAdd(selectedCategory)}
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[var(--card-bg)] hover:bg-[var(--hover-bg)] border border-[var(--border)] text-[var(--heading)] font-bold text-xs shadow-sm transition-all cursor-pointer"
-            >
-              <Plus className="w-4 h-4 text-[var(--muted)]" /> Add Manually
+              <Mic className="w-3.5 h-3.5" /> Speak to Brain
             </button>
           </div>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {filteredItems.map(item => {
-            const meta = item.metadata || {}
-            const isVoiceRule = item.category === 'voice_directive'
-
-            // CARD VARIANT 1: SPOKEN VOICE OVERRIDE CARD (Rendered in-stream)
-            if (isVoiceRule) {
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {directives.map(item => {
+              const meta = item.metadata || {}
               const isActive = item.status === 'available'
+
               return (
                 <div
                   key={item.id}
-                  className="bg-[var(--card-bg)] border-2 border-zinc-900/15 dark:border-white/15 rounded-2xl p-5 shadow-sm transition-all flex flex-col justify-between text-left space-y-3 relative overflow-hidden"
+                  className="p-5 rounded-2xl bg-[var(--card-bg)] border border-[var(--border)] shadow-xs space-y-4 hover:border-zinc-400 dark:hover:border-zinc-700 transition-all"
                 >
-                  <div className="space-y-3">
-                    <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="space-y-1">
                       <div className="flex items-center gap-2">
-                        <div className="p-2 rounded-xl bg-[var(--hover-bg)] border border-[var(--border)]">
-                          <Mic className="w-4 h-4 text-[var(--heading)]" />
-                        </div>
-                        <div>
-                          <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted)]">
-                            Daily Spoken Override
-                          </span>
-                          <h3 className="text-sm font-bold text-[var(--heading)] line-clamp-1">{item.title}</h3>
-                        </div>
+                        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                        <span className="text-[10px] font-mono uppercase tracking-wider text-[var(--muted)]">
+                          {meta.action_type || 'DAILY SPOKEN OVERRIDE'}
+                        </span>
                       </div>
+                      <h3 className="text-sm font-bold text-[var(--heading)]">{item.title}</h3>
                     </div>
 
-                    {meta.voice_transcript && (
-                      <p className="text-xs text-[var(--muted)] italic bg-[var(--hover-bg)]/40 p-2 rounded-xl border border-[var(--border)]">
-                        &quot;{meta.voice_transcript}&quot;
-                      </p>
-                    )}
-
-                    {meta.prompt_override && (
-                      <div className="space-y-1">
-                        <span className="text-[10px] font-semibold text-[var(--muted)] uppercase tracking-wider">
-                          Live Agent Instruction:
-                        </span>
-                        <p className="text-xs text-[var(--heading)] font-mono bg-[var(--hover-bg)] p-2.5 rounded-xl border border-[var(--border)] leading-relaxed">
-                          {meta.prompt_override}
-                        </p>
-                      </div>
-                    )}
+                    <span
+                      className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                        isActive
+                          ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300'
+                          : 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400'
+                      }`}
+                    >
+                      {isActive ? 'Active in Calls' : 'Paused'}
+                    </span>
                   </div>
 
-                  <div className="flex items-center justify-between pt-3 border-t border-[var(--border)]">
-                    <span className="text-[11px] text-[var(--muted)]">
+                  {meta.voice_transcript && (
+                    <div className="p-3 rounded-xl bg-[var(--hover-bg)] text-xs text-[var(--heading)] italic font-mono border border-[var(--border)]">
+                      "{meta.voice_transcript}"
+                    </div>
+                  )}
+
+                  {meta.prompt_override && (
+                    <div className="text-xs space-y-1">
+                      <span className="text-[10px] uppercase font-bold tracking-wider text-[var(--muted)]">
+                        Live Agent Instruction:
+                      </span>
+                      <p className="text-[var(--heading)] bg-[var(--hover-bg)]/50 p-2.5 rounded-xl border border-[var(--border)] leading-relaxed">
+                        {meta.prompt_override}
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="flex items-center justify-between pt-2 border-t border-[var(--border)] text-xs">
+                    <span className="text-[10px] text-[var(--muted)] font-mono">
                       {new Date(item.updated_at).toLocaleDateString()}
                     </span>
                     <div className="flex items-center gap-2">
                       <button
-                        onClick={() => handleAutoPopulateSlots(item.id)}
-                        disabled={generatingSlotsId === item.id}
-                        className="px-2.5 py-1 rounded-lg bg-[var(--hover-bg)] hover:bg-[var(--card-bg)] border border-[var(--border)] text-[var(--heading)] cursor-pointer text-xs font-semibold shadow-xs transition-colors flex items-center gap-1.5"
-                        title="Auto-generate appointment slots from this rule"
-                      >
-                        {generatingSlotsId === item.id ? (
-                          <>
-                            <Loader2 className="w-3 h-3 animate-spin" />
-                            <span>Generating...</span>
-                          </>
-                        ) : (
-                          <>
-                            <Calendar className="w-3 h-3 text-[var(--muted)]" />
-                            <span>Auto-Populate Slots</span>
-                          </>
-                        )}
-                      </button>
-                      <button
-                        onClick={() => handleToggleVoiceDirective(item.id, item.status)}
+                        onClick={() => handleToggleDirective(item.id, item.status)}
                         className="px-3 py-1 rounded-lg bg-[var(--card-bg)] hover:bg-[var(--hover-bg)] border border-[var(--border)] text-[var(--heading)] cursor-pointer text-xs font-semibold shadow-xs transition-colors"
                       >
                         {isActive ? 'Pause' : 'Activate'}
                       </button>
                       <button
-                        onClick={() => handleDelete(item.id, item.title)}
-                        className="p-1.5 rounded-lg border border-[var(--border)] hover:bg-red-500/10 text-zinc-400 hover:text-red-500 transition-colors cursor-pointer"
-                        title="Delete Rule"
+                        onClick={() => handleDeleteDirective(item.id)}
+                        className="p-1.5 rounded-lg hover:bg-red-100 dark:hover:bg-red-950/50 text-[var(--muted)] hover:text-red-500 cursor-pointer transition-colors"
+                        title="Delete Directive"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
@@ -850,213 +538,163 @@ export default function OperationsBrainPage() {
                   </div>
                 </div>
               )
-            }
+            })}
+          </div>
+        )}
+      </div>
 
-            // CARD VARIANT 2: STANDARD BUSINESS CATALOG & APPOINTMENT SLOT CARD
-            return (
-              <div
-                key={item.id}
-                className="bg-[var(--card-bg)] hover:border-[var(--muted)]/40 border border-[var(--border)] rounded-2xl p-5 shadow-sm transition-all space-y-4 flex flex-col justify-between text-left"
-              >
-                <div className="space-y-3">
-                  {/* Header row */}
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-center gap-2.5">
-                      <div className="p-2 rounded-xl bg-[var(--primary-bg)] border border-[var(--border)]">
-                        {getCategoryIcon(item.category)}
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-1.5">
-                          <h3 className="text-sm font-bold text-[var(--heading)] line-clamp-1">{item.title}</h3>
-                          {meta.auto_generated_from_directive_id && (
-                            <span className="text-[9px] font-semibold text-[var(--muted)] bg-[var(--hover-bg)] px-1.5 py-0.5 rounded border border-[var(--border)]">
-                              Auto-Generated
-                            </span>
-                          )}
-                        </div>
-                        {item.identifier_code && (
-                          <span className="text-[10px] font-mono text-[var(--muted)] bg-[var(--hover-bg)] px-1.5 py-0.5 rounded border border-[var(--border)]">
-                            {item.identifier_code}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    {getStatusBadge(item.status)}
-                  </div>
-
-                  {/* Route Information (if applicable) */}
-                  {(item.route_origin || item.route_destination) && (
-                    <div className="flex items-center gap-2 text-xs bg-[var(--hover-bg)] p-2.5 rounded-xl border border-[var(--border)] text-[var(--heading)]">
-                      <span className="font-semibold">{item.route_origin || 'Origin'}</span>
-                      <ArrowRight className="w-3.5 h-3.5 text-[var(--muted)]" />
-                      <span className="font-semibold">{item.route_destination || 'Destination'}</span>
-                    </div>
-                  )}
-
-                  {/* Doctor/Specialist details */}
-                  {meta.specialist_name && (
-                    <div className="text-xs bg-[var(--hover-bg)] p-2 rounded-xl border border-[var(--border)] text-[var(--heading)]">
-                      <span className="text-[var(--muted)]">Practitioner / Specialist:</span>{' '}
-                      <span className="font-semibold">{meta.specialist_name}</span>
-                    </div>
-                  )}
-
-                  {/* Description / Ingestion Note */}
-                  {meta.description && (
-                    <p className="text-xs text-[var(--muted)] line-clamp-2">
-                      {meta.description}
-                    </p>
-                  )}
-
-                  {/* Units & Slot times */}
-                  <div className="flex items-center justify-between text-xs text-[var(--muted)] pt-1">
-                    <span>Available Capacity:</span>
-                    <span className="font-bold text-[var(--heading)] font-mono">{item.available_units} units</span>
-                  </div>
-
-                  {item.booking_slot_start && (
-                    <div className="flex items-center justify-between text-xs text-[var(--muted)]">
-                      <span>Booking Slot:</span>
-                      <span className="text-[var(--heading)] font-mono text-[11px] font-medium">
-                        {new Date(item.booking_slot_start).toLocaleDateString()} {new Date(item.booking_slot_start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Pricing Box */}
-                  {(item.base_price_inr !== null || item.minimum_price_inr !== null) && (
-                    <div className="p-3 rounded-xl bg-[var(--hover-bg)] border border-[var(--border)] space-y-1.5">
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="text-[var(--muted)]">Quoted Price:</span>
-                        <span className="font-bold text-[var(--heading)] font-mono">
-                          {item.base_price_inr !== null ? `₹${item.base_price_inr.toLocaleString('en-IN')}` : 'Variable'}
-                        </span>
-                      </div>
-                      {item.minimum_price_inr !== null && (
-                        <div className="flex items-center justify-between text-xs pt-1 border-t border-[var(--border)]">
-                          <span className="text-[var(--heading)] flex items-center gap-1 font-semibold">
-                            <TrendingDown className="w-3.5 h-3.5 text-[var(--muted)]" /> AI Floor Price:
-                          </span>
-                          <span className="font-bold text-[var(--heading)] font-mono">
-                            ₹{item.minimum_price_inr.toLocaleString('en-IN')}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                {/* Card Footer Actions */}
-                <div className="flex items-center justify-between pt-3 border-t border-[var(--border)]">
-                  <span className="text-[11px] text-[var(--muted)]">
-                    {new Date(item.updated_at).toLocaleDateString()}
-                  </span>
-                  <div className="flex items-center gap-1.5">
-                    <button
-                      onClick={() => handleOpenEdit(item)}
-                      className="p-1.5 rounded-lg bg-[var(--card-bg)] hover:bg-[var(--hover-bg)] border border-[var(--border)] text-[var(--body)] transition-colors cursor-pointer"
-                      title="Edit Item"
-                    >
-                      <Edit2 className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      onClick={() => handleDelete(item.id, item.title)}
-                      className="p-1.5 rounded-lg border border-[var(--border)] hover:bg-red-500/10 text-zinc-400 hover:text-red-500 transition-colors cursor-pointer"
-                      title="Delete Item"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )
-          })}
+      {/* Section 2: Ingested Knowledge Documents & Sources */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <FileText className="w-4 h-4 text-[var(--heading)]" />
+            <h2 className="text-sm font-bold uppercase tracking-wider text-[var(--heading)]">
+              Ingested Business Knowledge Documents ({documents.length})
+            </h2>
+          </div>
+          <button
+            onClick={() => setIsDocumentModalOpen(true)}
+            className="text-xs font-semibold text-[var(--muted)] hover:text-[var(--heading)] cursor-pointer"
+          >
+            + Upload Document
+          </button>
         </div>
-      )}
 
-      {/* MODAL 1: SPEAK & BUILD THE BRAIN */}
-      {isVoiceModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="relative w-full max-w-xl bg-[var(--card-bg)] border border-[var(--border)] rounded-3xl p-6 sm:p-7 shadow-2xl space-y-5 text-left animate-in fade-in zoom-in-95">
-            <div className="flex items-center justify-between border-b border-[var(--border)] pb-4">
-              <div className="flex items-center gap-2.5">
-                <div className="p-2 rounded-xl bg-[var(--hover-bg)] border border-[var(--border)] text-[var(--heading)]">
-                  <Mic className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="text-base font-bold text-[var(--heading)]">Speak & Build the Brain</h3>
-                  <p className="text-xs text-[var(--muted)]">Speak your business rules in Hindi, Hinglish, or English</p>
-                </div>
-              </div>
-              <button
-                onClick={() => {
-                  stopVoiceRecording()
-                  setIsVoiceModalOpen(false)
-                }}
-                className="p-2 rounded-full hover:bg-[var(--hover-bg)] text-[var(--muted)] hover:text-[var(--heading)] cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Mic Status */}
-            <div className="flex flex-col items-center justify-center py-4 space-y-3">
-              <button
-                onClick={isRecording ? stopVoiceRecording : startVoiceRecording}
-                className={`w-20 h-20 rounded-full flex items-center justify-center transition-all shadow-md cursor-pointer ${
-                  isRecording
-                    ? 'bg-zinc-950 text-white ring-4 ring-zinc-500/20 animate-pulse'
-                    : 'bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 hover:scale-105'
-                }`}
-              >
-                {isRecording ? <MicOff className="w-8 h-8" /> : <Mic className="w-8 h-8" />}
-              </button>
-              <p className="text-xs font-semibold text-[var(--heading)]">
-                {isRecording ? 'Listening... Tap to stop' : 'Tap to start speaking'}
+        {documents.length === 0 ? (
+          <div className="p-8 rounded-2xl bg-[var(--card-bg)] border border-[var(--border)] text-center space-y-3">
+            <FileSpreadsheet className="w-8 h-8 mx-auto text-[var(--muted)] stroke-1" />
+            <div>
+              <p className="text-sm font-bold text-[var(--heading)]">No documents uploaded yet</p>
+              <p className="text-xs text-[var(--muted)] max-w-md mx-auto mt-0.5">
+                Upload your rate card, service price PDF, product specifications, or company FAQs. The AI brain extracts the exact facts for caller queries.
               </p>
             </div>
+            <button
+              onClick={() => setIsDocumentModalOpen(true)}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--card-bg)] hover:bg-[var(--hover-bg)] border border-[var(--border)] text-[var(--heading)] font-bold text-xs cursor-pointer"
+            >
+              <Upload className="w-3.5 h-3.5" /> Upload File
+            </button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {documents.map(doc => (
+              <div
+                key={doc.id}
+                className="p-4 rounded-2xl bg-[var(--card-bg)] border border-[var(--border)] shadow-xs space-y-3"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-center gap-2.5">
+                    <div className="p-2 rounded-xl bg-[var(--hover-bg)] border border-[var(--border)] text-[var(--heading)]">
+                      <FileText className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-bold text-[var(--heading)] line-clamp-1">{doc.name}</h4>
+                      <p className="text-[10px] text-[var(--muted)] font-mono">
+                        {(doc.size / 1024).toFixed(1)} KB • {new Date(doc.uploadedAt).toLocaleDateString()}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => handleDeleteDocument(doc.id)}
+                    className="p-1 rounded text-[var(--muted)] hover:text-red-500 cursor-pointer"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
 
-            {/* Transcript Textarea */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-[var(--heading)]">
-                Spoken Operational Instruction:
-              </label>
-              <textarea
-                rows={3}
-                value={voiceTranscript}
-                onChange={e => setVoiceTranscript(e.target.value)}
-                placeholder='e.g., "Aaj mai 10 baje se 4 bje tak salon open rakhunga to us time ke according he appointments lena"'
-                className="w-full p-3 rounded-xl bg-[var(--hover-bg)] border border-[var(--border)] text-xs text-[var(--heading)] focus:outline-none focus:ring-1 focus:ring-zinc-400 dark:focus:ring-zinc-500"
-              />
+                <div className="p-2.5 rounded-xl bg-[var(--hover-bg)] text-[11px] text-[var(--muted)] leading-relaxed">
+                  {doc.extractedSummary || 'Extracted knowledge indexed for in-call agent queries.'}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Speak to Brain Modal */}
+      {isVoiceModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl w-full max-w-xl p-6 shadow-xl space-y-5 animate-in fade-in zoom-in-95">
+            <div className="flex items-center justify-between">
+              <h2 className="text-base font-bold text-[var(--heading)] flex items-center gap-2">
+                <Mic className="w-5 h-5 text-[var(--heading)]" />
+                <span>Speak Operational Directive to Brain</span>
+              </h2>
+              <button
+                onClick={() => {
+                  stopRecording()
+                  setIsVoiceModalOpen(false)
+                }}
+                className="p-1.5 rounded-lg text-[var(--muted)] hover:text-[var(--heading)] hover:bg-[var(--hover-bg)] cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
             </div>
 
-            {/* Quick Scenario Chips */}
-            <div className="space-y-2">
-              <span className="text-[11px] font-semibold text-[var(--muted)] uppercase tracking-wider">
-                Quick Example Directives:
+            <p className="text-xs text-[var(--muted)]">
+              Speak naturally in Hindi, Hinglish, or English. Trinetra's AI extracts your exact directive and injects it live into your AI voice agent answering calls.
+            </p>
+
+            {/* Quick Prompt Presets */}
+            <div className="space-y-1.5">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted)]">
+                Try Examples:
               </span>
-              <div className="flex flex-wrap gap-2">
-                {QUICK_VOICE_PROMPTS.map((prompt, idx) => (
+              <div className="flex flex-wrap gap-1.5">
+                {QUICK_VOICE_PROMPTS.map((qp, idx) => (
                   <button
                     key={idx}
-                    onClick={() => setVoiceTranscript(prompt.text)}
-                    className="px-2.5 py-1 rounded-lg text-[11px] font-medium bg-[var(--hover-bg)] hover:bg-[var(--card-bg)] text-[var(--heading)] border border-[var(--border)] transition-colors cursor-pointer"
+                    type="button"
+                    onClick={() => setVoiceTranscript(qp.text)}
+                    className="px-2.5 py-1 rounded-lg text-[11px] font-medium bg-[var(--hover-bg)] hover:bg-[var(--card-bg)] text-[var(--heading)] border border-[var(--border)] transition-colors cursor-pointer text-left"
                   >
-                    {prompt.label}
+                    {qp.label}
                   </button>
                 ))}
               </div>
             </div>
 
-            {/* Action Buttons */}
-            <div className="flex items-center justify-end gap-3 pt-3 border-t border-[var(--border)]">
+            {/* Live Recording Area */}
+            <div className="p-4 rounded-xl bg-[var(--hover-bg)] border border-[var(--border)] flex flex-col items-center justify-center gap-3">
+              <button
+                type="button"
+                onClick={isRecording ? stopRecording : startRecording}
+                className={`w-16 h-16 rounded-full flex items-center justify-center transition-all cursor-pointer shadow-md ${
+                  isRecording
+                    ? 'bg-red-500 text-white animate-pulse scale-105'
+                    : 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-950 hover:scale-105'
+                }`}
+              >
+                {isRecording ? <MicOff className="w-6 h-6" /> : <Mic className="w-6 h-6" />}
+              </button>
+              <span className="text-xs font-semibold text-[var(--heading)]">
+                {isRecording ? 'Listening... Speak your directive' : 'Click to start speaking'}
+              </span>
+            </div>
+
+            {/* Editable Transcript */}
+            <div className="space-y-1">
+              <label className="text-[11px] font-bold uppercase text-[var(--muted)] tracking-wider">
+                Recognized Spoken Transcript:
+              </label>
+              <textarea
+                rows={3}
+                value={voiceTranscript}
+                onChange={e => setVoiceTranscript(e.target.value)}
+                placeholder="Or type here: e.g. Aaj salon 10 baje khulega, uske baad hi appointment book karna..."
+                className="w-full p-3 bg-[var(--hover-bg)] border border-[var(--border)] rounded-xl text-xs text-[var(--heading)] placeholder:text-[var(--muted)] focus:outline-none focus:ring-1 focus:ring-zinc-400"
+              />
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-[var(--border)]">
               <button
                 type="button"
                 onClick={() => {
-                  stopVoiceRecording()
+                  stopRecording()
                   setIsVoiceModalOpen(false)
                 }}
-                className="px-4 py-2.5 rounded-xl border border-[var(--border)] text-xs font-bold text-[var(--body)] hover:bg-[var(--hover-bg)] cursor-pointer"
+                className="px-4 py-2 rounded-xl bg-[var(--hover-bg)] text-[var(--muted)] hover:text-[var(--heading)] font-semibold text-xs cursor-pointer"
               >
                 Cancel
               </button>
@@ -1064,15 +702,17 @@ export default function OperationsBrainPage() {
                 type="button"
                 onClick={handleApplyVoiceDirective}
                 disabled={isProcessingVoice || !voiceTranscript.trim()}
-                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 text-xs font-bold transition-all shadow-sm active:scale-[0.98] cursor-pointer disabled:opacity-50"
+                className="inline-flex items-center gap-2 px-5 py-2.5 bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 font-bold text-xs rounded-xl shadow-xs transition-all cursor-pointer active:scale-95 disabled:opacity-50"
               >
                 {isProcessingVoice ? (
                   <>
-                    <Loader2 className="w-4 h-4 animate-spin" /> Processing & Auto-Populating Brain...
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span>Processing with AI...</span>
                   </>
                 ) : (
                   <>
-                    <Zap className="w-4 h-4" /> Apply to Brain & Live Agents
+                    <Check className="w-3.5 h-3.5" />
+                    <span>Apply Directive</span>
                   </>
                 )}
               </button>
@@ -1081,105 +721,84 @@ export default function OperationsBrainPage() {
         </div>
       )}
 
-      {/* MODAL 2: MULTI-DOCUMENT INGESTION */}
+      {/* Upload Documents Modal */}
       {isDocumentModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="relative w-full max-w-xl bg-[var(--card-bg)] border border-[var(--border)] rounded-3xl p-6 sm:p-7 shadow-2xl space-y-5 text-left animate-in fade-in zoom-in-95">
-            <div className="flex items-center justify-between border-b border-[var(--border)] pb-4">
-              <div className="flex items-center gap-2.5">
-                <div className="p-2 rounded-xl bg-[var(--hover-bg)] border border-[var(--border)] text-[var(--heading)]">
-                  <Upload className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="text-base font-bold text-[var(--heading)]">Upload Documents to Brain</h3>
-                  <p className="text-xs text-[var(--muted)]">Upload PDFs, Excel sheets, Word docs, or CSVs</p>
-                </div>
-              </div>
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl w-full max-w-lg p-6 shadow-xl space-y-5 animate-in fade-in zoom-in-95">
+            <div className="flex items-center justify-between">
+              <h2 className="text-base font-bold text-[var(--heading)] flex items-center gap-2">
+                <Upload className="w-5 h-5 text-[var(--heading)]" />
+                <span>Upload Documents to Brain</span>
+              </h2>
               <button
                 onClick={() => setIsDocumentModalOpen(false)}
-                className="p-2 rounded-full hover:bg-[var(--hover-bg)] text-[var(--muted)] hover:text-[var(--heading)] cursor-pointer"
+                className="p-1.5 rounded-lg text-[var(--muted)] hover:text-[var(--heading)] hover:bg-[var(--hover-bg)] cursor-pointer"
               >
-                <X className="w-5 h-5" />
+                <X className="w-4 h-4" />
               </button>
             </div>
 
-            {/* Dropzone */}
             <div
               onClick={() => fileInputRef.current?.click()}
-              className="border-2 border-dashed border-[var(--border)] hover:border-zinc-400 dark:hover:border-zinc-600 rounded-2xl p-6 sm:p-8 text-center cursor-pointer transition-colors bg-[var(--hover-bg)]/40 hover:bg-[var(--hover-bg)]"
+              className="p-8 border-2 border-dashed border-[var(--border)] hover:border-zinc-400 dark:hover:border-zinc-600 rounded-2xl text-center cursor-pointer transition-colors space-y-2 bg-[var(--hover-bg)]/40"
             >
+              <Upload className="w-8 h-8 mx-auto text-[var(--muted)] stroke-1" />
+              <div className="text-xs font-bold text-[var(--heading)]">
+                Click to select PDF, Excel, Word, or Text files
+              </div>
+              <p className="text-[11px] text-[var(--muted)]">Supports .pdf, .xlsx, .csv, .docx, .txt</p>
               <input
                 ref={fileInputRef}
                 type="file"
                 multiple
                 accept=".pdf,.xlsx,.xls,.csv,.docx,.txt"
-                className="hidden"
                 onChange={handleFilesSelected}
+                className="hidden"
               />
-              <div className="w-12 h-12 rounded-2xl bg-[var(--hover-bg)] text-[var(--heading)] flex items-center justify-center mx-auto mb-3">
-                <FileSpreadsheet className="w-6 h-6 text-[var(--muted)]" />
-              </div>
-              <p className="text-sm font-semibold text-[var(--heading)]">
-                Click or drop business files here
-              </p>
-              <p className="text-xs text-[var(--muted)] mt-1">
-                Upload price lists, product catalogs, service menus, or appointment slots (.xlsx, .csv, .pdf, .docx)
-              </p>
             </div>
 
-            {/* Uploaded Files Queue */}
             {uploadedFiles.length > 0 && (
-              <div className="space-y-2">
-                <span className="text-xs font-semibold text-[var(--heading)]">
+              <div className="space-y-1.5 max-h-36 overflow-y-auto">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted)]">
                   Selected Files ({uploadedFiles.length}):
                 </span>
-                <div className="max-h-40 overflow-y-auto space-y-1.5 pr-1">
-                  {uploadedFiles.map((file, idx) => (
-                    <div
-                      key={idx}
-                      className="flex items-center justify-between p-2.5 rounded-xl bg-[var(--hover-bg)] border border-[var(--border)] text-xs text-[var(--heading)]"
-                    >
-                      <div className="flex items-center gap-2 truncate">
-                        <FileText className="w-4 h-4 text-[var(--muted)] shrink-0" />
-                        <span className="truncate font-medium">{file.name}</span>
-                        <span className="text-[10px] text-[var(--muted)] font-mono shrink-0">
-                          ({(file.size / 1024).toFixed(1)} KB)
-                        </span>
-                      </div>
-                      <button
-                        onClick={() => handleRemoveFile(idx)}
-                        className="p-1 rounded border border-[var(--border)] hover:bg-red-500/10 text-zinc-400 hover:text-red-500 cursor-pointer"
-                      >
-                        <X className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
+                {uploadedFiles.map((f, i) => (
+                  <div
+                    key={i}
+                    className="p-2 rounded-lg bg-[var(--hover-bg)] border border-[var(--border)] text-xs flex items-center justify-between"
+                  >
+                    <span className="font-medium text-[var(--heading)] truncate">{f.name}</span>
+                    <span className="text-[10px] font-mono text-[var(--muted)]">
+                      {(f.size / 1024).toFixed(1)} KB
+                    </span>
+                  </div>
+                ))}
               </div>
             )}
 
-            {/* Action Buttons */}
-            <div className="flex items-center justify-end gap-3 pt-3 border-t border-[var(--border)]">
+            <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-[var(--border)]">
               <button
                 type="button"
                 onClick={() => setIsDocumentModalOpen(false)}
-                className="px-4 py-2.5 rounded-xl border border-[var(--border)] text-xs font-bold text-[var(--body)] hover:bg-[var(--hover-bg)] cursor-pointer"
+                className="px-4 py-2 rounded-xl bg-[var(--hover-bg)] text-[var(--muted)] hover:text-[var(--heading)] font-semibold text-xs cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 type="button"
-                onClick={handleIngestDocuments}
+                onClick={handleUploadAndProcessDocs}
                 disabled={isIngestingDocs || uploadedFiles.length === 0}
-                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 text-xs font-bold transition-all shadow-sm active:scale-[0.98] cursor-pointer disabled:opacity-50"
+                className="inline-flex items-center gap-2 px-5 py-2.5 bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 font-bold text-xs rounded-xl shadow-xs transition-all cursor-pointer active:scale-95 disabled:opacity-50"
               >
                 {isIngestingDocs ? (
                   <>
-                    <Loader2 className="w-4 h-4 animate-spin" /> Ingesting & Building Brain...
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span>Extracting Knowledge...</span>
                   </>
                 ) : (
                   <>
-                    <Check className="w-4 h-4" /> Extract & Build Brain
+                    <Check className="w-3.5 h-3.5" />
+                    <span>Extract & Save to Brain</span>
                   </>
                 )}
               </button>
@@ -1188,203 +807,63 @@ export default function OperationsBrainPage() {
         </div>
       )}
 
-      {/* MODAL 3: MANUAL ADD / EDIT OPERATION ITEM */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm overflow-y-auto">
-          <div className="relative w-full max-w-2xl bg-[var(--card-bg)] border border-[var(--border)] rounded-3xl p-6 sm:p-7 shadow-2xl space-y-5 text-left my-8 animate-in fade-in zoom-in-95">
-            <div className="flex items-center justify-between border-b border-[var(--border)] pb-4">
-              <div className="flex items-center gap-2.5">
-                <div className="p-2 rounded-xl bg-[var(--hover-bg)] border border-[var(--border)] text-[var(--heading)]">
-                  <Boxes className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="text-base font-bold text-[var(--heading)]">
-                    {editingItem ? 'Edit Brain Item' : 'Add Item to Operations Brain'}
-                  </h3>
-                  <p className="text-xs text-[var(--muted)]">Configure real-time capacity and negotiation limits</p>
-                </div>
-              </div>
+      {/* Add Custom Rule Modal */}
+      {isRuleModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl w-full max-w-lg p-6 shadow-xl space-y-5 animate-in fade-in zoom-in-95">
+            <div className="flex items-center justify-between">
+              <h2 className="text-base font-bold text-[var(--heading)] flex items-center gap-2">
+                <Plus className="w-5 h-5 text-[var(--heading)]" />
+                <span>Add Operating Rule / Guardrail</span>
+              </h2>
               <button
-                onClick={() => setIsModalOpen(false)}
-                className="p-2 rounded-full hover:bg-[var(--hover-bg)] text-[var(--muted)] hover:text-[var(--heading)] cursor-pointer"
+                onClick={() => setIsRuleModalOpen(false)}
+                className="p-1.5 rounded-lg text-[var(--muted)] hover:text-[var(--heading)] hover:bg-[var(--hover-bg)] cursor-pointer"
               >
-                <X className="w-5 h-5" />
+                <X className="w-4 h-4" />
               </button>
             </div>
 
-            <form onSubmit={handleSave} className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="sm:col-span-2 space-y-1">
-                  <label className="text-xs font-semibold text-[var(--heading)]">Item / Service Name *</label>
-                  <input
-                    type="text"
-                    required
-                    value={formData.title}
-                    onChange={e => setFormData({ ...formData, title: e.target.value })}
-                    placeholder="e.g. Hair Spa & Styling, Full Body Health Checkup, Mumbai-Delhi Express"
-                    className="w-full px-3 py-2 bg-[var(--hover-bg)] border border-[var(--border)] rounded-xl text-xs text-[var(--heading)] focus:outline-none focus:ring-1 focus:ring-zinc-400 dark:focus:ring-zinc-500"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-[var(--heading)]">Category</label>
-                  <select
-                    value={formData.category}
-                    onChange={e => setFormData({ ...formData, category: e.target.value as any })}
-                    className="w-full px-3 py-2 bg-[var(--hover-bg)] border border-[var(--border)] rounded-xl text-xs text-[var(--heading)] focus:outline-none focus:ring-1 focus:ring-zinc-400 dark:focus:ring-zinc-500 cursor-pointer"
-                  >
-                    <option value="general">Universal / Other Business</option>
-                    <option value="appointment_slots">Appointments & Slots</option>
-                    <option value="inventory">Products & Inventory</option>
-                    <option value="logistics">Routes & Transport</option>
-                    <option value="containers">Fleet & Assets</option>
-                  </select>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-[var(--heading)]">Identifier Code / SKU</label>
-                  <input
-                    type="text"
-                    value={formData.identifier_code}
-                    onChange={e => setFormData({ ...formData, identifier_code: e.target.value })}
-                    placeholder="e.g. SRV-01, SKU-101"
-                    className="w-full px-3 py-2 bg-[var(--hover-bg)] border border-[var(--border)] rounded-xl text-xs text-[var(--heading)] focus:outline-none focus:ring-1 focus:ring-zinc-400 dark:focus:ring-zinc-500"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-[var(--heading)]">Available Units / Capacity</label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={formData.available_units}
-                    onChange={e => setFormData({ ...formData, available_units: Number(e.target.value) || 0 })}
-                    className="w-full px-3 py-2 bg-[var(--hover-bg)] border border-[var(--border)] rounded-xl text-xs text-[var(--heading)] focus:outline-none focus:ring-1 focus:ring-zinc-400 dark:focus:ring-zinc-500"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-[var(--heading)]">Status</label>
-                  <select
-                    value={formData.status}
-                    onChange={e => setFormData({ ...formData, status: e.target.value as any })}
-                    className="w-full px-3 py-2 bg-[var(--hover-bg)] border border-[var(--border)] rounded-xl text-xs text-[var(--heading)] focus:outline-none focus:ring-1 focus:ring-zinc-400 dark:focus:ring-zinc-500 cursor-pointer"
-                  >
-                    <option value="available">Available</option>
-                    <option value="reserved">Reserved / Paused</option>
-                    <option value="booked">Booked</option>
-                  </select>
-                </div>
-
-                {/* Quoted and Floor Pricing */}
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-[var(--heading)]">Quoted Base Price (₹)</label>
-                  <input
-                    type="number"
-                    placeholder="e.g. 1500"
-                    value={formData.base_price_inr}
-                    onChange={e => setFormData({ ...formData, base_price_inr: e.target.value })}
-                    className="w-full px-3 py-2 bg-[var(--hover-bg)] border border-[var(--border)] rounded-xl text-xs text-[var(--heading)] focus:outline-none focus:ring-1 focus:ring-zinc-400 dark:focus:ring-zinc-500"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-[var(--heading)]">Strict AI Floor Price (₹)</label>
-                  <input
-                    type="number"
-                    placeholder="e.g. 1200 (Agent never quotes lower)"
-                    value={formData.minimum_price_inr}
-                    onChange={e => setFormData({ ...formData, minimum_price_inr: e.target.value })}
-                    className="w-full px-3 py-2 bg-[var(--hover-bg)] border border-[var(--border)] rounded-xl text-xs text-[var(--heading)] focus:outline-none focus:ring-1 focus:ring-zinc-400 dark:focus:ring-zinc-500"
-                  />
-                </div>
-
-                {/* Slot start/end (Appointments) */}
-                {formData.category === 'appointment_slots' && (
-                  <>
-                    <div className="space-y-1">
-                      <label className="text-xs font-semibold text-[var(--heading)]">Slot Start</label>
-                      <input
-                        type="datetime-local"
-                        value={formData.booking_slot_start}
-                        onChange={e => setFormData({ ...formData, booking_slot_start: e.target.value })}
-                        className="w-full px-3 py-2 bg-[var(--hover-bg)] border border-[var(--border)] rounded-xl text-xs text-[var(--heading)] focus:outline-none focus:ring-1 focus:ring-zinc-400 dark:focus:ring-zinc-500"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-xs font-semibold text-[var(--heading)]">Slot End</label>
-                      <input
-                        type="datetime-local"
-                        value={formData.booking_slot_end}
-                        onChange={e => setFormData({ ...formData, booking_slot_end: e.target.value })}
-                        className="w-full px-3 py-2 bg-[var(--hover-bg)] border border-[var(--border)] rounded-xl text-xs text-[var(--heading)] focus:outline-none focus:ring-1 focus:ring-zinc-400 dark:focus:ring-zinc-500"
-                      />
-                    </div>
-                  </>
-                )}
-
-                {/* Logistics Origin / Destination */}
-                {formData.category === 'logistics' && (
-                  <>
-                    <div className="space-y-1">
-                      <label className="text-xs font-semibold text-[var(--heading)]">Route Origin</label>
-                      <input
-                        type="text"
-                        placeholder="e.g. Delhi, Mumbai"
-                        value={formData.route_origin}
-                        onChange={e => setFormData({ ...formData, route_origin: e.target.value })}
-                        className="w-full px-3 py-2 bg-[var(--hover-bg)] border border-[var(--border)] rounded-xl text-xs text-[var(--heading)] focus:outline-none focus:ring-1 focus:ring-zinc-400 dark:focus:ring-zinc-500"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-xs font-semibold text-[var(--heading)]">Route Destination</label>
-                      <input
-                        type="text"
-                        placeholder="e.g. Bangalore, Pune"
-                        value={formData.route_destination}
-                        onChange={e => setFormData({ ...formData, route_destination: e.target.value })}
-                        className="w-full px-3 py-2 bg-[var(--hover-bg)] border border-[var(--border)] rounded-xl text-xs text-[var(--heading)] focus:outline-none focus:ring-1 focus:ring-zinc-400 dark:focus:ring-zinc-500"
-                      />
-                    </div>
-                  </>
-                )}
-              </div>
-
-              {/* Description */}
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-[var(--heading)]">Description / Instructions</label>
-                <textarea
-                  rows={2}
-                  value={formData.description}
-                  onChange={e => setFormData({ ...formData, description: e.target.value })}
-                  placeholder="Notes for voice agents when talking to customers about this offering"
-                  className="w-full px-3 py-2 bg-[var(--hover-bg)] border border-[var(--border)] rounded-xl text-xs text-[var(--heading)] focus:outline-none focus:ring-1 focus:ring-zinc-400 dark:focus:ring-zinc-500"
+            <form onSubmit={handleCreateRule} className="space-y-4 text-xs">
+              <div>
+                <label className="block font-semibold text-[var(--heading)] mb-1">Rule Title *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Mandatory Appointment Confirmation or Pricing Floor Rule"
+                  value={ruleTitle}
+                  onChange={e => setRuleTitle(e.target.value)}
+                  className="w-full px-3 py-2 bg-[var(--hover-bg)] border border-[var(--border)] rounded-xl text-[var(--heading)] focus:outline-none focus:ring-1 focus:ring-zinc-400"
                 />
               </div>
 
-              {/* Action Buttons */}
-              <div className="flex items-center justify-end gap-3 pt-3 border-t border-[var(--border)]">
+              <div>
+                <label className="block font-semibold text-[var(--heading)] mb-1">
+                  In-Call Agent Instruction (Prompt Override) *
+                </label>
+                <textarea
+                  rows={4}
+                  required
+                  placeholder="e.g. Always ask for customer's phone number before confirming appointment. Never offer discounts exceeding 15% on salon services."
+                  value={rulePrompt}
+                  onChange={e => setRulePrompt(e.target.value)}
+                  className="w-full px-3 py-2 bg-[var(--hover-bg)] border border-[var(--border)] rounded-xl text-[var(--heading)] focus:outline-none focus:ring-1 focus:ring-zinc-400 leading-relaxed"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-[var(--border)]">
                 <button
                   type="button"
-                  onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2.5 rounded-xl border border-[var(--border)] text-xs font-bold text-[var(--body)] hover:bg-[var(--hover-bg)] cursor-pointer"
+                  onClick={() => setIsRuleModalOpen(false)}
+                  className="px-4 py-2 rounded-xl bg-[var(--hover-bg)] text-[var(--muted)] hover:text-[var(--heading)] font-semibold cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  disabled={saving}
-                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 text-xs font-bold transition-all shadow-sm active:scale-[0.98] cursor-pointer disabled:opacity-50"
+                  className="px-5 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 font-bold shadow-xs cursor-pointer active:scale-95 transition-all"
                 >
-                  {saving ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" /> Saving...
-                    </>
-                  ) : (
-                    <>
-                      <Check className="w-4 h-4" /> Save Item
-                    </>
-                  )}
+                  Save Operating Rule
                 </button>
               </div>
             </form>

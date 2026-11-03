@@ -7,7 +7,7 @@ import {
   LayoutDashboard, Bot, Users, Phone, Megaphone,
   BarChart3, IndianRupee, CreditCard, Settings, HelpCircle, Pencil,
   ChevronLeft, ChevronRight, Calendar, Target, PhoneCall, ShieldCheck,
-  CalendarClock, Boxes
+  CalendarClock, Boxes, Brain, Package
 } from 'lucide-react'
 
 import { useAuth } from '@/src/components/providers/AuthProvider'
@@ -25,7 +25,8 @@ const topNavItems = [
   { label: 'Leads', href: '/dashboard/leads', icon: Target },
   { label: 'Appointments', href: '/dashboard/appointments', icon: Calendar },
   { label: 'Callbacks', href: '/dashboard/callbacks', icon: CalendarClock },
-  { label: 'Operations Brain', href: '/dashboard/operations', icon: Boxes },
+  { label: 'Operations Brain', href: '/dashboard/operations', icon: Brain },
+  { label: 'Inventory & Pricing', href: '/dashboard/inventory', icon: Package },
   { label: 'Customers', href: '/dashboard/customers', icon: Users },
   { label: 'Campaigns', href: '/dashboard/campaigns', icon: Megaphone },
   { label: 'Phone Numbers', href: '/dashboard/phone-numbers', icon: Phone },

@@ -319,6 +319,57 @@ export async function GET(request: Request) {
   }
 }
 
+export async function POST(request: Request) {
+  try {
+    const { authenticated, profile, error, supabase } = await authenticateRequest();
+    if (!authenticated || !profile) {
+      return NextResponse.json({ error: error || "Unauthorized" }, { status: 401 });
+    }
+
+    const body = await request.json();
+    const { contact_name, contact_phone, scheduled_at, duration_minutes, notes, meeting_type } = body;
+
+    if (!contact_name || !scheduled_at) {
+      return NextResponse.json({ error: "Contact name and scheduled time are required" }, { status: 400 });
+    }
+
+    const payload: Record<string, any> = {
+      user_id: profile.id,
+      contact_name: contact_name.trim(),
+      contact_phone: contact_phone?.trim() || "Manual Entry",
+      scheduled_at: new Date(scheduled_at).toISOString(),
+      duration_minutes: Number(duration_minutes) || 30,
+      status: "scheduled",
+      booked_via: "manual_sheet",
+      meeting_type: meeting_type || "Appointment",
+      notes: notes?.trim() || "Booked from Live Schedule Sheet"
+    };
+
+    if (profile.organization_id) {
+      payload.organization_id = profile.organization_id;
+    }
+
+    const { data: newAppt, error: insertError } = await supabase
+      .from("appointments")
+      .insert(payload)
+      .select()
+      .single();
+
+    if (insertError) {
+      console.error("[API] Error inserting appointment:", insertError);
+      return NextResponse.json({ success: false, error: "Failed to create appointment" }, { status: 500 });
+    }
+
+    return NextResponse.json({
+      success: true,
+      data: newAppt
+    });
+  } catch (err: any) {
+    console.error("[API] Error in appointments POST:", err);
+    return NextResponse.json({ success: false, error: "Internal server error" }, { status: 500 });
+  }
+}
+
 export async function PATCH(request: Request) {
   try {
     const { authenticated, profile, error, supabase } = await authenticateRequest();

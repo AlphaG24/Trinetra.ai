@@ -1752,6 +1752,12 @@ def create_appointment_tools(
                 new_status = "booked" if new_units == 0 else "available"
 
                 meta = item.get("metadata") or {}
+                # Dynamic inventory & sales tracking
+                curr_sold = float(meta.get("sold_units") or 0)
+                meta["sold_units"] = curr_sold + units_to_reserve
+                if "initial_units" not in meta:
+                    meta["initial_units"] = curr_units + curr_sold
+
                 bookings = meta.get("bookings") or []
                 bookings.append({
                     "customer_name": customer_name,

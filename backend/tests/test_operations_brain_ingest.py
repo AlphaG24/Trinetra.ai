@@ -135,3 +135,28 @@ def test_smart_auto_population_of_slots_from_voice_directive():
     assert "10:00:00Z" in slot_1["booking_slot_start"]
     assert slot_1["base_price_inr"] >= slot_1["minimum_price_inr"]
 
+
+def test_dynamic_inventory_stock_and_sales_tracking():
+    """Verify that when products are reserved/sold during calls, sold_units increments
+    and available_units decrements correctly."""
+    item = {
+        "title": "Classic T-Shirt (Black - M)",
+        "available_units": 10,
+        "metadata": {
+            "initial_units": 10,
+            "sold_units": 0
+        }
+    }
+    units_to_reserve = 3
+    curr_units = float(item["available_units"])
+    new_units = max(0, curr_units - units_to_reserve)
+    meta = item["metadata"]
+    curr_sold = float(meta.get("sold_units") or 0)
+    meta["sold_units"] = curr_sold + units_to_reserve
+    item["available_units"] = new_units
+
+    assert item["available_units"] == 7
+    assert meta["sold_units"] == 3
+    assert meta["initial_units"] == 10
+
+

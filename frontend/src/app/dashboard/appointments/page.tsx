@@ -1,12 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { 
   Calendar, Clock, Phone, User, Mail, Search, RefreshCw, 
   CheckCircle2, XCircle, Copy, Check, CalendarClock,
-  ExternalLink, CalendarDays, Bot, AlertCircle, ArrowRight
+  ExternalLink, CalendarDays, Bot, AlertCircle, ArrowRight,
+  FileSpreadsheet, Download, Plus, ChevronLeft, ChevronRight,
+  Coffee, UserPlus, X, Trash2
 } from "lucide-react";
-import { format } from "date-fns";
+import { format, addDays, subDays } from "date-fns";
 import { toast } from "sonner";
 
 interface Appointment {
@@ -23,89 +25,21 @@ interface Appointment {
   meeting_link?: string;
   booked_via?: string;
   created_at: string;
+  voice_call_id?: string;
   agent?: {
     id: string;
     name: string;
   };
 }
 
-// 1. Manually Animated Folio Calendar Agenda for "Total Bookings"
-function AnimatedAppointmentFolioIcon() {
-  return (
-    <svg className="w-6 h-6 overflow-visible" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-      {/* Calendar Folio Binder Body */}
-      <rect x="3" y="4" width="18" height="17" rx="3.5" strokeWidth="1.8" />
-      <line x1="3" y1="9" x2="21" y2="9" strokeWidth="1.8" />
-      {/* Binder Rings */}
-      <line x1="8" y1="2" x2="8" y2="5" strokeWidth="2.2" strokeLinecap="round" />
-      <line x1="16" y1="2" x2="16" y2="5" strokeWidth="2.2" strokeLinecap="round" />
-      {/* Sequenced Appointment Slots */}
-      <circle cx="8" cy="13" r="1.4" fill="currentColor" className="anim-cal-dot-1" stroke="none" />
-      <circle cx="12" cy="13" r="1.4" fill="currentColor" className="anim-cal-dot-2" stroke="none" />
-      <circle cx="16" cy="13" r="1.4" fill="currentColor" className="anim-cal-dot-3" stroke="none" />
-      {/* Active Booking Reservation Pill */}
-      <rect x="7" y="16.5" width="10" height="2" rx="1" fill="currentColor" stroke="none" opacity="0.75" />
-    </svg>
-  );
-}
-
-// 2. Manually Animated Precision Swiss Chronometer for "Upcoming / Scheduled"
-function AnimatedPrecisionChronoIcon() {
-  return (
-    <svg className="w-6 h-6 overflow-visible" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-      {/* Outer Chronometer Bezel */}
-      <circle cx="12" cy="12" r="9.5" strokeWidth="1.8" />
-      <circle cx="12" cy="12" r="7.2" strokeWidth="0.9" strokeDasharray="1.5 1.5" opacity="0.5" />
-      {/* Cardinal Precision Indices (12, 3, 6, 9) */}
-      <line x1="12" y1="3.5" x2="12" y2="5" strokeWidth="1.8" strokeLinecap="round" />
-      <line x1="19" y1="12" x2="20.5" y2="12" strokeWidth="1.8" strokeLinecap="round" />
-      <line x1="12" y1="19" x2="12" y2="20.5" strokeWidth="1.8" strokeLinecap="round" />
-      <line x1="3.5" y1="12" x2="5" y2="12" strokeWidth="1.8" strokeLinecap="round" />
-      {/* Hour Hand (Set to 10 o'clock) */}
-      <line x1="12" y1="12" x2="9.5" y2="8" strokeWidth="2" strokeLinecap="round" />
-      {/* Continuous Minute Hand Mechanical Sweep */}
-      <line x1="12" y1="12" x2="16" y2="12" strokeWidth="1.8" strokeLinecap="round" className="anim-chrono-minute" />
-      {/* Central Chrono Jewel Pin */}
-      <circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none" />
-    </svg>
-  );
-}
-
-// 3. Manually Animated Today Dispatch Timeline for "Today's Schedule"
-function AnimatedLiveDispatchTimelineIcon() {
-  return (
-    <svg className="w-6 h-6 overflow-visible" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-      {/* Timeline Board Silhouette */}
-      <rect x="3" y="3.5" width="18" height="17" rx="3.5" strokeWidth="1.8" />
-      <line x1="3" y1="8" x2="21" y2="8" strokeWidth="1.8" />
-      {/* Top Binder Tabs */}
-      <line x1="8" y1="1.8" x2="8" y2="4.2" strokeWidth="2" strokeLinecap="round" />
-      <line x1="16" y1="1.8" x2="16" y2="4.2" strokeWidth="2" strokeLinecap="round" />
-      {/* Time-Track Schedule Axis */}
-      <line x1="6" y1="12.5" x2="18" y2="12.5" strokeWidth="1.4" strokeDasharray="2 1.5" opacity="0.5" />
-      {/* Gliding Active Playhead Beacon */}
-      <circle cx="11" cy="12.5" r="2.2" fill="currentColor" stroke="none" className="anim-timeline-playhead" />
-      {/* Today Confirmed Slot */}
-      <rect x="6.5" y="16" width="7" height="2" rx="1" fill="currentColor" stroke="none" opacity="0.8" />
-      <circle cx="16.5" cy="17" r="1.2" fill="currentColor" stroke="none" opacity="0.5" />
-    </svg>
-  );
-}
-
-// 4. Manually Animated Verified Session Fulfillment Seal for "Completed Sessions"
-function AnimatedVerifiedSessionSealIcon() {
-  return (
-    <svg className="w-6 h-6 overflow-visible" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-      {/* Concentric Verified Seal Rings */}
-      <circle cx="12" cy="12" r="9.5" strokeWidth="1.8" />
-      <circle cx="12" cy="12" r="7.2" strokeWidth="0.9" strokeDasharray="2.5 1.5" opacity="0.4" />
-      {/* Precision Verified Checkmark */}
-      <path d="M 7.5 12.2 L 10.5 15.2 L 16.5 8.8" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
-      {/* Radiating Accomplishment Micro-Sparks */}
-      <circle cx="18" cy="6" r="1" fill="currentColor" stroke="none" className="anim-spark-radiance" />
-      <circle cx="6" cy="18" r="1" fill="currentColor" stroke="none" className="anim-spark-radiance" style={{ animationDelay: '0.7s' }} />
-    </svg>
-  );
+interface ScheduleSlot {
+  slotKey: string
+  startTime: string
+  endTime: string
+  label: string
+  isBooked: boolean
+  isBreak: boolean
+  appointment?: Appointment
 }
 
 export default function AppointmentsPage() {
@@ -119,7 +53,18 @@ export default function AppointmentsPage() {
     today_count: 0
   });
 
-  // Filters
+  // View mode: 'sheet' (Excel schedule grid) | 'directory' (bookings list)
+  const [viewMode, setViewMode] = useState<'sheet' | 'directory'>('sheet');
+  const [scheduleDate, setScheduleDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
+
+  // Active Voice Directive (Operating Hours)
+  const [voiceDirectiveTitle, setVoiceDirectiveTitle] = useState<string | null>(null);
+  const [startHour, setStartHour] = useState<number>(10); // default 10:00 AM
+
+  // Local breaks (e.g. Lunch break)
+  const [breakSlots, setBreakSlots] = useState<Record<string, boolean>>({});
+
+  // Filters for Directory View
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -130,16 +75,43 @@ export default function AppointmentsPage() {
   const [rejectTarget, setRejectTarget] = useState<Appointment | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
 
+  // Manual Quick Book Modal
+  const [quickBookSlot, setQuickBookSlot] = useState<ScheduleSlot | null>(null);
+  const [manualClientName, setManualClientName] = useState("");
+  const [manualClientPhone, setManualClientPhone] = useState("");
+  const [manualService, setManualService] = useState("");
+
   // Form states for reschedule
   const [newDate, setNewDate] = useState("");
   const [newTime, setNewTime] = useState("10:00");
   const [rescheduleReason, setRescheduleReason] = useState("");
   const [rejectReason, setRejectReason] = useState("");
 
+  // Fetch Voice Directive to dynamically configure opening hours
+  const fetchDirective = async () => {
+    try {
+      const res = await fetch('/api/business-catalog?category=voice_directive');
+      const json = await res.json();
+      if (json.success && json.data?.items?.length > 0) {
+        const active = json.data.items.find((i: any) => i.status === 'available') || json.data.items[0];
+        setVoiceDirectiveTitle(active.title);
+        // If transcript or mutations specify an hour (e.g. 10 AM)
+        const mutStart = active.metadata?.mutations?.slot_start;
+        if (mutStart && mutStart.includes('10')) {
+          setStartHour(10);
+        } else if (mutStart && mutStart.includes('11')) {
+          setStartHour(11);
+        } else if (mutStart && mutStart.includes('12')) {
+          setStartHour(12);
+        }
+      }
+    } catch (_) {}
+  };
+
   const fetchAppointments = async (isManualRefresh = false) => {
     try {
       if (isManualRefresh) setRefreshing(true);
-      else setLoading(true);
+      else if (appointments.length === 0) setLoading(true);
 
       const params = new URLSearchParams();
       if (statusFilter !== "all") params.append("status", statusFilter);
@@ -153,12 +125,9 @@ export default function AppointmentsPage() {
         if (json.data.stats) {
           setStats(json.data.stats);
         }
-      } else {
-        toast.error(json.error || "Failed to load appointments");
       }
     } catch (err: any) {
       console.error("Error fetching appointments:", err);
-      toast.error("Could not connect to appointments service");
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -167,7 +136,13 @@ export default function AppointmentsPage() {
 
   useEffect(() => {
     fetchAppointments();
-  }, [statusFilter]);
+    fetchDirective();
+    // Live in-call auto-polling: Polls every 6s so calls booking appointments update the XL sheet in real time!
+    const interval = setInterval(() => {
+      fetchAppointments(false);
+    }, 6000);
+    return () => clearInterval(interval);
+  }, [statusFilter, searchQuery]);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -181,7 +156,138 @@ export default function AppointmentsPage() {
     setTimeout(() => setCopiedId(null), 2000);
   };
 
-  // 1. Accept Appointment
+  // Generate dynamic 30-min schedule slots based on startHour & operating window
+  const scheduleSlots = useMemo(() => {
+    const slots: ScheduleSlot[] = [];
+    const endHour = 19; // 07:00 PM closing
+    const start = Math.max(8, Math.min(startHour, 16));
+
+    for (let h = start; h < endHour; h++) {
+      for (const m of [0, 30]) {
+        const startHStr = h.toString().padStart(2, '0');
+        const startMStr = m.toString().padStart(2, '0');
+        const nextM = m === 0 ? 30 : 0;
+        const nextH = m === 0 ? h : h + 1;
+        const endHStr = nextH.toString().padStart(2, '0');
+        const endMStr = nextM.toString().padStart(2, '0');
+
+        const startTime = `${startHStr}:${startMStr}`;
+        const endTime = `${endHStr}:${endMStr}`;
+
+        const format12 = (hour: number, min: number) => {
+          const ampm = hour >= 12 ? 'PM' : 'AM';
+          const h12 = hour % 12 || 12;
+          return `${h12.toString().padStart(2, '0')}:${min.toString().padStart(2, '0')} ${ampm}`;
+        };
+
+        const label = `${format12(h, m)} - ${format12(nextH, nextM)}`;
+        const slotKey = `${scheduleDate}_${startTime}`;
+
+        // Find matching appointment for this slot
+        const apt = appointments.find(a => {
+          if (a.status === 'cancelled' || a.status === 'rejected') return false;
+          try {
+            const aptDate = format(new Date(a.scheduled_at), 'yyyy-MM-dd');
+            if (aptDate !== scheduleDate) return false;
+            const aptTime = format(new Date(a.scheduled_at), 'HH:mm');
+            // Match within 30-min window
+            return aptTime >= startTime && aptTime < endTime;
+          } catch {
+            return false;
+          }
+        });
+
+        slots.push({
+          slotKey,
+          startTime,
+          endTime,
+          label,
+          isBooked: !!apt,
+          isBreak: !!breakSlots[slotKey],
+          appointment: apt
+        });
+      }
+    }
+    return slots;
+  }, [scheduleDate, startHour, appointments, breakSlots]);
+
+  // Quick Manual Booking Submit
+  const handleQuickBookSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!quickBookSlot || !manualClientName.trim()) {
+      toast.error("Client name is required");
+      return;
+    }
+
+    try {
+      setActionLoading(true);
+      const scheduledDateTime = `${scheduleDate}T${quickBookSlot.startTime}:00`;
+
+      const res = await fetch("/api/appointments", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contact_name: manualClientName.trim(),
+          contact_phone: manualClientPhone.trim() || "+91 99999 00000",
+          scheduled_at: scheduledDateTime,
+          duration_minutes: 30,
+          meeting_type: manualService.trim() || "In-Person Consultation",
+          notes: `Booked via Live Schedule Sheet. ${manualService.trim()}`
+        })
+      });
+
+      const json = await res.json();
+      if (json.success) {
+        toast.success(`Slot booked for ${manualClientName}!`);
+        setQuickBookSlot(null);
+        setManualClientName("");
+        setManualClientPhone("");
+        setManualService("");
+        fetchAppointments(true);
+      } else {
+        toast.error(json.error || "Failed to book slot");
+      }
+    } catch {
+      toast.error("Network error booking slot");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Toggle Break Slot
+  const toggleBreakSlot = (slotKey: string) => {
+    setBreakSlots(prev => ({
+      ...prev,
+      [slotKey]: !prev[slotKey]
+    }));
+    toast.success(breakSlots[slotKey] ? "Break cleared, slot available" : "Slot marked as Break / Blocked");
+  };
+
+  // Export Schedule to CSV
+  const handleExportScheduleCSV = () => {
+    const headers = ["Time Slot", "Status", "Client Name", "Contact Phone", "Service / Reason", "Booked Via", "Scheduled Date"];
+    const rows = scheduleSlots.map(s => [
+      `"${s.label}"`,
+      s.isBreak ? "Break / Blocked" : s.isBooked ? "Booked" : "Available",
+      `"${s.appointment?.contact_name || ''}"`,
+      `"${s.appointment?.contact_phone || ''}"`,
+      `"${s.appointment?.notes || s.appointment?.meeting_type || ''}"`,
+      `"${s.appointment?.booked_via || (s.isBooked ? 'AI Voice Call' : '')}"`,
+      `"${scheduleDate}"`
+    ]);
+
+    const csvContent = "data:text/csv;charset=utf-8," + [headers.join(","), ...rows.map(r => r.join(","))].join("\n");
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `schedule_sheet_${scheduleDate}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast.success("Schedule spreadsheet exported");
+  };
+
+  // Accept Appointment
   const handleAccept = async (apt: Appointment) => {
     try {
       setActionLoading(true);
@@ -196,19 +302,19 @@ export default function AppointmentsPage() {
       });
       const data = await res.json();
       if (data.success) {
-        toast.success(`Appointment accepted! Confirmation notification sent via WhatsApp & Email.`);
+        toast.success(`Appointment accepted! Customer notified.`);
         setAppointments(prev => prev.map(a => a.id === apt.id ? { ...a, status: "confirmed" } : a));
       } else {
         toast.error(data.error || "Failed to accept appointment");
       }
-    } catch (e) {
+    } catch {
       toast.error("Error accepting appointment");
     } finally {
       setActionLoading(false);
     }
   };
 
-  // 2. Reject Appointment
+  // Reject Appointment
   const handleRejectSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!rejectTarget) return;
@@ -227,21 +333,21 @@ export default function AppointmentsPage() {
       });
       const data = await res.json();
       if (data.success) {
-        toast.success(`Appointment rejected. Rejection notice delivered to customer.`);
+        toast.success(`Appointment declined.`);
         setAppointments(prev => prev.map(a => a.id === rejectTarget.id ? { ...a, status: "cancelled" } : a));
         setRejectTarget(null);
         setRejectReason("");
       } else {
-        toast.error(data.error || "Failed to reject appointment");
+        toast.error(data.error || "Failed to decline appointment");
       }
-    } catch (e) {
-      toast.error("Error rejecting appointment");
+    } catch {
+      toast.error("Error declining appointment");
     } finally {
       setActionLoading(false);
     }
   };
 
-  // 3. Reschedule Appointment
+  // Reschedule Appointment
   const handleRescheduleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!rescheduleTarget || !newDate || !newTime) {
@@ -251,8 +357,7 @@ export default function AppointmentsPage() {
 
     try {
       setActionLoading(true);
-      const combinedDateTime = new Date(`${newDate}T${newTime}:00`).toISOString();
-
+      const combinedDateTime = `${newDate}T${newTime}:00`;
       const res = await fetch("/api/appointments", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -266,15 +371,15 @@ export default function AppointmentsPage() {
       });
       const data = await res.json();
       if (data.success) {
-        toast.success(`Appointment rescheduled! Updated notice sent via WhatsApp & Email.`);
+        toast.success(`Appointment rescheduled!`);
         setAppointments(prev => prev.map(a => a.id === rescheduleTarget.id ? { ...a, status: "rescheduled", scheduled_at: combinedDateTime } : a));
         setRescheduleTarget(null);
         setNewDate("");
         setRescheduleReason("");
       } else {
-        toast.error(data.error || "Failed to reschedule appointment");
+        toast.error(data.error || "Failed to reschedule");
       }
-    } catch (e) {
+    } catch {
       toast.error("Error rescheduling appointment");
     } finally {
       setActionLoading(false);
@@ -282,363 +387,473 @@ export default function AppointmentsPage() {
   };
 
   return (
-    <div className="space-y-8 p-4 md:p-8 max-w-7xl mx-auto text-zinc-900 dark:text-zinc-100">
+    <div className="space-y-6 p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto">
       {/* Top Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-zinc-200 dark:border-white/10 pb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-3">
-            <div className="p-3 rounded-2xl bg-violet-500/10 border border-violet-500/20 text-violet-600 dark:text-violet-400">
-              <Calendar className="w-6 h-6" />
-            </div>
-            <div>
-              <h1 className="text-2xl md:text-3xl font-bold font-heading tracking-tight text-zinc-900 dark:text-white flex items-center gap-2">
-                Appointments & Consultations
-                <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-violet-500/10 text-violet-700 dark:text-violet-300 border border-violet-500/20">
-                  Live Operations
-                </span>
-              </h1>
-              <p className="text-sm text-zinc-600 dark:text-zinc-400 mt-1">
-                Manage, accept, reject, or reschedule bookings confirmed by your AI voice agents
-              </p>
-            </div>
-          </div>
+          <h1 className="text-2xl font-black text-[var(--heading)] tracking-tight flex items-center gap-2">
+            <Calendar className="w-6 h-6 text-[var(--heading)]" />
+            <span>Appointments & Live Schedule</span>
+          </h1>
+          <p className="text-xs text-[var(--muted)] mt-1 max-w-2xl">
+            Real-time schedule spreadsheet and customer booking directory. As incoming AI calls confirm appointments, slots update live.
+          </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2.5 flex-wrap">
           <button
             onClick={() => fetchAppointments(true)}
             disabled={refreshing}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-[#120E22] hover:bg-zinc-50 dark:hover:bg-white/5 text-xs font-bold uppercase tracking-wider text-zinc-800 dark:text-zinc-200 transition-all cursor-pointer shadow-xs disabled:opacity-50"
+            className="p-2.5 rounded-xl bg-[var(--card-bg)] hover:bg-[var(--hover-bg)] border border-[var(--border)] text-[var(--heading)] transition-all cursor-pointer shadow-xs disabled:opacity-50"
+            title="Refresh Bookings"
           >
-            <RefreshCw className={`w-3.5 h-3.5 text-violet-600 dark:text-violet-400 ${refreshing ? "animate-spin" : ""}`} />
-            Refresh
+            <RefreshCw className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`} />
           </button>
+
+          {viewMode === 'sheet' && (
+            <button
+              onClick={handleExportScheduleCSV}
+              className="inline-flex items-center gap-1.5 px-3 py-2.5 rounded-xl bg-[var(--card-bg)] hover:bg-[var(--hover-bg)] border border-[var(--border)] text-[var(--heading)] font-bold text-xs cursor-pointer shadow-xs transition-colors"
+            >
+              <Download className="w-4 h-4 text-[var(--muted)]" />
+              <span>Export CSV</span>
+            </button>
+          )}
         </div>
       </div>
 
       {/* KPI Stats Overview */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div className="bg-white dark:bg-[#120E22] border border-zinc-200 dark:border-white/10 rounded-2xl p-6 shadow-xs flex items-center gap-4 hover:border-violet-500/30 transition-all group">
-          <div className="text-violet-600 dark:text-violet-400 flex items-center justify-center flex-shrink-0">
-            <AnimatedAppointmentFolioIcon />
-          </div>
-          <div>
-            <div className="text-2xl font-bold font-mono text-zinc-900 dark:text-white">{stats.total_count}</div>
-            <div className="text-xs font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Total Bookings</div>
-          </div>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="p-4 rounded-2xl bg-[var(--card-bg)] border border-[var(--border)] shadow-xs space-y-1">
+          <div className="text-xs font-semibold text-[var(--muted)]">Total Bookings</div>
+          <div className="text-2xl font-black text-[var(--heading)]">{stats.total_count}</div>
+          <p className="text-[11px] text-[var(--muted)]">All registered calls</p>
         </div>
 
-        <div className="bg-white dark:bg-[#120E22] border border-zinc-200 dark:border-white/10 rounded-2xl p-6 shadow-xs flex items-center gap-4 hover:border-amber-500/30 transition-all group">
-          <div className="text-amber-600 dark:text-amber-400 flex items-center justify-center flex-shrink-0">
-            <AnimatedPrecisionChronoIcon />
-          </div>
-          <div>
-            <div className="text-2xl font-bold font-mono text-amber-600 dark:text-amber-400">{stats.scheduled_count}</div>
-            <div className="text-xs font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Upcoming / Scheduled</div>
-          </div>
+        <div className="p-4 rounded-2xl bg-[var(--card-bg)] border border-[var(--border)] shadow-xs space-y-1">
+          <div className="text-xs font-semibold text-[var(--muted)]">Upcoming / Scheduled</div>
+          <div className="text-2xl font-black text-amber-600 dark:text-amber-400">{stats.scheduled_count}</div>
+          <p className="text-[11px] text-[var(--muted)]">Pending sessions</p>
         </div>
 
-        <div className="bg-white dark:bg-[#120E22] border border-zinc-200 dark:border-white/10 rounded-2xl p-6 shadow-xs flex items-center gap-4 hover:border-emerald-500/30 transition-all group">
-          <div className="text-emerald-600 dark:text-emerald-400 flex items-center justify-center flex-shrink-0">
-            <AnimatedLiveDispatchTimelineIcon />
-          </div>
-          <div>
-            <div className="text-2xl font-bold font-mono text-emerald-600 dark:text-emerald-400">{stats.today_count}</div>
-            <div className="text-xs font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Today's Schedule</div>
-          </div>
+        <div className="p-4 rounded-2xl bg-[var(--card-bg)] border border-[var(--border)] shadow-xs space-y-1">
+          <div className="text-xs font-semibold text-[var(--muted)]">Today's Schedule</div>
+          <div className="text-2xl font-black text-emerald-600 dark:text-emerald-400">{stats.today_count}</div>
+          <p className="text-[11px] text-[var(--muted)]">Scheduled for today</p>
         </div>
 
-        <div className="bg-white dark:bg-[#120E22] border border-zinc-200 dark:border-white/10 rounded-2xl p-6 shadow-xs flex items-center gap-4 hover:border-violet-500/30 transition-all group">
-          <div className="text-violet-600 dark:text-violet-400 flex items-center justify-center flex-shrink-0">
-            <AnimatedVerifiedSessionSealIcon />
-          </div>
-          <div>
-            <div className="text-2xl font-bold font-mono text-zinc-900 dark:text-white">{stats.completed_count}</div>
-            <div className="text-xs font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Completed Sessions</div>
-          </div>
+        <div className="p-4 rounded-2xl bg-[var(--card-bg)] border border-[var(--border)] shadow-xs space-y-1">
+          <div className="text-xs font-semibold text-[var(--muted)]">Completed</div>
+          <div className="text-2xl font-black text-[var(--heading)]">{stats.completed_count}</div>
+          <p className="text-[11px] text-[var(--muted)]">Fulfilled sessions</p>
         </div>
       </div>
 
-      {/* Directory Filter / Search Toolbar */}
-      <div className="bg-white dark:bg-[#120E22] border border-zinc-200 dark:border-white/10 rounded-2xl p-4 md:p-6 shadow-xs space-y-4">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <form onSubmit={handleSearchSubmit} className="relative flex-grow max-w-md">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400 dark:text-zinc-500" />
-            <input 
-              type="text" 
-              placeholder="Search by client name, phone number, service..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-zinc-50 dark:bg-[#1C1530] border border-zinc-200 dark:border-white/10 rounded-xl pl-11 pr-4 py-2.5 text-xs text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-violet-500/30"
-            />
-          </form>
+      {/* View Switcher Tabs */}
+      <div className="flex items-center gap-2 border-b border-[var(--border)] pb-2">
+        <button
+          onClick={() => setViewMode('sheet')}
+          className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+            viewMode === 'sheet'
+              ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-950 shadow-xs'
+              : 'bg-[var(--card-bg)] text-[var(--muted)] hover:text-[var(--heading)] hover:bg-[var(--hover-bg)]'
+          }`}
+        >
+          <FileSpreadsheet className="w-4 h-4" />
+          <span>Live Schedule Sheet (Excel Grid)</span>
+        </button>
 
-          <div className="flex items-center gap-2 flex-wrap">
-            {["all", "scheduled", "confirmed", "rescheduled", "completed", "cancelled"].map((st) => (
+        <button
+          onClick={() => setViewMode('directory')}
+          className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+            viewMode === 'directory'
+              ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-950 shadow-xs'
+              : 'bg-[var(--card-bg)] text-[var(--muted)] hover:text-[var(--heading)] hover:bg-[var(--hover-bg)]'
+          }`}
+        >
+          <Calendar className="w-4 h-4" />
+          <span>Bookings Directory ({appointments.length})</span>
+        </button>
+      </div>
+
+      {/* VIEW 1: LIVE SCHEDULE SPREADSHEET (EXCEL GRID) */}
+      {viewMode === 'sheet' && (
+        <div className="space-y-4">
+          {/* Schedule Date Navigator & Operating Hours Banner */}
+          <div className="p-4 rounded-2xl bg-[var(--card-bg)] border border-[var(--border)] flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-xs">
+            <div className="flex items-center gap-2">
               <button
-                key={st}
-                onClick={() => setStatusFilter(st)}
-                className={`px-3 py-1.5 rounded-lg capitalize text-xs font-bold tracking-wider transition-all cursor-pointer ${
-                  statusFilter === st
-                    ? "bg-zinc-900 text-white dark:bg-white dark:text-zinc-950 shadow-xs"
-                    : "bg-zinc-100 dark:bg-white/5 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-200 dark:hover:bg-white/10"
-                }`}
-              >
-                {st}
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Appointments List / Table */}
-      <div className="bg-white dark:bg-[#120E22] border border-zinc-200 dark:border-white/10 rounded-2xl shadow-xs overflow-hidden">
-        {loading ? (
-          <div className="py-20 flex flex-col items-center justify-center gap-3">
-            <div className="w-8 h-8 border-2 border-violet-500 border-t-transparent rounded-full animate-spin" />
-            <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400">Loading bookings from database...</p>
-          </div>
-        ) : appointments.length === 0 ? (
-          <div className="py-20 flex flex-col items-center justify-center text-center p-6">
-            <div className="w-14 h-14 rounded-2xl bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 flex items-center justify-center mb-4">
-              <Calendar className="w-7 h-7 text-zinc-400 dark:text-zinc-500" />
-            </div>
-            <h3 className="text-base font-bold text-zinc-900 dark:text-white mb-1">No appointments found</h3>
-            <p className="text-xs text-zinc-500 dark:text-zinc-400 max-w-sm">
-              {searchQuery || statusFilter !== "all" 
-                ? "No appointments match your filters. Try clearing your search."
-                : "When your AI Voice Agents confirm client bookings, they will appear here."}
-            </p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm border-collapse">
-              <thead>
-                <tr className="border-b border-zinc-200 dark:border-white/10 text-xs font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 bg-zinc-50 dark:bg-white/5">
-                  <th className="py-3.5 px-6">Client / Contact</th>
-                  <th className="py-3.5 px-6">Scheduled Date & Time</th>
-                  <th className="py-3.5 px-6">Meeting Service</th>
-                  <th className="py-3.5 px-6">Agent</th>
-                  <th className="py-3.5 px-6">Status</th>
-                  <th className="py-3.5 px-6 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-zinc-200/80 dark:divide-white/5">
-                {appointments.map((apt) => {
-                  let formattedDate = "Pending Date";
+                onClick={() => {
                   try {
-                    formattedDate = format(new Date(apt.scheduled_at), "EEE, MMM d, yyyy • h:mm a");
-                  } catch (e) {
-                    formattedDate = apt.scheduled_at;
-                  }
-
-                  const isPendingOrScheduled = apt.status === "scheduled" || apt.status === "confirmed" || apt.status === "pending" || apt.status === "rescheduled";
-
-                  return (
-                    <tr key={apt.id} className="hover:bg-zinc-50/80 dark:hover:bg-white/5 transition-colors group">
-                      <td className="py-4 px-6">
-                        <div className="flex items-center gap-3">
-                          <div className="w-9 h-9 rounded-xl bg-violet-500/10 border border-violet-500/20 flex items-center justify-center text-violet-600 dark:text-violet-400 font-bold text-sm">
-                            {(apt.contact_name || "C")[0].toUpperCase()}
-                          </div>
-                          <div>
-                            <div className="font-semibold text-zinc-900 dark:text-white group-hover:text-violet-600 dark:group-hover:text-violet-400 transition-colors">
-                              {apt.contact_name || "Unknown Prospect"}
-                            </div>
-                            <div className="flex items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
-                              <span>{apt.contact_phone || "No phone"}</span>
-                              {apt.contact_phone && (
-                                <button
-                                  onClick={() => handleCopy(apt.contact_phone, apt.id)}
-                                  className="hover:text-zinc-900 dark:hover:text-white transition-colors cursor-pointer"
-                                  title="Copy Phone"
-                                >
-                                  {copiedId === apt.id ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
-                                </button>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      </td>
-
-                      <td className="py-4 px-6">
-                        <div className="text-zinc-900 dark:text-white font-medium flex items-center gap-2 text-xs">
-                          <Clock className="w-3.5 h-3.5 text-violet-600 dark:text-violet-400" />
-                          {formattedDate} (IST)
-                        </div>
-                        <div className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-0.5">
-                          {apt.duration_minutes ? `${apt.duration_minutes} Mins Duration` : "30 Mins Consultation"}
-                        </div>
-                      </td>
-
-                      <td className="py-4 px-6">
-                        <div className="text-zinc-900 dark:text-white font-medium text-xs">{apt.meeting_type || "AI Demo Consultation"}</div>
-                        {apt.notes && (
-                          <div className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-0.5 truncate max-w-[220px]" title={apt.notes}>
-                            {apt.notes}
-                          </div>
-                        )}
-                      </td>
-
-                      <td className="py-4 px-6">
-                        <span className="inline-flex items-center gap-1.5 text-xs text-zinc-800 dark:text-zinc-200 bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 px-2.5 py-1 rounded-lg">
-                          <Bot className="w-3.5 h-3.5 text-violet-600 dark:text-violet-400" />
-                          {apt.agent?.name || apt.booked_via || "Arika"}
-                        </span>
-                      </td>
-
-                      <td className="py-4 px-6">
-                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border ${
-                          apt.status === "confirmed" || apt.status === "scheduled"
-                            ? "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/25"
-                            : apt.status === "completed"
-                            ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/25"
-                            : apt.status === "rescheduled"
-                            ? "bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/25"
-                            : "bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-500/25"
-                        }`}>
-                          <span className="w-1.5 h-1.5 rounded-full bg-current" />
-                          <span className="capitalize">{apt.status}</span>
-                        </span>
-                      </td>
-
-                      <td className="py-4 px-6 text-right">
-                        <div className="flex items-center justify-end gap-1.5 flex-wrap">
-                          {isPendingOrScheduled && (
-                            <>
-                              {apt.status !== "confirmed" && (
-                                <button
-                                  onClick={() => handleAccept(apt)}
-                                  disabled={actionLoading}
-                                  className="px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/25 text-xs font-bold hover:bg-emerald-500/20 transition-all cursor-pointer disabled:opacity-50"
-                                  title="Accept and notify user via WhatsApp & Email"
-                                >
-                                  Accept
-                                </button>
-                              )}
-
-                              <button
-                                onClick={() => {
-                                  setRescheduleTarget(apt);
-                                  try {
-                                    const d = new Date(apt.scheduled_at);
-                                    setNewDate(d.toISOString().split("T")[0]);
-                                    setNewTime(d.toTimeString().slice(0, 5));
-                                  } catch {
-                                    setNewDate("");
-                                    setNewTime("10:00");
-                                  }
-                                }}
-                                disabled={actionLoading}
-                                className="px-2.5 py-1 rounded-lg bg-zinc-900/10 text-zinc-900 dark:bg-white/10 dark:text-white border border-zinc-300 dark:border-zinc-700 text-xs font-bold hover:bg-zinc-900/20 dark:hover:bg-white/20 transition-all cursor-pointer disabled:opacity-50"
-                                title="Reschedule date/time and notify user"
-                              >
-                                Reschedule
-                              </button>
-
-                              <button
-                                onClick={() => setRejectTarget(apt)}
-                                disabled={actionLoading}
-                                className="px-2.5 py-1 rounded-lg bg-rose-500/10 text-rose-700 dark:text-rose-400 border border-rose-500/25 text-xs font-bold hover:bg-rose-500/20 transition-all cursor-pointer disabled:opacity-50"
-                                title="Reject and send cancellation notice"
-                              >
-                                Reject
-                              </button>
-                            </>
-                          )}
-
-                          <button
-                            onClick={() => setSelectedAppointment(apt)}
-                            className="p-1.5 rounded-lg border border-zinc-200 dark:border-white/10 hover:bg-zinc-100 dark:hover:bg-white/5 text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-all cursor-pointer"
-                            title="View Full Details"
-                          >
-                            <ExternalLink className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-
-      {/* 1. Reschedule Modal */}
-      {rescheduleTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">
-          <div className="bg-white dark:bg-[#120E22] border border-zinc-200 dark:border-white/10 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-5 text-zinc-900 dark:text-zinc-100">
-            <div className="flex items-center justify-between border-b border-zinc-200 dark:border-white/10 pb-3">
-              <div className="flex items-center gap-2.5">
-                <div className="p-2 rounded-xl bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white border border-zinc-200 dark:border-white/10">
-                  <CalendarClock className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="font-bold text-zinc-900 dark:text-white text-base">Reschedule Appointment</h3>
-                  <p className="text-xs text-zinc-500 dark:text-zinc-400">Notify {rescheduleTarget.contact_name} on WhatsApp & Email</p>
-                </div>
-              </div>
-              <button
-                onClick={() => setRescheduleTarget(null)}
-                className="p-1 rounded-lg text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/5 transition-colors cursor-pointer"
+                    const prev = subDays(new Date(scheduleDate), 1);
+                    setScheduleDate(format(prev, 'yyyy-MM-dd'));
+                  } catch (_) {}
+                }}
+                className="p-1.5 rounded-lg border border-[var(--border)] hover:bg-[var(--hover-bg)] text-[var(--heading)] cursor-pointer"
+                title="Previous Day"
               >
-                <XCircle className="w-5 h-5" />
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+
+              <input
+                type="date"
+                value={scheduleDate}
+                onChange={e => setScheduleDate(e.target.value)}
+                className="px-3 py-1.5 bg-[var(--hover-bg)] border border-[var(--border)] rounded-xl text-xs font-bold text-[var(--heading)] focus:outline-none focus:ring-1 focus:ring-zinc-400 cursor-pointer"
+              />
+
+              <button
+                onClick={() => {
+                  try {
+                    const next = addDays(new Date(scheduleDate), 1);
+                    setScheduleDate(format(next, 'yyyy-MM-dd'));
+                  } catch (_) {}
+                }}
+                className="p-1.5 rounded-lg border border-[var(--border)] hover:bg-[var(--hover-bg)] text-[var(--heading)] cursor-pointer"
+                title="Next Day"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+
+              <button
+                onClick={() => setScheduleDate(format(new Date(), 'yyyy-MM-dd'))}
+                className="px-2.5 py-1.5 rounded-lg bg-[var(--hover-bg)] text-[11px] font-semibold text-[var(--heading)] border border-[var(--border)] cursor-pointer hover:bg-[var(--card-bg)] ml-1"
+              >
+                Today
               </button>
             </div>
 
-            <form onSubmit={handleRescheduleSubmit} className="space-y-4 text-xs">
+            {/* Operating Directive Hint */}
+            {voiceDirectiveTitle && (
+              <div className="flex items-center gap-2 text-xs text-[var(--muted)] bg-[var(--hover-bg)] px-3 py-1.5 rounded-xl border border-[var(--border)]">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="font-semibold text-[var(--heading)]">Directive:</span>
+                <span className="truncate max-w-sm">{voiceDirectiveTitle}</span>
+              </div>
+            )}
+          </div>
+
+          {/* Excel Spreadsheet Table */}
+          <div className="rounded-2xl border border-[var(--border)] bg-[var(--card-bg)] overflow-hidden shadow-xs">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr className="border-b border-[var(--border)] bg-[var(--hover-bg)] text-[var(--muted)] uppercase font-mono text-[10px] tracking-wider select-none">
+                    <th className="py-3 px-4 font-bold w-48">Time Slot</th>
+                    <th className="py-3 px-3 font-bold text-center w-28">Status</th>
+                    <th className="py-3 px-4 font-bold">Client / Customer</th>
+                    <th className="py-3 px-3 font-bold">Phone Number</th>
+                    <th className="py-3 px-4 font-bold">Service / Purpose</th>
+                    <th className="py-3 px-3 font-bold text-center">Booked Via</th>
+                    <th className="py-3 px-4 font-bold text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[var(--border)]">
+                  {scheduleSlots.map(slot => {
+                    const isBooked = slot.isBooked;
+                    const isBreak = slot.isBreak;
+                    const apt = slot.appointment;
+
+                    return (
+                      <tr
+                        key={slot.slotKey}
+                        className={`hover:bg-[var(--hover-bg)]/60 transition-colors ${
+                          isBooked ? 'bg-emerald-50/20 dark:bg-emerald-950/10' : isBreak ? 'bg-zinc-100/40 dark:bg-zinc-900/40' : ''
+                        }`}
+                      >
+                        {/* Time Slot */}
+                        <td className="py-3 px-4 font-mono font-bold text-[var(--heading)] flex items-center gap-2">
+                          <Clock className="w-3.5 h-3.5 text-[var(--muted)]" />
+                          <span>{slot.label}</span>
+                        </td>
+
+                        {/* Status */}
+                        <td className="py-3 px-3 text-center">
+                          <span
+                            className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                              isBreak
+                                ? 'bg-zinc-200 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300'
+                                : isBooked
+                                ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800'
+                                : 'bg-[var(--hover-bg)] text-[var(--muted)] border border-[var(--border)]'
+                            }`}
+                          >
+                            {isBreak ? 'Break' : isBooked ? 'Booked' : 'Available'}
+                          </span>
+                        </td>
+
+                        {/* Client Name */}
+                        <td className="py-3 px-4 font-semibold text-[var(--heading)]">
+                          {isBooked ? (
+                            <div className="flex items-center gap-1.5">
+                              <span>{apt?.contact_name || 'Caller'}</span>
+                            </div>
+                          ) : isBreak ? (
+                            <span className="italic text-[var(--muted)]">Blocked for Break / Maintenance</span>
+                          ) : (
+                            <span className="text-[var(--muted)]">-</span>
+                          )}
+                        </td>
+
+                        {/* Phone Number */}
+                        <td className="py-3 px-3 font-mono text-[11px] text-[var(--muted)]">
+                          {isBooked && apt?.contact_phone ? (
+                            <div className="flex items-center gap-1">
+                              <span>{apt.contact_phone}</span>
+                              <button
+                                onClick={() => handleCopy(apt.contact_phone, apt.id)}
+                                className="p-0.5 hover:text-[var(--heading)] cursor-pointer"
+                                title="Copy Phone"
+                              >
+                                <Copy className="w-3 h-3" />
+                              </button>
+                            </div>
+                          ) : (
+                            <span className="opacity-40">-</span>
+                          )}
+                        </td>
+
+                        {/* Service / Purpose */}
+                        <td className="py-3 px-4 text-[var(--heading)]">
+                          {isBooked ? (
+                            <span className="line-clamp-1">{apt?.notes || apt?.meeting_type || 'Appointment'}</span>
+                          ) : (
+                            <span className="text-[var(--muted)]">-</span>
+                          )}
+                        </td>
+
+                        {/* Booked Via */}
+                        <td className="py-3 px-3 text-center">
+                          {isBooked ? (
+                            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-[var(--hover-bg)] border border-[var(--border)] text-[var(--muted)]">
+                              {apt?.booked_via === 'voice' ? 'AI Voice Call' : 'Manual'}
+                            </span>
+                          ) : (
+                            <span className="text-[var(--muted)]">-</span>
+                          )}
+                        </td>
+
+                        {/* Actions */}
+                        <td className="py-3 px-4 text-right">
+                          <div className="flex items-center justify-end gap-1.5">
+                            {isBooked && apt ? (
+                              <>
+                                <button
+                                  onClick={() => setSelectedAppointment(apt)}
+                                  className="px-2.5 py-1 rounded-lg bg-[var(--hover-bg)] hover:bg-[var(--card-bg)] text-[var(--heading)] border border-[var(--border)] font-semibold text-[11px] cursor-pointer"
+                                >
+                                  Details
+                                </button>
+                                <button
+                                  onClick={() => setRejectTarget(apt)}
+                                  className="px-2.5 py-1 rounded-lg hover:bg-red-100 dark:hover:bg-red-950/50 text-[var(--muted)] hover:text-red-500 font-semibold text-[11px] cursor-pointer"
+                                >
+                                  Cancel
+                                </button>
+                              </>
+                            ) : (
+                              <>
+                                <button
+                                  onClick={() => setQuickBookSlot(slot)}
+                                  disabled={isBreak}
+                                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 font-bold text-[11px] shadow-xs cursor-pointer disabled:opacity-30"
+                                >
+                                  <UserPlus className="w-3 h-3" />
+                                  <span>Book</span>
+                                </button>
+                                <button
+                                  onClick={() => toggleBreakSlot(slot.slotKey)}
+                                  className="p-1 rounded-lg hover:bg-[var(--hover-bg)] text-[var(--muted)] hover:text-[var(--heading)] cursor-pointer"
+                                  title={isBreak ? "Remove Break" : "Mark as Break"}
+                                >
+                                  <Coffee className="w-3.5 h-3.5" />
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* VIEW 2: BOOKINGS DIRECTORY LIST */}
+      {viewMode === 'directory' && (
+        <div className="space-y-4">
+          {/* Search & Status Filters */}
+          <div className="p-4 rounded-2xl bg-[var(--card-bg)] border border-[var(--border)] flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-xs">
+            <form onSubmit={handleSearchSubmit} className="relative flex-1 max-w-md">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--muted)]" />
+              <input
+                type="text"
+                placeholder="Search by client name, phone number, service..."
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                className="w-full pl-9 pr-3 py-2 bg-[var(--hover-bg)] border border-[var(--border)] rounded-xl text-xs text-[var(--heading)] placeholder:text-[var(--muted)] focus:outline-none focus:ring-1 focus:ring-zinc-400"
+              />
+            </form>
+
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {["all", "scheduled", "confirmed", "rescheduled", "completed", "cancelled"].map(st => (
+                <button
+                  key={st}
+                  onClick={() => setStatusFilter(st)}
+                  className={`px-3 py-1.5 rounded-lg capitalize text-xs font-bold transition-all cursor-pointer ${
+                    statusFilter === st
+                      ? "bg-zinc-900 text-white dark:bg-white dark:text-zinc-950 shadow-xs"
+                      : "bg-[var(--hover-bg)] text-[var(--muted)] hover:text-[var(--heading)]"
+                  }`}
+                >
+                  {st}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Appointments Table */}
+          <div className="rounded-2xl border border-[var(--border)] bg-[var(--card-bg)] overflow-hidden shadow-xs">
+            {loading ? (
+              <div className="py-20 flex flex-col items-center justify-center gap-3 text-[var(--muted)]">
+                <RefreshCw className="w-5 h-5 animate-spin text-[var(--heading)]" />
+                <p className="text-xs font-medium">Loading bookings...</p>
+              </div>
+            ) : appointments.length === 0 ? (
+              <div className="py-20 text-center text-[var(--muted)] space-y-2">
+                <Calendar className="w-8 h-8 mx-auto text-[var(--muted)] stroke-1" />
+                <h3 className="text-base font-bold text-[var(--heading)]">No bookings found</h3>
+                <p className="text-xs max-w-sm mx-auto">
+                  When your AI voice agents book customer appointments, they will be listed here.
+                </p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="border-b border-[var(--border)] bg-[var(--hover-bg)] text-[var(--muted)] uppercase font-mono text-[10px] tracking-wider select-none">
+                      <th className="py-3 px-4 font-bold">Client / Contact</th>
+                      <th className="py-3 px-4 font-bold">Scheduled Time</th>
+                      <th className="py-3 px-4 font-bold">Service / Purpose</th>
+                      <th className="py-3 px-3 font-bold text-center">Status</th>
+                      <th className="py-3 px-4 font-bold text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[var(--border)]">
+                    {appointments.map(apt => (
+                      <tr key={apt.id} className="hover:bg-[var(--hover-bg)]/60 transition-colors">
+                        <td className="py-3 px-4 font-semibold text-[var(--heading)]">
+                          <div>{apt.contact_name || "Unknown Prospect"}</div>
+                          <div className="text-[11px] font-mono text-[var(--muted)]">{apt.contact_phone}</div>
+                        </td>
+                        <td className="py-3 px-4 font-mono text-[var(--heading)]">
+                          {format(new Date(apt.scheduled_at), "EEE, MMM d • h:mm a")}
+                        </td>
+                        <td className="py-3 px-4 text-[var(--heading)] max-w-xs truncate">
+                          {apt.notes || apt.meeting_type}
+                        </td>
+                        <td className="py-3 px-3 text-center">
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[var(--hover-bg)] border border-[var(--border)] text-[var(--heading)] capitalize">
+                            {apt.status}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-right">
+                          <div className="flex items-center justify-end gap-1.5">
+                            {apt.status === 'scheduled' && (
+                              <button
+                                onClick={() => handleAccept(apt)}
+                                className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] cursor-pointer"
+                              >
+                                Accept
+                              </button>
+                            )}
+                            <button
+                              onClick={() => setSelectedAppointment(apt)}
+                              className="px-2.5 py-1 rounded-lg bg-[var(--hover-bg)] border border-[var(--border)] text-[var(--heading)] font-semibold text-[11px] cursor-pointer"
+                            >
+                              Details
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Manual Quick Book Modal */}
+      {quickBookSlot && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl w-full max-w-md p-6 shadow-xl space-y-4 animate-in fade-in zoom-in-95">
+            <div className="flex items-center justify-between">
+              <h3 className="text-base font-bold text-[var(--heading)] flex items-center gap-2">
+                <UserPlus className="w-4 h-4" />
+                <span>Book Slot ({quickBookSlot.label})</span>
+              </h3>
+              <button
+                onClick={() => setQuickBookSlot(null)}
+                className="p-1 rounded text-[var(--muted)] hover:text-[var(--heading)] cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleQuickBookSubmit} className="space-y-3 text-xs">
               <div>
-                <label className="font-bold uppercase tracking-wider text-zinc-600 dark:text-zinc-400 block mb-1">New Appointment Date</label>
+                <label className="block font-semibold text-[var(--heading)] mb-1">Customer / Client Name *</label>
                 <input
-                  type="date"
+                  type="text"
                   required
-                  value={newDate}
-                  onChange={(e) => setNewDate(e.target.value)}
-                  className="w-full bg-zinc-50 dark:bg-[#1C1530] border border-zinc-200 dark:border-white/10 rounded-xl px-3.5 py-2.5 text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500/30"
+                  placeholder="e.g. Rahul Verma"
+                  value={manualClientName}
+                  onChange={e => setManualClientName(e.target.value)}
+                  className="w-full px-3 py-2 bg-[var(--hover-bg)] border border-[var(--border)] rounded-xl text-[var(--heading)] focus:outline-none focus:ring-1 focus:ring-zinc-400"
                 />
               </div>
 
               <div>
-                <label className="font-bold uppercase tracking-wider text-zinc-600 dark:text-zinc-400 block mb-1">New Appointment Time (IST)</label>
+                <label className="block font-semibold text-[var(--heading)] mb-1">Contact Phone Number</label>
                 <input
-                  type="time"
-                  required
-                  value={newTime}
-                  onChange={(e) => setNewTime(e.target.value)}
-                  className="w-full bg-zinc-50 dark:bg-[#1C1530] border border-zinc-200 dark:border-white/10 rounded-xl px-3.5 py-2.5 text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500/30"
+                  type="tel"
+                  placeholder="e.g. +91 98765 43210"
+                  value={manualClientPhone}
+                  onChange={e => setManualClientPhone(e.target.value)}
+                  className="w-full px-3 py-2 bg-[var(--hover-bg)] border border-[var(--border)] rounded-xl text-[var(--heading)] focus:outline-none focus:ring-1 focus:ring-zinc-400"
                 />
               </div>
 
               <div>
-                <label className="font-bold uppercase tracking-wider text-zinc-600 dark:text-zinc-400 block mb-1">Reason / Note to Customer (Optional)</label>
-                <textarea
-                  rows={2}
-                  placeholder="e.g. Rescheduled due to technical briefing conflict. Look forward to our discussion."
-                  value={rescheduleReason}
-                  onChange={(e) => setRescheduleReason(e.target.value)}
-                  className="w-full bg-zinc-50 dark:bg-[#1C1530] border border-zinc-200 dark:border-white/10 rounded-xl p-3 text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-violet-500/30"
+                <label className="block font-semibold text-[var(--heading)] mb-1">Service / Reason</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Haircut & Styling or Business Consultation"
+                  value={manualService}
+                  onChange={e => setManualService(e.target.value)}
+                  className="w-full px-3 py-2 bg-[var(--hover-bg)] border border-[var(--border)] rounded-xl text-[var(--heading)] focus:outline-none focus:ring-1 focus:ring-zinc-400"
                 />
               </div>
 
-              <div className="p-3 rounded-xl bg-violet-500/10 border border-violet-500/20 text-[11px] text-violet-700 dark:text-violet-300 leading-relaxed">
-                ⚡ Submitting will immediately update the database and dispatch automated confirmation alerts via <strong>WhatsApp (+91...)</strong> and <strong>Email</strong> to the customer.
-              </div>
-
-              <div className="flex items-center justify-end gap-2 pt-2 border-t border-zinc-200 dark:border-white/10">
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-[var(--border)]">
                 <button
                   type="button"
-                  onClick={() => setRescheduleTarget(null)}
-                  className="px-4 py-2 rounded-xl border border-zinc-200 dark:border-white/10 hover:bg-zinc-100 dark:hover:bg-white/5 font-bold text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors cursor-pointer"
+                  onClick={() => setQuickBookSlot(null)}
+                  className="px-4 py-2 rounded-xl bg-[var(--hover-bg)] text-[var(--muted)] font-semibold cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={actionLoading}
-                  className="px-4 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-100 font-bold transition-all cursor-pointer shadow-xs disabled:opacity-50"
+                  className="px-5 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 font-bold shadow-xs cursor-pointer disabled:opacity-50"
                 >
-                  {actionLoading ? "Dispatching..." : "Confirm & Send Notice"}
+                  {actionLoading ? "Confirming..." : "Confirm Booking"}
                 </button>
               </div>
             </form>
@@ -646,129 +861,109 @@ export default function AppointmentsPage() {
         </div>
       )}
 
-      {/* 2. Reject Modal */}
-      {rejectTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">
-          <div className="bg-white dark:bg-[#120E22] border border-zinc-200 dark:border-white/10 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-5 text-zinc-900 dark:text-zinc-100">
-            <div className="flex items-center justify-between border-b border-zinc-200 dark:border-white/10 pb-3">
-              <div className="flex items-center gap-2.5">
-                <div className="p-2 rounded-xl bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20">
-                  <AlertCircle className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="font-bold text-zinc-900 dark:text-white text-base">Decline Appointment</h3>
-                  <p className="text-xs text-zinc-500 dark:text-zinc-400">Send cancellation notification to {rejectTarget.contact_name}</p>
-                </div>
-              </div>
-              <button
-                onClick={() => setRejectTarget(null)}
-                className="p-1 rounded-lg text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/5 transition-colors cursor-pointer"
-              >
-                <XCircle className="w-5 h-5" />
-              </button>
-            </div>
-
-            <form onSubmit={handleRejectSubmit} className="space-y-4 text-xs">
-              <div>
-                <label className="font-bold uppercase tracking-wider text-zinc-600 dark:text-zinc-400 block mb-1">Reason for Rejection / Cancellation</label>
-                <textarea
-                  rows={3}
-                  placeholder="e.g. Service slot currently booked out. Please reach out to schedule for next week."
-                  value={rejectReason}
-                  onChange={(e) => setRejectReason(e.target.value)}
-                  className="w-full bg-zinc-50 dark:bg-[#1C1530] border border-zinc-200 dark:border-white/10 rounded-xl p-3 text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-rose-500/30"
-                />
-              </div>
-
-              <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-[11px] text-rose-700 dark:text-rose-300 leading-relaxed">
-                ⚠️ The appointment will be marked cancelled and a formal cancellation message will be sent to the customer on WhatsApp and Email.
-              </div>
-
-              <div className="flex items-center justify-end gap-2 pt-2 border-t border-zinc-200 dark:border-white/10">
-                <button
-                  type="button"
-                  onClick={() => setRejectTarget(null)}
-                  className="px-4 py-2 rounded-xl border border-zinc-200 dark:border-white/10 hover:bg-zinc-100 dark:hover:bg-white/5 font-bold text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors cursor-pointer"
-                >
-                  Back
-                </button>
-                <button
-                  type="submit"
-                  disabled={actionLoading}
-                  className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold transition-all cursor-pointer shadow-xs disabled:opacity-50"
-                >
-                  {actionLoading ? "Declining..." : "Decline & Notify"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* 3. Details Modal */}
+      {/* Appointment Details Modal */}
       {selectedAppointment && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">
-          <div className="bg-white dark:bg-[#120E22] border border-zinc-200 dark:border-white/10 rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-5 text-zinc-900 dark:text-zinc-100">
-            <div className="flex items-center justify-between border-b border-zinc-200 dark:border-white/10 pb-3">
-              <div className="flex items-center gap-2.5">
-                <div className="p-2.5 rounded-xl bg-violet-500/10 text-violet-600 dark:text-violet-400 border border-violet-500/20">
-                  <Calendar className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="font-bold text-zinc-900 dark:text-white text-base">Appointment Intelligence Details</h3>
-                  <p className="text-xs text-zinc-500 dark:text-zinc-400">ID: {selectedAppointment.id}</p>
-                </div>
-              </div>
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl w-full max-w-md p-6 shadow-xl space-y-4 animate-in fade-in zoom-in-95 text-xs">
+            <div className="flex items-center justify-between border-b border-[var(--border)] pb-3">
+              <h3 className="font-bold text-sm text-[var(--heading)] flex items-center gap-2">
+                <Calendar className="w-4 h-4" />
+                <span>Booking Details</span>
+              </h3>
               <button
                 onClick={() => setSelectedAppointment(null)}
-                className="p-1 rounded-lg text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/5 transition-colors cursor-pointer"
+                className="p-1 rounded text-[var(--muted)] hover:text-[var(--heading)] cursor-pointer"
               >
-                <XCircle className="w-5 h-5" />
+                <X className="w-4 h-4" />
               </button>
             </div>
 
-            <div className="space-y-4 text-xs">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-zinc-500 dark:text-zinc-400 font-bold uppercase tracking-wider block">Client Name</label>
-                  <p className="text-zinc-900 dark:text-white font-semibold mt-1 text-sm">{selectedAppointment.contact_name || "Unknown"}</p>
-                </div>
-                <div>
-                  <label className="text-zinc-500 dark:text-zinc-400 font-bold uppercase tracking-wider block">Phone Number</label>
-                  <p className="text-zinc-900 dark:text-white font-semibold mt-1 text-sm">{selectedAppointment.contact_phone || "Not specified"}</p>
-                </div>
+            <div className="space-y-3">
+              <div>
+                <span className="text-[10px] font-bold uppercase text-[var(--muted)]">Client Name</span>
+                <p className="font-bold text-sm text-[var(--heading)]">{selectedAppointment.contact_name}</p>
               </div>
 
               <div>
-                <label className="text-zinc-500 dark:text-zinc-400 font-bold uppercase tracking-wider block">Scheduled Date & Time</label>
-                <p className="text-violet-600 dark:text-violet-400 font-semibold mt-1 text-sm">
-                  {format(new Date(selectedAppointment.scheduled_at), "EEEE, MMMM d, yyyy • h:mm a")} (IST)
+                <span className="text-[10px] font-bold uppercase text-[var(--muted)]">Phone</span>
+                <p className="font-mono text-xs text-[var(--heading)]">{selectedAppointment.contact_phone || 'None'}</p>
+              </div>
+
+              <div>
+                <span className="text-[10px] font-bold uppercase text-[var(--muted)]">Scheduled Date & Time</span>
+                <p className="font-mono text-xs text-[var(--heading)]">
+                  {format(new Date(selectedAppointment.scheduled_at), "EEEE, MMMM d, yyyy • h:mm a")}
                 </p>
               </div>
 
               <div>
-                <label className="text-zinc-500 dark:text-zinc-400 font-bold uppercase tracking-wider block">Meeting Type / Purpose</label>
-                <p className="text-zinc-900 dark:text-white mt-1 font-medium">{selectedAppointment.meeting_type || "AI Voice Demo Consultation"}</p>
+                <span className="text-[10px] font-bold uppercase text-[var(--muted)]">Booked Via</span>
+                <p className="text-xs text-[var(--heading)]">
+                  {selectedAppointment.booked_via === 'voice' ? 'AI Voice Call Agent' : 'Manual Entry'}
+                </p>
               </div>
 
               {selectedAppointment.notes && (
                 <div>
-                  <label className="text-zinc-500 dark:text-zinc-400 font-bold uppercase tracking-wider block">Call Summary & Notes</label>
-                  <div className="mt-1 p-3 rounded-xl bg-zinc-50 dark:bg-[#1C1530] border border-zinc-200 dark:border-white/10 text-zinc-900 dark:text-zinc-100 text-xs leading-relaxed">
+                  <span className="text-[10px] font-bold uppercase text-[var(--muted)]">Notes</span>
+                  <p className="p-2.5 rounded-xl bg-[var(--hover-bg)] text-[var(--heading)] mt-1">
                     {selectedAppointment.notes}
-                  </div>
+                  </p>
                 </div>
               )}
             </div>
 
-            <div className="flex items-center justify-end gap-3 pt-3 border-t border-zinc-200 dark:border-white/10">
+            <div className="flex justify-end pt-3 border-t border-[var(--border)]">
               <button
                 onClick={() => setSelectedAppointment(null)}
-                className="px-4 py-2 rounded-xl border border-zinc-200 dark:border-white/10 hover:bg-zinc-100 dark:hover:bg-white/5 font-bold text-xs text-zinc-700 dark:text-zinc-300 transition-colors cursor-pointer"
+                className="px-4 py-2 rounded-xl bg-[var(--hover-bg)] text-[var(--heading)] font-semibold cursor-pointer"
               >
                 Close
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Decline Appointment Modal */}
+      {rejectTarget && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl w-full max-w-md p-6 shadow-xl space-y-4 animate-in fade-in zoom-in-95 text-xs">
+            <div className="flex items-center justify-between border-b border-[var(--border)] pb-3">
+              <h3 className="font-bold text-sm text-[var(--heading)]">Decline Appointment</h3>
+              <button onClick={() => setRejectTarget(null)} className="p-1 rounded text-[var(--muted)] cursor-pointer">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleRejectSubmit} className="space-y-3">
+              <p className="text-[var(--muted)]">
+                Are you sure you want to decline the booking for <strong className="text-[var(--heading)]">{rejectTarget.contact_name}</strong>?
+              </p>
+              <textarea
+                rows={2}
+                placeholder="Optional reason for cancellation..."
+                value={rejectReason}
+                onChange={e => setRejectReason(e.target.value)}
+                className="w-full p-2.5 bg-[var(--hover-bg)] border border-[var(--border)] rounded-xl text-[var(--heading)]"
+              />
+              <div className="flex justify-end gap-2 pt-2 border-t border-[var(--border)]">
+                <button
+                  type="button"
+                  onClick={() => setRejectTarget(null)}
+                  className="px-4 py-2 rounded-xl bg-[var(--hover-bg)] text-[var(--muted)] font-semibold cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={actionLoading}
+                  className="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold cursor-pointer disabled:opacity-50"
+                >
+                  {actionLoading ? "Declining..." : "Decline Booking"}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
