@@ -1193,6 +1193,47 @@ export async function POST(request: Request) {
       console.error('[Verify Payment] Invoice email send error:', err.message)
     }
 
+    // 5b. Multi-Channel WhatsApp Invoice Delivery (India Phone)
+    const targetPhone = profile.phone || profile.contact_phone || user.phone
+    if (targetPhone) {
+      try {
+        const cleanDigits = targetPhone.replace(/\D/g, '')
+        const raw10 = cleanDigits.slice(-10)
+        if (raw10.length === 10) {
+          const recipientPhone = `91${raw10}`
+          const waMessage = `*Tax Invoice Confirmed* ✅\n\n` +
+            `Namaste ${profile.full_name || 'Valued Client'}! 🙏\n` +
+            `Your payment of ₹${(finalTotalPaisa / 100).toFixed(2)} has been successfully verified.\n\n` +
+            `*Invoice No:* ${invoiceRecord.invoice_number}\n` +
+            `*Plan/Service:* ${planTierToSet.toUpperCase()}\n` +
+            (pdfUrl ? `*Download Invoice PDF:* ${pdfUrl}\n\n` : '\n') +
+            `Thank you for choosing Vaakriti AI!`
+
+          const phoneId = process.env.WHATSAPP_PHONE_ID || process.env.META_WHATSAPP_PHONE_ID
+          const waToken = process.env.WHATSAPP_ACCESS_TOKEN || process.env.META_WHATSAPP_TOKEN
+          if (phoneId && waToken) {
+            await fetch(`https://graph.facebook.com/v21.0/${phoneId}/messages`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${waToken}`
+              },
+              body: JSON.stringify({
+                messaging_product: 'whatsapp',
+                recipient_type: 'individual',
+                to: recipientPhone,
+                type: 'text',
+                text: { preview_url: true, body: waMessage }
+              })
+            })
+            console.log('[Verify Payment] WhatsApp invoice notification dispatched to', recipientPhone)
+          }
+        }
+      } catch (waErr: any) {
+        console.warn('[Verify Payment] WhatsApp notification error (non-fatal):', waErr.message)
+      }
+    }
+
     // 6. Telegram notification
     if (profile.telegram_chat_id) {
       const botToken = process.env.TELEGRAM_BOT_TOKEN

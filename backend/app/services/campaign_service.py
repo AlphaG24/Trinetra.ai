@@ -1243,6 +1243,54 @@ class CampaignService:
         except Exception as wa_err:
             logger.debug(f"[Campaign Report] WhatsApp executor skipped/failed: {wa_err}")
 
+        # 11. Dispatch Post-Campaign Assistance Message to Connected Callers (Rule 8)
+        try:
+            contacts_res = await asyncio.to_thread(
+                supabase_admin.table("campaign_contacts")
+                .select("id, full_name, phone_number, status, disposition")
+                .eq("campaign_id", campaign_id)
+                .in_("status", ["completed", "answered"])
+                .execute
+            )
+            connected_contacts = contacts_res.data or []
+
+            from app.services.integration_executor import IntegrationExecutor
+            caller_executor = IntegrationExecutor()
+
+            for contact in connected_contacts:
+                disp = (contact.get("disposition") or "").lower()
+                if disp in ("dnd", "not_interested", "rejected", "opt_out"):
+                    continue
+
+                c_phone = contact.get("phone_number")
+                if not c_phone:
+                    continue
+
+                c_name = contact.get("full_name") or "there"
+                follow_up_msg = (
+                    f"Namaste {c_name} ji! 🙏\n\n"
+                    f"Thank you for speaking with our assistant today regarding *{camp_name}*.\n\n"
+                    f"If you need any further assistance, wish to reschedule a discussion, or have any questions, "
+                    f"please feel free to reply directly to this message anytime.\n\n"
+                    f"Wishing you a wonderful day ahead!"
+                )
+
+                asyncio.create_task(caller_executor._send_whatsapp(
+                    config={},
+                    message=follow_up_msg,
+                    data={
+                        "contact_name": c_name,
+                        "contact_phone": c_phone,
+                        "campaign_name": camp_name,
+                        "recipient_type": "customer",
+                        "whatsapp_opt_in": True,
+                        "event_type": "campaign_followup"
+                    }
+                ))
+            logger.info(f"[Campaign Report] Dispatched post-call assistance follow-ups to {len(connected_contacts)} contacts.")
+        except Exception as caller_fu_err:
+            logger.warning(f"[Campaign Report] Post-call assistance dispatch failed (non-fatal): {caller_fu_err}")
+
         return {
             "success": True,
             "campaign_id": campaign_id,
