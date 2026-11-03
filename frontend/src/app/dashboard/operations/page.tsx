@@ -3,7 +3,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react'
 import {
   Boxes,
-  Truck,
   Package,
   Calendar,
   Layers,
@@ -19,8 +18,16 @@ import {
   X,
   Upload,
   FileSpreadsheet,
-  Download,
-  SlidersHorizontal
+  FileText,
+  SlidersHorizontal,
+  Mic,
+  MicOff,
+  Sparkles,
+  Zap,
+  ShieldCheck,
+  Building2,
+  Check,
+  Loader2
 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -28,7 +35,7 @@ interface OperationsItem {
   id: string
   title: string
   identifier_code: string | null
-  category: 'logistics' | 'containers' | 'appointment_slots' | 'inventory' | 'general'
+  category: 'logistics' | 'containers' | 'appointment_slots' | 'inventory' | 'general' | 'voice_directive'
   route_origin: string | null
   route_destination: string | null
   available_units: number
@@ -43,12 +50,31 @@ interface OperationsItem {
 }
 
 const CATEGORIES = [
-  { id: 'all', label: 'All Items', icon: Boxes },
-  { id: 'logistics', label: 'Logistics & Transport', icon: Truck },
-  { id: 'containers', label: 'Containers & Fleet', icon: Layers },
-  { id: 'appointment_slots', label: 'Doctor / Booking Slots', icon: Calendar },
-  { id: 'inventory', label: 'Products & Inventory', icon: Package },
-  { id: 'general', label: 'Universal / Other Business', icon: SlidersHorizontal }
+  { id: 'all', label: 'All Knowledge & Offerings', icon: Boxes },
+  { id: 'appointment_slots', label: 'Appointments & Slots', icon: Calendar },
+  { id: 'inventory', label: 'Products & Services', icon: Package },
+  { id: 'logistics', label: 'Routes & Transport', icon: Building2 },
+  { id: 'containers', label: 'Fleet & Assets', icon: Layers },
+  { id: 'general', label: 'Universal / Custom Rules', icon: SlidersHorizontal }
+]
+
+const QUICK_VOICE_PROMPTS = [
+  {
+    label: 'Salon / Clinic Timings',
+    text: 'Aaj mai 10 baje se 4 bje tak salon open rakhunga to us time ke according he appointments lena'
+  },
+  {
+    label: 'Store Closed / Reschedule',
+    text: 'Aaj mai shop close rakhunga so aaj ki saari appointment kal schedule karo aur us hisab se karna'
+  },
+  {
+    label: 'Logistics / Fleet Update',
+    text: 'Aaj mere paas koi gaadi nahi hai par products available hai to aur koi product mat lena sirf gadi ki jarurat hai'
+  },
+  {
+    label: 'Urgent Discount / Offer',
+    text: 'Aaj sabhi haircut aur facials par 20% discount offer karo aur minimum price limit strict rakhna'
+  }
 ]
 
 export default function OperationsBrainPage() {
@@ -60,14 +86,21 @@ export default function OperationsBrainPage() {
 
   // Modals
   const [isModalOpen, setIsModalOpen] = useState(false)
-  const [isImportModalOpen, setIsImportModalOpen] = useState(false)
+  const [isDocumentModalOpen, setIsDocumentModalOpen] = useState(false)
+  const [isVoiceModalOpen, setIsVoiceModalOpen] = useState(false)
   const [editingItem, setEditingItem] = useState<OperationsItem | null>(null)
   const [saving, setSaving] = useState(false)
-  const [importing, setImporting] = useState(false)
 
-  // CSV Import State
+  // Document Ingest State
+  const [uploadedFiles, setUploadedFiles] = useState<File[]>([])
+  const [isIngestingDocs, setIsIngestingDocs] = useState(false)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
-  const [parsedImportRows, setParsedImportRows] = useState<any[]>([])
+
+  // Voice to Brain State
+  const [isRecording, setIsRecording] = useState(false)
+  const [voiceTranscript, setVoiceTranscript] = useState('')
+  const [isProcessingVoice, setIsProcessingVoice] = useState(false)
+  const recognitionRef = useRef<any>(null)
 
   // Dynamic Custom Key-Values for General category
   const [customAttributes, setCustomAttributes] = useState<{ key: string; value: string }[]>([
@@ -78,22 +111,17 @@ export default function OperationsBrainPage() {
   const [formData, setFormData] = useState({
     title: '',
     identifier_code: '',
-    category: 'logistics',
-    // Logistics specific
+    category: 'general',
     route_origin: '',
     route_destination: '',
     vehicle_type: '',
-    // Container specific
     container_size: '',
     yard_location: '',
-    // Appointments specific
     specialist_name: '',
     booking_slot_start: '',
     booking_slot_end: '',
-    // Products specific
     sku_code: '',
     department: '',
-    // Common
     available_units: 1,
     base_price_inr: '',
     minimum_price_inr: '',
@@ -109,11 +137,11 @@ export default function OperationsBrainPage() {
       if (json.success && json.data) {
         setItems(json.data.items || [])
       } else {
-        toast.error('Failed to load operations catalog')
+        toast.error('Failed to load operations brain')
       }
     } catch (err) {
       console.error('Failed to load items:', err)
-      toast.error('Network error loading catalog')
+      toast.error('Network error loading operations brain')
     } finally {
       setLoading(false)
     }
@@ -123,8 +151,18 @@ export default function OperationsBrainPage() {
     fetchItems()
   }, [])
 
+  // Separate Active Voice Directives from Catalog items
+  const activeVoiceDirectives = useMemo(() => {
+    return items.filter(i => i.category === 'voice_directive')
+  }, [items])
+
+  const catalogItems = useMemo(() => {
+    return items.filter(i => i.category !== 'voice_directive')
+  }, [items])
+
+  // Filtered Catalog Items
   const filteredItems = useMemo(() => {
-    return items.filter(item => {
+    return catalogItems.filter(item => {
       const matchesSearch =
         searchQuery === '' ||
         item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -140,11 +178,173 @@ export default function OperationsBrainPage() {
 
       return matchesSearch && matchesCategory && matchesStatus
     })
-  }, [items, searchQuery, selectedCategory, statusFilter])
+  }, [catalogItems, searchQuery, selectedCategory, statusFilter])
 
+  // Universal Summary Metrics
+  const totalCatalogItems = catalogItems.length
+  const totalUnitsCapacity = catalogItems.reduce((acc, curr) => acc + (curr.available_units || 0), 0)
+  const itemsWithPricingFloor = catalogItems.filter(i => i.minimum_price_inr !== null && i.minimum_price_inr > 0).length
+  const activeDirectivesCount = activeVoiceDirectives.filter(i => i.status === 'available').length
+
+  // Voice Recognition Controls
+  const startVoiceRecording = () => {
+    if (typeof window === 'undefined') return
+
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
+    if (!SpeechRecognition) {
+      toast.error('Voice recognition is not supported in this browser. Please type your directive.')
+      return
+    }
+
+    try {
+      const recognition = new SpeechRecognition()
+      recognition.continuous = true
+      recognition.interimResults = true
+      recognition.lang = 'hi-IN' // Hindi + Hinglish
+
+      recognition.onstart = () => {
+        setIsRecording(true)
+        toast.info('Listening... Speak your operational instructions in Hindi or English.')
+      }
+
+      recognition.onresult = (event: any) => {
+        let currentTranscript = ''
+        for (let i = 0; i < event.results.length; i++) {
+          currentTranscript += event.results[i][0].transcript + ' '
+        }
+        setVoiceTranscript(currentTranscript.trim())
+      }
+
+      recognition.onerror = (event: any) => {
+        console.warn('Speech recognition error:', event.error)
+        if (event.error !== 'no-speech') {
+          toast.error(`Mic error: ${event.error}`)
+        }
+        setIsRecording(false)
+      }
+
+      recognition.onend = () => {
+        setIsRecording(false)
+      }
+
+      recognition.start()
+      recognitionRef.current = recognition
+    } catch (err: any) {
+      console.error('Failed to start speech recognition:', err)
+      toast.error('Could not access microphone')
+      setIsRecording(false)
+    }
+  }
+
+  const stopVoiceRecording = () => {
+    if (recognitionRef.current) {
+      recognitionRef.current.stop()
+      recognitionRef.current = null
+    }
+    setIsRecording(false)
+  }
+
+  const handleApplyVoiceDirective = async () => {
+    if (!voiceTranscript.trim()) {
+      toast.error('Please speak or type an operational instruction first')
+      return
+    }
+
+    try {
+      setIsProcessingVoice(true)
+      const res = await fetch('/api/business-catalog/voice-directive', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ transcript: voiceTranscript.trim() })
+      })
+
+      const json = await res.json()
+      if (json.success) {
+        toast.success('Spoken directive applied to Brain! Live agents will follow this rule.')
+        setVoiceTranscript('')
+        setIsVoiceModalOpen(false)
+        fetchItems()
+      } else {
+        toast.error(json.error || 'Failed to apply voice directive')
+      }
+    } catch (err: any) {
+      console.error('Voice directive error:', err)
+      toast.error('Network error processing voice directive')
+    } finally {
+      setIsProcessingVoice(false)
+    }
+  }
+
+  const handleToggleVoiceDirective = async (id: string, currentStatus: string) => {
+    try {
+      const newStatus = currentStatus === 'available' ? false : true
+      const res = await fetch('/api/business-catalog/voice-directive', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, is_active: newStatus })
+      })
+      const json = await res.json()
+      if (json.success) {
+        toast.success(newStatus ? 'Directive activated' : 'Directive paused')
+        fetchItems()
+      } else {
+        toast.error(json.error || 'Failed to update directive')
+      }
+    } catch (err) {
+      toast.error('Failed to toggle directive')
+    }
+  }
+
+  // Multi-Document Ingest
+  const handleFilesSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files) return
+    const newFiles = Array.from(e.target.files)
+    setUploadedFiles(prev => [...prev, ...newFiles])
+  }
+
+  const handleRemoveFile = (index: number) => {
+    setUploadedFiles(prev => prev.filter((_, idx) => idx !== index))
+  }
+
+  const handleIngestDocuments = async () => {
+    if (uploadedFiles.length === 0) {
+      toast.error('Please select at least one document to upload')
+      return
+    }
+
+    try {
+      setIsIngestingDocs(true)
+      const formDataUpload = new FormData()
+      uploadedFiles.forEach(file => {
+        formDataUpload.append('files', file)
+      })
+
+      const res = await fetch('/api/business-catalog/ingest-document', {
+        method: 'POST',
+        body: formDataUpload
+      })
+
+      const json = await res.json()
+      if (json.success) {
+        toast.success(`AI successfully extracted & saved ${json.data.count} items into the brain!`)
+        setUploadedFiles([])
+        setIsDocumentModalOpen(false)
+        fetchItems()
+      } else {
+        toast.error(json.error || 'Failed to parse documents')
+      }
+    } catch (err: any) {
+      console.error('Document ingestion error:', err)
+      toast.error('Error uploading and processing documents')
+    } finally {
+      setIsIngestingDocs(false)
+    }
+  }
+
+  // Manual Add/Edit
   const handleOpenAdd = (defaultCat?: string) => {
     setEditingItem(null)
-    const cat = defaultCat && defaultCat !== 'all' ? defaultCat : 'logistics'
+    const cat = defaultCat && defaultCat !== 'all' ? defaultCat : 'general'
     setFormData({
       title: '',
       identifier_code: '',
@@ -193,7 +393,6 @@ export default function OperationsBrainPage() {
       description: meta.description || ''
     })
 
-    // Load custom attributes
     const customList: { key: string; value: string }[] = []
     if (meta.custom_attributes && typeof meta.custom_attributes === 'object') {
       Object.entries(meta.custom_attributes).forEach(([k, v]) => {
@@ -202,20 +401,6 @@ export default function OperationsBrainPage() {
     }
     setCustomAttributes(customList.length > 0 ? customList : [{ key: '', value: '' }])
     setIsModalOpen(true)
-  }
-
-  const handleAddCustomAttribute = () => {
-    setCustomAttributes([...customAttributes, { key: '', value: '' }])
-  }
-
-  const handleRemoveCustomAttribute = (index: number) => {
-    setCustomAttributes(customAttributes.filter((_, i) => i !== index))
-  }
-
-  const handleCustomAttributeChange = (index: number, field: 'key' | 'value', val: string) => {
-    const updated = [...customAttributes]
-    updated[index][field] = val
-    setCustomAttributes(updated)
   }
 
   const handleSave = async (e: React.FormEvent) => {
@@ -243,7 +428,6 @@ export default function OperationsBrainPage() {
         if (formData.department) meta.department = formData.department.trim()
       }
 
-      // Collect custom attributes
       const customDict: Record<string, string> = {}
       customAttributes.forEach(attr => {
         if (attr.key.trim()) {
@@ -322,154 +506,33 @@ export default function OperationsBrainPage() {
         toast.error(json.error || 'Failed to delete item')
       }
     } catch (err) {
-      console.error('Error deleting item:', err)
       toast.error('Failed to delete item')
     }
-  }
-
-  // Parse CSV File in Browser
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-
-    const reader = new FileReader()
-    reader.onload = evt => {
-      const text = evt.target?.result as string
-      if (!text) return
-
-      try {
-        const lines = text.split(/\r?\n/).filter(l => l.trim().length > 0)
-        if (lines.length < 2) {
-          toast.error('CSV file has no data rows')
-          return
-        }
-
-        const headers = lines[0].split(',').map(h => h.trim().toLowerCase().replace(/['"]/g, ''))
-        const parsed: any[] = []
-
-        for (let i = 1; i < lines.length; i++) {
-          const rowVals = lines[i].split(',').map(v => v.trim().replace(/^["']|["']$/g, ''))
-          if (rowVals.length === 0 || !rowVals[0]) continue
-
-          const rowObj: Record<string, any> = {}
-          headers.forEach((h, idx) => {
-            rowObj[h] = rowVals[idx] || ''
-          })
-
-          const title = rowObj.title || rowObj.name || rowObj.item || rowObj.route || `Item ${i}`
-          parsed.push({
-            title,
-            category: rowObj.category || 'general',
-            identifier_code: rowObj.code || rowObj.identifier_code || rowObj.sku || null,
-            route_origin: rowObj.origin || rowObj.from || rowObj.route_origin || null,
-            route_destination: rowObj.destination || rowObj.to || rowObj.route_destination || null,
-            available_units: Number(rowObj.units || rowObj.qty || rowObj.available_units || 1) || 1,
-            base_price_inr: rowObj.price || rowObj.rate || rowObj.base_price_inr ? Number(rowObj.price || rowObj.rate || rowObj.base_price_inr) : null,
-            minimum_price_inr: rowObj.min_price || rowObj.floor || rowObj.minimum_price_inr ? Number(rowObj.min_price || rowObj.floor || rowObj.minimum_price_inr) : null,
-            status: rowObj.status || 'available'
-          })
-        }
-
-        setParsedImportRows(parsed)
-        toast.success(`Parsed ${parsed.length} items from CSV file`)
-      } catch (parseErr) {
-        console.error('CSV parse error:', parseErr)
-        toast.error('Failed to parse CSV file. Ensure valid comma-separated format.')
-      }
-    }
-    reader.readAsText(file)
-  }
-
-  const handleBulkImportSave = async () => {
-    if (parsedImportRows.length === 0) {
-      toast.error('No items to import')
-      return
-    }
-
-    try {
-      setImporting(true)
-      const res = await fetch('/api/business-catalog', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(parsedImportRows)
-      })
-      const json = await res.json()
-      if (json.success) {
-        toast.success(`Successfully imported ${parsedImportRows.length} items to AI brain!`)
-        setIsImportModalOpen(false)
-        setParsedImportRows([])
-        fetchItems()
-      } else {
-        toast.error(json.error || 'Failed to import items')
-      }
-    } catch (err) {
-      console.error('Import error:', err)
-      toast.error('Error importing items')
-    } finally {
-      setImporting(false)
-    }
-  }
-
-  const handleDownloadSampleCsv = (category: string) => {
-    let csvContent = ''
-    if (category === 'logistics') {
-      csvContent = 'title,category,identifier_code,origin,destination,units,price,min_price,status\n' +
-        'Delhi to Mumbai 32ft MX Truck,logistics,TRK-DL-MUM,Delhi,Mumbai,3,46000,42000,available\n' +
-        'Ahmedabad to Pune 20ft Container,logistics,TRK-AHM-PUN,Ahmedabad,Pune,2,32000,29000,available\n'
-    } else if (category === 'appointment_slots') {
-      csvContent = 'title,category,identifier_code,units,price,min_price,status\n' +
-        'Dr. Sharma General Consultation,appointment_slots,APT-DRS-01,5,800,800,available\n' +
-        'Dental Root Canal Evaluation,appointment_slots,APT-DEN-02,3,1500,1200,available\n'
-    } else if (category === 'inventory') {
-      csvContent = 'title,category,identifier_code,units,price,min_price,status\n' +
-        'Solar Inverter 5kVA Pro,inventory,INV-5KVA,12,48000,44000,available\n' +
-        'Lithium Iron Battery 48V,inventory,BAT-48V-100AH,8,65000,59000,available\n'
-    } else {
-      csvContent = 'title,category,identifier_code,units,price,min_price,status\n' +
-        '3BHK Luxury Apartment Inspection,general,PROP-3BHK-01,1,8500000,8200000,available\n' +
-        'Corporate Annual Audit Package,general,SRV-AUD-2026,4,25000,20000,available\n'
-    }
-
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.setAttribute('download', `sample_${category}_catalog.csv`)
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-    toast.success(`Downloaded sample CSV template for ${category}`)
   }
 
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'available':
         return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-            <CheckCircle2 className="w-3.5 h-3.5" /> Available
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+            <CheckCircle2 className="w-3.5 h-3.5" /> Active
           </span>
         )
       case 'reserved':
         return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
-            <Clock className="w-3.5 h-3.5" /> Reserved
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+            <Clock className="w-3.5 h-3.5" /> Paused / Reserved
           </span>
         )
       case 'booked':
         return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
             <Boxes className="w-3.5 h-3.5" /> Booked
-          </span>
-        )
-      case 'in_transit':
-        return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20">
-            <Truck className="w-3.5 h-3.5" /> In Transit
           </span>
         )
       default:
         return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-zinc-500/10 text-zinc-600 dark:text-zinc-400 border border-zinc-500/20">
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-zinc-500/10 text-zinc-600 dark:text-zinc-400 border border-zinc-500/20">
             {status}
           </span>
         )
@@ -478,14 +541,16 @@ export default function OperationsBrainPage() {
 
   const getCategoryIcon = (category: string) => {
     switch (category) {
-      case 'logistics':
-        return <Truck className="w-4 h-4 text-cyan-600 dark:text-cyan-400" />
-      case 'containers':
-        return <Layers className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
       case 'appointment_slots':
         return <Calendar className="w-4 h-4 text-amber-600 dark:text-amber-400" />
       case 'inventory':
         return <Package className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+      case 'logistics':
+        return <Building2 className="w-4 h-4 text-cyan-600 dark:text-cyan-400" />
+      case 'containers':
+        return <Layers className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+      case 'voice_directive':
+        return <Zap className="w-4 h-4 text-rose-500" />
       default:
         return <SlidersHorizontal className="w-4 h-4 text-purple-600 dark:text-purple-400" />
     }
@@ -493,47 +558,181 @@ export default function OperationsBrainPage() {
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto py-2 md:py-4 font-montserrat text-left">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-[var(--border)] pb-5">
+      {/* Universal Page Header */}
+      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 border-b border-[var(--border)] pb-5">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-[var(--heading)] font-display uppercase tracking-wider">
-            Live Operations Brain
-          </h1>
-          <p className="text-xs sm:text-sm text-[var(--muted)] mt-1 max-w-2xl">
-            Manage real-time operational catalog, services, daily inventory, and pricing floor limits referenced live by your voice agents during calls.
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-[var(--heading)] font-display tracking-tight">
+              Operations & Knowledge Brain
+            </h1>
+          </div>
+          <p className="text-xs sm:text-sm text-[var(--muted)] mt-1.5 max-w-2xl leading-relaxed">
+            Universal real-time knowledge base, catalog items, and daily voice directives referenced live by your AI voice agents during customer calls.
           </p>
         </div>
 
-        <div className="flex items-center gap-2.5 sm:gap-3 shrink-0 self-start sm:self-center">
+        {/* Action Controls */}
+        <div className="flex flex-wrap items-center gap-2.5 sm:gap-3 shrink-0 self-stretch sm:self-auto">
+          {/* Speak to Brain Button */}
+          <button
+            onClick={() => setIsVoiceModalOpen(true)}
+            className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-semibold text-xs tracking-wide transition-all shadow-md hover:shadow-indigo-500/25 active:scale-[0.98] cursor-pointer"
+          >
+            <Mic className="w-4 h-4 animate-pulse" />
+            <span>Speak to Brain</span>
+          </button>
+
+          {/* Upload Documents Button */}
+          <button
+            onClick={() => setIsDocumentModalOpen(true)}
+            className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-[var(--card-bg)] hover:bg-[var(--hover-bg)] border border-[var(--border)] text-[var(--heading)] font-semibold text-xs tracking-wide transition-all shadow-sm active:scale-[0.98] cursor-pointer"
+          >
+            <Upload className="w-4 h-4 text-indigo-500" />
+            <span>Upload Documents</span>
+          </button>
+
+          {/* Add Operations Item */}
+          <button
+            onClick={() => handleOpenAdd(selectedCategory)}
+            className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 font-semibold text-xs tracking-wide rounded-xl transition-all shadow-sm active:scale-[0.98] cursor-pointer"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Add Item</span>
+          </button>
+
+          {/* Refresh */}
           <button
             onClick={fetchItems}
             disabled={loading}
             className="p-2.5 rounded-xl bg-[var(--card-bg)] hover:bg-[var(--hover-bg)] border border-[var(--border)] text-[var(--body)] transition-colors cursor-pointer shrink-0 shadow-sm"
             title="Refresh Catalog"
           >
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-[var(--accent)]' : ''}`} />
-          </button>
-
-          <button
-            onClick={() => setIsImportModalOpen(true)}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[var(--card-bg)] hover:bg-[var(--hover-bg)] border border-[var(--border)] text-[var(--heading)] font-bold text-xs uppercase tracking-wider transition-all shadow-sm active:scale-[0.98] cursor-pointer whitespace-nowrap"
-          >
-            <Upload className="w-4 h-4" /> Import Excel / CSV
-          </button>
-
-          <button
-            onClick={() => handleOpenAdd(selectedCategory)}
-            className="flex items-center gap-2 px-5 py-2.5 bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 font-bold text-xs uppercase tracking-wider rounded-xl transition-all shadow-sm active:scale-[0.98] cursor-pointer whitespace-nowrap"
-          >
-            <Plus className="w-4 h-4" /> Add Operations Item
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-indigo-500' : ''}`} />
           </button>
         </div>
       </div>
 
+      {/* Universal Dynamic Summary Cards (No hardcoded logistics blocks) */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        <div className="p-4 sm:p-5 rounded-2xl bg-[var(--card-bg)] border border-[var(--border)] shadow-sm space-y-1">
+          <div className="flex items-center justify-between text-xs text-[var(--muted)] font-medium">
+            <span>Live Catalog Offerings</span>
+            <Boxes className="w-4 h-4 text-indigo-500" />
+          </div>
+          <p className="text-2xl sm:text-3xl font-extrabold text-[var(--heading)] font-mono">{totalCatalogItems}</p>
+          <p className="text-[11px] text-[var(--muted)]">Active knowledge items indexed for voice agents</p>
+        </div>
+
+        <div className="p-4 sm:p-5 rounded-2xl bg-[var(--card-bg)] border border-[var(--border)] shadow-sm space-y-1">
+          <div className="flex items-center justify-between text-xs text-[var(--muted)] font-medium">
+            <span>Spoken Voice Directives</span>
+            <Zap className="w-4 h-4 text-rose-500" />
+          </div>
+          <p className="text-2xl sm:text-3xl font-extrabold text-rose-500 font-mono">{activeDirectivesCount}</p>
+          <p className="text-[11px] text-[var(--muted)]">Daily owner speech overrides currently live</p>
+        </div>
+
+        <div className="p-4 sm:p-5 rounded-2xl bg-[var(--card-bg)] border border-[var(--border)] shadow-sm space-y-1">
+          <div className="flex items-center justify-between text-xs text-[var(--muted)] font-medium">
+            <span>Total Units / Capacity</span>
+            <Layers className="w-4 h-4 text-cyan-500" />
+          </div>
+          <p className="text-2xl sm:text-3xl font-extrabold text-[var(--heading)] font-mono">{totalUnitsCapacity}</p>
+          <p className="text-[11px] text-[var(--muted)]">Bookable appointment slots or product inventory</p>
+        </div>
+
+        <div className="p-4 sm:p-5 rounded-2xl bg-[var(--card-bg)] border border-[var(--border)] shadow-sm space-y-1">
+          <div className="flex items-center justify-between text-xs text-[var(--muted)] font-medium">
+            <span>Pricing Guardrails</span>
+            <ShieldCheck className="w-4 h-4 text-emerald-500" />
+          </div>
+          <p className="text-2xl sm:text-3xl font-extrabold text-emerald-500 font-mono">{itemsWithPricingFloor}</p>
+          <p className="text-[11px] text-[var(--muted)]">Offerings with strict AI floor limits enforced</p>
+        </div>
+      </div>
+
+      {/* Active Voice Directives Section (When owner has spoken instructions) */}
+      {activeVoiceDirectives.length > 0 && (
+        <div className="rounded-2xl border border-indigo-500/20 bg-indigo-500/5 dark:bg-indigo-950/20 p-4 sm:p-5 space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Zap className="w-4 h-4 text-rose-500 animate-pulse" />
+              <h3 className="text-sm font-bold text-[var(--heading)]">
+                Active Spoken Voice Directives & Daily Overrides
+              </h3>
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-rose-500/10 text-rose-500 border border-rose-500/20">
+                Live in Call Prompt
+              </span>
+            </div>
+            <button
+              onClick={() => setIsVoiceModalOpen(true)}
+              className="text-xs text-indigo-500 hover:text-indigo-400 font-medium inline-flex items-center gap-1 cursor-pointer"
+            >
+              <Mic className="w-3.5 h-3.5" /> + New Voice Rule
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {activeVoiceDirectives.map(directive => {
+              const meta = directive.metadata || {}
+              const isActive = directive.status === 'available'
+              return (
+                <div
+                  key={directive.id}
+                  className="p-3.5 rounded-xl bg-[var(--card-bg)] border border-[var(--border)] shadow-sm flex items-start justify-between gap-3 text-left"
+                >
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-xs text-[var(--heading)]">{directive.title}</span>
+                      <span
+                        className={`px-2 py-0.2 rounded-full text-[10px] font-semibold ${
+                          isActive
+                            ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
+                            : 'bg-zinc-500/10 text-zinc-500 border border-zinc-500/20'
+                        }`}
+                      >
+                        {isActive ? 'Active' : 'Paused'}
+                      </span>
+                    </div>
+                    {meta.voice_transcript && (
+                      <p className="text-xs text-[var(--muted)] italic">
+                        &quot;{meta.voice_transcript}&quot;
+                      </p>
+                    )}
+                    {meta.prompt_override && (
+                      <p className="text-[11px] text-indigo-600 dark:text-indigo-400 font-mono bg-[var(--hover-bg)] p-1.5 rounded-lg border border-[var(--border)] mt-1">
+                        Agent Directive: {meta.prompt_override}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <button
+                      onClick={() => handleToggleVoiceDirective(directive.id, directive.status)}
+                      className="p-1.5 rounded-lg bg-[var(--hover-bg)] text-[var(--body)] hover:text-[var(--heading)] cursor-pointer text-xs font-semibold"
+                      title={isActive ? 'Pause rule' : 'Activate rule'}
+                    >
+                      {isActive ? 'Pause' : 'Activate'}
+                    </button>
+                    <button
+                      onClick={() => handleDelete(directive.id, directive.title)}
+                      className="p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 cursor-pointer"
+                      title="Delete directive"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Filters & Search */}
       <div className="flex flex-col md:flex-row items-center justify-between gap-4">
         {/* Category Tabs */}
-        <div className="flex items-center gap-1.5 p-1 bg-[var(--card-bg)] border border-[var(--border)] rounded-xl overflow-x-auto max-w-full shadow-sm [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+        <div className="flex items-center gap-1.5 p-1 bg-[var(--card-bg)] border border-[var(--border)] rounded-xl overflow-x-auto max-w-full shadow-sm [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden w-full md:w-auto">
           {CATEGORIES.map(cat => {
             const Icon = cat.icon
             const active = selectedCategory === cat.id
@@ -560,56 +759,61 @@ export default function OperationsBrainPage() {
             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted)]" />
             <input
               type="text"
-              placeholder="Search route, item or code..."
+              placeholder="Search catalog, item or code..."
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-3 py-2 bg-[var(--card-bg)] border border-[var(--border)] rounded-xl text-xs text-[var(--heading)] placeholder:text-[var(--muted)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)] shadow-sm"
+              className="w-full pl-9 pr-3 py-2 bg-[var(--card-bg)] border border-[var(--border)] rounded-xl text-xs text-[var(--heading)] placeholder:text-[var(--muted)] focus:outline-none focus:ring-1 focus:ring-indigo-500 shadow-sm"
             />
           </div>
 
           <select
             value={statusFilter}
             onChange={e => setStatusFilter(e.target.value)}
-            className="px-3 py-2 bg-[var(--card-bg)] border border-[var(--border)] rounded-xl text-xs text-[var(--heading)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)] cursor-pointer shadow-sm"
+            className="px-3 py-2 bg-[var(--card-bg)] border border-[var(--border)] rounded-xl text-xs text-[var(--heading)] focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer shadow-sm"
           >
             <option value="all">All Statuses</option>
-            <option value="available">Available</option>
-            <option value="reserved">Reserved</option>
+            <option value="available">Active / Available</option>
+            <option value="reserved">Reserved / Paused</option>
             <option value="booked">Booked</option>
-            <option value="in_transit">In Transit</option>
           </select>
         </div>
       </div>
 
-      {/* Main Items Grid */}
+      {/* Main Catalog Items Grid */}
       {loading ? (
         <div className="py-20 flex flex-col items-center justify-center gap-3 text-[var(--muted)]">
-          <RefreshCw className="w-6 h-6 animate-spin text-[var(--accent)]" />
-          <p className="text-sm font-medium">Loading live operational catalog...</p>
+          <RefreshCw className="w-6 h-6 animate-spin text-indigo-500" />
+          <p className="text-sm font-medium">Loading live operations brain...</p>
         </div>
       ) : filteredItems.length === 0 ? (
         <div className="py-16 text-center rounded-2xl bg-[var(--card-bg)] border border-[var(--border)] p-8 space-y-4 shadow-sm">
-          <div className="w-12 h-12 rounded-2xl bg-[var(--primary-bg)] border border-[var(--border)] text-[var(--accent)] flex items-center justify-center mx-auto">
-            <Boxes className="w-6 h-6" />
+          <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-500 flex items-center justify-center mx-auto">
+            <Sparkles className="w-6 h-6" />
           </div>
           <div className="space-y-1">
-            <h3 className="text-base font-bold text-[var(--heading)]">No catalog items found</h3>
+            <h3 className="text-base font-bold text-[var(--heading)]">Operations Brain is Ready</h3>
             <p className="text-xs text-[var(--muted)] max-w-md mx-auto">
-              Add your business offerings (routes, consultation slots, product catalogs, or custom properties) so the AI agent can fetch live data and negotiate within your limits during calls.
+              Upload your price list, product catalog, or appointment schedule, or simply speak into the mic to automatically build your business brain.
             </p>
           </div>
-          <div className="flex items-center justify-center gap-3 pt-2">
+          <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
             <button
-              onClick={() => handleOpenAdd(selectedCategory)}
-              className="inline-flex items-center gap-2 px-5 py-2.5 bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 font-bold text-xs uppercase tracking-wider rounded-xl transition-all shadow-sm active:scale-[0.98] cursor-pointer"
+              onClick={() => setIsVoiceModalOpen(true)}
+              className="inline-flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-semibold text-xs rounded-xl shadow-md cursor-pointer"
             >
-              <Plus className="w-4 h-4" /> Add Item
+              <Mic className="w-4 h-4" /> Speak to Brain
             </button>
             <button
-              onClick={() => setIsImportModalOpen(true)}
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[var(--card-bg)] hover:bg-[var(--hover-bg)] border border-[var(--border)] text-[var(--heading)] font-bold text-xs uppercase tracking-wider cursor-pointer"
+              onClick={() => setIsDocumentModalOpen(true)}
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[var(--card-bg)] hover:bg-[var(--hover-bg)] border border-[var(--border)] text-[var(--heading)] font-semibold text-xs cursor-pointer shadow-sm"
             >
-              <Upload className="w-4 h-4" /> Import Excel / CSV
+              <Upload className="w-4 h-4 text-indigo-500" /> Upload Documents
+            </button>
+            <button
+              onClick={() => handleOpenAdd(selectedCategory)}
+              className="inline-flex items-center gap-2 px-4 py-2.5 bg-zinc-900 text-white dark:bg-white dark:text-zinc-950 font-semibold text-xs rounded-xl shadow-sm cursor-pointer"
+            >
+              <Plus className="w-4 h-4" /> Add Manually
             </button>
           </div>
         </div>
@@ -641,44 +845,28 @@ export default function OperationsBrainPage() {
                     {getStatusBadge(item.status)}
                   </div>
 
-                  {/* Route Information - ONLY FOR LOGISTICS */}
-                  {item.category === 'logistics' && (item.route_origin || item.route_destination) && (
+                  {/* Route Information (if applicable) */}
+                  {(item.route_origin || item.route_destination) && (
                     <div className="flex items-center gap-2 text-xs bg-[var(--hover-bg)] p-2.5 rounded-xl border border-[var(--border)] text-[var(--heading)]">
-                      <span className="font-semibold">{item.route_origin || 'Any Origin'}</span>
+                      <span className="font-semibold">{item.route_origin || 'Origin'}</span>
                       <ArrowRight className="w-3.5 h-3.5 text-[var(--muted)]" />
-                      <span className="font-semibold">{item.route_destination || 'Any Destination'}</span>
+                      <span className="font-semibold">{item.route_destination || 'Destination'}</span>
                     </div>
                   )}
 
-                  {/* Container Details */}
-                  {item.category === 'containers' && (meta.container_size || meta.yard_location) && (
-                    <div className="text-xs bg-[var(--hover-bg)] p-2.5 rounded-xl border border-[var(--border)] text-[var(--heading)] space-y-1">
-                      {meta.container_size && (
-                        <div><span className="text-[var(--muted)]">Size/Type:</span> <span className="font-semibold">{meta.container_size}</span></div>
-                      )}
-                      {meta.yard_location && (
-                        <div><span className="text-[var(--muted)]">Port/Yard:</span> <span className="font-semibold">{meta.yard_location}</span></div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Specialist / Clinic Details */}
-                  {item.category === 'appointment_slots' && meta.specialist_name && (
+                  {/* Doctor/Specialist details */}
+                  {meta.specialist_name && (
                     <div className="text-xs bg-[var(--hover-bg)] p-2 rounded-xl border border-[var(--border)] text-[var(--heading)]">
-                      <span className="text-[var(--muted)]">Doctor/Specialist:</span> <span className="font-semibold">{meta.specialist_name}</span>
+                      <span className="text-[var(--muted)]">Practitioner / Specialist:</span>{' '}
+                      <span className="font-semibold">{meta.specialist_name}</span>
                     </div>
                   )}
 
-                  {/* Custom Attributes for General / Universal */}
-                  {meta.custom_attributes && Object.keys(meta.custom_attributes).length > 0 && (
-                    <div className="text-xs bg-[var(--hover-bg)] p-2.5 rounded-xl border border-[var(--border)] space-y-1">
-                      {Object.entries(meta.custom_attributes).slice(0, 3).map(([k, v]) => (
-                        <div key={k} className="flex justify-between text-[11px]">
-                          <span className="text-[var(--muted)]">{k}:</span>
-                          <span className="font-semibold text-[var(--heading)]">{String(v)}</span>
-                        </div>
-                      ))}
-                    </div>
+                  {/* Description / Ingestion Note */}
+                  {meta.description && (
+                    <p className="text-xs text-[var(--muted)] line-clamp-2">
+                      {meta.description}
+                    </p>
                   )}
 
                   {/* Units & Slot times */}
@@ -747,18 +935,239 @@ export default function OperationsBrainPage() {
         </div>
       )}
 
-      {/* Add / Edit Modal with Adaptive Fields */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="w-full max-w-xl bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl shadow-2xl p-6 space-y-6 max-h-[90vh] overflow-y-auto text-left">
+      {/* MODAL 1: SPEAK & BUILD THE BRAIN */}
+      {isVoiceModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="relative w-full max-w-xl bg-[var(--card-bg)] border border-[var(--border)] rounded-3xl p-6 sm:p-7 shadow-2xl space-y-5 text-left animate-in fade-in zoom-in-95">
             <div className="flex items-center justify-between border-b border-[var(--border)] pb-4">
-              <h2 className="text-lg font-bold text-[var(--heading)] flex items-center gap-2 font-display uppercase tracking-wider">
-                <Boxes className="w-5 h-5 text-[var(--accent)]" />
-                {editingItem ? 'Edit Operations Item' : 'Add Item to AI Brain'}
-              </h2>
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 text-white">
+                  <Mic className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-[var(--heading)]">Speak & Build the Brain</h3>
+                  <p className="text-xs text-[var(--muted)]">Speak your business rules in Hindi, Hinglish, or English</p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  stopVoiceRecording()
+                  setIsVoiceModalOpen(false)
+                }}
+                className="p-2 rounded-full hover:bg-[var(--hover-bg)] text-[var(--muted)] hover:text-[var(--heading)] cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Mic Status & Wave Animation */}
+            <div className="flex flex-col items-center justify-center py-4 space-y-3">
+              <button
+                onClick={isRecording ? stopVoiceRecording : startVoiceRecording}
+                className={`w-20 h-20 rounded-full flex items-center justify-center transition-all shadow-lg cursor-pointer ${
+                  isRecording
+                    ? 'bg-rose-500 text-white animate-pulse ring-4 ring-rose-500/30'
+                    : 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white hover:scale-105 ring-4 ring-indigo-500/20'
+                }`}
+              >
+                {isRecording ? <MicOff className="w-8 h-8" /> : <Mic className="w-8 h-8" />}
+              </button>
+              <p className="text-xs font-semibold text-[var(--heading)]">
+                {isRecording ? 'Listening... Tap to stop' : 'Tap to start speaking'}
+              </p>
+            </div>
+
+            {/* Transcript Textarea */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-[var(--heading)]">
+                Spoken Operational Instruction:
+              </label>
+              <textarea
+                rows={3}
+                value={voiceTranscript}
+                onChange={e => setVoiceTranscript(e.target.value)}
+                placeholder='e.g., "Aaj mai 10 baje se 4 bje tak salon open rakhunga to us time ke according he appointments lena"'
+                className="w-full p-3 rounded-xl bg-[var(--hover-bg)] border border-[var(--border)] text-xs text-[var(--heading)] focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              />
+            </div>
+
+            {/* Quick Scenario Chips */}
+            <div className="space-y-2">
+              <span className="text-[11px] font-semibold text-[var(--muted)] uppercase tracking-wider">
+                Quick Example Directives:
+              </span>
+              <div className="flex flex-wrap gap-2">
+                {QUICK_VOICE_PROMPTS.map((prompt, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => setVoiceTranscript(prompt.text)}
+                    className="px-2.5 py-1 rounded-lg text-[11px] font-medium bg-[var(--hover-bg)] hover:bg-indigo-500/10 text-[var(--body)] hover:text-indigo-500 border border-[var(--border)] transition-colors cursor-pointer"
+                  >
+                    {prompt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex items-center justify-end gap-3 pt-3 border-t border-[var(--border)]">
+              <button
+                type="button"
+                onClick={() => {
+                  stopVoiceRecording()
+                  setIsVoiceModalOpen(false)
+                }}
+                className="px-4 py-2.5 rounded-xl border border-[var(--border)] text-xs font-semibold text-[var(--body)] hover:bg-[var(--hover-bg)] cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleApplyVoiceDirective}
+                disabled={isProcessingVoice || !voiceTranscript.trim()}
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs font-semibold transition-all shadow-md active:scale-[0.98] cursor-pointer disabled:opacity-50"
+              >
+                {isProcessingVoice ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" /> Processing with AI...
+                  </>
+                ) : (
+                  <>
+                    <Zap className="w-4 h-4" /> Apply to Brain & Live Agents
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 2: MULTI-DOCUMENT INGESTION */}
+      {isDocumentModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="relative w-full max-w-xl bg-[var(--card-bg)] border border-[var(--border)] rounded-3xl p-6 sm:p-7 shadow-2xl space-y-5 text-left animate-in fade-in zoom-in-95">
+            <div className="flex items-center justify-between border-b border-[var(--border)] pb-4">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-500">
+                  <Upload className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-[var(--heading)]">Upload Documents to Brain</h3>
+                  <p className="text-xs text-[var(--muted)]">Upload PDFs, Excel sheets, Word docs, or CSVs</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsDocumentModalOpen(false)}
+                className="p-2 rounded-full hover:bg-[var(--hover-bg)] text-[var(--muted)] hover:text-[var(--heading)] cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Dropzone */}
+            <div
+              onClick={() => fileInputRef.current?.click()}
+              className="border-2 border-dashed border-[var(--border)] hover:border-indigo-500/50 rounded-2xl p-6 sm:p-8 text-center cursor-pointer transition-colors bg-[var(--hover-bg)]/40 hover:bg-indigo-500/5"
+            >
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                accept=".pdf,.xlsx,.xls,.csv,.docx,.txt"
+                className="hidden"
+                onChange={handleFilesSelected}
+              />
+              <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 text-indigo-500 flex items-center justify-center mx-auto mb-3">
+                <FileSpreadsheet className="w-6 h-6" />
+              </div>
+              <p className="text-sm font-semibold text-[var(--heading)]">
+                Click or drop business files here
+              </p>
+              <p className="text-xs text-[var(--muted)] mt-1">
+                Upload price lists, product catalogs, service menus, or appointment slots (.xlsx, .csv, .pdf, .docx)
+              </p>
+            </div>
+
+            {/* Uploaded Files Queue */}
+            {uploadedFiles.length > 0 && (
+              <div className="space-y-2">
+                <span className="text-xs font-semibold text-[var(--heading)]">
+                  Selected Files ({uploadedFiles.length}):
+                </span>
+                <div className="max-h-40 overflow-y-auto space-y-1.5 pr-1">
+                  {uploadedFiles.map((file, idx) => (
+                    <div
+                      key={idx}
+                      className="flex items-center justify-between p-2.5 rounded-xl bg-[var(--hover-bg)] border border-[var(--border)] text-xs text-[var(--heading)]"
+                    >
+                      <div className="flex items-center gap-2 truncate">
+                        <FileText className="w-4 h-4 text-indigo-500 shrink-0" />
+                        <span className="truncate font-medium">{file.name}</span>
+                        <span className="text-[10px] text-[var(--muted)] font-mono shrink-0">
+                          ({(file.size / 1024).toFixed(1)} KB)
+                        </span>
+                      </div>
+                      <button
+                        onClick={() => handleRemoveFile(idx)}
+                        className="p-1 rounded hover:bg-rose-500/10 text-rose-500 cursor-pointer"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Action Buttons */}
+            <div className="flex items-center justify-end gap-3 pt-3 border-t border-[var(--border)]">
+              <button
+                type="button"
+                onClick={() => setIsDocumentModalOpen(false)}
+                className="px-4 py-2.5 rounded-xl border border-[var(--border)] text-xs font-semibold text-[var(--body)] hover:bg-[var(--hover-bg)] cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleIngestDocuments}
+                disabled={isIngestingDocs || uploadedFiles.length === 0}
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 text-xs font-semibold transition-all shadow-md active:scale-[0.98] cursor-pointer disabled:opacity-50"
+              >
+                {isIngestingDocs ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" /> Ingesting & Building Brain...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-4 h-4" /> Extract & Build Brain
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 3: MANUAL ADD / EDIT OPERATION ITEM */}
+      {isModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm overflow-y-auto">
+          <div className="relative w-full max-w-2xl bg-[var(--card-bg)] border border-[var(--border)] rounded-3xl p-6 sm:p-7 shadow-2xl space-y-5 text-left my-8 animate-in fade-in zoom-in-95">
+            <div className="flex items-center justify-between border-b border-[var(--border)] pb-4">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-500">
+                  <Boxes className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-[var(--heading)]">
+                    {editingItem ? 'Edit Brain Item' : 'Add Item to Operations Brain'}
+                  </h3>
+                  <p className="text-xs text-[var(--muted)]">Configure real-time capacity and negotiation limits</p>
+                </div>
+              </div>
               <button
                 onClick={() => setIsModalOpen(false)}
-                className="p-1.5 rounded-lg text-[var(--muted)] hover:text-[var(--heading)] hover:bg-[var(--hover-bg)] cursor-pointer"
+                className="p-2 rounded-full hover:bg-[var(--hover-bg)] text-[var(--muted)] hover:text-[var(--heading)] cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -766,457 +1175,180 @@ export default function OperationsBrainPage() {
 
             <form onSubmit={handleSave} className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {/* Category Selection */}
-                <div className="space-y-1.5 sm:col-span-2">
-                  <label className="text-xs font-semibold text-[var(--heading)]">Business Category *</label>
-                  <select
-                    value={formData.category}
-                    onChange={e => setFormData({ ...formData, category: e.target.value })}
-                    className="w-full px-3 py-2 bg-[var(--card-bg)] border border-[var(--border)] rounded-xl text-xs text-[var(--heading)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)] cursor-pointer shadow-sm"
-                  >
-                    <option value="logistics">🚚 Logistics & Transport (Routes & Trucks)</option>
-                    <option value="containers">📦 Containers & Yard Fleet (20ft, 40ft, Reefers)</option>
-                    <option value="appointment_slots">🩺 Appointments & Doctor/Clinic Booking Slots</option>
-                    <option value="inventory">🏷️ Products, Inventory & E-Commerce Items</option>
-                    <option value="general">⚙️ Universal / Other Business Brain (Custom Fields)</option>
-                  </select>
-                </div>
-
-                {/* Common Title */}
-                <div className="space-y-1.5 sm:col-span-2">
-                  <label className="text-xs font-semibold text-[var(--heading)]">
-                    {formData.category === 'logistics' && 'Route / Freight Load Title *'}
-                    {formData.category === 'containers' && 'Container Unit / Package Title *'}
-                    {formData.category === 'appointment_slots' && 'Service / Consultation Slot Title *'}
-                    {formData.category === 'inventory' && 'Product / Item Name *'}
-                    {formData.category === 'general' && 'Business Offering / Service Title *'}
-                  </label>
+                <div className="sm:col-span-2 space-y-1">
+                  <label className="text-xs font-semibold text-[var(--heading)]">Item / Service Name *</label>
                   <input
                     type="text"
                     required
-                    placeholder={
-                      formData.category === 'logistics'
-                        ? 'e.g., Delhi to Mumbai 32ft MX Container Truck'
-                        : formData.category === 'appointment_slots'
-                        ? 'e.g., Dr. Sharma Senior Physician Consultation'
-                        : formData.category === 'inventory'
-                        ? 'e.g., 5kVA Solar Inverter Pure Sine'
-                        : 'e.g., 3BHK Luxury Villa Inspection or Service'
-                    }
                     value={formData.title}
                     onChange={e => setFormData({ ...formData, title: e.target.value })}
-                    className="w-full px-3 py-2 bg-[var(--card-bg)] border border-[var(--border)] rounded-xl text-xs text-[var(--heading)] placeholder:text-[var(--muted)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)] shadow-sm"
+                    placeholder="e.g. Hair Spa & Styling, Full Body Health Checkup, Mumbai-Delhi Express"
+                    className="w-full px-3 py-2 bg-[var(--hover-bg)] border border-[var(--border)] rounded-xl text-xs text-[var(--heading)] focus:outline-none focus:ring-1 focus:ring-indigo-500"
                   />
                 </div>
 
-                {/* Common Identifier / Code */}
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-[var(--heading)]">
-                    {formData.category === 'inventory' ? 'SKU / Barcode' : 'Reference Code / ID'}
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g., DL-MUM-01 or SKU-9821"
-                    value={formData.identifier_code}
-                    onChange={e => setFormData({ ...formData, identifier_code: e.target.value })}
-                    className="w-full px-3 py-2 bg-[var(--card-bg)] border border-[var(--border)] rounded-xl text-xs text-[var(--heading)] placeholder:text-[var(--muted)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)] font-mono shadow-sm"
-                  />
-                </div>
-
-                {/* Common Status */}
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-[var(--heading)]">Status</label>
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-[var(--heading)]">Category</label>
                   <select
-                    value={formData.status}
-                    onChange={e => setFormData({ ...formData, status: e.target.value as any })}
-                    className="w-full px-3 py-2 bg-[var(--card-bg)] border border-[var(--border)] rounded-xl text-xs text-[var(--heading)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)] cursor-pointer shadow-sm"
+                    value={formData.category}
+                    onChange={e => setFormData({ ...formData, category: e.target.value as any })}
+                    className="w-full px-3 py-2 bg-[var(--hover-bg)] border border-[var(--border)] rounded-xl text-xs text-[var(--heading)] focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer"
                   >
-                    <option value="available">Available</option>
-                    <option value="reserved">Reserved</option>
-                    <option value="booked">Booked</option>
-                    <option value="in_transit">In Transit</option>
+                    <option value="general">Universal / Other Business</option>
+                    <option value="appointment_slots">Appointments & Slots</option>
+                    <option value="inventory">Products & Inventory</option>
+                    <option value="logistics">Routes & Transport</option>
+                    <option value="containers">Fleet & Assets</option>
                   </select>
                 </div>
 
-                {/* --- ADAPTIVE SECTION: LOGISTICS ONLY --- */}
-                {formData.category === 'logistics' && (
-                  <>
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-semibold text-[var(--heading)]">Route Origin City</label>
-                      <input
-                        type="text"
-                        placeholder="e.g., Delhi NCR"
-                        value={formData.route_origin}
-                        onChange={e => setFormData({ ...formData, route_origin: e.target.value })}
-                        className="w-full px-3 py-2 bg-[var(--card-bg)] border border-[var(--border)] rounded-xl text-xs text-[var(--heading)] placeholder:text-[var(--muted)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)] shadow-sm"
-                      />
-                    </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-[var(--heading)]">Identifier Code / SKU</label>
+                  <input
+                    type="text"
+                    value={formData.identifier_code}
+                    onChange={e => setFormData({ ...formData, identifier_code: e.target.value })}
+                    placeholder="e.g. SRV-01, SKU-101"
+                    className="w-full px-3 py-2 bg-[var(--hover-bg)] border border-[var(--border)] rounded-xl text-xs text-[var(--heading)] focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  />
+                </div>
 
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-semibold text-[var(--heading)]">Route Destination City</label>
-                      <input
-                        type="text"
-                        placeholder="e.g., Mumbai JNPT"
-                        value={formData.route_destination}
-                        onChange={e => setFormData({ ...formData, route_destination: e.target.value })}
-                        className="w-full px-3 py-2 bg-[var(--card-bg)] border border-[var(--border)] rounded-xl text-xs text-[var(--heading)] placeholder:text-[var(--muted)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)] shadow-sm"
-                      />
-                    </div>
-
-                    <div className="space-y-1.5 sm:col-span-2">
-                      <label className="text-xs font-semibold text-[var(--heading)]">Vehicle / Load Type</label>
-                      <input
-                        type="text"
-                        placeholder="e.g., 32ft Multi-Axle Container, 20ft Open Truck, 40ft Trailer"
-                        value={formData.vehicle_type}
-                        onChange={e => setFormData({ ...formData, vehicle_type: e.target.value })}
-                        className="w-full px-3 py-2 bg-[var(--card-bg)] border border-[var(--border)] rounded-xl text-xs text-[var(--heading)] placeholder:text-[var(--muted)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)] shadow-sm"
-                      />
-                    </div>
-                  </>
-                )}
-
-                {/* --- ADAPTIVE SECTION: CONTAINERS ONLY --- */}
-                {formData.category === 'containers' && (
-                  <>
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-semibold text-[var(--heading)]">Container Size & Type</label>
-                      <input
-                        type="text"
-                        placeholder="e.g., 20ft Dry Cargo, 40ft High Cube, Reefer"
-                        value={formData.container_size}
-                        onChange={e => setFormData({ ...formData, container_size: e.target.value })}
-                        className="w-full px-3 py-2 bg-[var(--card-bg)] border border-[var(--border)] rounded-xl text-xs text-[var(--heading)] placeholder:text-[var(--muted)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)] shadow-sm"
-                      />
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-semibold text-[var(--heading)]">Port / Depot Yard Location</label>
-                      <input
-                        type="text"
-                        placeholder="e.g., JNPT Nhava Sheva / Mundra Port"
-                        value={formData.yard_location}
-                        onChange={e => setFormData({ ...formData, yard_location: e.target.value })}
-                        className="w-full px-3 py-2 bg-[var(--card-bg)] border border-[var(--border)] rounded-xl text-xs text-[var(--heading)] placeholder:text-[var(--muted)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)] shadow-sm"
-                      />
-                    </div>
-                  </>
-                )}
-
-                {/* --- ADAPTIVE SECTION: APPOINTMENTS ONLY --- */}
-                {formData.category === 'appointment_slots' && (
-                  <>
-                    <div className="space-y-1.5 sm:col-span-2">
-                      <label className="text-xs font-semibold text-[var(--heading)]">Doctor / Specialist / Staff Name</label>
-                      <input
-                        type="text"
-                        placeholder="e.g., Dr. Ajay Sharma (Senior Cardiologist)"
-                        value={formData.specialist_name}
-                        onChange={e => setFormData({ ...formData, specialist_name: e.target.value })}
-                        className="w-full px-3 py-2 bg-[var(--card-bg)] border border-[var(--border)] rounded-xl text-xs text-[var(--heading)] placeholder:text-[var(--muted)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)] shadow-sm"
-                      />
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-semibold text-[var(--heading)]">Slot Start Time</label>
-                      <input
-                        type="datetime-local"
-                        value={formData.booking_slot_start}
-                        onChange={e => setFormData({ ...formData, booking_slot_start: e.target.value })}
-                        className="w-full px-3 py-2 bg-[var(--card-bg)] border border-[var(--border)] rounded-xl text-xs text-[var(--heading)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)] shadow-sm"
-                      />
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-semibold text-[var(--heading)]">Slot End Time</label>
-                      <input
-                        type="datetime-local"
-                        value={formData.booking_slot_end}
-                        onChange={e => setFormData({ ...formData, booking_slot_end: e.target.value })}
-                        className="w-full px-3 py-2 bg-[var(--card-bg)] border border-[var(--border)] rounded-xl text-xs text-[var(--heading)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)] shadow-sm"
-                      />
-                    </div>
-                  </>
-                )}
-
-                {/* --- ADAPTIVE SECTION: INVENTORY / PRODUCTS ONLY --- */}
-                {formData.category === 'inventory' && (
-                  <div className="space-y-1.5 sm:col-span-2">
-                    <label className="text-xs font-semibold text-[var(--heading)]">Department / Brand / Category</label>
-                    <input
-                      type="text"
-                      placeholder="e.g., Electronics / Renewable Power / Hardware"
-                      value={formData.department}
-                      onChange={e => setFormData({ ...formData, department: e.target.value })}
-                      className="w-full px-3 py-2 bg-[var(--card-bg)] border border-[var(--border)] rounded-xl text-xs text-[var(--heading)] placeholder:text-[var(--muted)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)] shadow-sm"
-                    />
-                  </div>
-                )}
-
-                {/* --- ADAPTIVE SECTION: GENERAL BUSINESS (DYNAMIC CUSTOM KEY-VALUES) --- */}
-                {formData.category === 'general' && (
-                  <div className="space-y-2 sm:col-span-2 pt-1 border-t border-[var(--border)]">
-                    <div className="flex items-center justify-between">
-                      <label className="text-xs font-semibold text-[var(--heading)] flex items-center gap-1.5">
-                        <SlidersHorizontal className="w-3.5 h-3.5 text-[var(--accent)]" /> Custom Business Attributes
-                      </label>
-                      <button
-                        type="button"
-                        onClick={handleAddCustomAttribute}
-                        className="text-[11px] font-bold text-[var(--accent)] hover:underline flex items-center gap-1 cursor-pointer"
-                      >
-                        <Plus className="w-3 h-3" /> Add Attribute
-                      </button>
-                    </div>
-                    <p className="text-[11px] text-[var(--muted)]">
-                      Add any custom detail for your business (e.g. Property Type, Area, Delivery Time, Warranty). The AI reads all of them live.
-                    </p>
-
-                    <div className="space-y-2 pt-1">
-                      {customAttributes.map((attr, idx) => (
-                        <div key={idx} className="flex items-center gap-2">
-                          <input
-                            type="text"
-                            placeholder="Attribute Name (e.g. Area, Facing, Warranty)"
-                            value={attr.key}
-                            onChange={e => handleCustomAttributeChange(idx, 'key', e.target.value)}
-                            className="flex-1 px-3 py-1.5 bg-[var(--card-bg)] border border-[var(--border)] rounded-lg text-xs text-[var(--heading)] placeholder:text-[var(--muted)] shadow-sm"
-                          />
-                          <input
-                            type="text"
-                            placeholder="Value (e.g. 1500 sq ft, 2 Years)"
-                            value={attr.value}
-                            onChange={e => handleCustomAttributeChange(idx, 'value', e.target.value)}
-                            className="flex-1 px-3 py-1.5 bg-[var(--card-bg)] border border-[var(--border)] rounded-lg text-xs text-[var(--heading)] placeholder:text-[var(--muted)] shadow-sm"
-                          />
-                          {customAttributes.length > 1 && (
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveCustomAttribute(idx)}
-                              className="p-1.5 text-rose-500 hover:bg-rose-500/10 rounded-lg cursor-pointer"
-                            >
-                              <X className="w-3.5 h-3.5" />
-                            </button>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Common Units */}
-                <div className="space-y-1.5">
+                <div className="space-y-1">
                   <label className="text-xs font-semibold text-[var(--heading)]">Available Units / Capacity</label>
                   <input
                     type="number"
                     min="0"
                     value={formData.available_units}
-                    onChange={e => setFormData({ ...formData, available_units: Number(e.target.value) })}
-                    className="w-full px-3 py-2 bg-[var(--card-bg)] border border-[var(--border)] rounded-xl text-xs text-[var(--heading)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)] font-mono shadow-sm"
+                    onChange={e => setFormData({ ...formData, available_units: Number(e.target.value) || 0 })}
+                    className="w-full px-3 py-2 bg-[var(--hover-bg)] border border-[var(--border)] rounded-xl text-xs text-[var(--heading)] focus:outline-none focus:ring-1 focus:ring-indigo-500"
                   />
                 </div>
 
-                {/* Common Base Price */}
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-[var(--heading)]">Base Quoted Price (₹)</label>
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-[var(--heading)]">Status</label>
+                  <select
+                    value={formData.status}
+                    onChange={e => setFormData({ ...formData, status: e.target.value as any })}
+                    className="w-full px-3 py-2 bg-[var(--hover-bg)] border border-[var(--border)] rounded-xl text-xs text-[var(--heading)] focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer"
+                  >
+                    <option value="available">Available</option>
+                    <option value="reserved">Reserved / Paused</option>
+                    <option value="booked">Booked</option>
+                  </select>
+                </div>
+
+                {/* Quoted and Floor Pricing */}
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-[var(--heading)]">Quoted Base Price (₹)</label>
                   <input
                     type="number"
-                    min="0"
-                    placeholder="e.g., 45000"
+                    placeholder="e.g. 1500"
                     value={formData.base_price_inr}
                     onChange={e => setFormData({ ...formData, base_price_inr: e.target.value })}
-                    className="w-full px-3 py-2 bg-[var(--card-bg)] border border-[var(--border)] rounded-xl text-xs text-[var(--heading)] placeholder:text-[var(--muted)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)] font-mono shadow-sm"
+                    className="w-full px-3 py-2 bg-[var(--hover-bg)] border border-[var(--border)] rounded-xl text-xs text-[var(--heading)] focus:outline-none focus:ring-1 focus:ring-indigo-500"
                   />
-                  <p className="text-[10px] text-[var(--muted)]">Initial rate quoted by the voice bot.</p>
                 </div>
 
-                {/* Common Minimum Price Floor */}
-                <div className="space-y-1.5 sm:col-span-2">
-                  <label className="text-xs font-semibold text-amber-600 dark:text-amber-400 flex items-center gap-1">
-                    <TrendingDown className="w-3.5 h-3.5" /> Strict Negotiation Floor Price (₹)
-                  </label>
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-amber-600 dark:text-amber-400">Strict AI Floor Price (₹)</label>
                   <input
                     type="number"
-                    min="0"
-                    placeholder="e.g., 41000"
+                    placeholder="e.g. 1200 (Agent never quotes lower)"
                     value={formData.minimum_price_inr}
                     onChange={e => setFormData({ ...formData, minimum_price_inr: e.target.value })}
-                    className="w-full px-3 py-2 bg-amber-500/5 border border-amber-500/30 rounded-xl text-xs text-amber-700 dark:text-amber-300 focus:outline-none focus:ring-1 focus:ring-amber-500 font-mono shadow-sm"
+                    className="w-full px-3 py-2 bg-[var(--hover-bg)] border border-amber-500/30 rounded-xl text-xs text-[var(--heading)] focus:outline-none focus:ring-1 focus:ring-amber-500"
                   />
-                  <p className="text-[10px] text-amber-600/80 dark:text-amber-400/80 font-medium">
-                    The bot will NEVER negotiate below this floor under any circumstance.
-                  </p>
                 </div>
+
+                {/* Slot start/end (Appointments) */}
+                {formData.category === 'appointment_slots' && (
+                  <>
+                    <div className="space-y-1">
+                      <label className="text-xs font-semibold text-[var(--heading)]">Slot Start</label>
+                      <input
+                        type="datetime-local"
+                        value={formData.booking_slot_start}
+                        onChange={e => setFormData({ ...formData, booking_slot_start: e.target.value })}
+                        className="w-full px-3 py-2 bg-[var(--hover-bg)] border border-[var(--border)] rounded-xl text-xs text-[var(--heading)] focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs font-semibold text-[var(--heading)]">Slot End</label>
+                      <input
+                        type="datetime-local"
+                        value={formData.booking_slot_end}
+                        onChange={e => setFormData({ ...formData, booking_slot_end: e.target.value })}
+                        className="w-full px-3 py-2 bg-[var(--hover-bg)] border border-[var(--border)] rounded-xl text-xs text-[var(--heading)] focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                      />
+                    </div>
+                  </>
+                )}
+
+                {/* Logistics Origin / Destination */}
+                {formData.category === 'logistics' && (
+                  <>
+                    <div className="space-y-1">
+                      <label className="text-xs font-semibold text-[var(--heading)]">Route Origin</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Delhi, Mumbai"
+                        value={formData.route_origin}
+                        onChange={e => setFormData({ ...formData, route_origin: e.target.value })}
+                        className="w-full px-3 py-2 bg-[var(--hover-bg)] border border-[var(--border)] rounded-xl text-xs text-[var(--heading)] focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs font-semibold text-[var(--heading)]">Route Destination</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Bangalore, Pune"
+                        value={formData.route_destination}
+                        onChange={e => setFormData({ ...formData, route_destination: e.target.value })}
+                        className="w-full px-3 py-2 bg-[var(--hover-bg)] border border-[var(--border)] rounded-xl text-xs text-[var(--heading)] focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                      />
+                    </div>
+                  </>
+                )}
               </div>
 
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-[var(--border)]">
+              {/* Description */}
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-[var(--heading)]">Description / Instructions</label>
+                <textarea
+                  rows={2}
+                  value={formData.description}
+                  onChange={e => setFormData({ ...formData, description: e.target.value })}
+                  placeholder="Notes for voice agents when talking to customers about this offering"
+                  className="w-full px-3 py-2 bg-[var(--hover-bg)] border border-[var(--border)] rounded-xl text-xs text-[var(--heading)] focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                />
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-[var(--border)]">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2.5 rounded-xl bg-[var(--card-bg)] hover:bg-[var(--hover-bg)] border border-[var(--border)] text-xs font-semibold text-[var(--body)] cursor-pointer"
+                  className="px-4 py-2.5 rounded-xl border border-[var(--border)] text-xs font-semibold text-[var(--body)] hover:bg-[var(--hover-bg)] cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={saving}
-                  className="px-5 py-2.5 bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 font-bold text-xs uppercase tracking-wider rounded-xl transition-all shadow-sm active:scale-[0.98] cursor-pointer disabled:opacity-50"
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 text-xs font-semibold transition-all shadow-sm active:scale-[0.98] cursor-pointer disabled:opacity-50"
                 >
-                  {saving ? 'Saving...' : editingItem ? 'Save Changes' : 'Add to AI Brain'}
+                  {saving ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" /> Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Check className="w-4 h-4" /> Save Item
+                    </>
+                  )}
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
-
-      {/* CSV / Excel Import Modal */}
-      {isImportModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="w-full max-w-2xl bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl shadow-2xl p-6 space-y-6 max-h-[90vh] overflow-y-auto text-left">
-            <div className="flex items-center justify-between border-b border-[var(--border)] pb-4">
-              <h2 className="text-lg font-bold text-[var(--heading)] flex items-center gap-2 font-display uppercase tracking-wider">
-                <FileSpreadsheet className="w-5 h-5 text-[var(--accent)]" />
-                Import Excel / CSV to AI Operations Brain
-              </h2>
-              <button
-                onClick={() => {
-                  setIsImportModalOpen(false)
-                  setParsedImportRows([])
-                }}
-                className="p-1.5 rounded-lg text-[var(--muted)] hover:text-[var(--heading)] hover:bg-[var(--hover-bg)] cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="space-y-4">
-              <p className="text-xs text-[var(--muted)]">
-                Upload your rate card, container stock, doctor schedule, or inventory spreadsheet. The AI will parse the rows and index them directly into the live call brain.
-              </p>
-
-              {/* Sample Templates */}
-              <div className="p-4 rounded-xl bg-[var(--hover-bg)] border border-[var(--border)] space-y-2">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--heading)] flex items-center gap-1.5">
-                  <Download className="w-3.5 h-3.5 text-[var(--accent)]" /> Download Sample CSV Templates
-                </span>
-                <div className="flex items-center gap-2 flex-wrap pt-1">
-                  <button
-                    type="button"
-                    onClick={() => handleDownloadSampleCsv('logistics')}
-                    className="px-3 py-1.5 rounded-lg bg-[var(--card-bg)] border border-[var(--border)] text-[11px] font-semibold text-[var(--heading)] hover:bg-[var(--hover-bg)] cursor-pointer"
-                  >
-                    🚚 Logistics & Freight Template
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleDownloadSampleCsv('appointment_slots')}
-                    className="px-3 py-1.5 rounded-lg bg-[var(--card-bg)] border border-[var(--border)] text-[11px] font-semibold text-[var(--heading)] hover:bg-[var(--hover-bg)] cursor-pointer"
-                  >
-                    🩺 Clinic & Doctor Template
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleDownloadSampleCsv('inventory')}
-                    className="px-3 py-1.5 rounded-lg bg-[var(--card-bg)] border border-[var(--border)] text-[11px] font-semibold text-[var(--heading)] hover:bg-[var(--hover-bg)] cursor-pointer"
-                  >
-                    🏷️ Product Catalog Template
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleDownloadSampleCsv('general')}
-                    className="px-3 py-1.5 rounded-lg bg-[var(--card-bg)] border border-[var(--border)] text-[11px] font-semibold text-[var(--heading)] hover:bg-[var(--hover-bg)] cursor-pointer"
-                  >
-                    ⚙️ Universal Business Template
-                  </button>
-                </div>
-              </div>
-
-              {/* File Dropzone */}
-              <div
-                onClick={() => fileInputRef.current?.click()}
-                className="border-2 border-dashed border-[var(--border)] hover:border-[var(--accent)] rounded-2xl p-8 text-center space-y-3 cursor-pointer transition-colors bg-[var(--hover-bg)]"
-              >
-                <Upload className="w-8 h-8 text-[var(--accent)] mx-auto" />
-                <div className="space-y-1">
-                  <p className="text-xs font-bold text-[var(--heading)]">Click to choose a CSV file or drag and drop</p>
-                  <p className="text-[11px] text-[var(--muted)]">Supports .csv rate sheets and catalogs</p>
-                </div>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".csv"
-                  onChange={handleFileUpload}
-                  className="hidden"
-                />
-              </div>
-
-              {/* Parsed Rows Preview */}
-              {parsedImportRows.length > 0 && (
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-[var(--heading)]">
-                      Preview ({parsedImportRows.length} items parsed)
-                    </span>
-                    <button
-                      onClick={() => setParsedImportRows([])}
-                      className="text-[11px] text-rose-500 hover:underline cursor-pointer"
-                    >
-                      Clear
-                    </button>
-                  </div>
-                  <div className="max-h-48 overflow-y-auto border border-[var(--border)] rounded-xl divide-y divide-[var(--border)] text-xs">
-                    {parsedImportRows.slice(0, 10).map((row, idx) => (
-                      <div key={idx} className="p-2.5 flex items-center justify-between gap-3 bg-[var(--card-bg)]">
-                        <div className="truncate">
-                          <span className="font-bold text-[var(--heading)]">{row.title}</span>
-                          <span className="text-[11px] text-[var(--muted)] ml-2">({row.category})</span>
-                          {row.route_origin && (
-                            <span className="text-[10px] text-cyan-600 dark:text-cyan-400 ml-2">
-                              {row.route_origin} → {row.route_destination}
-                            </span>
-                          )}
-                        </div>
-                        <div className="font-mono text-xs font-semibold text-[var(--heading)] whitespace-nowrap">
-                          {row.base_price_inr ? `₹${row.base_price_inr}` : '-'}
-                          {row.minimum_price_inr && (
-                            <span className="text-amber-600 dark:text-amber-400 text-[10px] ml-1.5">
-                              (Floor: ₹{row.minimum_price_inr})
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                    {parsedImportRows.length > 10 && (
-                      <div className="p-2 text-center text-[11px] text-[var(--muted)] bg-[var(--hover-bg)] font-medium">
-                        + {parsedImportRows.length - 10} more rows
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div className="flex items-center justify-end gap-3 pt-4 border-t border-[var(--border)]">
-              <button
-                type="button"
-                onClick={() => {
-                  setIsImportModalOpen(false)
-                  setParsedImportRows([])
-                }}
-                className="px-4 py-2.5 rounded-xl bg-[var(--card-bg)] hover:bg-[var(--hover-bg)] border border-[var(--border)] text-xs font-semibold text-[var(--body)] cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                disabled={importing || parsedImportRows.length === 0}
-                onClick={handleBulkImportSave}
-                className="px-5 py-2.5 bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 font-bold text-xs uppercase tracking-wider rounded-xl transition-all shadow-sm active:scale-[0.98] cursor-pointer disabled:opacity-50"
-              >
-                {importing ? 'Importing to Brain...' : `Import ${parsedImportRows.length} Items to Brain`}
-              </button>
-            </div>
           </div>
         </div>
       )}

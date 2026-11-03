@@ -1625,7 +1625,7 @@ def create_appointment_tools(
                 # Query business_operations_catalog with strict tenant isolation
                 db_q = supabase_admin.table("business_operations_catalog").select(
                     "id, title, identifier_code, category, route_origin, route_destination, available_units, base_price_inr, minimum_price_inr, booking_slot_start, booking_slot_end, status, metadata"
-                ).eq("status", "available")
+                ).eq("status", "available").neq("category", "voice_directive")
 
                 if organization_id:
                     db_q = db_q.eq("organization_id", organization_id)
@@ -1648,7 +1648,7 @@ def create_appointment_tools(
                     # Fallback query matching title or identifier_code
                     fallback_q = supabase_admin.table("business_operations_catalog").select(
                         "id, title, identifier_code, category, route_origin, route_destination, available_units, base_price_inr, minimum_price_inr, booking_slot_start, booking_slot_end, status"
-                    ).eq("status", "available")
+                    ).eq("status", "available").neq("category", "voice_directive")
                     if organization_id:
                         fallback_q = fallback_q.eq("organization_id", organization_id)
                     elif user_id:
@@ -4081,7 +4081,7 @@ async def entrypoint(ctx: JobContext):
                 except Exception as apt_lookup_err:
                     logger.warning(f"Could not load appointment records in EP: {apt_lookup_err}")
 
-                # 10b. Live Business Operations Brain Injection (Real-Time Catalog, Routes, Inventory & Pricing Floors)
+                # 10b. Live Business Operations Brain Injection (Voice Directives, Real-Time Catalog, Inventory & Floor Pricing)
                 try:
                     cat_query = supabase_admin.table("business_operations_catalog").select(
                         "identifier_code, title, category, route_origin, route_destination, available_units, base_price_inr, minimum_price_inr, booking_slot_start, metadata"
@@ -4091,13 +4091,23 @@ async def entrypoint(ctx: JobContext):
                     elif user_id:
                         cat_query = cat_query.eq("user_id", user_id)
 
-                    cat_res = await asyncio.to_thread(cat_query.limit(10).execute)
+                    cat_res = await asyncio.to_thread(cat_query.limit(20).execute)
                     if cat_res.data and len(cat_res.data) > 0:
+                        voice_directives = []
                         cat_lines = []
+
                         for item in cat_res.data:
+                            cat = item.get("category") or "general"
+                            meta = item.get("metadata") or {}
+
+                            # Check for Owner Spoken Voice Directives
+                            if cat == "voice_directive":
+                                prompt_override = meta.get("prompt_override") or item.get("title")
+                                voice_directives.append(f"- ⚡ [OWNER VOICE OVERRIDE]: {prompt_override}")
+                                continue
+
                             code = item.get("identifier_code") or "ITEM"
                             title = item.get("title") or "Item"
-                            cat = item.get("category") or "general"
                             orig = item.get("route_origin")
                             dest = item.get("route_destination")
                             units = item.get("available_units", 1)
@@ -4113,15 +4123,27 @@ async def entrypoint(ctx: JobContext):
                                 desc += f", Strict Floor Limit: Rs. {min_p}"
                             cat_lines.append(desc)
 
-                        system_prompt += (
-                            f"\n\n## LIVE BUSINESS OPERATIONS BRAIN (REAL-TIME CATALOG, INVENTORY & PRICING)\n"
-                            + "\n".join(cat_lines) +
-                            "\n- REAL-TIME INVENTORY & PRICING DIRECTIVES:\n"
-                            "  1. Use this real data directly during the call to quote routes, vehicle types, container fleet, or open appointment slots.\n"
-                            "  2. First quote the base Quoted Price. If the caller asks for discount or negotiates, you may offer a discount down to the Strict Floor Limit, but NEVER accept or quote below the Floor Limit.\n"
-                            "  3. Use 'reserve_business_inventory' to lock in any confirmed booking so slots/routes never overlap.\n"
-                            "  4. If the customer requests demo links or payment details, use 'dispatch_demo_or_business_link' or 'dispatch_payment_request' immediately during the call.\n"
-                        )
+                        # Inject Active Spoken Voice Directives with highest operational precedence
+                        if voice_directives:
+                            system_prompt += (
+                                f"\n\n## CRITICAL OWNER DAILY VOICE DIRECTIVES (HIGH PRIORITY SPOKEN OVERRIDES)\n"
+                                f"The business owner has given direct verbal instructions for today's operations. "
+                                f"You MUST follow these rules strictly over standard behavior:\n"
+                                + "\n".join(voice_directives) +
+                                f"\n- MANDATORY ENFORCEMENT: Never schedule or quote against an active owner directive above.\n"
+                            )
+
+                        # Inject Catalog Inventory & Floor limits
+                        if cat_lines:
+                            system_prompt += (
+                                f"\n\n## LIVE BUSINESS OPERATIONS BRAIN (REAL-TIME CATALOG, INVENTORY & PRICING)\n"
+                                + "\n".join(cat_lines) +
+                                "\n- REAL-TIME INVENTORY & PRICING DIRECTIVES:\n"
+                                "  1. Use this real data directly during the call to quote routes, vehicle types, container fleet, or open appointment slots.\n"
+                                "  2. First quote the base Quoted Price. If the caller asks for discount or negotiates, you may offer a discount down to the Strict Floor Limit, but NEVER accept or quote below the Floor Limit.\n"
+                                "  3. Use 'reserve_business_inventory' to lock in any confirmed booking so slots/routes never overlap.\n"
+                                "  4. If the customer requests demo links or payment details, use 'dispatch_demo_or_business_link' or 'dispatch_payment_request' immediately during the call.\n"
+                            )
                 except Exception as cat_err:
                     logger.debug(f"Catalog prompt injection note: {cat_err}")
 
