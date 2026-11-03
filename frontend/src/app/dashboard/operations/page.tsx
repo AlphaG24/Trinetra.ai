@@ -20,9 +20,7 @@ import {
   Upload,
   FileSpreadsheet,
   Download,
-  FileText,
-  SlidersHorizontal,
-  HelpCircle
+  SlidersHorizontal
 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -143,16 +141,6 @@ export default function OperationsBrainPage() {
       return matchesSearch && matchesCategory && matchesStatus
     })
   }, [items, searchQuery, selectedCategory, statusFilter])
-
-  // KPIs
-  const stats = useMemo(() => {
-    return {
-      total: items.length,
-      logistics: items.filter(i => i.category === 'logistics' && i.status === 'available').length,
-      containers: items.filter(i => i.category === 'containers' && i.status === 'available').length,
-      slots: items.filter(i => i.category === 'appointment_slots' && i.status === 'available').length
-    }
-  }, [items])
 
   const handleOpenAdd = (defaultCat?: string) => {
     setEditingItem(null)
@@ -506,31 +494,21 @@ export default function OperationsBrainPage() {
   return (
     <div className="space-y-6 max-w-7xl mx-auto py-2 md:py-4 font-montserrat text-left">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-[var(--border)] pb-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-[var(--border)] pb-5">
         <div>
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-[var(--primary-bg)] border border-[var(--border)] text-[var(--accent)]">
-              <Boxes className="w-6 h-6" />
-            </div>
-            <div>
-              <h1 className="text-2xl md:text-3xl font-extrabold text-[var(--heading)] font-display uppercase tracking-wider flex items-center gap-2.5">
-                Live Operations Brain
-                <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25 font-mono font-bold uppercase tracking-normal">
-                  In-Call Sync Active
-                </span>
-              </h1>
-              <p className="text-sm text-[var(--muted)] mt-1">
-                Real-time operational knowledge base for routes, inventory, appointments, and price negotiation floors accessed live during calls.
-              </p>
-            </div>
-          </div>
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-[var(--heading)] font-display uppercase tracking-wider">
+            Live Operations Brain
+          </h1>
+          <p className="text-xs sm:text-sm text-[var(--muted)] mt-1 max-w-2xl">
+            Manage real-time operational catalog, services, daily inventory, and pricing floor limits referenced live by your voice agents during calls.
+          </p>
         </div>
 
-        <div className="flex items-center gap-2.5 flex-wrap">
+        <div className="flex items-center gap-2.5 sm:gap-3 shrink-0 self-start sm:self-center">
           <button
             onClick={fetchItems}
             disabled={loading}
-            className="p-2.5 rounded-xl bg-[var(--card-bg)] hover:bg-[var(--hover-bg)] border border-[var(--border)] text-[var(--body)] transition-colors cursor-pointer"
+            className="p-2.5 rounded-xl bg-[var(--card-bg)] hover:bg-[var(--hover-bg)] border border-[var(--border)] text-[var(--body)] transition-colors cursor-pointer shrink-0 shadow-sm"
             title="Refresh Catalog"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-[var(--accent)]' : ''}`} />
@@ -538,63 +516,24 @@ export default function OperationsBrainPage() {
 
           <button
             onClick={() => setIsImportModalOpen(true)}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[var(--card-bg)] hover:bg-[var(--hover-bg)] border border-[var(--border)] text-[var(--heading)] font-bold text-xs uppercase tracking-wider transition-all shadow-sm active:scale-[0.98] cursor-pointer"
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[var(--card-bg)] hover:bg-[var(--hover-bg)] border border-[var(--border)] text-[var(--heading)] font-bold text-xs uppercase tracking-wider transition-all shadow-sm active:scale-[0.98] cursor-pointer whitespace-nowrap"
           >
             <Upload className="w-4 h-4" /> Import Excel / CSV
           </button>
 
           <button
             onClick={() => handleOpenAdd(selectedCategory)}
-            className="flex items-center gap-2 px-5 py-2.5 bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 font-bold text-xs uppercase tracking-wider rounded-xl transition-all shadow-sm active:scale-[0.98] cursor-pointer"
+            className="flex items-center gap-2 px-5 py-2.5 bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 font-bold text-xs uppercase tracking-wider rounded-xl transition-all shadow-sm active:scale-[0.98] cursor-pointer whitespace-nowrap"
           >
             <Plus className="w-4 h-4" /> Add Operations Item
           </button>
         </div>
       </div>
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-5 shadow-sm space-y-1">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted)]">Total Catalog Items</span>
-            <Boxes className="w-4 h-4 text-[var(--muted)]" />
-          </div>
-          <div className="text-2xl font-black text-[var(--heading)] font-mono">{stats.total}</div>
-          <div className="text-xs text-[var(--muted)]">Live items indexed in voice bot brain</div>
-        </div>
-
-        <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-5 shadow-sm space-y-1">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-cyan-600 dark:text-cyan-400">Available Routes</span>
-            <Truck className="w-4 h-4 text-cyan-600 dark:text-cyan-400" />
-          </div>
-          <div className="text-2xl font-black text-cyan-600 dark:text-cyan-300 font-mono">{stats.logistics}</div>
-          <div className="text-xs text-[var(--muted)]">Open freight routes ready for booking</div>
-        </div>
-
-        <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-5 shadow-sm space-y-1">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">Container Fleet</span>
-            <Layers className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-          </div>
-          <div className="text-2xl font-black text-indigo-600 dark:text-indigo-300 font-mono">{stats.containers}</div>
-          <div className="text-xs text-[var(--muted)]">20ft / 40ft units in stock</div>
-        </div>
-
-        <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-5 shadow-sm space-y-1">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">Active Booking Slots</span>
-            <Calendar className="w-4 h-4 text-amber-600 dark:text-amber-400" />
-          </div>
-          <div className="text-2xl font-black text-amber-600 dark:text-amber-300 font-mono">{stats.slots}</div>
-          <div className="text-xs text-[var(--muted)]">Open slots for patient / client booking</div>
-        </div>
-      </div>
-
       {/* Filters & Search */}
       <div className="flex flex-col md:flex-row items-center justify-between gap-4">
         {/* Category Tabs */}
-        <div className="flex items-center gap-1.5 p-1 bg-[var(--card-bg)] border border-[var(--border)] rounded-xl overflow-x-auto w-full md:w-auto shadow-sm">
+        <div className="flex items-center gap-1.5 p-1 bg-[var(--card-bg)] border border-[var(--border)] rounded-xl overflow-x-auto max-w-full shadow-sm [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
           {CATEGORIES.map(cat => {
             const Icon = cat.icon
             const active = selectedCategory === cat.id
