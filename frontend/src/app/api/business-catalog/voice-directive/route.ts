@@ -14,19 +14,16 @@ function getAdminClient() {
 }
 
 async function analyzeVoiceDirectiveWithLLM(transcript: string) {
+  const now = new Date();
+  const dateIso = now.toISOString().slice(0, 10);
+
   const systemPrompt = `You are the AI Business Brain Operations Specialist for Trinetra AI.
 The business owner has provided a verbal instruction or operational update in Hindi, Hinglish, or English.
-Examples:
-1. "Aaj mai 10 baje se 4 bje tak salon open rakhunga to us time ke according he appointements lena"
-   -> Goal: Limit appointment booking strictly to 10:00 AM - 4:00 PM today.
-2. "Aaj mai shop close rakhunga so aaj ki saari appointement kal schedule karo aur us hisab se karna"
-   -> Goal: Shop is closed today. Reschedule/decline today's appointments, offer tomorrow onwards.
-3. "aaj mere paas koi gaadi nhi hai par products available hai to aur koi product mat lena sirf gadi ki jarurat hai"
-   -> Goal: 0 transport vehicles/trucks available. Do not accept vehicle bookings; inform callers and seek truck providers.
+Current Date: ${dateIso}.
 
-Your job is to analyze the user's spoken words and return a structured JSON response:
+Analyze the user's spoken words and return a structured JSON response:
 {
-  "title": "Short, clear human-readable title (e.g. 'Operating Hours: 10:00 AM - 4:00 PM Today' or 'Shop Closed Today - Reschedule to Tomorrow')",
+  "title": "Short, clear human-readable title (e.g. 'Operating Hours: Open After 10:00 AM Today' or 'Shop Closed Today - Reschedule to Tomorrow')",
   "prompt_override": "A direct, imperative instruction for the AI voice agent answering live calls. State clearly what the bot must tell callers, what slots to book, and what limits to enforce.",
   "category": "appointment_slots | inventory | logistics | general",
   "action_type": "hours_update | closure_reschedule | inventory_zero | rule_override",
@@ -36,11 +33,34 @@ Your job is to analyze the user's spoken words and return a structured JSON resp
     "mark_closed": boolean,
     "slot_start": "string or null",
     "slot_end": "string or null"
-  }
+  },
+  "auto_populated_items": [
+    {
+      "title": "Clear offering or slot name (e.g. 'Appointment Slot: 10:00 AM - 12:00 PM' or 'Afternoon Consultation Slot: 02:00 PM - 04:00 PM')",
+      "category": "appointment_slots | inventory | logistics | general",
+      "identifier_code": "e.g. SLOT-10AM",
+      "available_units": 3,
+      "base_price_inr": 500,
+      "minimum_price_inr": 400,
+      "booking_slot_start": "${dateIso}T10:00:00Z",
+      "booking_slot_end": "${dateIso}T12:00:00Z",
+      "metadata": {
+        "notes": "Smart auto-populated from owner spoken instruction"
+      }
+    }
+  ]
 }
 
+RULES FOR AUTO-POPULATED ITEMS:
+1. If the owner mentions open hours or appointment booking (e.g., "10 baje tak band rahega to uske baad appointment lena" or "10 baje se 4 bje tak salon open rakhunga"):
+   - Generate 2 to 4 bookable appointment slots within that open window for today (e.g. 10:00-12:00, 12:00-14:00, 14:00-16:00, etc.) so customers calling the AI agent can book actual confirmed times.
+2. If the owner says the shop is closed today ("aaj shop close rakhunga"):
+   - auto_populated_items can be an empty array [] or tomorrow's first available slot.
+3. If the owner mentions specific products or discounts, create or update those items.
+4. If no specific slots are implied, return "auto_populated_items": [].
+
 OUTPUT RULES:
-- Output ONLY valid JSON. No markdown codeblocks. No introductory text.`;
+- Output ONLY valid JSON. No markdown codeblocks. No conversational introduction.`;
 
   const groqApiKey = process.env.GROQ_API_KEY;
   const geminiApiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
@@ -203,7 +223,7 @@ export async function POST(request: Request) {
         category: "voice_directive",
         identifier_code: `VOICE-${Date.now().toString().slice(-6)}`,
         available_units: 1,
-        status: "available", // "available" means active
+        status: "available",
         metadata: {
           is_active: true,
           voice_transcript: transcript,
@@ -223,11 +243,44 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Failed to save voice directive" }, { status: 500 });
     }
 
+    // Smart Auto-Population: If slots or offerings were generated from the voice instruction
+    let autoPopulatedRows: any[] = [];
+    if (Array.isArray(analysis.auto_populated_items) && analysis.auto_populated_items.length > 0) {
+      const itemsToInsert = analysis.auto_populated_items.map((raw: any, idx: number) => ({
+        user_id: user.id,
+        organization_id: orgId,
+        title: raw.title || `Operational Slot ${idx + 1}`,
+        category: raw.category || "appointment_slots",
+        identifier_code: raw.identifier_code || `AUTO-${Date.now().toString().slice(-4)}-${idx + 1}`,
+        available_units: Number(raw.available_units) || 1,
+        base_price_inr: raw.base_price_inr !== undefined && raw.base_price_inr !== null ? Number(raw.base_price_inr) : null,
+        minimum_price_inr: raw.minimum_price_inr !== undefined && raw.minimum_price_inr !== null ? Number(raw.minimum_price_inr) : null,
+        booking_slot_start: raw.booking_slot_start || null,
+        booking_slot_end: raw.booking_slot_end || null,
+        status: "available",
+        metadata: {
+          ...(raw.metadata || {}),
+          auto_generated_from_directive_id: newDirective?.id,
+          source_voice_transcript: transcript
+        }
+      }));
+
+      const { data: insertedSlots, error: slotsError } = await admin
+        .from("business_operations_catalog")
+        .insert(itemsToInsert)
+        .select();
+
+      if (!slotsError && insertedSlots) {
+        autoPopulatedRows = insertedSlots;
+      }
+    }
+
     return NextResponse.json({
       success: true,
       data: {
         directive: newDirective,
-        analysis
+        analysis,
+        auto_populated_items: autoPopulatedRows
       }
     });
   } catch (err: any) {
@@ -251,7 +304,7 @@ export async function PATCH(request: Request) {
     }
 
     const admin = getAdminClient();
-    const status = is_active ? "available" : "reserved"; // "available" = active in call prompt, "reserved" = paused
+    const status = is_active ? "available" : "reserved";
 
     const { data, error: updateError } = await admin
       .from("business_operations_catalog")
@@ -272,4 +325,3 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: err?.message || "Failed to toggle directive" }, { status: 500 });
   }
 }
-

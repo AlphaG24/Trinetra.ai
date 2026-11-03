@@ -51,6 +51,7 @@ interface OperationsItem {
 
 const CATEGORIES = [
   { id: 'all', label: 'All Knowledge & Offerings', icon: Boxes },
+  { id: 'voice_directive', label: 'Spoken Rules & Overrides', icon: Mic },
   { id: 'appointment_slots', label: 'Appointments & Slots', icon: Calendar },
   { id: 'inventory', label: 'Products & Services', icon: Package },
   { id: 'logistics', label: 'Routes & Transport', icon: Building2 },
@@ -151,24 +152,31 @@ export default function OperationsBrainPage() {
     fetchItems()
   }, [])
 
-  // Separate Active Voice Directives from Catalog items
+  // Universal Summary Metrics
   const activeVoiceDirectives = useMemo(() => {
     return items.filter(i => i.category === 'voice_directive')
   }, [items])
 
-  const catalogItems = useMemo(() => {
+  const catalogOfferings = useMemo(() => {
     return items.filter(i => i.category !== 'voice_directive')
   }, [items])
 
-  // Filtered Catalog Items
+  const totalCatalogItems = catalogOfferings.length
+  const totalUnitsCapacity = catalogOfferings.reduce((acc, curr) => acc + (curr.available_units || 0), 0)
+  const itemsWithPricingFloor = catalogOfferings.filter(i => i.minimum_price_inr !== null && i.minimum_price_inr > 0).length
+  const activeDirectivesCount = activeVoiceDirectives.filter(i => i.status === 'available').length
+
+  // Unified Filtered Items Stream (Option A: includes voice directives when on "all" or "voice_directive")
   const filteredItems = useMemo(() => {
-    return catalogItems.filter(item => {
+    return items.filter(item => {
+      const meta = item.metadata || {}
       const matchesSearch =
         searchQuery === '' ||
         item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         (item.identifier_code && item.identifier_code.toLowerCase().includes(searchQuery.toLowerCase())) ||
         (item.route_origin && item.route_origin.toLowerCase().includes(searchQuery.toLowerCase())) ||
-        (item.route_destination && item.route_destination.toLowerCase().includes(searchQuery.toLowerCase()))
+        (item.route_destination && item.route_destination.toLowerCase().includes(searchQuery.toLowerCase())) ||
+        (meta.voice_transcript && meta.voice_transcript.toLowerCase().includes(searchQuery.toLowerCase()))
 
       const matchesCategory =
         selectedCategory === 'all' || item.category === selectedCategory
@@ -178,13 +186,7 @@ export default function OperationsBrainPage() {
 
       return matchesSearch && matchesCategory && matchesStatus
     })
-  }, [catalogItems, searchQuery, selectedCategory, statusFilter])
-
-  // Universal Summary Metrics (clean monochrome numbers)
-  const totalCatalogItems = catalogItems.length
-  const totalUnitsCapacity = catalogItems.reduce((acc, curr) => acc + (curr.available_units || 0), 0)
-  const itemsWithPricingFloor = catalogItems.filter(i => i.minimum_price_inr !== null && i.minimum_price_inr > 0).length
-  const activeDirectivesCount = activeVoiceDirectives.filter(i => i.status === 'available').length
+  }, [items, searchQuery, selectedCategory, statusFilter])
 
   // Voice Recognition Controls
   const startVoiceRecording = () => {
@@ -260,7 +262,12 @@ export default function OperationsBrainPage() {
 
       const json = await res.json()
       if (json.success) {
-        toast.success('Spoken directive applied to Brain! Live agents will follow this rule.')
+        const autoSlots = json.data?.auto_populated_items?.length || 0
+        if (autoSlots > 0) {
+          toast.success(`Directive applied and smart-generated ${autoSlots} bookable appointment slots!`)
+        } else {
+          toast.success('Spoken directive applied to Brain! Live agents will follow this rule.')
+        }
         setVoiceTranscript('')
         setIsVoiceModalOpen(false)
         fetchItems()
@@ -344,7 +351,7 @@ export default function OperationsBrainPage() {
   // Manual Add/Edit
   const handleOpenAdd = (defaultCat?: string) => {
     setEditingItem(null)
-    const cat = defaultCat && defaultCat !== 'all' ? defaultCat : 'general'
+    const cat = defaultCat && defaultCat !== 'all' && defaultCat !== 'voice_directive' ? defaultCat : 'general'
     setFormData({
       title: '',
       identifier_code: '',
@@ -541,6 +548,8 @@ export default function OperationsBrainPage() {
 
   const getCategoryIcon = (category: string) => {
     switch (category) {
+      case 'voice_directive':
+        return <Mic className="w-4 h-4 text-[var(--muted)]" />
       case 'appointment_slots':
         return <Calendar className="w-4 h-4 text-[var(--muted)]" />
       case 'inventory':
@@ -549,8 +558,6 @@ export default function OperationsBrainPage() {
         return <Building2 className="w-4 h-4 text-[var(--muted)]" />
       case 'containers':
         return <Layers className="w-4 h-4 text-[var(--muted)]" />
-      case 'voice_directive':
-        return <Mic className="w-4 h-4 text-[var(--muted)]" />
       default:
         return <SlidersHorizontal className="w-4 h-4 text-[var(--muted)]" />
     }
@@ -569,9 +576,8 @@ export default function OperationsBrainPage() {
           </p>
         </div>
 
-        {/* Action Controls with Luxury Monochrome Theme (No Purple) */}
+        {/* Action Controls */}
         <div className="flex flex-wrap items-center gap-2.5 sm:gap-3 shrink-0 self-stretch sm:self-auto">
-          {/* Speak to Brain Button */}
           <button
             onClick={() => setIsVoiceModalOpen(true)}
             className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 font-bold text-xs tracking-wide transition-all shadow-sm active:scale-[0.98] cursor-pointer"
@@ -580,7 +586,6 @@ export default function OperationsBrainPage() {
             <span>Speak to Brain</span>
           </button>
 
-          {/* Upload Documents Button */}
           <button
             onClick={() => setIsDocumentModalOpen(true)}
             className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-[var(--card-bg)] hover:bg-[var(--hover-bg)] border border-[var(--border)] text-[var(--heading)] font-bold text-xs tracking-wide transition-all shadow-sm active:scale-[0.98] cursor-pointer"
@@ -589,7 +594,6 @@ export default function OperationsBrainPage() {
             <span>Upload Documents</span>
           </button>
 
-          {/* Add Item Button */}
           <button
             onClick={() => handleOpenAdd(selectedCategory)}
             className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-[var(--card-bg)] hover:bg-[var(--hover-bg)] border border-[var(--border)] text-[var(--heading)] font-bold text-xs tracking-wide rounded-xl transition-all shadow-sm active:scale-[0.98] cursor-pointer"
@@ -598,7 +602,6 @@ export default function OperationsBrainPage() {
             <span>Add Item</span>
           </button>
 
-          {/* Refresh Button */}
           <button
             onClick={fetchItems}
             disabled={loading}
@@ -610,7 +613,7 @@ export default function OperationsBrainPage() {
         </div>
       </div>
 
-      {/* Dynamic Summary Cards (Monochrome Theme, No Multi-Colors) */}
+      {/* Dynamic Summary Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <div className="p-4 sm:p-5 rounded-2xl bg-[var(--card-bg)] border border-[var(--border)] shadow-sm space-y-1">
           <div className="flex items-center justify-between text-xs text-[var(--muted)] font-medium">
@@ -649,85 +652,7 @@ export default function OperationsBrainPage() {
         </div>
       </div>
 
-      {/* Active Voice Directives Section (Clean Monochrome Theme) */}
-      {activeVoiceDirectives.length > 0 && (
-        <div className="rounded-2xl border border-[var(--border)] bg-[var(--card-bg)] p-4 sm:p-5 space-y-3 shadow-sm">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Mic className="w-4 h-4 text-[var(--muted)]" />
-              <h3 className="text-sm font-bold text-[var(--heading)]">
-                Active Spoken Voice Directives & Daily Overrides
-              </h3>
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-[var(--hover-bg)] text-[var(--muted)] border border-[var(--border)]">
-                Live in Call Prompt
-              </span>
-            </div>
-            <button
-              onClick={() => setIsVoiceModalOpen(true)}
-              className="text-xs text-[var(--heading)] hover:text-zinc-950 dark:hover:text-white font-semibold underline underline-offset-4 inline-flex items-center gap-1 cursor-pointer"
-            >
-              <Plus className="w-3.5 h-3.5" /> New Voice Rule
-            </button>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {activeVoiceDirectives.map(directive => {
-              const meta = directive.metadata || {}
-              const isActive = directive.status === 'available'
-              return (
-                <div
-                  key={directive.id}
-                  className="p-3.5 rounded-xl bg-[var(--hover-bg)]/50 border border-[var(--border)] shadow-xs flex items-start justify-between gap-3 text-left"
-                >
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-xs text-[var(--heading)]">{directive.title}</span>
-                      <span
-                        className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
-                          isActive
-                            ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-950'
-                            : 'bg-[var(--card-bg)] text-[var(--muted)] border border-[var(--border)]'
-                        }`}
-                      >
-                        {isActive ? 'Active' : 'Paused'}
-                      </span>
-                    </div>
-                    {meta.voice_transcript && (
-                      <p className="text-xs text-[var(--muted)] italic">
-                        &quot;{meta.voice_transcript}&quot;
-                      </p>
-                    )}
-                    {meta.prompt_override && (
-                      <p className="text-[11px] text-[var(--heading)] font-mono bg-[var(--card-bg)] p-1.5 rounded-lg border border-[var(--border)] mt-1">
-                        Agent Directive: {meta.prompt_override}
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    <button
-                      onClick={() => handleToggleVoiceDirective(directive.id, directive.status)}
-                      className="px-2.5 py-1 rounded-lg bg-[var(--card-bg)] hover:bg-[var(--hover-bg)] border border-[var(--border)] text-[var(--heading)] cursor-pointer text-xs font-semibold shadow-xs"
-                      title={isActive ? 'Pause rule' : 'Activate rule'}
-                    >
-                      {isActive ? 'Pause' : 'Activate'}
-                    </button>
-                    <button
-                      onClick={() => handleDelete(directive.id, directive.title)}
-                      className="p-1.5 rounded-lg border border-[var(--border)] hover:bg-red-500/10 text-zinc-400 hover:text-red-500 transition-colors cursor-pointer"
-                      title="Delete directive"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Filters & Search */}
+      {/* Filters & Unified Category Tabs (Option A) */}
       <div className="flex flex-col md:flex-row items-center justify-between gap-4">
         {/* Category Tabs */}
         <div className="flex items-center gap-1.5 p-1 bg-[var(--card-bg)] border border-[var(--border)] rounded-xl overflow-x-auto max-w-full shadow-sm [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden w-full md:w-auto">
@@ -757,7 +682,7 @@ export default function OperationsBrainPage() {
             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted)]" />
             <input
               type="text"
-              placeholder="Search catalog, item or code..."
+              placeholder="Search catalog, rule or code..."
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               className="w-full pl-9 pr-3 py-2 bg-[var(--card-bg)] border border-[var(--border)] rounded-xl text-xs text-[var(--heading)] placeholder:text-[var(--muted)] focus:outline-none focus:ring-1 focus:ring-zinc-400 dark:focus:ring-zinc-500 shadow-sm"
@@ -777,7 +702,7 @@ export default function OperationsBrainPage() {
         </div>
       </div>
 
-      {/* Main Catalog Items Grid */}
+      {/* Main Unified Items Grid (Option A: Never looks empty when rules or offerings exist!) */}
       {loading ? (
         <div className="py-20 flex flex-col items-center justify-center gap-3 text-[var(--muted)]">
           <RefreshCw className="w-6 h-6 animate-spin text-[var(--heading)]" />
@@ -819,6 +744,83 @@ export default function OperationsBrainPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {filteredItems.map(item => {
             const meta = item.metadata || {}
+            const isVoiceRule = item.category === 'voice_directive'
+
+            // CARD VARIANT 1: SPOKEN VOICE OVERRIDE CARD (Rendered in-stream)
+            if (isVoiceRule) {
+              const isActive = item.status === 'available'
+              return (
+                <div
+                  key={item.id}
+                  className="bg-[var(--card-bg)] border-2 border-zinc-900/15 dark:border-white/15 rounded-2xl p-5 shadow-sm transition-all flex flex-col justify-between text-left space-y-3 relative overflow-hidden"
+                >
+                  <div className="space-y-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <div className="p-2 rounded-xl bg-[var(--hover-bg)] border border-[var(--border)]">
+                          <Mic className="w-4 h-4 text-[var(--heading)]" />
+                        </div>
+                        <div>
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted)]">
+                            Daily Spoken Override
+                          </span>
+                          <h3 className="text-sm font-bold text-[var(--heading)] line-clamp-1">{item.title}</h3>
+                        </div>
+                      </div>
+                      <span
+                        className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
+                          isActive
+                            ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-950'
+                            : 'bg-[var(--hover-bg)] text-[var(--muted)] border border-[var(--border)]'
+                        }`}
+                      >
+                        {isActive ? 'Active in Calls' : 'Paused'}
+                      </span>
+                    </div>
+
+                    {meta.voice_transcript && (
+                      <p className="text-xs text-[var(--muted)] italic bg-[var(--hover-bg)]/40 p-2 rounded-xl border border-[var(--border)]">
+                        &quot;{meta.voice_transcript}&quot;
+                      </p>
+                    )}
+
+                    {meta.prompt_override && (
+                      <div className="space-y-1">
+                        <span className="text-[10px] font-semibold text-[var(--muted)] uppercase tracking-wider">
+                          Live Agent Instruction:
+                        </span>
+                        <p className="text-xs text-[var(--heading)] font-mono bg-[var(--hover-bg)] p-2.5 rounded-xl border border-[var(--border)] leading-relaxed">
+                          {meta.prompt_override}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex items-center justify-between pt-3 border-t border-[var(--border)]">
+                    <span className="text-[11px] text-[var(--muted)]">
+                      {new Date(item.updated_at).toLocaleDateString()}
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => handleToggleVoiceDirective(item.id, item.status)}
+                        className="px-3 py-1 rounded-lg bg-[var(--card-bg)] hover:bg-[var(--hover-bg)] border border-[var(--border)] text-[var(--heading)] cursor-pointer text-xs font-semibold shadow-xs transition-colors"
+                      >
+                        {isActive ? 'Pause' : 'Activate'}
+                      </button>
+                      <button
+                        onClick={() => handleDelete(item.id, item.title)}
+                        className="p-1.5 rounded-lg border border-[var(--border)] hover:bg-red-500/10 text-zinc-400 hover:text-red-500 transition-colors cursor-pointer"
+                        title="Delete Rule"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )
+            }
+
+            // CARD VARIANT 2: STANDARD BUSINESS CATALOG & APPOINTMENT SLOT CARD
             return (
               <div
                 key={item.id}
@@ -882,7 +884,7 @@ export default function OperationsBrainPage() {
                     </div>
                   )}
 
-                  {/* Pricing Box (Clean Neutral Theme) */}
+                  {/* Pricing Box */}
                   {(item.base_price_inr !== null || item.minimum_price_inr !== null) && (
                     <div className="p-3 rounded-xl bg-[var(--hover-bg)] border border-[var(--border)] space-y-1.5">
                       <div className="flex items-center justify-between text-xs">
@@ -933,7 +935,7 @@ export default function OperationsBrainPage() {
         </div>
       )}
 
-      {/* MODAL 1: SPEAK & BUILD THE BRAIN (Zero Purple, Clean Zinc/Monochrome) */}
+      {/* MODAL 1: SPEAK & BUILD THE BRAIN */}
       {isVoiceModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
           <div className="relative w-full max-w-xl bg-[var(--card-bg)] border border-[var(--border)] rounded-3xl p-6 sm:p-7 shadow-2xl space-y-5 text-left animate-in fade-in zoom-in-95">
@@ -1027,7 +1029,7 @@ export default function OperationsBrainPage() {
               >
                 {isProcessingVoice ? (
                   <>
-                    <Loader2 className="w-4 h-4 animate-spin" /> Processing with AI...
+                    <Loader2 className="w-4 h-4 animate-spin" /> Processing & Auto-Populating Brain...
                   </>
                 ) : (
                   <>
@@ -1040,7 +1042,7 @@ export default function OperationsBrainPage() {
         </div>
       )}
 
-      {/* MODAL 2: MULTI-DOCUMENT INGESTION (Zero Purple, Clean Zinc/Monochrome) */}
+      {/* MODAL 2: MULTI-DOCUMENT INGESTION */}
       {isDocumentModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
           <div className="relative w-full max-w-xl bg-[var(--card-bg)] border border-[var(--border)] rounded-3xl p-6 sm:p-7 shadow-2xl space-y-5 text-left animate-in fade-in zoom-in-95">
@@ -1147,7 +1149,7 @@ export default function OperationsBrainPage() {
         </div>
       )}
 
-      {/* MODAL 3: MANUAL ADD / EDIT OPERATION ITEM (Zero Purple, Clean Zinc/Monochrome) */}
+      {/* MODAL 3: MANUAL ADD / EDIT OPERATION ITEM */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm overflow-y-auto">
           <div className="relative w-full max-w-2xl bg-[var(--card-bg)] border border-[var(--border)] rounded-3xl p-6 sm:p-7 shadow-2xl space-y-5 text-left my-8 animate-in fade-in zoom-in-95">

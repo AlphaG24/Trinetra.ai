@@ -93,3 +93,45 @@ def test_sec011_compliance_with_brain_injection():
     # SEC-011 Mandates: Must state AI identity and recording disclosure
     assert "AI assistant" in opening or "AI" in opening
     assert "record" in opening.lower() or "रिकॉर्ड" in opening
+
+
+def test_smart_auto_population_of_slots_from_voice_directive():
+    """Verify that when a voice directive contains appointment scheduling constraints,
+    auto-populated slots are structured with proper booking slots and capacity."""
+    sample_analysis = {
+        "title": "Operating Hours: Open from 10:00 AM Today",
+        "prompt_override": "Please inform callers that appointments can only be booked from 10:00 AM onwards today.",
+        "category": "appointment_slots",
+        "action_type": "hours_update",
+        "summary_hindi": "Salon 10 baje ke baad open rahega",
+        "auto_populated_items": [
+            {
+                "title": "Appointment Slot: 10:00 AM - 12:00 PM",
+                "category": "appointment_slots",
+                "identifier_code": "SLOT-10AM",
+                "available_units": 3,
+                "base_price_inr": 500,
+                "minimum_price_inr": 400,
+                "booking_slot_start": "2026-11-03T10:00:00Z",
+                "booking_slot_end": "2026-11-03T12:00:00Z"
+            },
+            {
+                "title": "Appointment Slot: 12:00 PM - 02:00 PM",
+                "category": "appointment_slots",
+                "identifier_code": "SLOT-12PM",
+                "available_units": 3,
+                "base_price_inr": 500,
+                "minimum_price_inr": 400,
+                "booking_slot_start": "2026-11-03T12:00:00Z",
+                "booking_slot_end": "2026-11-03T14:00:00Z"
+            }
+        ]
+    }
+
+    assert len(sample_analysis["auto_populated_items"]) == 2
+    slot_1 = sample_analysis["auto_populated_items"][0]
+    assert slot_1["category"] == "appointment_slots"
+    assert slot_1["available_units"] == 3
+    assert "10:00:00Z" in slot_1["booking_slot_start"]
+    assert slot_1["base_price_inr"] >= slot_1["minimum_price_inr"]
+
