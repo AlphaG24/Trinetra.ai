@@ -1598,13 +1598,200 @@ def create_appointment_tools(
             return await tool_guard.execute_tool("dispatch_payment_request", _execute)
         return await _execute()
 
+
+    @llm.function_tool(
+        description="Query the live business operations brain for real-time truck loads, logistics routes, container availability, inventory items, and appointment slots. Returns live availability, base price, and the strict minimum negotiation floor price."
+    )
+    async def query_live_inventory(
+        category: str = "",
+        query: str = "",
+        origin: str = "",
+        destination: str = "",
+        max_budget_inr: float = 0.0
+    ) -> str:
+        """
+        Query real-time business operations catalog.
+        Args:
+            category: Operational category (e.g., 'logistics', 'containers', 'appointment_slots', 'inventory', 'pricing').
+            query: Freeform search query or item title (e.g., 'truck', '20ft container', 'Jaipur to Delhi').
+            origin: Route starting city/hub (optional, e.g., 'Delhi', 'Jaipur', 'Mumbai').
+            destination: Route ending city/hub (optional, e.g., 'Mumbai', 'Ahmedabad', 'Kolkata').
+            max_budget_inr: Maximum customer budget in INR if specified (optional).
+        """
+        async def _execute() -> str:
+            if timing_tracker:
+                timing_tracker.mark("tool_start", extra="tool=query_live_inventory")
+            try:
+                # Query business_operations_catalog with strict tenant isolation
+                db_q = supabase_admin.table("business_operations_catalog").select(
+                    "id, title, identifier_code, category, route_origin, route_destination, available_units, base_price_inr, minimum_price_inr, booking_slot_start, booking_slot_end, status, metadata"
+                ).eq("status", "available")
+
+                if organization_id:
+                    db_q = db_q.eq("organization_id", organization_id)
+                elif user_id:
+                    db_q = db_q.eq("user_id", user_id)
+
+                if category and category.lower() != "all":
+                    db_q = db_q.ilike("category", f"%{category.lower()}%")
+
+                if origin:
+                    db_q = db_q.ilike("route_origin", f"%{origin.strip()}%")
+
+                if destination:
+                    db_q = db_q.ilike("route_destination", f"%{destination.strip()}%")
+
+                res = await asyncio.to_thread(db_q.limit(5).execute)
+                items = res.data or []
+
+                if not items and (query or origin or destination):
+                    # Fallback query matching title or identifier_code
+                    fallback_q = supabase_admin.table("business_operations_catalog").select(
+                        "id, title, identifier_code, category, route_origin, route_destination, available_units, base_price_inr, minimum_price_inr, booking_slot_start, booking_slot_end, status"
+                    ).eq("status", "available")
+                    if organization_id:
+                        fallback_q = fallback_q.eq("organization_id", organization_id)
+                    elif user_id:
+                        fallback_q = fallback_q.eq("user_id", user_id)
+                    
+                    search_term = query or origin or destination
+                    fallback_q = fallback_q.or_(f"title.ilike.%{search_term}%,identifier_code.ilike.%{search_term}%,route_origin.ilike.%{search_term}%,route_destination.ilike.%{search_term}%")
+                    res_fallback = await asyncio.to_thread(fallback_q.limit(5).execute)
+                    items = res_fallback.data or []
+
+                if not items:
+                    return f"NO_OPERATIONS_FOUND: No currently available inventory or routes matching '{query or category or origin or destination}'. Inform the caller politely and offer to note their exact requirements."
+
+                lines = []
+                for itm in items:
+                    title = itm.get("title", "Item")
+                    code = itm.get("identifier_code") or itm.get("id", "")[:8]
+                    units = itm.get("available_units", 1)
+                    orig = itm.get("route_origin")
+                    dest = itm.get("route_destination")
+                    base_p = itm.get("base_price_inr")
+                    min_p = itm.get("minimum_price_inr")
+                    slot_s = itm.get("booking_slot_start")
+
+                    route_info = f" Route: {orig} -> {dest}." if orig and dest else ""
+                    slot_info = f" Available Slot: {slot_s}." if slot_s else ""
+                    pricing_info = ""
+                    if base_p is not None:
+                        pricing_info += f" Quoted Price: Rs. {base_p}."
+                    if min_p is not None:
+                        pricing_info += f" STRICT MINIMUM FLOOR (DO NOT GO BELOW): Rs. {min_p}."
+
+                    lines.append(f"- [{code}] {title} (Units: {units}).{route_info}{slot_info}{pricing_info}")
+
+                return (
+                    f"LIVE BUSINESS CATALOG FOUND ({len(items)} items):\n"
+                    + "\n".join(lines)
+                    + "\n\nCRITICAL NEGOTIATION INSTRUCTION FOR AGENT: Quote the customer the base Quoted Price first. If the customer negotiates or asks for discount, you are authorized to negotiate down, but NEVER under any circumstance offer or accept any amount below the STRICT MINIMUM FLOOR."
+                )
+            except Exception as e:
+                logger.error(f"[query_live_inventory] Lookup error: {e}")
+                return "LIVE_CATALOG_UNAVAILABLE: Catalog lookup encountered an error. Proceed with standard customer inquiry."
+            finally:
+                if timing_tracker:
+                    timing_tracker.mark("tool_end", extra="tool=query_live_inventory")
+
+        if tool_guard:
+            return await tool_guard.execute_tool("query_live_inventory", _execute)
+        return await _execute()
+
+    @llm.function_tool(
+        description="Reserve or book an item, route load, container, or appointment slot in the live operations catalog so available stock/units are decremented and slots never overlap."
+    )
+    async def reserve_business_inventory(
+        identifier_code: str = "",
+        item_title: str = "",
+        units_to_reserve: int = 1,
+        customer_name: str = "",
+        contact_phone: str = ""
+    ) -> str:
+        """
+        Reserve units of a catalog item/route/slot.
+        Args:
+            identifier_code: The code or ID of the item to reserve.
+            item_title: Title or description of the item if code is not known.
+            units_to_reserve: Number of units, trucks, or containers to reserve (default 1).
+            customer_name: Customer's name.
+            contact_phone: Customer's contact phone number.
+        """
+        async def _execute() -> str:
+            if timing_tracker:
+                timing_tracker.mark("tool_start", extra="tool=reserve_business_inventory")
+            try:
+                # Query item
+                q = supabase_admin.table("business_operations_catalog").select("*")
+                if organization_id:
+                    q = q.eq("organization_id", organization_id)
+                elif user_id:
+                    q = q.eq("user_id", user_id)
+
+                if identifier_code:
+                    clean_id = identifier_code.strip()
+                    is_uuid = bool(re.match(r'^[0-9a-fA-F-]{36}$', clean_id))
+                    if is_uuid:
+                        q = q.or_(f"identifier_code.ilike.%{clean_id}%,id.eq.{clean_id}")
+                    else:
+                        q = q.or_(f"identifier_code.ilike.%{clean_id}%,title.ilike.%{clean_id}%")
+                elif item_title:
+                    q = q.ilike("title", f"%{item_title}%")
+                else:
+                    return "Please specify the item code or route title to reserve."
+
+                res = await asyncio.to_thread(q.limit(1).execute)
+                if not res.data:
+                    return f"RESERVATION_FAILED: Item '{identifier_code or item_title}' not found in catalog."
+
+                item = res.data[0]
+                item_id = item["id"]
+                curr_units = float(item.get("available_units") or 1)
+                new_units = max(0, curr_units - units_to_reserve)
+                new_status = "booked" if new_units == 0 else "available"
+
+                meta = item.get("metadata") or {}
+                bookings = meta.get("bookings") or []
+                bookings.append({
+                    "customer_name": customer_name,
+                    "contact_phone": contact_phone,
+                    "units": units_to_reserve,
+                    "reserved_at": datetime.utcnow().isoformat(),
+                    "call_id": call_id
+                })
+                meta["bookings"] = bookings
+
+                await asyncio.to_thread(
+                    supabase_admin.table("business_operations_catalog").update({
+                        "available_units": new_units,
+                        "status": new_status,
+                        "metadata": meta,
+                        "updated_at": datetime.utcnow().isoformat()
+                    }).eq("id", item_id).execute
+                )
+
+                return f"RESERVATION_CONFIRMED: Successfully reserved {units_to_reserve} unit(s) of '{item.get('title')}' (Code: {item.get('identifier_code') or item_id[:8]}) for {customer_name or 'the customer'}. Remaining available: {new_units}."
+            except Exception as e:
+                logger.error(f"[reserve_business_inventory] Reservation error: {e}")
+                return f"Reservation noted for {item_title or identifier_code}."
+            finally:
+                if timing_tracker:
+                    timing_tracker.mark("tool_end", extra="tool=reserve_business_inventory")
+
+        if tool_guard:
+            return await tool_guard.execute_tool("reserve_business_inventory", _execute)
+        return await _execute()
+
     return [
         check_existing_appointment,
         book_appointment_slot,
         reschedule_appointment_slot,
         decline_call_recording,
         transfer_to_human,
-        dispatch_payment_request
+        dispatch_payment_request,
+        query_live_inventory,
+        reserve_business_inventory
     ]
 
 class VikramAgent(Agent):
@@ -3715,20 +3902,53 @@ async def entrypoint(ctx: JobContext):
                     except Exception as e:
                         logger.error(f"Failed to fetch campaign contact {contact_id}: {e}")
 
-                # 9. Fast Caller Name Lookup (bounded by 300ms timeout, isolated to organization_id)
+                # 9. Returning Caller & Callback Memory Lookup (bounded by 450ms timeout)
                 customer = None
-                if not campaign_contact and organization_id and caller_number != "Unknown":
+                if not campaign_contact and (organization_id or user_id) and caller_number != "Unknown":
                     try:
-                        fast_name = await lookup_caller_name_fast(
+                        from app.services.caller_lookup import lookup_caller_history_memory
+                        caller_memory = await lookup_caller_history_memory(
                             supabase_admin,
                             organization_id=organization_id,
+                            user_id=user_id,
                             phone_number=caller_number,
-                            timeout_sec=0.30
+                            timeout_sec=0.45
                         )
-                        if fast_name:
+                        if caller_memory.get("name"):
+                            fast_name = caller_memory["name"]
                             customer = {"full_name": fast_name, "phone": caller_number}
-                            logger.info(f"[CallerLookup - EP] Recognized customer: {fast_name} ({caller_number})")
-                            system_prompt += f"\n\n## CALLER RECOGNITION (CUSTOMER DATABASE MATCH)\n- Caller Name: {fast_name}\n- Caller Phone: {caller_number}\n- INSTRUCTION: Address the caller warmly by their name ({fast_name}) as a valued contact.\n"
+                            if not db_caller_name or db_caller_name == "Unknown Caller":
+                                db_caller_name = fast_name
+
+                        if caller_memory.get("is_returning"):
+                            c_name = caller_memory.get("name") or "valued customer"
+                            c_comp = f" ({caller_memory.get('company')})" if caller_memory.get("company") else ""
+                            c_calls = caller_memory.get("total_calls", 2)
+                            c_last_sum = caller_memory.get("last_summary") or caller_memory.get("notes") or ""
+
+                            sum_line = f"- Previous Discussion / Call Context: {c_last_sum}\n" if c_last_sum else ""
+                            system_prompt += (
+                                f"\n\n## RETURNING CUSTOMER INTELLIGENCE & PERSONAL MEMORY\n"
+                                f"- Customer Status: RETURNING VALUED CLIENT (Call #{c_calls})\n"
+                                f"- Customer Name: {c_name}{c_comp}\n"
+                                f"{sum_line}"
+                                f"- MANDATORY CONVERSATION DIRECTIVES FOR RETURNING CLIENT:\n"
+                                f"  1. Greet the customer warmly and respectfully by name ({c_name}). Maintain a polite, natural tone (use 'ji' naturally, masculine verb endings).\n"
+                                f"  2. Follow up on their previous discussion if applicable (e.g. asking if their previous order/query/payment went smoothly, or enquire politely about their well-being/health).\n"
+                                f"  3. If they wish to check routes, containers, appointment slots, or negotiate prices, use the live inventory tools.\n"
+                            )
+                        elif customer and customer.get("full_name"):
+                            system_prompt += f"\n\n## CALLER RECOGNITION (CUSTOMER DATABASE MATCH)\n- Caller Name: {customer['full_name']}\n- Caller Phone: {caller_number}\n- INSTRUCTION: Address the caller warmly by their name ({customer['full_name']}) as a valued contact.\n"
+
+                        if caller_memory.get("callback_reason") or locals().get("call_type") == "callback":
+                            cb_reason = caller_memory.get("callback_reason") or "your requested follow-up"
+                            c_name = caller_memory.get("name") or db_caller_name or "sir"
+                            system_prompt += (
+                                f"\n\n## SCHEDULED CALLBACK CONTEXT (NOT A COLD CALL)\n"
+                                f"- This call is an agreed CALLBACK regarding: '{cb_reason}' for {c_name}.\n"
+                                f"- DIRECTIVE: DO NOT use a generic cold sales introduction. Greet them directly acknowledging the callback:\n"
+                                f"  'Namaste {c_name} ji, main Vaakriti se bol raha hoon. Aapne {cb_reason} ke regarding callback schedule kiya tha, usi silsile mein call kiya hai. Kaise madad kar sakta hoon aapki?'\n"
+                            )
                     except Exception as lookup_err:
                         logger.warning(f"Fast caller lookup timed out or failed in EP: {lookup_err}")
 
@@ -4809,21 +5029,53 @@ async def run_agent(room_name: str, agent_id: str | None = None, contact_id: str
                     except Exception as cb_err:
                         logger.warning(f"Failed to parse callback metadata: {cb_err}")
 
-                # 9. Lookup Returning Customer
+                # 9. Returning Caller & Callback Memory Lookup in run_agent
                 customer = None
-                if not campaign_contact and organization_id and caller_number != "Unknown":
+                if not campaign_contact and (organization_id or user_id) and caller_number != "Unknown":
                     try:
-                        from app.services.caller_lookup import CallerLookupService
-                        lookup_svc = CallerLookupService(supabase_admin)
-                        customer = await lookup_svc.lookup_caller(organization_id, caller_number)
-                        if customer:
-                            cust_name = customer.get("full_name") or ""
-                            cust_notes = customer.get("notes") or ""
-                            cust_company = customer.get("company") or ""
-                            cust_tags = customer.get("tags") or []
-                            logger.info(f"[CallerLookup] Recognized returning customer: {cust_name} ({caller_number})")
-                            customer_context = f"\n\n## CALLER RECOGNITION (CUSTOMER DATABASE MATCH)\n- Caller Name: {cust_name}\n- Caller Phone: {caller_number}\n- Company: {cust_company}\n- Customer Tags: {', '.join(cust_tags) if cust_tags else 'None'}\n- Past Interaction History / Notes: {cust_notes or 'First recorded interaction'}\n- INSTRUCTION: Address the caller warmly by their name ({cust_name}) as a valued contact. Do not introduce yourself as a stranger!\n"
-                            system_prompt += customer_context
+                        from app.services.caller_lookup import lookup_caller_history_memory
+                        caller_memory = await lookup_caller_history_memory(
+                            supabase_admin,
+                            organization_id=organization_id,
+                            user_id=user_id,
+                            phone_number=caller_number,
+                            timeout_sec=0.45
+                        )
+                        if caller_memory.get("name"):
+                            cust_name = caller_memory["name"]
+                            customer = {"full_name": cust_name, "phone": caller_number}
+                            if not locals().get("db_caller_name") or locals().get("db_caller_name") == "Unknown Caller":
+                                db_caller_name = cust_name
+
+                        if caller_memory.get("is_returning"):
+                            c_name = caller_memory.get("name") or "valued customer"
+                            c_comp = f" ({caller_memory.get('company')})" if caller_memory.get("company") else ""
+                            c_calls = caller_memory.get("total_calls", 2)
+                            c_last_sum = caller_memory.get("last_summary") or caller_memory.get("notes") or ""
+
+                            sum_line = f"- Previous Discussion / Call Context: {c_last_sum}\n" if c_last_sum else ""
+                            system_prompt += (
+                                f"\n\n## RETURNING CUSTOMER INTELLIGENCE & PERSONAL MEMORY\n"
+                                f"- Customer Status: RETURNING VALUED CLIENT (Call #{c_calls})\n"
+                                f"- Customer Name: {c_name}{c_comp}\n"
+                                f"{sum_line}"
+                                f"- MANDATORY CONVERSATION DIRECTIVES FOR RETURNING CLIENT:\n"
+                                f"  1. Greet the customer warmly and respectfully by name ({c_name}). Maintain a polite, natural tone (use 'ji' naturally, masculine verb endings).\n"
+                                f"  2. Follow up on their previous discussion if applicable (e.g. asking if their previous order/query/payment went smoothly, or enquire politely about their well-being/health).\n"
+                                f"  3. If they wish to check routes, containers, appointment slots, or negotiate prices, use the live inventory tools.\n"
+                            )
+                        elif customer and customer.get("full_name"):
+                            system_prompt += f"\n\n## CALLER RECOGNITION (CUSTOMER DATABASE MATCH)\n- Caller Name: {customer['full_name']}\n- Caller Phone: {caller_number}\n- INSTRUCTION: Address the caller warmly by their name ({customer['full_name']}) as a valued contact.\n"
+
+                        if caller_memory.get("callback_reason") or locals().get("call_type") == "callback":
+                            cb_reason = caller_memory.get("callback_reason") or "your requested follow-up"
+                            c_name = caller_memory.get("name") or locals().get("db_caller_name") or "sir"
+                            system_prompt += (
+                                f"\n\n## SCHEDULED CALLBACK CONTEXT (NOT A COLD CALL)\n"
+                                f"- This call is an agreed CALLBACK regarding: '{cb_reason}' for {c_name}.\n"
+                                f"- DIRECTIVE: DO NOT use a generic cold sales introduction. Greet them directly acknowledging the callback:\n"
+                                f"  'Namaste {c_name} ji, main Vaakriti se bol raha hoon. Aapne {cb_reason} ke regarding callback schedule kiya tha, usi silsile mein call kiya hai. Kaise madad kar sakta hoon aapki?'\n"
+                            )
                     except Exception as lookup_err:
                         logger.error(f"Failed to lookup caller: {lookup_err}")
 

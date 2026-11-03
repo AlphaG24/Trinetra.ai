@@ -212,3 +212,122 @@ class CallerLookupService:
             logger.error(f"[CallerLookupService] Error in upsert_from_call: {e}")
             return None
 
+
+
+async def lookup_caller_history_memory(
+    supabase_client,
+    organization_id: str | None = None,
+    user_id: str | None = None,
+    phone_number: str = "",
+    timeout_sec: float = 0.45
+) -> dict:
+    """
+    Fast lookup of caller's past interaction history, notes, previous call summary,
+    and pending callback status for returning customer personalization.
+    Strictly bounded by timeout_sec (default 450ms) to preserve zero latency greeting.
+    """
+    if not supabase_client or not phone_number:
+        return {}
+
+    cleaned = re.sub(r'\D', '', str(phone_number))
+    if len(cleaned) > 10:
+        if cleaned.startswith('91') and len(cleaned) == 12:
+            cleaned = cleaned[2:]
+        elif cleaned.startswith('0') and len(cleaned) == 11:
+            cleaned = cleaned[1:]
+
+    if not cleaned or len(cleaned) < 8:
+        return {}
+
+    async def _fetch_memory() -> dict:
+        memory = {
+            "name": None,
+            "company": None,
+            "is_returning": False,
+            "total_calls": 0,
+            "last_call_at": None,
+            "last_summary": None,
+            "notes": None,
+            "callback_reason": None,
+            "pending_appointment": None,
+        }
+
+        # 1. Check customer_contacts table
+        try:
+            q_cust = supabase_client.table("customer_contacts").select(
+                "full_name, company, total_calls, last_contact_at, notes, tags"
+            )
+            if organization_id:
+                q_cust = q_cust.eq("organization_id", organization_id)
+            q_cust = q_cust.eq("phone_number", cleaned).limit(1)
+
+            res_cust = await asyncio.to_thread(q_cust.execute)
+            if res_cust.data and len(res_cust.data) > 0:
+                c_data = res_cust.data[0]
+                c_name = c_data.get("full_name")
+                if c_name and c_name.lower() not in ("none", "null", "unknown", "unknown caller", "inbound caller", "client", "prospect"):
+                    memory["name"] = c_name
+                memory["company"] = c_data.get("company")
+                memory["total_calls"] = c_data.get("total_calls") or 1
+                memory["last_call_at"] = c_data.get("last_contact_at")
+                memory["notes"] = c_data.get("notes")
+                if memory["total_calls"] > 1:
+                    memory["is_returning"] = True
+        except Exception as e_c:
+            logger.debug(f"[lookup_caller_history_memory] customer_contacts lookup: {e_c}")
+
+        # 2. Check previous voice_calls summary & sentiment
+        try:
+            q_calls = supabase_client.table("voice_calls").select(
+                "created_at, summary, notes, call_status, duration_seconds"
+            ).order("created_at", desc=True)
+
+            if organization_id:
+                q_calls = q_calls.eq("organization_id", organization_id)
+            elif user_id:
+                q_calls = q_calls.eq("user_id", user_id)
+
+            q_calls = q_calls.ilike("caller_number", f"%{cleaned}%").limit(2)
+            res_calls = await asyncio.to_thread(q_calls.execute)
+            if res_calls.data and len(res_calls.data) > 0:
+                past_calls = res_calls.data
+                if len(past_calls) > 1 or memory["total_calls"] > 1:
+                    memory["is_returning"] = True
+                
+                # Fetch the most informative summary
+                for call_row in past_calls:
+                    sum_text = call_row.get("summary") or call_row.get("notes")
+                    if sum_text and len(str(sum_text).strip()) > 5:
+                        memory["last_summary"] = str(sum_text).strip()
+                        if not memory["last_call_at"]:
+                            memory["last_call_at"] = call_row.get("created_at")
+                        break
+        except Exception as e_vc:
+            logger.debug(f"[lookup_caller_history_memory] voice_calls lookup: {e_vc}")
+
+        # 3. Check for any scheduled callback
+        try:
+            q_cb = supabase_client.table("callbacks").select(
+                "prospect_name, scheduled_at, notes, priority"
+            ).eq("status", "scheduled")
+
+            if organization_id:
+                q_cb = q_cb.eq("organization_id", organization_id)
+
+            q_cb = q_cb.ilike("prospect_phone", f"%{cleaned}%").order("scheduled_at", desc=True).limit(1)
+            res_cb = await asyncio.to_thread(q_cb.execute)
+            if res_cb.data and len(res_cb.data) > 0:
+                cb = res_cb.data[0]
+                if not memory["name"] and cb.get("prospect_name"):
+                    memory["name"] = cb.get("prospect_name")
+                memory["callback_reason"] = cb.get("notes") or "Requested callback inquiry"
+        except Exception as e_cb:
+            logger.debug(f"[lookup_caller_history_memory] callbacks lookup: {e_cb}")
+
+        return memory
+
+    try:
+        return await asyncio.wait_for(_fetch_memory(), timeout=timeout_sec)
+    except (asyncio.TimeoutError, Exception) as err:
+        logger.debug(f"[lookup_caller_history_memory] Timed out or err ({err}), returning fallback")
+        return {}
