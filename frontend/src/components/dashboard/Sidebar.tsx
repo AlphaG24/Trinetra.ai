@@ -187,7 +187,7 @@ export function Sidebar({ isOpen, onClose }: { isOpen?: boolean; onClose?: () =>
           <button
             suppressHydrationWarning
             onClick={toggleSidebarCollapsed}
-            className="hidden md:flex absolute -right-2.5 top-1 z-30 w-5 h-5 rounded-full bg-[var(--card-bg)] border border-[var(--border)] shadow-xs hover:shadow-sm items-center justify-center text-zinc-600 hover:text-zinc-950 dark:text-zinc-300 dark:hover:text-white hover:bg-[var(--hover-bg)] transition-all duration-150 cursor-pointer"
+            className="hidden md:flex absolute -right-2.5 top-3.5 z-30 w-5 h-5 rounded-full bg-[var(--card-bg)] border border-[var(--border)] shadow-xs hover:shadow-sm items-center justify-center text-zinc-600 hover:text-zinc-950 dark:text-zinc-300 dark:hover:text-white hover:bg-[var(--hover-bg)] transition-all duration-150 cursor-pointer"
             title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
             aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
           >
@@ -199,8 +199,8 @@ export function Sidebar({ isOpen, onClose }: { isOpen?: boolean; onClose?: () =>
           </button>
         )}
 
-        {/* Main Navigation links */}
-        <div className="flex flex-col flex-1 min-h-0 pt-1">
+        {/* Main Navigation links with generous top breathing room */}
+        <div className="flex flex-col flex-1 min-h-0 pt-3 sm:pt-4">
           <nav suppressHydrationWarning className="flex-1 px-2.5 space-y-1 overflow-y-auto custom-scrollbar">
             {navItemsToRender.map(renderLink)}
           </nav>

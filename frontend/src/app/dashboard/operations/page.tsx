@@ -22,12 +22,12 @@ import {
   SlidersHorizontal,
   Mic,
   MicOff,
-  Sparkles,
   Zap,
   ShieldCheck,
   Building2,
   Check,
-  Loader2
+  Loader2,
+  Brain
 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -180,7 +180,7 @@ export default function OperationsBrainPage() {
     })
   }, [catalogItems, searchQuery, selectedCategory, statusFilter])
 
-  // Universal Summary Metrics
+  // Universal Summary Metrics (clean monochrome numbers)
   const totalCatalogItems = catalogItems.length
   const totalUnitsCapacity = catalogItems.reduce((acc, curr) => acc + (curr.available_units || 0), 0)
   const itemsWithPricingFloor = catalogItems.filter(i => i.minimum_price_inr !== null && i.minimum_price_inr > 0).length
@@ -200,11 +200,11 @@ export default function OperationsBrainPage() {
       const recognition = new SpeechRecognition()
       recognition.continuous = true
       recognition.interimResults = true
-      recognition.lang = 'hi-IN' // Hindi + Hinglish
+      recognition.lang = 'hi-IN'
 
       recognition.onstart = () => {
         setIsRecording(true)
-        toast.info('Listening... Speak your operational instructions in Hindi or English.')
+        toast.info('Listening... Speak your operational instructions.')
       }
 
       recognition.onresult = (event: any) => {
@@ -514,25 +514,25 @@ export default function OperationsBrainPage() {
     switch (status) {
       case 'available':
         return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-[var(--hover-bg)] text-[var(--heading)] border border-[var(--border)]">
             <CheckCircle2 className="w-3.5 h-3.5" /> Active
           </span>
         )
       case 'reserved':
         return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
-            <Clock className="w-3.5 h-3.5" /> Paused / Reserved
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-[var(--hover-bg)] text-[var(--muted)] border border-[var(--border)]">
+            <Clock className="w-3.5 h-3.5" /> Paused
           </span>
         )
       case 'booked':
         return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-[var(--hover-bg)] text-[var(--heading)] border border-[var(--border)]">
             <Boxes className="w-3.5 h-3.5" /> Booked
           </span>
         )
       default:
         return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-zinc-500/10 text-zinc-600 dark:text-zinc-400 border border-zinc-500/20">
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-[var(--hover-bg)] text-[var(--muted)] border border-[var(--border)]">
             {status}
           </span>
         )
@@ -542,17 +542,17 @@ export default function OperationsBrainPage() {
   const getCategoryIcon = (category: string) => {
     switch (category) {
       case 'appointment_slots':
-        return <Calendar className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+        return <Calendar className="w-4 h-4 text-[var(--muted)]" />
       case 'inventory':
-        return <Package className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+        return <Package className="w-4 h-4 text-[var(--muted)]" />
       case 'logistics':
-        return <Building2 className="w-4 h-4 text-cyan-600 dark:text-cyan-400" />
+        return <Building2 className="w-4 h-4 text-[var(--muted)]" />
       case 'containers':
-        return <Layers className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+        return <Layers className="w-4 h-4 text-[var(--muted)]" />
       case 'voice_directive':
-        return <Zap className="w-4 h-4 text-rose-500" />
+        return <Mic className="w-4 h-4 text-[var(--muted)]" />
       default:
-        return <SlidersHorizontal className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+        return <SlidersHorizontal className="w-4 h-4 text-[var(--muted)]" />
     }
   }
 
@@ -561,63 +561,61 @@ export default function OperationsBrainPage() {
       {/* Universal Page Header */}
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 border-b border-[var(--border)] pb-5">
         <div>
-          <div className="flex items-center gap-3">
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-[var(--heading)] font-display tracking-tight">
-              Operations & Knowledge Brain
-            </h1>
-          </div>
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-[var(--heading)] tracking-tight">
+            Operations & Knowledge Brain
+          </h1>
           <p className="text-xs sm:text-sm text-[var(--muted)] mt-1.5 max-w-2xl leading-relaxed">
             Universal real-time knowledge base, catalog items, and daily voice directives referenced live by your AI voice agents during customer calls.
           </p>
         </div>
 
-        {/* Action Controls */}
+        {/* Action Controls with Luxury Monochrome Theme (No Purple) */}
         <div className="flex flex-wrap items-center gap-2.5 sm:gap-3 shrink-0 self-stretch sm:self-auto">
           {/* Speak to Brain Button */}
           <button
             onClick={() => setIsVoiceModalOpen(true)}
-            className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-semibold text-xs tracking-wide transition-all shadow-md hover:shadow-indigo-500/25 active:scale-[0.98] cursor-pointer"
+            className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 font-bold text-xs tracking-wide transition-all shadow-sm active:scale-[0.98] cursor-pointer"
           >
-            <Mic className="w-4 h-4 animate-pulse" />
+            <Mic className="w-4 h-4" />
             <span>Speak to Brain</span>
           </button>
 
           {/* Upload Documents Button */}
           <button
             onClick={() => setIsDocumentModalOpen(true)}
-            className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-[var(--card-bg)] hover:bg-[var(--hover-bg)] border border-[var(--border)] text-[var(--heading)] font-semibold text-xs tracking-wide transition-all shadow-sm active:scale-[0.98] cursor-pointer"
+            className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-[var(--card-bg)] hover:bg-[var(--hover-bg)] border border-[var(--border)] text-[var(--heading)] font-bold text-xs tracking-wide transition-all shadow-sm active:scale-[0.98] cursor-pointer"
           >
-            <Upload className="w-4 h-4 text-indigo-500" />
+            <Upload className="w-4 h-4 text-[var(--muted)]" />
             <span>Upload Documents</span>
           </button>
 
-          {/* Add Operations Item */}
+          {/* Add Item Button */}
           <button
             onClick={() => handleOpenAdd(selectedCategory)}
-            className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 font-semibold text-xs tracking-wide rounded-xl transition-all shadow-sm active:scale-[0.98] cursor-pointer"
+            className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-[var(--card-bg)] hover:bg-[var(--hover-bg)] border border-[var(--border)] text-[var(--heading)] font-bold text-xs tracking-wide rounded-xl transition-all shadow-sm active:scale-[0.98] cursor-pointer"
           >
-            <Plus className="w-4 h-4" />
+            <Plus className="w-4 h-4 text-[var(--muted)]" />
             <span>Add Item</span>
           </button>
 
-          {/* Refresh */}
+          {/* Refresh Button */}
           <button
             onClick={fetchItems}
             disabled={loading}
-            className="p-2.5 rounded-xl bg-[var(--card-bg)] hover:bg-[var(--hover-bg)] border border-[var(--border)] text-[var(--body)] transition-colors cursor-pointer shrink-0 shadow-sm"
+            className="p-2.5 rounded-xl bg-[var(--card-bg)] hover:bg-[var(--hover-bg)] border border-[var(--border)] text-[var(--muted)] hover:text-[var(--heading)] transition-colors cursor-pointer shrink-0 shadow-sm"
             title="Refresh Catalog"
           >
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-indigo-500' : ''}`} />
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-[var(--heading)]' : ''}`} />
           </button>
         </div>
       </div>
 
-      {/* Universal Dynamic Summary Cards (No hardcoded logistics blocks) */}
+      {/* Dynamic Summary Cards (Monochrome Theme, No Multi-Colors) */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <div className="p-4 sm:p-5 rounded-2xl bg-[var(--card-bg)] border border-[var(--border)] shadow-sm space-y-1">
           <div className="flex items-center justify-between text-xs text-[var(--muted)] font-medium">
             <span>Live Catalog Offerings</span>
-            <Boxes className="w-4 h-4 text-indigo-500" />
+            <Boxes className="w-4 h-4 text-[var(--muted)]" />
           </div>
           <p className="text-2xl sm:text-3xl font-extrabold text-[var(--heading)] font-mono">{totalCatalogItems}</p>
           <p className="text-[11px] text-[var(--muted)]">Active knowledge items indexed for voice agents</p>
@@ -626,16 +624,16 @@ export default function OperationsBrainPage() {
         <div className="p-4 sm:p-5 rounded-2xl bg-[var(--card-bg)] border border-[var(--border)] shadow-sm space-y-1">
           <div className="flex items-center justify-between text-xs text-[var(--muted)] font-medium">
             <span>Spoken Voice Directives</span>
-            <Zap className="w-4 h-4 text-rose-500" />
+            <Mic className="w-4 h-4 text-[var(--muted)]" />
           </div>
-          <p className="text-2xl sm:text-3xl font-extrabold text-rose-500 font-mono">{activeDirectivesCount}</p>
+          <p className="text-2xl sm:text-3xl font-extrabold text-[var(--heading)] font-mono">{activeDirectivesCount}</p>
           <p className="text-[11px] text-[var(--muted)]">Daily owner speech overrides currently live</p>
         </div>
 
         <div className="p-4 sm:p-5 rounded-2xl bg-[var(--card-bg)] border border-[var(--border)] shadow-sm space-y-1">
           <div className="flex items-center justify-between text-xs text-[var(--muted)] font-medium">
             <span>Total Units / Capacity</span>
-            <Layers className="w-4 h-4 text-cyan-500" />
+            <Layers className="w-4 h-4 text-[var(--muted)]" />
           </div>
           <p className="text-2xl sm:text-3xl font-extrabold text-[var(--heading)] font-mono">{totalUnitsCapacity}</p>
           <p className="text-[11px] text-[var(--muted)]">Bookable appointment slots or product inventory</p>
@@ -644,31 +642,31 @@ export default function OperationsBrainPage() {
         <div className="p-4 sm:p-5 rounded-2xl bg-[var(--card-bg)] border border-[var(--border)] shadow-sm space-y-1">
           <div className="flex items-center justify-between text-xs text-[var(--muted)] font-medium">
             <span>Pricing Guardrails</span>
-            <ShieldCheck className="w-4 h-4 text-emerald-500" />
+            <ShieldCheck className="w-4 h-4 text-[var(--muted)]" />
           </div>
-          <p className="text-2xl sm:text-3xl font-extrabold text-emerald-500 font-mono">{itemsWithPricingFloor}</p>
+          <p className="text-2xl sm:text-3xl font-extrabold text-[var(--heading)] font-mono">{itemsWithPricingFloor}</p>
           <p className="text-[11px] text-[var(--muted)]">Offerings with strict AI floor limits enforced</p>
         </div>
       </div>
 
-      {/* Active Voice Directives Section (When owner has spoken instructions) */}
+      {/* Active Voice Directives Section (Clean Monochrome Theme) */}
       {activeVoiceDirectives.length > 0 && (
-        <div className="rounded-2xl border border-indigo-500/20 bg-indigo-500/5 dark:bg-indigo-950/20 p-4 sm:p-5 space-y-3">
+        <div className="rounded-2xl border border-[var(--border)] bg-[var(--card-bg)] p-4 sm:p-5 space-y-3 shadow-sm">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Zap className="w-4 h-4 text-rose-500 animate-pulse" />
+              <Mic className="w-4 h-4 text-[var(--muted)]" />
               <h3 className="text-sm font-bold text-[var(--heading)]">
                 Active Spoken Voice Directives & Daily Overrides
               </h3>
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-rose-500/10 text-rose-500 border border-rose-500/20">
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-[var(--hover-bg)] text-[var(--muted)] border border-[var(--border)]">
                 Live in Call Prompt
               </span>
             </div>
             <button
               onClick={() => setIsVoiceModalOpen(true)}
-              className="text-xs text-indigo-500 hover:text-indigo-400 font-medium inline-flex items-center gap-1 cursor-pointer"
+              className="text-xs text-[var(--heading)] hover:text-zinc-950 dark:hover:text-white font-semibold underline underline-offset-4 inline-flex items-center gap-1 cursor-pointer"
             >
-              <Mic className="w-3.5 h-3.5" /> + New Voice Rule
+              <Plus className="w-3.5 h-3.5" /> New Voice Rule
             </button>
           </div>
 
@@ -679,16 +677,16 @@ export default function OperationsBrainPage() {
               return (
                 <div
                   key={directive.id}
-                  className="p-3.5 rounded-xl bg-[var(--card-bg)] border border-[var(--border)] shadow-sm flex items-start justify-between gap-3 text-left"
+                  className="p-3.5 rounded-xl bg-[var(--hover-bg)]/50 border border-[var(--border)] shadow-xs flex items-start justify-between gap-3 text-left"
                 >
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
                       <span className="font-bold text-xs text-[var(--heading)]">{directive.title}</span>
                       <span
-                        className={`px-2 py-0.2 rounded-full text-[10px] font-semibold ${
+                        className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
                           isActive
-                            ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
-                            : 'bg-zinc-500/10 text-zinc-500 border border-zinc-500/20'
+                            ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-950'
+                            : 'bg-[var(--card-bg)] text-[var(--muted)] border border-[var(--border)]'
                         }`}
                       >
                         {isActive ? 'Active' : 'Paused'}
@@ -700,7 +698,7 @@ export default function OperationsBrainPage() {
                       </p>
                     )}
                     {meta.prompt_override && (
-                      <p className="text-[11px] text-indigo-600 dark:text-indigo-400 font-mono bg-[var(--hover-bg)] p-1.5 rounded-lg border border-[var(--border)] mt-1">
+                      <p className="text-[11px] text-[var(--heading)] font-mono bg-[var(--card-bg)] p-1.5 rounded-lg border border-[var(--border)] mt-1">
                         Agent Directive: {meta.prompt_override}
                       </p>
                     )}
@@ -709,14 +707,14 @@ export default function OperationsBrainPage() {
                   <div className="flex items-center gap-1.5 shrink-0">
                     <button
                       onClick={() => handleToggleVoiceDirective(directive.id, directive.status)}
-                      className="p-1.5 rounded-lg bg-[var(--hover-bg)] text-[var(--body)] hover:text-[var(--heading)] cursor-pointer text-xs font-semibold"
+                      className="px-2.5 py-1 rounded-lg bg-[var(--card-bg)] hover:bg-[var(--hover-bg)] border border-[var(--border)] text-[var(--heading)] cursor-pointer text-xs font-semibold shadow-xs"
                       title={isActive ? 'Pause rule' : 'Activate rule'}
                     >
                       {isActive ? 'Pause' : 'Activate'}
                     </button>
                     <button
                       onClick={() => handleDelete(directive.id, directive.title)}
-                      className="p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 cursor-pointer"
+                      className="p-1.5 rounded-lg border border-[var(--border)] hover:bg-red-500/10 text-zinc-400 hover:text-red-500 transition-colors cursor-pointer"
                       title="Delete directive"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
@@ -746,7 +744,7 @@ export default function OperationsBrainPage() {
                     : 'text-[var(--body)] hover:text-[var(--heading)] hover:bg-[var(--hover-bg)]'
                 }`}
               >
-                <Icon className="w-3.5 h-3.5" />
+                <Icon className="w-3.5 h-3.5 text-[var(--muted)]" />
                 {cat.label}
               </button>
             )
@@ -762,14 +760,14 @@ export default function OperationsBrainPage() {
               placeholder="Search catalog, item or code..."
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-3 py-2 bg-[var(--card-bg)] border border-[var(--border)] rounded-xl text-xs text-[var(--heading)] placeholder:text-[var(--muted)] focus:outline-none focus:ring-1 focus:ring-indigo-500 shadow-sm"
+              className="w-full pl-9 pr-3 py-2 bg-[var(--card-bg)] border border-[var(--border)] rounded-xl text-xs text-[var(--heading)] placeholder:text-[var(--muted)] focus:outline-none focus:ring-1 focus:ring-zinc-400 dark:focus:ring-zinc-500 shadow-sm"
             />
           </div>
 
           <select
             value={statusFilter}
             onChange={e => setStatusFilter(e.target.value)}
-            className="px-3 py-2 bg-[var(--card-bg)] border border-[var(--border)] rounded-xl text-xs text-[var(--heading)] focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer shadow-sm"
+            className="px-3 py-2 bg-[var(--card-bg)] border border-[var(--border)] rounded-xl text-xs text-[var(--heading)] focus:outline-none focus:ring-1 focus:ring-zinc-400 dark:focus:ring-zinc-500 cursor-pointer shadow-sm"
           >
             <option value="all">All Statuses</option>
             <option value="available">Active / Available</option>
@@ -782,13 +780,13 @@ export default function OperationsBrainPage() {
       {/* Main Catalog Items Grid */}
       {loading ? (
         <div className="py-20 flex flex-col items-center justify-center gap-3 text-[var(--muted)]">
-          <RefreshCw className="w-6 h-6 animate-spin text-indigo-500" />
+          <RefreshCw className="w-6 h-6 animate-spin text-[var(--heading)]" />
           <p className="text-sm font-medium">Loading live operations brain...</p>
         </div>
       ) : filteredItems.length === 0 ? (
         <div className="py-16 text-center rounded-2xl bg-[var(--card-bg)] border border-[var(--border)] p-8 space-y-4 shadow-sm">
-          <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-500 flex items-center justify-center mx-auto">
-            <Sparkles className="w-6 h-6" />
+          <div className="w-12 h-12 rounded-2xl bg-[var(--hover-bg)] border border-[var(--border)] text-[var(--heading)] flex items-center justify-center mx-auto">
+            <Brain className="w-6 h-6" />
           </div>
           <div className="space-y-1">
             <h3 className="text-base font-bold text-[var(--heading)]">Operations Brain is Ready</h3>
@@ -799,21 +797,21 @@ export default function OperationsBrainPage() {
           <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
             <button
               onClick={() => setIsVoiceModalOpen(true)}
-              className="inline-flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-semibold text-xs rounded-xl shadow-md cursor-pointer"
+              className="inline-flex items-center gap-2 px-4 py-2.5 bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 font-bold text-xs rounded-xl shadow-sm transition-all cursor-pointer"
             >
               <Mic className="w-4 h-4" /> Speak to Brain
             </button>
             <button
               onClick={() => setIsDocumentModalOpen(true)}
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[var(--card-bg)] hover:bg-[var(--hover-bg)] border border-[var(--border)] text-[var(--heading)] font-semibold text-xs cursor-pointer shadow-sm"
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[var(--card-bg)] hover:bg-[var(--hover-bg)] border border-[var(--border)] text-[var(--heading)] font-bold text-xs cursor-pointer shadow-sm transition-all"
             >
-              <Upload className="w-4 h-4 text-indigo-500" /> Upload Documents
+              <Upload className="w-4 h-4 text-[var(--muted)]" /> Upload Documents
             </button>
             <button
               onClick={() => handleOpenAdd(selectedCategory)}
-              className="inline-flex items-center gap-2 px-4 py-2.5 bg-zinc-900 text-white dark:bg-white dark:text-zinc-950 font-semibold text-xs rounded-xl shadow-sm cursor-pointer"
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[var(--card-bg)] hover:bg-[var(--hover-bg)] border border-[var(--border)] text-[var(--heading)] font-bold text-xs shadow-sm transition-all cursor-pointer"
             >
-              <Plus className="w-4 h-4" /> Add Manually
+              <Plus className="w-4 h-4 text-[var(--muted)]" /> Add Manually
             </button>
           </div>
         </div>
@@ -884,7 +882,7 @@ export default function OperationsBrainPage() {
                     </div>
                   )}
 
-                  {/* Negotiation Pricing Box */}
+                  {/* Pricing Box (Clean Neutral Theme) */}
                   {(item.base_price_inr !== null || item.minimum_price_inr !== null) && (
                     <div className="p-3 rounded-xl bg-[var(--hover-bg)] border border-[var(--border)] space-y-1.5">
                       <div className="flex items-center justify-between text-xs">
@@ -895,10 +893,10 @@ export default function OperationsBrainPage() {
                       </div>
                       {item.minimum_price_inr !== null && (
                         <div className="flex items-center justify-between text-xs pt-1 border-t border-[var(--border)]">
-                          <span className="text-amber-600 dark:text-amber-400 flex items-center gap-1 font-semibold">
-                            <TrendingDown className="w-3.5 h-3.5" /> AI Floor Price:
+                          <span className="text-[var(--heading)] flex items-center gap-1 font-semibold">
+                            <TrendingDown className="w-3.5 h-3.5 text-[var(--muted)]" /> AI Floor Price:
                           </span>
-                          <span className="font-bold text-amber-600 dark:text-amber-300 font-mono">
+                          <span className="font-bold text-[var(--heading)] font-mono">
                             ₹{item.minimum_price_inr.toLocaleString('en-IN')}
                           </span>
                         </div>
@@ -922,7 +920,7 @@ export default function OperationsBrainPage() {
                     </button>
                     <button
                       onClick={() => handleDelete(item.id, item.title)}
-                      className="p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 border border-rose-500/20 transition-colors cursor-pointer"
+                      className="p-1.5 rounded-lg border border-[var(--border)] hover:bg-red-500/10 text-zinc-400 hover:text-red-500 transition-colors cursor-pointer"
                       title="Delete Item"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
@@ -935,13 +933,13 @@ export default function OperationsBrainPage() {
         </div>
       )}
 
-      {/* MODAL 1: SPEAK & BUILD THE BRAIN */}
+      {/* MODAL 1: SPEAK & BUILD THE BRAIN (Zero Purple, Clean Zinc/Monochrome) */}
       {isVoiceModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
           <div className="relative w-full max-w-xl bg-[var(--card-bg)] border border-[var(--border)] rounded-3xl p-6 sm:p-7 shadow-2xl space-y-5 text-left animate-in fade-in zoom-in-95">
             <div className="flex items-center justify-between border-b border-[var(--border)] pb-4">
               <div className="flex items-center gap-2.5">
-                <div className="p-2 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 text-white">
+                <div className="p-2 rounded-xl bg-[var(--hover-bg)] border border-[var(--border)] text-[var(--heading)]">
                   <Mic className="w-5 h-5" />
                 </div>
                 <div>
@@ -960,14 +958,14 @@ export default function OperationsBrainPage() {
               </button>
             </div>
 
-            {/* Mic Status & Wave Animation */}
+            {/* Mic Status */}
             <div className="flex flex-col items-center justify-center py-4 space-y-3">
               <button
                 onClick={isRecording ? stopVoiceRecording : startVoiceRecording}
-                className={`w-20 h-20 rounded-full flex items-center justify-center transition-all shadow-lg cursor-pointer ${
+                className={`w-20 h-20 rounded-full flex items-center justify-center transition-all shadow-md cursor-pointer ${
                   isRecording
-                    ? 'bg-rose-500 text-white animate-pulse ring-4 ring-rose-500/30'
-                    : 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white hover:scale-105 ring-4 ring-indigo-500/20'
+                    ? 'bg-zinc-950 text-white ring-4 ring-zinc-500/20 animate-pulse'
+                    : 'bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 hover:scale-105'
                 }`}
               >
                 {isRecording ? <MicOff className="w-8 h-8" /> : <Mic className="w-8 h-8" />}
@@ -987,7 +985,7 @@ export default function OperationsBrainPage() {
                 value={voiceTranscript}
                 onChange={e => setVoiceTranscript(e.target.value)}
                 placeholder='e.g., "Aaj mai 10 baje se 4 bje tak salon open rakhunga to us time ke according he appointments lena"'
-                className="w-full p-3 rounded-xl bg-[var(--hover-bg)] border border-[var(--border)] text-xs text-[var(--heading)] focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                className="w-full p-3 rounded-xl bg-[var(--hover-bg)] border border-[var(--border)] text-xs text-[var(--heading)] focus:outline-none focus:ring-1 focus:ring-zinc-400 dark:focus:ring-zinc-500"
               />
             </div>
 
@@ -1001,7 +999,7 @@ export default function OperationsBrainPage() {
                   <button
                     key={idx}
                     onClick={() => setVoiceTranscript(prompt.text)}
-                    className="px-2.5 py-1 rounded-lg text-[11px] font-medium bg-[var(--hover-bg)] hover:bg-indigo-500/10 text-[var(--body)] hover:text-indigo-500 border border-[var(--border)] transition-colors cursor-pointer"
+                    className="px-2.5 py-1 rounded-lg text-[11px] font-medium bg-[var(--hover-bg)] hover:bg-[var(--card-bg)] text-[var(--heading)] border border-[var(--border)] transition-colors cursor-pointer"
                   >
                     {prompt.label}
                   </button>
@@ -1017,7 +1015,7 @@ export default function OperationsBrainPage() {
                   stopVoiceRecording()
                   setIsVoiceModalOpen(false)
                 }}
-                className="px-4 py-2.5 rounded-xl border border-[var(--border)] text-xs font-semibold text-[var(--body)] hover:bg-[var(--hover-bg)] cursor-pointer"
+                className="px-4 py-2.5 rounded-xl border border-[var(--border)] text-xs font-bold text-[var(--body)] hover:bg-[var(--hover-bg)] cursor-pointer"
               >
                 Cancel
               </button>
@@ -1025,7 +1023,7 @@ export default function OperationsBrainPage() {
                 type="button"
                 onClick={handleApplyVoiceDirective}
                 disabled={isProcessingVoice || !voiceTranscript.trim()}
-                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs font-semibold transition-all shadow-md active:scale-[0.98] cursor-pointer disabled:opacity-50"
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 text-xs font-bold transition-all shadow-sm active:scale-[0.98] cursor-pointer disabled:opacity-50"
               >
                 {isProcessingVoice ? (
                   <>
@@ -1042,13 +1040,13 @@ export default function OperationsBrainPage() {
         </div>
       )}
 
-      {/* MODAL 2: MULTI-DOCUMENT INGESTION */}
+      {/* MODAL 2: MULTI-DOCUMENT INGESTION (Zero Purple, Clean Zinc/Monochrome) */}
       {isDocumentModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
           <div className="relative w-full max-w-xl bg-[var(--card-bg)] border border-[var(--border)] rounded-3xl p-6 sm:p-7 shadow-2xl space-y-5 text-left animate-in fade-in zoom-in-95">
             <div className="flex items-center justify-between border-b border-[var(--border)] pb-4">
               <div className="flex items-center gap-2.5">
-                <div className="p-2 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-500">
+                <div className="p-2 rounded-xl bg-[var(--hover-bg)] border border-[var(--border)] text-[var(--heading)]">
                   <Upload className="w-5 h-5" />
                 </div>
                 <div>
@@ -1067,7 +1065,7 @@ export default function OperationsBrainPage() {
             {/* Dropzone */}
             <div
               onClick={() => fileInputRef.current?.click()}
-              className="border-2 border-dashed border-[var(--border)] hover:border-indigo-500/50 rounded-2xl p-6 sm:p-8 text-center cursor-pointer transition-colors bg-[var(--hover-bg)]/40 hover:bg-indigo-500/5"
+              className="border-2 border-dashed border-[var(--border)] hover:border-zinc-400 dark:hover:border-zinc-600 rounded-2xl p-6 sm:p-8 text-center cursor-pointer transition-colors bg-[var(--hover-bg)]/40 hover:bg-[var(--hover-bg)]"
             >
               <input
                 ref={fileInputRef}
@@ -1077,8 +1075,8 @@ export default function OperationsBrainPage() {
                 className="hidden"
                 onChange={handleFilesSelected}
               />
-              <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 text-indigo-500 flex items-center justify-center mx-auto mb-3">
-                <FileSpreadsheet className="w-6 h-6" />
+              <div className="w-12 h-12 rounded-2xl bg-[var(--hover-bg)] text-[var(--heading)] flex items-center justify-center mx-auto mb-3">
+                <FileSpreadsheet className="w-6 h-6 text-[var(--muted)]" />
               </div>
               <p className="text-sm font-semibold text-[var(--heading)]">
                 Click or drop business files here
@@ -1101,7 +1099,7 @@ export default function OperationsBrainPage() {
                       className="flex items-center justify-between p-2.5 rounded-xl bg-[var(--hover-bg)] border border-[var(--border)] text-xs text-[var(--heading)]"
                     >
                       <div className="flex items-center gap-2 truncate">
-                        <FileText className="w-4 h-4 text-indigo-500 shrink-0" />
+                        <FileText className="w-4 h-4 text-[var(--muted)] shrink-0" />
                         <span className="truncate font-medium">{file.name}</span>
                         <span className="text-[10px] text-[var(--muted)] font-mono shrink-0">
                           ({(file.size / 1024).toFixed(1)} KB)
@@ -1109,7 +1107,7 @@ export default function OperationsBrainPage() {
                       </div>
                       <button
                         onClick={() => handleRemoveFile(idx)}
-                        className="p-1 rounded hover:bg-rose-500/10 text-rose-500 cursor-pointer"
+                        className="p-1 rounded border border-[var(--border)] hover:bg-red-500/10 text-zinc-400 hover:text-red-500 cursor-pointer"
                       >
                         <X className="w-3.5 h-3.5" />
                       </button>
@@ -1124,7 +1122,7 @@ export default function OperationsBrainPage() {
               <button
                 type="button"
                 onClick={() => setIsDocumentModalOpen(false)}
-                className="px-4 py-2.5 rounded-xl border border-[var(--border)] text-xs font-semibold text-[var(--body)] hover:bg-[var(--hover-bg)] cursor-pointer"
+                className="px-4 py-2.5 rounded-xl border border-[var(--border)] text-xs font-bold text-[var(--body)] hover:bg-[var(--hover-bg)] cursor-pointer"
               >
                 Cancel
               </button>
@@ -1132,7 +1130,7 @@ export default function OperationsBrainPage() {
                 type="button"
                 onClick={handleIngestDocuments}
                 disabled={isIngestingDocs || uploadedFiles.length === 0}
-                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 text-xs font-semibold transition-all shadow-md active:scale-[0.98] cursor-pointer disabled:opacity-50"
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 text-xs font-bold transition-all shadow-sm active:scale-[0.98] cursor-pointer disabled:opacity-50"
               >
                 {isIngestingDocs ? (
                   <>
@@ -1140,7 +1138,7 @@ export default function OperationsBrainPage() {
                   </>
                 ) : (
                   <>
-                    <Sparkles className="w-4 h-4" /> Extract & Build Brain
+                    <Check className="w-4 h-4" /> Extract & Build Brain
                   </>
                 )}
               </button>
@@ -1149,13 +1147,13 @@ export default function OperationsBrainPage() {
         </div>
       )}
 
-      {/* MODAL 3: MANUAL ADD / EDIT OPERATION ITEM */}
+      {/* MODAL 3: MANUAL ADD / EDIT OPERATION ITEM (Zero Purple, Clean Zinc/Monochrome) */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm overflow-y-auto">
           <div className="relative w-full max-w-2xl bg-[var(--card-bg)] border border-[var(--border)] rounded-3xl p-6 sm:p-7 shadow-2xl space-y-5 text-left my-8 animate-in fade-in zoom-in-95">
             <div className="flex items-center justify-between border-b border-[var(--border)] pb-4">
               <div className="flex items-center gap-2.5">
-                <div className="p-2 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-500">
+                <div className="p-2 rounded-xl bg-[var(--hover-bg)] border border-[var(--border)] text-[var(--heading)]">
                   <Boxes className="w-5 h-5" />
                 </div>
                 <div>
@@ -1183,7 +1181,7 @@ export default function OperationsBrainPage() {
                     value={formData.title}
                     onChange={e => setFormData({ ...formData, title: e.target.value })}
                     placeholder="e.g. Hair Spa & Styling, Full Body Health Checkup, Mumbai-Delhi Express"
-                    className="w-full px-3 py-2 bg-[var(--hover-bg)] border border-[var(--border)] rounded-xl text-xs text-[var(--heading)] focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                    className="w-full px-3 py-2 bg-[var(--hover-bg)] border border-[var(--border)] rounded-xl text-xs text-[var(--heading)] focus:outline-none focus:ring-1 focus:ring-zinc-400 dark:focus:ring-zinc-500"
                   />
                 </div>
 
@@ -1192,7 +1190,7 @@ export default function OperationsBrainPage() {
                   <select
                     value={formData.category}
                     onChange={e => setFormData({ ...formData, category: e.target.value as any })}
-                    className="w-full px-3 py-2 bg-[var(--hover-bg)] border border-[var(--border)] rounded-xl text-xs text-[var(--heading)] focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer"
+                    className="w-full px-3 py-2 bg-[var(--hover-bg)] border border-[var(--border)] rounded-xl text-xs text-[var(--heading)] focus:outline-none focus:ring-1 focus:ring-zinc-400 dark:focus:ring-zinc-500 cursor-pointer"
                   >
                     <option value="general">Universal / Other Business</option>
                     <option value="appointment_slots">Appointments & Slots</option>
@@ -1209,7 +1207,7 @@ export default function OperationsBrainPage() {
                     value={formData.identifier_code}
                     onChange={e => setFormData({ ...formData, identifier_code: e.target.value })}
                     placeholder="e.g. SRV-01, SKU-101"
-                    className="w-full px-3 py-2 bg-[var(--hover-bg)] border border-[var(--border)] rounded-xl text-xs text-[var(--heading)] focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                    className="w-full px-3 py-2 bg-[var(--hover-bg)] border border-[var(--border)] rounded-xl text-xs text-[var(--heading)] focus:outline-none focus:ring-1 focus:ring-zinc-400 dark:focus:ring-zinc-500"
                   />
                 </div>
 
@@ -1220,7 +1218,7 @@ export default function OperationsBrainPage() {
                     min="0"
                     value={formData.available_units}
                     onChange={e => setFormData({ ...formData, available_units: Number(e.target.value) || 0 })}
-                    className="w-full px-3 py-2 bg-[var(--hover-bg)] border border-[var(--border)] rounded-xl text-xs text-[var(--heading)] focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                    className="w-full px-3 py-2 bg-[var(--hover-bg)] border border-[var(--border)] rounded-xl text-xs text-[var(--heading)] focus:outline-none focus:ring-1 focus:ring-zinc-400 dark:focus:ring-zinc-500"
                   />
                 </div>
 
@@ -1229,7 +1227,7 @@ export default function OperationsBrainPage() {
                   <select
                     value={formData.status}
                     onChange={e => setFormData({ ...formData, status: e.target.value as any })}
-                    className="w-full px-3 py-2 bg-[var(--hover-bg)] border border-[var(--border)] rounded-xl text-xs text-[var(--heading)] focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer"
+                    className="w-full px-3 py-2 bg-[var(--hover-bg)] border border-[var(--border)] rounded-xl text-xs text-[var(--heading)] focus:outline-none focus:ring-1 focus:ring-zinc-400 dark:focus:ring-zinc-500 cursor-pointer"
                   >
                     <option value="available">Available</option>
                     <option value="reserved">Reserved / Paused</option>
@@ -1245,18 +1243,18 @@ export default function OperationsBrainPage() {
                     placeholder="e.g. 1500"
                     value={formData.base_price_inr}
                     onChange={e => setFormData({ ...formData, base_price_inr: e.target.value })}
-                    className="w-full px-3 py-2 bg-[var(--hover-bg)] border border-[var(--border)] rounded-xl text-xs text-[var(--heading)] focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                    className="w-full px-3 py-2 bg-[var(--hover-bg)] border border-[var(--border)] rounded-xl text-xs text-[var(--heading)] focus:outline-none focus:ring-1 focus:ring-zinc-400 dark:focus:ring-zinc-500"
                   />
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-xs font-semibold text-amber-600 dark:text-amber-400">Strict AI Floor Price (₹)</label>
+                  <label className="text-xs font-semibold text-[var(--heading)]">Strict AI Floor Price (₹)</label>
                   <input
                     type="number"
                     placeholder="e.g. 1200 (Agent never quotes lower)"
                     value={formData.minimum_price_inr}
                     onChange={e => setFormData({ ...formData, minimum_price_inr: e.target.value })}
-                    className="w-full px-3 py-2 bg-[var(--hover-bg)] border border-amber-500/30 rounded-xl text-xs text-[var(--heading)] focus:outline-none focus:ring-1 focus:ring-amber-500"
+                    className="w-full px-3 py-2 bg-[var(--hover-bg)] border border-[var(--border)] rounded-xl text-xs text-[var(--heading)] focus:outline-none focus:ring-1 focus:ring-zinc-400 dark:focus:ring-zinc-500"
                   />
                 </div>
 
@@ -1269,7 +1267,7 @@ export default function OperationsBrainPage() {
                         type="datetime-local"
                         value={formData.booking_slot_start}
                         onChange={e => setFormData({ ...formData, booking_slot_start: e.target.value })}
-                        className="w-full px-3 py-2 bg-[var(--hover-bg)] border border-[var(--border)] rounded-xl text-xs text-[var(--heading)] focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                        className="w-full px-3 py-2 bg-[var(--hover-bg)] border border-[var(--border)] rounded-xl text-xs text-[var(--heading)] focus:outline-none focus:ring-1 focus:ring-zinc-400 dark:focus:ring-zinc-500"
                       />
                     </div>
                     <div className="space-y-1">
@@ -1278,7 +1276,7 @@ export default function OperationsBrainPage() {
                         type="datetime-local"
                         value={formData.booking_slot_end}
                         onChange={e => setFormData({ ...formData, booking_slot_end: e.target.value })}
-                        className="w-full px-3 py-2 bg-[var(--hover-bg)] border border-[var(--border)] rounded-xl text-xs text-[var(--heading)] focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                        className="w-full px-3 py-2 bg-[var(--hover-bg)] border border-[var(--border)] rounded-xl text-xs text-[var(--heading)] focus:outline-none focus:ring-1 focus:ring-zinc-400 dark:focus:ring-zinc-500"
                       />
                     </div>
                   </>
@@ -1294,7 +1292,7 @@ export default function OperationsBrainPage() {
                         placeholder="e.g. Delhi, Mumbai"
                         value={formData.route_origin}
                         onChange={e => setFormData({ ...formData, route_origin: e.target.value })}
-                        className="w-full px-3 py-2 bg-[var(--hover-bg)] border border-[var(--border)] rounded-xl text-xs text-[var(--heading)] focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                        className="w-full px-3 py-2 bg-[var(--hover-bg)] border border-[var(--border)] rounded-xl text-xs text-[var(--heading)] focus:outline-none focus:ring-1 focus:ring-zinc-400 dark:focus:ring-zinc-500"
                       />
                     </div>
                     <div className="space-y-1">
@@ -1304,7 +1302,7 @@ export default function OperationsBrainPage() {
                         placeholder="e.g. Bangalore, Pune"
                         value={formData.route_destination}
                         onChange={e => setFormData({ ...formData, route_destination: e.target.value })}
-                        className="w-full px-3 py-2 bg-[var(--hover-bg)] border border-[var(--border)] rounded-xl text-xs text-[var(--heading)] focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                        className="w-full px-3 py-2 bg-[var(--hover-bg)] border border-[var(--border)] rounded-xl text-xs text-[var(--heading)] focus:outline-none focus:ring-1 focus:ring-zinc-400 dark:focus:ring-zinc-500"
                       />
                     </div>
                   </>
@@ -1319,7 +1317,7 @@ export default function OperationsBrainPage() {
                   value={formData.description}
                   onChange={e => setFormData({ ...formData, description: e.target.value })}
                   placeholder="Notes for voice agents when talking to customers about this offering"
-                  className="w-full px-3 py-2 bg-[var(--hover-bg)] border border-[var(--border)] rounded-xl text-xs text-[var(--heading)] focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  className="w-full px-3 py-2 bg-[var(--hover-bg)] border border-[var(--border)] rounded-xl text-xs text-[var(--heading)] focus:outline-none focus:ring-1 focus:ring-zinc-400 dark:focus:ring-zinc-500"
                 />
               </div>
 
@@ -1328,14 +1326,14 @@ export default function OperationsBrainPage() {
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2.5 rounded-xl border border-[var(--border)] text-xs font-semibold text-[var(--body)] hover:bg-[var(--hover-bg)] cursor-pointer"
+                  className="px-4 py-2.5 rounded-xl border border-[var(--border)] text-xs font-bold text-[var(--body)] hover:bg-[var(--hover-bg)] cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={saving}
-                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 text-xs font-semibold transition-all shadow-sm active:scale-[0.98] cursor-pointer disabled:opacity-50"
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 text-xs font-bold transition-all shadow-sm active:scale-[0.98] cursor-pointer disabled:opacity-50"
                 >
                   {saving ? (
                     <>
