@@ -49,6 +49,7 @@ from app.routers.compliance_router import compliance_router
 from app.routers.observability_router import observability_router
 from app.routers.backup_router import backup_router
 from app.routers.load_benchmark_router import load_benchmark_router
+from app.routers.whatsapp_webhook_router import router as whatsapp_webhook_router
 from app.services.observability_service import ObservabilityService
 
 app = FastAPI(title="Vaakriti API")
@@ -125,6 +126,7 @@ app.include_router(compliance_router)
 app.include_router(observability_router)
 app.include_router(backup_router)
 app.include_router(load_benchmark_router)
+app.include_router(whatsapp_webhook_router)
 
 @app.on_event("startup")
 async def app_startup():
