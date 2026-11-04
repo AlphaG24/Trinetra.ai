@@ -1172,9 +1172,6 @@ function BillingContent() {
         >
           <Building2 className="w-4 h-4" />
           <span>Client Invoice & Payment Setup</span>
-          <span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400">
-            For Callers
-          </span>
         </button>
       </div>
 
@@ -1926,14 +1923,7 @@ function BillingContent() {
               )}
 
               <div className="mt-4 pt-4 border-t border-[var(--border)] flex items-center justify-between flex-wrap gap-2">
-                <p className="text-xs text-[var(--muted)] flex items-center gap-1.5">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                  <span>
-                    {invoiceTab === 'paid'
-                      ? 'All statutory B2B/B2C GST invoices are permanently stored for your accounting records.'
-                      : 'Trial invoices document your ₹99 evaluation and upcoming autopay mandate disclosures.'}
-                  </span>
-                </p>
+                <div />
                 {activeList.length > 3 && (
                   <button
                     onClick={() => setShowAllInvoices(!showAllInvoices)}
