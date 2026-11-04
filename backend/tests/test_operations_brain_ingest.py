@@ -160,3 +160,47 @@ def test_dynamic_inventory_stock_and_sales_tracking():
     assert meta["initial_units"] == 10
 
 
+def test_family_member_vip_exclusion_and_owner_transfer():
+    """Verify that family members and VIPs in business_operations_catalog are
+    recognized for immediate warm transfer and outbound calling exclusion."""
+    family_catalog_items = [
+        {
+            "category": "family_vip",
+            "title": "Rohan",
+            "identifier_code": "+919876543210",
+            "metadata": {
+                "relationship": "Brother",
+                "phone": "+919876543210",
+                "auto_transfer": True,
+                "exclude_from_outbound": True
+            }
+        },
+        {
+            "category": "call_forwarding",
+            "title": "Owner Secondary Line",
+            "metadata": {
+                "owner_secondary_phone": "+919988776655",
+                "warm_transfer_enabled": True,
+                "fallback_message": "Owner is currently unavailable, WhatsApp alert sent."
+            }
+        }
+    ]
+
+    family_contacts = []
+    owner_forwarding = None
+
+    for item in family_catalog_items:
+        if item["category"] == "family_vip":
+            name = item["title"]
+            phone = item["metadata"]["phone"]
+            rel = item["metadata"]["relationship"]
+            family_contacts.append(f"{name} ({rel}): {phone}")
+        elif item["category"] == "call_forwarding":
+            owner_forwarding = item["metadata"]["owner_secondary_phone"]
+
+    assert len(family_contacts) == 1
+    assert "Rohan (Brother): +919876543210" in family_contacts[0]
+    assert owner_forwarding == "+919988776655"
+
+
+

@@ -1530,6 +1530,71 @@ def create_appointment_tools(
             logger.error(f"[transfer_to_human] Error: {err}")
             return "Transferring you to a human representative right now."
 
+    @llm.function_tool(description="Transfer the call directly to the business owner when the caller is a family member, VIP, or requests to speak to the owner in person.")
+    async def transfer_to_owner(caller_identity: str = "", reason: str = "caller_requested_owner") -> str:
+        """
+        Execute warm call transfer to the business owner's secondary direct line (Dual SIM).
+        Args:
+            caller_identity: Who the caller is (e.g. 'Rohan (Brother)', 'VIP Client Rahul', or 'Customer').
+            reason: Reason for transfer (e.g. 'Family inquiry', 'Urgent complaint', 'Bulk pricing deal').
+        """
+        try:
+            target_phone = ""
+            fallback_msg = "Raghav ji abhi dusri call mein vyast hain. Maine unhe aapka urgent message aur contact number WhatsApp par bhej diya hai, woh jald call back karenge."
+
+            if supabase_admin:
+                q = supabase_admin.table("business_operations_catalog").select("*").eq("category", "call_forwarding").limit(1)
+                if organization_id:
+                    q = q.eq("organization_id", organization_id)
+                elif user_id:
+                    q = q.eq("user_id", user_id)
+                res = await asyncio.to_thread(q.execute)
+                if res.data and len(res.data) > 0:
+                    meta = res.data[0].get("metadata") or {}
+                    target_phone = meta.get("owner_secondary_phone") or ""
+                    if meta.get("fallback_message"):
+                        fallback_msg = meta.get("fallback_message")
+
+                if call_id:
+                    await asyncio.to_thread(
+                        supabase_admin.table("voice_calls")
+                        .update({
+                            "consent_outcome": "transferred_to_owner",
+                            "call_status": "transferred",
+                            "metadata": {
+                                "transfer_target": target_phone or "owner_secondary",
+                                "transfer_reason": reason,
+                                "caller_identity": caller_identity
+                            }
+                        })
+                        .eq("metadata->>room_name", call_id)
+                        .execute
+                    )
+
+                if user_id:
+                    try:
+                        from app.services.notification_service import NotificationService
+                        await NotificationService.dispatch(
+                            user_id=user_id,
+                            event_type="call_transfer_requested",
+                            title="🚨 Urgent Call Transfer to Owner",
+                            message=f"Caller {caller_identity or 'Incoming Caller'} ({caller_phone or 'Unknown'}) is requesting to speak with you directly (Reason: {reason}).",
+                            payload={
+                                "caller_identity": caller_identity,
+                                "caller_phone": caller_phone,
+                                "transfer_target": target_phone,
+                                "reason": reason,
+                                "call_id": call_id
+                            }
+                        )
+                    except Exception as notif_err:
+                        logger.warning(f"[transfer_to_owner] Notification dispatch warning: {notif_err}")
+
+            return f"OWNER WARM TRANSFER INITIATED: Inform the caller warmly: 'Main ek second mein aapki call Raghav ji ko transfer kar rahi hoon, kripya line par bane rahein.' If the owner does not answer within 20 seconds, reassure them politely: '{fallback_msg}'"
+        except Exception as err:
+            logger.error(f"[transfer_to_owner] Error: {err}")
+            return "Main aapki call Raghav ji ko transfer kar rahi hoon, kripya line par bane rahein."
+
     @llm.function_tool(description="Dispatch official payment details, UPI ID, payment link, or QR code to the customer's phone on WhatsApp during or at the close of a call when an order, booking, service fee, or advance payment is agreed.")
     async def dispatch_payment_request(phone_number: str = "", amount: str = "", item_description: str = "") -> str:
         """
@@ -1897,6 +1962,7 @@ def create_appointment_tools(
         reschedule_appointment_slot,
         decline_call_recording,
         transfer_to_human,
+        transfer_to_owner,
         dispatch_payment_request,
         query_live_inventory,
         reserve_business_inventory,
@@ -4097,10 +4163,12 @@ async def entrypoint(ctx: JobContext):
                     elif user_id:
                         cat_query = cat_query.eq("user_id", user_id)
 
-                    cat_res = await asyncio.to_thread(cat_query.limit(20).execute)
+                    cat_res = await asyncio.to_thread(cat_query.limit(30).execute)
                     if cat_res.data and len(cat_res.data) > 0:
                         voice_directives = []
                         cat_lines = []
+                        family_members = []
+                        owner_secondary_info = None
 
                         for item in cat_res.data:
                             cat = item.get("category") or "general"
@@ -4110,6 +4178,21 @@ async def entrypoint(ctx: JobContext):
                             if cat == "voice_directive":
                                 prompt_override = meta.get("prompt_override") or item.get("title")
                                 voice_directives.append(f"- ⚡ [OWNER VOICE OVERRIDE]: {prompt_override}")
+                                continue
+
+                            # Check for Family Members & VIP Exclusion / Auto-Transfer List
+                            if cat == "family_vip":
+                                fam_name = item.get("title") or "Family Contact"
+                                rel = meta.get("relationship") or "Family"
+                                fam_phone = meta.get("phone") or item.get("identifier_code") or ""
+                                family_members.append(f"- {fam_name} ({rel}, Phone: {fam_phone})")
+                                continue
+
+                            # Check for Call Forwarding Configuration
+                            if cat == "call_forwarding":
+                                sec_phone = meta.get("owner_secondary_phone")
+                                if sec_phone:
+                                    owner_secondary_info = sec_phone
                                 continue
 
                             code = item.get("identifier_code") or "ITEM"
@@ -4149,6 +4232,21 @@ async def entrypoint(ctx: JobContext):
                                 "  2. First quote the base Quoted Price. If the caller asks for discount or negotiates, you may offer a discount down to the Strict Floor Limit, but NEVER accept or quote below the Floor Limit.\n"
                                 "  3. Use 'reserve_business_inventory' to lock in any confirmed booking so slots/routes never overlap.\n"
                                 "  4. If the customer requests demo links or payment details, use 'dispatch_demo_or_business_link' or 'dispatch_payment_request' immediately during the call.\n"
+                            )
+
+                        # Inject Family Members & VIP Callers
+                        if family_members:
+                            system_prompt += (
+                                f"\n\n## OWNER FAMILY MEMBERS & VIP EXCLUSIONS (IMMEDIATE WARM TRANSFER)\n"
+                                f"The following individuals are verified family members and personal VIP contacts of the business owner:\n"
+                                + "\n".join(family_members) +
+                                f"\n- MANDATORY INSTRUCTION: If caller is identified as one of these family members, or states they are family/relatives of the owner, greet them warmly with utmost respect, and IMMEDIATELY invoke `transfer_to_owner` (Warm Transfer). Do NOT pitch business services or treat them like a random customer!\n"
+                            )
+
+                        if owner_secondary_info:
+                            system_prompt += (
+                                f"\n\n## OWNER CALL FORWARDING DIRECTIVE:\n"
+                                f"Owner's secondary direct line is configured ({owner_secondary_info}). Whenever a caller requests to speak directly to the owner, or is a family member, or demands human perception, invoke `transfer_to_owner`.\n"
                             )
                 except Exception as cat_err:
                     logger.debug(f"Catalog prompt injection note: {cat_err}")

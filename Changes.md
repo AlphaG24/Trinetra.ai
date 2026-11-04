@@ -85,7 +85,9 @@ For foreign clients : Twilio + 11labs will be used
 11. Clarify one thing that our whatsapp number is now used for notifications to our customers , and what about their customers like if they didn't connect then their messages will also be sended via that number but it was our official vaakriti number so everyone see vaakriti as branding . Although it is better for our branding but then also ? 
 12. After every call the call details like transcripts and audio must be sent to user whatsapp or mail .
 13. Currently the number can just send details but when someone did payment and at last messahe it is wirtten that once payment is done send the screenshot and UTR so that we can verify but this message actaully goes nowhere , so what about that type og messaging  handling to make our whatsapp bot as well intelligent and capable . 
-14. 
+14. When the call is regarding any family member or customer wants to talk to owner then forward teh call to owner directly so that the discussion can be carry forwarded into real human perception. 
+Also there may be some other scenarios where need to forward the call to owner then also do this thing.
+
 Our aim is to achieve <100 ms latency to achieve like sarvam. Now we have to choose the pipeline very strategically , as our main custom pipleine is already built and ready just need polishing so that the lags , voice cracking , smooth voice and fast reposnes will start . Once those issues are eliminated our pipleine is best . So tell me about it that what should we choose and how do we achieve our latency aim . Can it be done without server or need a dedicated server . 
 
 I have written nearly all rules and scenarios that are needed in our pplatform and wokring of our entire platform . Here I aksed some questions and some new features and some just need verifications that they are wokring or not.
