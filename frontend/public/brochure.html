@@ -1,0 +1,1147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Vaakriti AI — Enterprise Sales Brochure</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Playfair+Display:ital,wght@0,600;0,700;1,600&display=swap');
+
+  @page {
+    size: A4 portrait;
+    margin: 0;
+  }
+
+  *, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  body {
+    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: #e2e8f0;
+    color: #0f172a;
+    line-height: 1.45;
+    font-size: 13px;
+  }
+
+  .sheet {
+    width: 210mm;
+    height: 297mm;
+    max-height: 297mm;
+    position: relative;
+    overflow: hidden;
+    margin: 15px auto;
+    background: #ffffff;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    page-break-after: always;
+    break-after: page;
+  }
+
+  @media print {
+    body { background: transparent; }
+    .sheet {
+      margin: 0;
+      box-shadow: none;
+      width: 210mm;
+      height: 297mm;
+    }
+  }
+
+  /* COLOR THEMES */
+  .dark-page {
+    background: #080312;
+    color: #f8fafc;
+  }
+
+  /* HEADER & FOOTER */
+  .sheet-header {
+    padding: 22mm 22mm 0 22mm;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #e2e8f0;
+    padding-bottom: 12px;
+  }
+  .dark-page .sheet-header {
+    border-bottom-color: rgba(255,255,255,0.12);
+  }
+
+  .sheet-body {
+    padding: 16px 22mm;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+  }
+
+  .sheet-footer {
+    padding: 0 22mm 18mm 22mm;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 10px;
+    font-family: monospace;
+    color: #64748b;
+    border-top: 1px solid #e2e8f0;
+    padding-top: 10px;
+  }
+  .dark-page .sheet-footer {
+    border-top-color: rgba(255,255,255,0.12);
+    color: #94a3b8;
+  }
+
+  /* TYPOGRAPHY */
+  .brand-logo-text {
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-weight: 800;
+    letter-spacing: 0.15em;
+    font-size: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .doc-category {
+    font-size: 10px;
+    font-family: monospace;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    color: #64748b;
+  }
+  .dark-page .doc-category { color: #94a3b8; }
+
+  h1.hero-headline {
+    font-family: 'Playfair Display', serif;
+    font-size: 42px;
+    line-height: 1.15;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: #ffffff;
+  }
+  h2.page-headline {
+    font-family: 'Playfair Display', serif;
+    font-size: 26px;
+    line-height: 1.25;
+    font-weight: 700;
+    color: #090314;
+    margin-bottom: 6px;
+  }
+  .dark-page h2.page-headline {
+    color: #ffffff;
+  }
+
+  .section-tag {
+    font-size: 11px;
+    font-family: monospace;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    font-weight: 700;
+    color: #6366f1;
+    margin-bottom: 4px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .dark-page .section-tag { color: #a5b4fc; }
+
+  p.lead-subhead {
+    font-size: 13px;
+    color: #475569;
+    line-height: 1.5;
+    margin-bottom: 14px;
+  }
+  .dark-page p.lead-subhead { color: #cbd5e1; }
+
+  /* CARDS & CONTAINERS */
+  .card {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 12px 14px;
+  }
+  .card-dark {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 10px;
+    padding: 12px 14px;
+  }
+
+  /* SOUNDWAVE MOTIF */
+  .soundwave {
+    display: inline-flex;
+    align-items: center;
+    gap: 2.5px;
+    height: 16px;
+  }
+  .soundwave span {
+    width: 2px;
+    background: #6366f1;
+    border-radius: 2px;
+  }
+  .soundwave span:nth-child(1) { height: 6px; }
+  .soundwave span:nth-child(2) { height: 12px; }
+  .soundwave span:nth-child(3) { height: 16px; }
+  .soundwave span:nth-child(4) { height: 9px; }
+  .soundwave span:nth-child(5) { height: 14px; }
+  .soundwave span:nth-child(6) { height: 7px; }
+
+  /* BADGES */
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 600;
+    border: 1px solid #cbd5e1;
+    background: #ffffff;
+    color: #0f172a;
+  }
+  .badge-dark {
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.15);
+    color: #f1f5f9;
+  }
+
+  /* PILL BUTTON */
+  .btn-gold {
+    background: linear-gradient(135deg, #f59e0b, #d97706);
+    color: #ffffff;
+    font-weight: 700;
+    padding: 8px 18px;
+    border-radius: 20px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  /* SPEECH HINDI QUOTE */
+  .speech-quote {
+    background: #f1f5f9;
+    border-left: 3px solid #6366f1;
+    padding: 8px 12px;
+    border-radius: 0 6px 6px 0;
+    margin: 6px 0;
+  }
+  .speech-hindi {
+    font-size: 12px;
+    font-weight: 600;
+    color: #1e1b4b;
+    display: block;
+  }
+  .speech-english {
+    font-size: 11px;
+    color: #64748b;
+    font-style: italic;
+    display: block;
+    margin-top: 2px;
+  }
+
+  /* COMPARISON TABLE */
+  table.comp-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 11px;
+    margin-top: 6px;
+  }
+  table.comp-table th {
+    padding: 8px 10px;
+    background: #0f172a;
+    color: #ffffff;
+    text-align: left;
+    font-size: 10px;
+    font-family: monospace;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+  table.comp-table th.highlight-th {
+    background: #312e81;
+    color: #a5b4fc;
+    border-top: 2px solid #6366f1;
+  }
+  table.comp-table td {
+    padding: 7px 10px;
+    border-bottom: 1px solid #e2e8f0;
+    vertical-align: middle;
+  }
+  table.comp-table tr:last-child td {
+    border-bottom: none;
+  }
+  table.comp-table td.highlight-td {
+    background: #eef2ff;
+    font-weight: 600;
+    color: #1e1b4b;
+    border-left: 1px solid #c7d2fe;
+    border-right: 1px solid #c7d2fe;
+  }
+
+  /* FOOTNOTE */
+  .footnote {
+    font-size: 9.5px;
+    color: #64748b;
+    font-style: italic;
+    margin-top: 8px;
+  }
+</style>
+</head>
+<body>
+
+<!-- ========================================================================= -->
+<!-- PAGE 1: COVER (DARK)                                                      -->
+<!-- ========================================================================= -->
+<section class="sheet dark-page">
+  <div style="padding: 24mm 22mm 0 22mm; display: flex; justify-content: space-between; align-items: center;">
+    <div class="brand-logo-text">
+      <svg width="24" height="24" viewBox="175 120 673 783" fill="#ffffff">
+        <path d="M 326 682 C 326 684 328 686 330 687 C 335 689 339 692 344 694 L 512 800 L 680 694 C 685 692 689 689 694 687 L 698 682 L 512 360 Z"/>
+      </svg>
+      <span>VAAKRITI</span>
+    </div>
+    <div class="soundwave">
+      <span style="background:#a5b4fc"></span><span style="background:#a5b4fc"></span><span style="background:#a5b4fc"></span>
+      <span style="background:#a5b4fc"></span><span style="background:#a5b4fc"></span><span style="background:#a5b4fc"></span>
+    </div>
+  </div>
+
+  <div style="padding: 0 22mm; margin: auto 0; max-width: 170mm;">
+    <div style="font-family: monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 0.18em; color: #a5b4fc; margin-bottom: 12px; font-weight: 700;">
+      AUTONOMOUS ENTERPRISE VOICE INFRASTRUCTURE
+    </div>
+    
+    <h1 class="hero-headline" style="margin-bottom: 18px;">
+      The voice that runs your business.
+    </h1>
+    
+    <p style="font-size: 16px; line-height: 1.5; color: #cbd5e1; font-weight: 300; margin-bottom: 28px; max-width: 155mm;">
+      Answer, adapt to today's schedule, issue tax invoices, collect payments and escalate to the owner in a single call.
+    </p>
+
+    <div style="display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 34px;">
+      <div class="badge badge-dark">✓ Instant GST Invoicing</div>
+      <div class="badge badge-dark">✓ Non-Custodial UPI Settlement</div>
+      <div class="badge badge-dark">✓ Fluent Hindi, Hinglish &amp; English</div>
+      <div class="badge badge-dark">✓ TRAI &amp; Telephony Compliant</div>
+    </div>
+  </div>
+
+  <div style="padding: 0 22mm 20mm 22mm; border-top: 1px solid rgba(255,255,255,0.12); display: flex; justify-content: space-between; align-items: flex-end; padding-top: 14px;">
+    <div>
+      <div style="font-size: 10px; font-family: monospace; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.08em;">Designed For Enterprise Operations In India</div>
+      <div style="font-size: 12px; font-weight: 600; color: #f1f5f9; margin-top: 2px;">Clinics • Logistics &amp; Transport • Retail &amp; Commerce • Professional Services</div>
+    </div>
+    <div style="font-family: monospace; font-size: 11px; color: #a5b4fc;">
+      2026–2027
+    </div>
+  </div>
+</section>
+
+<!-- ========================================================================= -->
+<!-- PAGE 2: THE CHALLENGE                                                     -->
+<!-- ========================================================================= -->
+<section class="sheet">
+  <div class="sheet-header">
+    <div class="brand-logo-text" style="color: #0f172a;">
+      <svg width="20" height="20" viewBox="175 120 673 783" fill="#0f172a">
+        <path d="M 326 682 L 512 800 L 698 682 L 512 360 Z"/>
+      </svg>
+      <span>VAAKRITI</span>
+    </div>
+    <div class="doc-category">The Operational Challenge</div>
+  </div>
+
+  <div class="sheet-body">
+    <div class="section-tag">01. Industry Reality</div>
+    <h2 class="page-headline">Why Ordinary Voice Bots Fail Real Businesses</h2>
+    <p class="lead-subhead">
+      Commercial voice bots can speak, but they cannot operate. When deployed in Indian customer operations, standard voice bots break down in four critical moments:
+    </p>
+
+    <div style="display: flex; flex-direction: column; gap: 12px; margin-top: 4px;">
+      
+      <!-- Pain 1 -->
+      <div class="card" style="border-left: 4px solid #ef4444;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+          <strong style="font-size: 13px; color: #0f172a;">1. Outdated Information &amp; Phantom Bookings</strong>
+          <span style="font-size: 10px; font-family: monospace; color: #ef4444; font-weight: 700;">STATIC BLINDNESS</span>
+        </div>
+        <p style="font-size: 12px; color: #475569;">
+          Doctors arrive late, routes change, and stock runs out during the day. Ordinary bots cannot update their facts without code changes, booking double-booked or cancelled slots.
+        </p>
+        <div style="font-size: 11px; color: #991b1b; font-weight: 600; margin-top: 4px;">
+          Customer Impact: Disappointed callers arrive at closed clinics or book unavailable items.
+        </div>
+      </div>
+
+      <!-- Pain 2 -->
+      <div class="card" style="border-left: 4px solid #f97316;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+          <strong style="font-size: 13px; color: #0f172a;">2. Dead-End Calls with No Payment Settlement</strong>
+          <span style="font-size: 10px; font-family: monospace; color: #f97316; font-weight: 700;">REVENUE LOSS</span>
+        </div>
+        <p style="font-size: 12px; color: #475569;">
+          Calls that end with <em>"Please visit our website to pay"</em> lose up to 85%* of customers. Ordinary bots cannot generate tax invoices or dispatch UPI payment links on the call.
+        </p>
+        <div style="font-size: 11px; color: #c2410c; font-weight: 600; margin-top: 4px;">
+          Customer Impact: Verbal sales agreements evaporate the moment the caller hangs up.
+        </div>
+      </div>
+
+      <!-- Pain 3 -->
+      <div class="card" style="border-left: 4px solid #eab308;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+          <strong style="font-size: 13px; color: #0f172a;">3. Infinite Call-Forwarding Loops</strong>
+          <span style="font-size: 10px; font-family: monospace; color: #ca8a04; font-weight: 700;">ROUTING CRASH</span>
+        </div>
+        <p style="font-size: 12px; color: #475569;">
+          When an owner forwards their phone to an agent, requests to speak to the owner trigger an endless loop back to the agent. Without intelligent routing, the phone rings endlessly.
+        </p>
+        <div style="font-size: 11px; color: #854d0e; font-weight: 600; margin-top: 4px;">
+          Customer Impact: Important VIP clients and family members get trapped in automated loops.
+        </div>
+      </div>
+
+      <!-- Pain 4 -->
+      <div class="card" style="border-left: 4px solid #64748b;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+          <strong style="font-size: 13px; color: #0f172a;">4. Robotic Pauses &amp; Audio Crackles on Indian Telecom Networks</strong>
+          <span style="font-size: 10px; font-family: monospace; color: #475569; font-weight: 700;">UNNATURAL PACE</span>
+        </div>
+        <p style="font-size: 12px; color: #475569;">
+          Unoptimized systems suffer 1.5 to 2.5 second pauses between turns and produce audible audio crackles when playing over Indian mobile networks (Airtel, Jio, Vi).
+        </p>
+        <div style="font-size: 11px; color: #334155; font-weight: 600; margin-top: 4px;">
+          Customer Impact: Callers realize they are talking to a slow machine and disconnect early.
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Bridge -->
+    <div style="margin-top: 14px; background: #e0e7ff; border: 1px solid #c7d2fe; border-radius: 8px; padding: 10px 14px; font-size: 12px; color: #1e1b4b; font-weight: 600; display: flex; align-items: center; justify-content: space-between;">
+      <span>Vaakriti AI was engineered to eliminate these breakdowns with a complete, closed-loop operating system.</span>
+      <span style="font-size: 14px;">→</span>
+    </div>
+
+    <div class="footnote">*Based on internal estimates; results vary by deployment.</div>
+  </div>
+
+  <div class="sheet-footer">
+    <span>Vaakriti AI • Enterprise 2026-27 • Commercial in Confidence</span>
+    <span>Page 02</span>
+  </div>
+</section>
+
+<!-- ========================================================================= -->
+<!-- PAGE 3: MEET VAAKRITI (OVERVIEW)                                          -->
+<!-- ========================================================================= -->
+<section class="sheet">
+  <div class="sheet-header">
+    <div class="brand-logo-text" style="color: #0f172a;">
+      <svg width="20" height="20" viewBox="175 120 673 783" fill="#0f172a">
+        <path d="M 326 682 L 512 800 L 698 682 L 512 360 Z"/>
+      </svg>
+      <span>VAAKRITI</span>
+    </div>
+    <div class="doc-category">System Overview</div>
+  </div>
+
+  <div class="sheet-body">
+    <div class="section-tag">02. Platform Overview</div>
+    <h2 class="page-headline">Meet Vaakriti AI: The Complete Business Operator</h2>
+    <p class="lead-subhead">
+      Vaakriti is an enterprise voice infrastructure that speaks naturally, checks live business facts, generates tax invoices, collects verified payments, and escalates to owners in real time.
+    </p>
+
+    <!-- HORIZONTAL FLOW DIAGRAM -->
+    <div style="background: #0f172a; color: #ffffff; padding: 14px; border-radius: 10px; margin: 4px 0 16px 0;">
+      <div style="font-size: 10px; font-family: monospace; color: #94a3b8; text-transform: uppercase; margin-bottom: 10px; letter-spacing: 0.08em;">
+        THE CLOSED-LOOP OPERATIONAL CALL FLOW
+      </div>
+      <div style="display: flex; align-items: center; justify-content: space-between; font-size: 11px; text-align: center;">
+        <div style="flex: 1; padding: 6px; background: rgba(255,255,255,0.08); border-radius: 6px;">
+          <div style="font-weight: 700; color: #a5b4fc;">1. Customer Call</div>
+          <div style="font-size: 9.5px; color: #94a3b8; margin-top: 2px;">Identity &amp; notice given</div>
+        </div>
+        <div style="padding: 0 4px; color: #64748b;">→</div>
+        <div style="flex: 1; padding: 6px; background: rgba(255,255,255,0.08); border-radius: 6px;">
+          <div style="font-weight: 700; color: #a5b4fc;">2. Live Brain</div>
+          <div style="font-size: 9.5px; color: #94a3b8; margin-top: 2px;">Real-time slots &amp; rates</div>
+        </div>
+        <div style="padding: 0 4px; color: #64748b;">→</div>
+        <div style="flex: 1; padding: 6px; background: rgba(255,255,255,0.08); border-radius: 6px;">
+          <div style="font-weight: 700; color: #a5b4fc;">3. In-Call Invoice</div>
+          <div style="font-size: 9.5px; color: #94a3b8; margin-top: 2px;">GST PDF + UPI QR sent</div>
+        </div>
+        <div style="padding: 0 4px; color: #64748b;">→</div>
+        <div style="flex: 1; padding: 6px; background: rgba(255,255,255,0.08); border-radius: 6px;">
+          <div style="font-weight: 700; color: #34d399;">4. Verified Paid</div>
+          <div style="font-size: 9.5px; color: #94a3b8; margin-top: 2px;">Receipt &amp; owner alerted</div>
+        </div>
+      </div>
+      <div style="margin-top: 8px; padding-top: 8px; border-top: 1px dashed rgba(255,255,255,0.15); display: flex; justify-content: space-between; align-items: center; font-size: 10px; color: #cbd5e1;">
+        <span><strong>VIP / Family Branch:</strong> Recognized instantly → Connected to owner's direct mobile line with context whisper.</span>
+        <span style="color: #f59e0b; font-weight: 700;">Loop-Free</span>
+      </div>
+    </div>
+
+    <!-- 6 CORE CAPABILITIES GRID -->
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 4px;">
+      
+      <div class="card">
+        <strong style="font-size: 12px; color: #0f172a; display: block; margin-bottom: 2px;">1. Operations Brain Hub</strong>
+        <p style="font-size: 11px; color: #475569;">
+          Owners speak daily audio memos to update operating hours and rules instantly without reprogramming.
+        </p>
+      </div>
+
+      <div class="card">
+        <strong style="font-size: 12px; color: #0f172a; display: block; margin-bottom: 2px;">2. Cash-to-Call Settlement</strong>
+        <p style="font-size: 11px; color: #475569;">
+          Turns phone negotiations into closed deals by sending custom GST invoices and UPI QR codes on WhatsApp.
+        </p>
+      </div>
+
+      <div class="card">
+        <strong style="font-size: 12px; color: #0f172a; display: block; margin-bottom: 2px;">3. WhatsApp Receipt Vision</strong>
+        <p style="font-size: 11px; color: #475569;">
+          Inspects customer payment screenshots, verifies the transaction reference, and marks bookings confirmed.
+        </p>
+      </div>
+
+      <div class="card">
+        <strong style="font-size: 12px; color: #0f172a; display: block; margin-bottom: 2px;">4. Smart Dual-SIM Escalation</strong>
+        <p style="font-size: 11px; color: #475569;">
+          Safely routes family and high-value customers to the owner's personal phone line without forwarding loops.
+        </p>
+      </div>
+
+      <div class="card">
+        <strong style="font-size: 12px; color: #0f172a; display: block; margin-bottom: 2px;">5. Human-Paced Conversation</strong>
+        <p style="font-size: 11px; color: #475569;">
+          Ultra-responsive turn timing with zero robotic lag, clear audio, and polite human-style interruption handling.
+        </p>
+      </div>
+
+      <div class="card">
+        <strong style="font-size: 12px; color: #0f172a; display: block; margin-bottom: 2px;">6. Indian Telephony Compliance</strong>
+        <p style="font-size: 11px; color: #475569;">
+          Built-in AI identity disclosure, call recording notices, calling hour limits, and Do-Not-Disturb checking.
+        </p>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="sheet-footer">
+    <span>Vaakriti AI • Enterprise 2026-27 • Commercial in Confidence</span>
+    <span>Page 03</span>
+  </div>
+</section>
+
+<!-- ========================================================================= -->
+<!-- PAGE 4: LIVE BUSINESS BRAIN + IN-CALL PAYMENTS                            -->
+<!-- ========================================================================= -->
+<section class="sheet">
+  <div class="sheet-header">
+    <div class="brand-logo-text" style="color: #0f172a;">
+      <svg width="20" height="20" viewBox="175 120 673 783" fill="#0f172a">
+        <path d="M 326 682 L 512 800 L 698 682 L 512 360 Z"/>
+      </svg>
+      <span>VAAKRITI</span>
+    </div>
+    <div class="doc-category">Daily Brain &amp; Invoicing</div>
+  </div>
+
+  <div class="sheet-body">
+    <div class="section-tag">03. Adaptive Operations</div>
+    <h2 class="page-headline">Live Business Brain &amp; In-Call Payments</h2>
+    <p class="lead-subhead">
+      Your voice agent stays updated with today's real-world business status, and turns verbal promises into immediate bank settlements.
+    </p>
+
+    <!-- SECTION A: OPERATIONS BRAIN (3 FEATURES) -->
+    <div style="margin-bottom: 14px;">
+      <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: #0f172a; margin-bottom: 6px; letter-spacing: 0.05em;">
+        A. The Three Pillars of the Operations Brain
+      </div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px;">
+        
+        <div class="card">
+          <strong style="font-size: 11px; color: #0f172a; display: block;">Spoken Daily Directives</strong>
+          <p style="font-size: 10.5px; color: #475569; margin: 3px 0;">
+            Record a short voice note on your phone. The agent adopts the new schedule instantly.
+          </p>
+          <div class="speech-quote">
+            <span class="speech-hindi">"Aaj salon 10:00 baje tak band rahega to uske baad hi appointment book karna."</span>
+            <span class="speech-english">("The salon is closed until 10:00 AM today; please book appointments only after that.")</span>
+          </div>
+        </div>
+
+        <div class="card">
+          <strong style="font-size: 11px; color: #0f172a; display: block;">Live Slots &amp; Calendar</strong>
+          <p style="font-size: 10.5px; color: #475569; margin: 3px 0;">
+            Real-time appointment calendar sync prevents double bookings. Booked slots vanish immediately.
+          </p>
+          <div class="speech-quote">
+            <span class="speech-hindi">"11:30 baje ka slot book ho gaya hai, agla available samay 12:00 baje hai."</span>
+            <span class="speech-english">("The 11:30 slot is now reserved; the next opening is at 12:00 PM.")</span>
+          </div>
+        </div>
+
+        <div class="card">
+          <strong style="font-size: 11px; color: #0f172a; display: block;">Inventory &amp; Pricing</strong>
+          <p style="font-size: 10.5px; color: #475569; margin: 3px 0;">
+            Maintains available packages, transport routes, and lowest negotiation limits for accurate quotes.
+          </p>
+          <div class="speech-quote">
+            <span class="speech-hindi">"Humare paas 2 gaadiyan available hain Kanpur se Delhi route ke liye."</span>
+            <span class="speech-english">("We have 2 vehicles available for the Kanpur to Delhi route.")</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- SECTION B: IN-CALL INVOICE & PAYMENT FLOW (4 STEPS + MOCK INVOICE) -->
+    <div>
+      <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: #0f172a; margin-bottom: 6px; letter-spacing: 0.05em;">
+        B. 4-Step In-Call Invoice &amp; Payment Settlement
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 12px; align-items: stretch;">
+        
+        <!-- 4 Steps -->
+        <div style="display: flex; flex-direction: column; gap: 6px;">
+          <div class="card" style="padding: 8px 10px;">
+            <strong style="font-size: 11px; color: #0f172a;">1. Spoken Deal Extraction</strong>
+            <p style="font-size: 10.5px; color: #475569;">Listens to the agreed price and service description during the call.</p>
+          </div>
+          <div class="card" style="padding: 8px 10px;">
+            <strong style="font-size: 11px; color: #0f172a;">2. Statutory GST Invoice Built</strong>
+            <p style="font-size: 10.5px; color: #475569;">Generates a clean tax invoice with your company logo, GSTIN, and tax breakup.</p>
+          </div>
+          <div class="card" style="padding: 8px 10px;">
+            <strong style="font-size: 11px; color: #0f172a;">3. WhatsApp Invoice &amp; QR Sent</strong>
+            <p style="font-size: 10.5px; color: #475569;">Pushes the invoice PDF and scan-to-pay QR to caller's WhatsApp before call ends.</p>
+          </div>
+          <div class="card" style="padding: 8px 10px;">
+            <strong style="font-size: 11px; color: #0f172a;">4. Direct Settlement</strong>
+            <p style="font-size: 10.5px; color: #475569;">100% of customer funds transfer directly to your business account or UPI ID.</p>
+          </div>
+        </div>
+
+        <!-- WhatsApp Invoice Card Mockup -->
+        <div style="background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; padding: 10px 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.06); display: flex; flex-direction: column; justify-content: space-between;">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 1px solid #f1f5f9; pb-2;">
+            <div>
+              <div style="font-size: 12px; font-weight: 800; color: #0f172a;">Vaakriti Partner</div>
+              <div style="font-size: 9px; color: #64748b;">GSTIN: 23RAGHAVTHAKUR000</div>
+            </div>
+            <div style="text-align: right;">
+              <span style="font-size: 9px; font-family: monospace; background: #f1f5f9; padding: 2px 5px; border-radius: 3px; font-weight: 700;">TAX INVOICE</span>
+              <div style="font-size: 8.5px; color: #64748b; margin-top: 2px;">INV #VAAK/26-27/0001</div>
+            </div>
+          </div>
+
+          <div style="margin: 6px 0; font-size: 10.5px; line-height: 1.4;">
+            <div style="display: flex; justify-content: space-between; color: #475569;">
+              <span>Premium Consultation Service</span>
+              <span style="font-weight: 600; color: #0f172a;">₹1,200.00</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; color: #64748b; font-size: 9.5px;">
+              <span>GST (18% Included)</span>
+              <span>₹216.00</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; border-top: 1px solid #e2e8f0; padding-top: 3px; margin-top: 3px; font-weight: 700; color: #0f172a; font-size: 11px;">
+              <span>Total Payable</span>
+              <span>₹1,416.00</span>
+            </div>
+          </div>
+
+          <div style="background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 6px; padding: 6px; display: flex; align-items: center; justify-content: space-between;">
+            <div>
+              <div style="font-size: 9px; color: #64748b;">Scan &amp; Pay via UPI</div>
+              <div style="font-size: 10px; font-family: monospace; font-weight: 700; color: #0f172a;">vaak@hdfc</div>
+            </div>
+            <div style="width: 32px; height: 32px; background: #0f172a; border-radius: 4px; display: flex; align-items: center; justify-content: center; color: #ffffff; font-size: 8px; font-family: monospace;">
+              QR
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <div class="sheet-footer">
+    <span>Vaakriti AI • Enterprise 2026-27 • Commercial in Confidence</span>
+    <span>Page 04</span>
+  </div>
+</section>
+
+<!-- ========================================================================= -->
+<!-- PAGE 5: PAYMENT VERIFICATION + OWNER ESCALATION                           -->
+<!-- ========================================================================= -->
+<section class="sheet">
+  <div class="sheet-header">
+    <div class="brand-logo-text" style="color: #0f172a;">
+      <svg width="20" height="20" viewBox="175 120 673 783" fill="#0f172a">
+        <path d="M 326 682 L 512 800 L 698 682 L 512 360 Z"/>
+      </svg>
+      <span>VAAKRITI</span>
+    </div>
+    <div class="doc-category">Receipt OCR &amp; Human Transfer</div>
+  </div>
+
+  <div class="sheet-body">
+    <div class="section-tag">04. Closure &amp; Escalation</div>
+    <h2 class="page-headline">Automated Verification &amp; Safe Escalation</h2>
+    <p class="lead-subhead">
+      Close the loop automatically: verify customer payment receipts via WhatsApp, and safely transfer urgent calls to the owner without infinite forwarding loops.
+    </p>
+
+    <!-- SECTION A: RECEIPT VERIFICATION -->
+    <div style="margin-bottom: 14px;">
+      <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: #0f172a; margin-bottom: 6px; letter-spacing: 0.05em;">
+        A. WhatsApp Screenshot &amp; Transaction Verification
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+        
+        <div class="card">
+          <strong style="font-size: 11px; color: #0f172a; display: block; margin-bottom: 4px;">Universal App Support</strong>
+          <p style="font-size: 11px; color: #475569;">
+            Inspects payment receipts sent on WhatsApp from Google Pay, PhonePe, Paytm, BHIM, and bank transfers.
+          </p>
+          <div style="display: flex; gap: 6px; margin-top: 6px;">
+            <span style="font-size: 9.5px; background: #e2e8f0; padding: 2px 6px; border-radius: 4px; font-weight: 600;">GPay</span>
+            <span style="font-size: 9.5px; background: #e2e8f0; padding: 2px 6px; border-radius: 4px; font-weight: 600;">PhonePe</span>
+            <span style="font-size: 9.5px; background: #e2e8f0; padding: 2px 6px; border-radius: 4px; font-weight: 600;">Paytm</span>
+            <span style="font-size: 9.5px; background: #e2e8f0; padding: 2px 6px; border-radius: 4px; font-weight: 600;">NetBanking</span>
+          </div>
+        </div>
+
+        <div class="card">
+          <strong style="font-size: 11px; color: #0f172a; display: block; margin-bottom: 4px;">12-Digit Reference &amp; Status</strong>
+          <p style="font-size: 11px; color: #475569;">
+            Extracts the official 12-digit transaction number, verifies payment status (Success vs Pending/Failed), and reconciles the order.
+          </p>
+          <div style="font-size: 10px; font-family: monospace; color: #166534; background: #dcfce7; padding: 3px 6px; border-radius: 4px; margin-top: 6px; font-weight: 700;">
+            ✓ Status: SUCCESS • UTR: 432109876543
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Auto Confirmation Text Box -->
+      <div style="margin-top: 8px; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 8px; padding: 8px 12px; font-size: 11px; display: flex; justify-content: space-between; align-items: center;">
+        <div>
+          <span style="font-weight: 700; color: #0f172a;">Customer Auto-Confirmation:</span>
+          <span style="color: #475569; margin-left: 6px;">"Aapka payment verify ho gaya hai. Aapka order confirm hai. Dhanyawad!"</span>
+        </div>
+        <span style="font-size: 9.5px; background: #3b82f6; color: #ffffff; padding: 2px 6px; border-radius: 10px; font-weight: 600;">INSTANT</span>
+      </div>
+    </div>
+
+    <!-- SECTION B: LOOP-PROOF WARM TRANSFER -->
+    <div>
+      <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: #0f172a; margin-bottom: 6px; letter-spacing: 0.05em;">
+        B. Loop-Proof Warm Transfer to Owner
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+        
+        <div class="card">
+          <strong style="font-size: 11px; color: #0f172a; display: block; margin-bottom: 2px;">Dual-SIM Anti-Loop Routing</strong>
+          <p style="font-size: 11px; color: #475569;">
+            Configure your personal secondary number (SIM 2). When callers ask for the owner, calls forward strictly to SIM 2 to prevent infinite looping.
+          </p>
+        </div>
+
+        <div class="card">
+          <strong style="font-size: 11px; color: #0f172a; display: block; margin-bottom: 2px;">Family &amp; VIP Priority List</strong>
+          <p style="font-size: 11px; color: #475569;">
+            Pre-approved contacts bypass the automated agent entirely. They are connected directly and excluded from all outbound campaigns.
+          </p>
+        </div>
+
+      </div>
+
+      <!-- 20s Reassurance Box -->
+      <div style="margin-top: 8px; border: 1px solid #e2e8f0; background: #ffffff; border-radius: 8px; padding: 10px 12px;">
+        <div style="font-size: 11px; font-weight: 700; color: #0f172a; margin-bottom: 4px;">
+          20-Second Fallback Reassurance (If Owner Cannot Answer)
+        </div>
+        <div class="speech-quote" style="margin: 0;">
+          <span class="speech-hindi">"Raghav ji abhi dusri call mein vyast hain. Maine unhe aapka urgent message aur contact number WhatsApp par bhej diya hai, woh jald call back karenge."</span>
+          <span class="speech-english">("Raghav is currently on another call. I have sent your urgent message and contact number to his WhatsApp; he will call back shortly.")</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="sheet-footer">
+    <span>Vaakriti AI • Enterprise 2026-27 • Commercial in Confidence</span>
+    <span>Page 05</span>
+  </div>
+</section>
+
+<!-- ========================================================================= -->
+<!-- PAGE 6: SPEED, CLARITY AND COMPLIANCE                                     -->
+<!-- ========================================================================= -->
+<section class="sheet">
+  <div class="sheet-header">
+    <div class="brand-logo-text" style="color: #0f172a;">
+      <svg width="20" height="20" viewBox="175 120 673 783" fill="#0f172a">
+        <path d="M 326 682 L 512 800 L 698 682 L 512 360 Z"/>
+      </svg>
+      <span>VAAKRITI</span>
+    </div>
+    <div class="doc-category">Speed &amp; Regulatory Safety</div>
+  </div>
+
+  <div class="sheet-body">
+    <div class="section-tag">05. Quality &amp; Governance</div>
+    <h2 class="page-headline">Speed, Audio Clarity &amp; Regulatory Safety</h2>
+    <p class="lead-subhead">
+      Natural conversational timing tuned for Indian telecommunication networks, paired with mandatory regulatory safeguards.
+    </p>
+
+    <!-- SECTION A: 4 BENEFIT TILES -->
+    <div style="margin-bottom: 14px;">
+      <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: #0f172a; margin-bottom: 6px; letter-spacing: 0.05em;">
+        A. Four Customer-Facing Speech Benefits
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+        
+        <div class="card">
+          <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 2px;">
+            <strong style="font-size: 11px; color: #0f172a;">Natural Conversation Pace</strong>
+            <span style="font-size: 9.5px; color: #16a34a; font-weight: 700;">FAST ONSET</span>
+          </div>
+          <p style="font-size: 11px; color: #475569;">
+            Responds in a natural, human-paced rhythm. When the customer finishes their sentence, the agent responds without awkward, robotic dead air.
+          </p>
+        </div>
+
+        <div class="card">
+          <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 2px;">
+            <strong style="font-size: 11px; color: #0f172a;">Crystal-Clear Phone Audio</strong>
+            <span style="font-size: 9.5px; color: #16a34a; font-weight: 700;">NO CRACKLES</span>
+          </div>
+          <p style="font-size: 11px; color: #475569;">
+            Natively formatted for Indian telecom carriers, eliminating digital distortion, voice crackles, and clipping across mobile devices.
+          </p>
+        </div>
+
+        <div class="card">
+          <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 2px;">
+            <strong style="font-size: 11px; color: #0f172a;">Instant Answers to Inquiries</strong>
+            <span style="font-size: 9.5px; color: #16a34a; font-weight: 700;">LOW DELAY</span>
+          </div>
+          <p style="font-size: 11px; color: #475569;">
+            Begins streaming answers immediately as customer finishes talking, keeping the conversation fluid, energetic, and engaging.
+          </p>
+        </div>
+
+        <div class="card">
+          <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 2px;">
+            <strong style="font-size: 11px; color: #0f172a;">Seamless Caller Interruption</strong>
+            <span style="font-size: 9.5px; color: #16a34a; font-weight: 700;">SMART BARGE-IN</span>
+          </div>
+          <p style="font-size: 11px; color: #475569;">
+            When a customer speaks while the agent is talking, the agent stops immediately and listens with polite attentiveness.
+          </p>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- SECTION B: COMPLIANCE BADGES & SAFEGUARDS -->
+    <div>
+      <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: #0f172a; margin-bottom: 6px; letter-spacing: 0.05em;">
+        B. Three Mandatory Regulatory Safeguards
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 6px;">
+        
+        <div style="background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 8px; padding: 8px 12px; display: flex; align-items: flex-start; gap: 10px;">
+          <div style="background: #0f172a; color: #ffffff; width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; shrink-0;">1</div>
+          <div>
+            <div style="font-size: 11px; font-weight: 700; color: #0f172a;">Mandatory AI Identity &amp; Recording Disclosure</div>
+            <p style="font-size: 10.5px; color: #475569; margin-top: 1px;">
+              Every call begins with clear disclosure: <em>"Main Vaakriti se bol rahi hoon, ek AI assistant. Service quality ke liye yeh call record ki ja sakti hai."</em>
+            </p>
+          </div>
+        </div>
+
+        <div style="background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 8px; padding: 8px 12px; display: flex; align-items: flex-start; gap: 10px;">
+          <div style="background: #0f172a; color: #ffffff; width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; shrink-0;">2</div>
+          <div>
+            <div style="font-size: 11px; font-weight: 700; color: #0f172a;">Statutory Calling Hours Floor (09:00 to 21:00 IST)</div>
+            <p style="font-size: 10.5px; color: #475569; margin-top: 1px;">
+              Hard technical safeguards prevent outbound marketing calls outside the legally permitted window under Indian telecom regulations.
+            </p>
+          </div>
+        </div>
+
+        <div style="background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 8px; padding: 8px 12px; display: flex; align-items: flex-start; gap: 10px;">
+          <div style="background: #0f172a; color: #ffffff; width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; shrink-0;">3</div>
+          <div>
+            <div style="font-size: 11px; font-weight: 700; color: #0f172a;">Real-Time Do-Not-Disturb (DND) &amp; Consent Scrubbing</div>
+            <p style="font-size: 10.5px; color: #475569; margin-top: 1px;">
+              Automatically verifies phone numbers against national and internal preference registries to prevent spam complaints.
+            </p>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+
+  <div class="sheet-footer">
+    <span>Vaakriti AI • Enterprise 2026-27 • Commercial in Confidence</span>
+    <span>Page 06</span>
+  </div>
+</section>
+
+<!-- ========================================================================= -->
+<!-- PAGE 7: WHY VAAKRITI (COMPARISON & KPIS)                                  -->
+<!-- ========================================================================= -->
+<section class="sheet">
+  <div class="sheet-header">
+    <div class="brand-logo-text" style="color: #0f172a;">
+      <svg width="20" height="20" viewBox="175 120 673 783" fill="#0f172a">
+        <path d="M 326 682 L 512 800 L 698 682 L 512 360 Z"/>
+      </svg>
+      <span>VAAKRITI</span>
+    </div>
+    <div class="doc-category">Decision Matrix</div>
+  </div>
+
+  <div class="sheet-body">
+    <div class="section-tag">06. Competitive Benchmark</div>
+    <h2 class="page-headline">Why Choose Vaakriti AI?</h2>
+    <p class="lead-subhead">
+      A transparent comparison between human BPO call centers, generic voice bots, and Vaakriti's closed-loop enterprise infrastructure.
+    </p>
+
+    <!-- COMPACT TABLE -->
+    <table class="comp-table">
+      <thead>
+        <tr>
+          <th>Capability</th>
+          <th>Traditional Call Center</th>
+          <th>Generic Voice Bot</th>
+          <th class="highlight-th">Vaakriti AI System</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Daily Schedule Adaptability</strong></td>
+          <td>Requires daily team briefings; human error</td>
+          <td style="color:#ef4444;">Static prompt; cannot adapt</td>
+          <td class="highlight-td">Spoken Voice Directives in real time</td>
+        </tr>
+        <tr>
+          <td><strong>In-Call GST Invoice &amp; Payment</strong></td>
+          <td>Delayed email link; 2–6 hours lag</td>
+          <td style="color:#ef4444;">None (directs to website; 85% drop*)</td>
+          <td class="highlight-td">Instant GST Invoice + UPI QR sent on WhatsApp</td>
+        </tr>
+        <tr>
+          <td><strong>Payment Proof Verification</strong></td>
+          <td>Manual accounts review (24hr SLA)</td>
+          <td style="color:#ef4444;">None (blind to receipts)</td>
+          <td class="highlight-td">WhatsApp Vision OCR extracts 12-digit UTR</td>
+        </tr>
+        <tr>
+          <td><strong>Owner Escalation</strong></td>
+          <td>5 to 15 min hold queues</td>
+          <td style="color:#ef4444;">Infinite forwarding loop</td>
+          <td class="highlight-td">Dual-SIM Anti-Loop + 20s spoken fallback</td>
+        </tr>
+        <tr>
+          <td><strong>Conversational Pace</strong></td>
+          <td>Natural human timing</td>
+          <td style="color:#ef4444;">1.5s–2.5s robotic pauses</td>
+          <td class="highlight-td">Human-paced conversation</td>
+        </tr>
+        <tr>
+          <td><strong>Indian Telephony Sound</strong></td>
+          <td>Standard phone quality</td>
+          <td style="color:#ef4444;">Voice crackling &amp; clipping</td>
+          <td class="highlight-td">Native telecom audio (zero distortion)</td>
+        </tr>
+        <tr>
+          <td><strong>Family &amp; VIP Protection</strong></td>
+          <td>Manual caller ID scrutiny</td>
+          <td style="color:#ef4444;">Pitches owner's family as leads</td>
+          <td class="highlight-td">Whitelisted &amp; excluded from sales calls</td>
+        </tr>
+        <tr>
+          <td><strong>Statutory Compliance</strong></td>
+          <td>Inconsistent human scripts</td>
+          <td style="color:#ef4444;">Risk of regulatory penalties</td>
+          <td class="highlight-td">Built-in AI disclosure &amp; DLT hours</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- 3 KPI TILES -->
+    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-top: 14px;">
+      
+      <div style="background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 8px; padding: 10px; text-align: center;">
+        <div style="font-size: 22px; font-weight: 800; color: #1e1b4b; font-family: 'Playfair Display', serif;">3.4x*</div>
+        <div style="font-size: 10px; font-weight: 700; text-transform: uppercase; color: #0f172a; margin-top: 2px;">Faster Payments</div>
+        <p style="font-size: 9.5px; color: #64748b; margin-top: 2px;">In-call WhatsApp QR delivery closes deals within 15 minutes.</p>
+      </div>
+
+      <div style="background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 8px; padding: 10px; text-align: center;">
+        <div style="font-size: 22px; font-weight: 800; color: #1e1b4b; font-family: 'Playfair Display', serif;">75%*</div>
+        <div style="font-size: 10px; font-weight: 700; text-transform: uppercase; color: #0f172a; margin-top: 2px;">Lower Operating Cost</div>
+        <p style="font-size: 9.5px; color: #64748b; margin-top: 2px;">Eliminates after-hours staffing while achieving 24/7 availability.</p>
+      </div>
+
+      <div style="background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 8px; padding: 10px; text-align: center;">
+        <div style="font-size: 22px; font-weight: 800; color: #1e1b4b; font-family: 'Playfair Display', serif;">Zero*</div>
+        <div style="font-size: 10px; font-weight: 700; text-transform: uppercase; color: #0f172a; margin-top: 2px;">Missed Customer Calls</div>
+        <p style="font-size: 9.5px; color: #64748b; margin-top: 2px;">Automatic callback booking and instant WhatsApp alerts.</p>
+      </div>
+
+    </div>
+
+    <!-- TARGET INDUSTRIES STRIP -->
+    <div style="margin-top: 12px; background: #0f172a; color: #ffffff; border-radius: 8px; padding: 8px 14px; display: flex; justify-content: space-between; align-items: center; font-size: 11px;">
+      <span style="font-weight: 700; color: #a5b4fc; text-transform: uppercase; font-size: 10px; letter-spacing: 0.05em;">Proven In:</span>
+      <span>🏥 Clinics &amp; Doctors</span>
+      <span>🛒 Retail &amp; Commerce</span>
+      <span>🚚 Logistics &amp; Transport</span>
+      <span>💼 Telecom &amp; Services</span>
+    </div>
+
+    <div class="footnote">*Based on internal estimates; results vary by deployment.</div>
+  </div>
+
+  <div class="sheet-footer">
+    <span>Vaakriti AI • Enterprise 2026-27 • Commercial in Confidence</span>
+    <span>Page 07</span>
+  </div>
+</section>
+
+<!-- ========================================================================= -->
+<!-- PAGE 8: GET STARTED (DARK)                                                -->
+<!-- ========================================================================= -->
+<section class="sheet dark-page">
+  <div style="padding: 22mm 22mm 0 22mm; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.12); padding-bottom: 12px;">
+    <div class="brand-logo-text">
+      <svg width="20" height="20" viewBox="175 120 673 783" fill="#ffffff">
+        <path d="M 326 682 L 512 800 L 698 682 L 512 360 Z"/>
+      </svg>
+      <span>VAAKRITI</span>
+    </div>
+    <div class="doc-category">Implementation &amp; Next Steps</div>
+  </div>
+
+  <div class="sheet-body">
+    <div class="section-tag">07. Fast Deployment</div>
+    <h2 class="page-headline">Live in 4 Days</h2>
+    <p class="lead-subhead">
+      A simple three-step deployment plan to take your enterprise from catalog setup to live carrier cutover.
+    </p>
+
+    <!-- 3-STEP TIMELINE -->
+    <div style="display: flex; flex-direction: column; gap: 10px; margin: 8px 0 16px 0;">
+      
+      <div class="card-dark" style="display: flex; gap: 12px; align-items: flex-start;">
+        <div style="background: #ffffff; color: #0f172a; width: 28px; height: 28px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 11px; shrink-0;">
+          D1
+        </div>
+        <div>
+          <strong style="font-size: 12px; color: #ffffff;">Day 1: Operations Brain Setup &amp; Knowledge Connection</strong>
+          <p style="font-size: 11px; color: #cbd5e1; margin-top: 2px;">
+            Connect your product catalog, service price lists, appointment slots, and attest non-custodial UPI settlement details.
+          </p>
+        </div>
+      </div>
+
+      <div class="card-dark" style="display: flex; gap: 12px; align-items: flex-start;">
+        <div style="background: #ffffff; color: #0f172a; width: 28px; height: 28px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 11px; shrink-0;">
+          D2-3
+        </div>
+        <div>
+          <strong style="font-size: 12px; color: #ffffff;">Days 2–3: Telephony Setup &amp; Verification Testing</strong>
+          <p style="font-size: 11px; color: #cbd5e1; margin-top: 2px;">
+            Provision virtual numbers, configure dual-SIM forwarding lines, test WhatsApp receipt callbacks, and verify Hindi/Hinglish speech accuracy.
+          </p>
+        </div>
+      </div>
+
+      <div class="card-dark" style="display: flex; gap: 12px; align-items: flex-start;">
+        <div style="background: #ffffff; color: #0f172a; width: 28px; height: 28px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 11px; shrink-0;">
+          D4
+        </div>
+        <div>
+          <strong style="font-size: 12px; color: #ffffff;">Day 4: Live Carrier Activation &amp; Go-Live</strong>
+          <p style="font-size: 11px; color: #cbd5e1; margin-top: 2px;">
+            Switch call routing to live lines, verify telecom registrations, and grant full analytics dashboard access to your management team.
+          </p>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- TRUST ROW -->
+    <div style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); border-radius: 10px; padding: 12px 16px; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 18px; text-align: center;">
+      <div>
+        <div style="font-size: 11px; font-weight: 700; color: #ffffff;">99.9% Uptime SLA</div>
+        <div style="font-size: 10px; color: #94a3b8; margin-top: 1px;">High-availability enterprise voice network</div>
+      </div>
+      <div style="border-left: 1px solid rgba(255,255,255,0.12); border-right: 1px solid rgba(255,255,255,0.12);">
+        <div style="font-size: 11px; font-weight: 700; color: #ffffff;">RBI-Aligned Payouts</div>
+        <div style="font-size: 10px; color: #94a3b8; margin-top: 1px;">Direct non-custodial bank settlement</div>
+      </div>
+      <div>
+        <div style="font-size: 11px; font-weight: 700; color: #ffffff;">Tamper-Proof Audit</div>
+        <div style="font-size: 10px; color: #94a3b8; margin-top: 1px;">Append-only verified transaction logs</div>
+      </div>
+    </div>
+
+    <!-- CALL TO ACTION BOX -->
+    <div style="background: #ffffff; color: #0f172a; border-radius: 10px; padding: 16px 20px; display: flex; justify-content: space-between; align-items: center;">
+      <div>
+        <div style="font-family: 'Playfair Display', serif; font-size: 17px; font-weight: 700;">
+          Schedule an Executive Voice Demonstration
+        </div>
+        <div style="font-size: 11px; color: #475569; margin-top: 2px;">
+          Experience Vaakriti live on your business scenario within 24 hours.
+        </div>
+      </div>
+      <div style="text-align: right;">
+        <div style="font-size: 12px; font-weight: 800; color: #4338ca;">enterprise@vaakriti.com</div>
+        <div style="font-size: 12px; font-weight: 800; color: #0f172a; margin-top: 2px;">+91 95138 86363</div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="sheet-footer">
+    <span>Vaakriti AI • Enterprise 2026-27 • Commercial in Confidence</span>
+    <span>Page 08</span>
+  </div>
+</section>
+
+</body>
+</html>

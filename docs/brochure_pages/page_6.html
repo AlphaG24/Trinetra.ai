@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Vaakriti AI — Enterprise Sales Brochure</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Playfair+Display:ital,wght@0,600;0,700;1,600&display=swap');
+
+  @page {
+    size: A4 portrait;
+    margin: 0;
+  }
+
+  *, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  body {
+    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: #e2e8f0;
+    color: #0f172a;
+    line-height: 1.45;
+    font-size: 13px;
+  }
+
+  .sheet {
+    width: 210mm;
+    height: 297mm;
+    max-height: 297mm;
+    position: relative;
+    overflow: hidden;
+    margin: 0; border: none; box-shadow: none;
+    background: #ffffff;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    page-break-after: always;
+    break-after: page;
+  }
+
+  @media print {
+    body { background: transparent; }
+    .sheet {
+      margin: 0;
+      box-shadow: none;
+      width: 210mm;
+      height: 297mm;
+    }
+  }
+
+  /* COLOR THEMES */
+  .dark-page {
+    background: #080312;
+    color: #f8fafc;
+  }
+
+  /* HEADER & FOOTER */
+  .sheet-header {
+    padding: 22mm 22mm 0 22mm;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #e2e8f0;
+    padding-bottom: 12px;
+  }
+  .dark-page .sheet-header {
+    border-bottom-color: rgba(255,255,255,0.12);
+  }
+
+  .sheet-body {
+    padding: 16px 22mm;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+  }
+
+  .sheet-footer {
+    padding: 0 22mm 18mm 22mm;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 10px;
+    font-family: monospace;
+    color: #64748b;
+    border-top: 1px solid #e2e8f0;
+    padding-top: 10px;
+  }
+  .dark-page .sheet-footer {
+    border-top-color: rgba(255,255,255,0.12);
+    color: #94a3b8;
+  }
+
+  /* TYPOGRAPHY */
+  .brand-logo-text {
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-weight: 800;
+    letter-spacing: 0.15em;
+    font-size: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .doc-category {
+    font-size: 10px;
+    font-family: monospace;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    color: #64748b;
+  }
+  .dark-page .doc-category { color: #94a3b8; }
+
+  h1.hero-headline {
+    font-family: 'Playfair Display', serif;
+    font-size: 42px;
+    line-height: 1.15;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: #ffffff;
+  }
+  h2.page-headline {
+    font-family: 'Playfair Display', serif;
+    font-size: 26px;
+    line-height: 1.25;
+    font-weight: 700;
+    color: #090314;
+    margin-bottom: 6px;
+  }
+  .dark-page h2.page-headline {
+    color: #ffffff;
+  }
+
+  .section-tag {
+    font-size: 11px;
+    font-family: monospace;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    font-weight: 700;
+    color: #6366f1;
+    margin-bottom: 4px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .dark-page .section-tag { color: #a5b4fc; }
+
+  p.lead-subhead {
+    font-size: 13px;
+    color: #475569;
+    line-height: 1.5;
+    margin-bottom: 14px;
+  }
+  .dark-page p.lead-subhead { color: #cbd5e1; }
+
+  /* CARDS & CONTAINERS */
+  .card {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 12px 14px;
+  }
+  .card-dark {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 10px;
+    padding: 12px 14px;
+  }
+
+  /* SOUNDWAVE MOTIF */
+  .soundwave {
+    display: inline-flex;
+    align-items: center;
+    gap: 2.5px;
+    height: 16px;
+  }
+  .soundwave span {
+    width: 2px;
+    background: #6366f1;
+    border-radius: 2px;
+  }
+  .soundwave span:nth-child(1) { height: 6px; }
+  .soundwave span:nth-child(2) { height: 12px; }
+  .soundwave span:nth-child(3) { height: 16px; }
+  .soundwave span:nth-child(4) { height: 9px; }
+  .soundwave span:nth-child(5) { height: 14px; }
+  .soundwave span:nth-child(6) { height: 7px; }
+
+  /* BADGES */
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 600;
+    border: 1px solid #cbd5e1;
+    background: #ffffff;
+    color: #0f172a;
+  }
+  .badge-dark {
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.15);
+    color: #f1f5f9;
+  }
+
+  /* PILL BUTTON */
+  .btn-gold {
+    background: linear-gradient(135deg, #f59e0b, #d97706);
+    color: #ffffff;
+    font-weight: 700;
+    padding: 8px 18px;
+    border-radius: 20px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  /* SPEECH HINDI QUOTE */
+  .speech-quote {
+    background: #f1f5f9;
+    border-left: 3px solid #6366f1;
+    padding: 8px 12px;
+    border-radius: 0 6px 6px 0;
+    margin: 6px 0;
+  }
+  .speech-hindi {
+    font-size: 12px;
+    font-weight: 600;
+    color: #1e1b4b;
+    display: block;
+  }
+  .speech-english {
+    font-size: 11px;
+    color: #64748b;
+    font-style: italic;
+    display: block;
+    margin-top: 2px;
+  }
+
+  /* COMPARISON TABLE */
+  table.comp-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 11px;
+    margin-top: 6px;
+  }
+  table.comp-table th {
+    padding: 8px 10px;
+    background: #0f172a;
+    color: #ffffff;
+    text-align: left;
+    font-size: 10px;
+    font-family: monospace;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+  table.comp-table th.highlight-th {
+    background: #312e81;
+    color: #a5b4fc;
+    border-top: 2px solid #6366f1;
+  }
+  table.comp-table td {
+    padding: 7px 10px;
+    border-bottom: 1px solid #e2e8f0;
+    vertical-align: middle;
+  }
+  table.comp-table tr:last-child td {
+    border-bottom: none;
+  }
+  table.comp-table td.highlight-td {
+    background: #eef2ff;
+    font-weight: 600;
+    color: #1e1b4b;
+    border-left: 1px solid #c7d2fe;
+    border-right: 1px solid #c7d2fe;
+  }
+
+  /* FOOTNOTE */
+  .footnote {
+    font-size: 9.5px;
+    color: #64748b;
+    font-style: italic;
+    margin-top: 8px;
+  }
+</style>
+</head>
+<body>
+
+<!-- ========================================================================= -->
+<!-- PAGE 1: COVER (DARK)                                                      -->
+<!-- ========================================================================= -->
+<section class="sheet">
+  <div class="sheet-header">
+    <div class="brand-logo-text" style="color: #0f172a;">
+      <svg width="20" height="20" viewBox="175 120 673 783" fill="#0f172a">
+        <path d="M 326 682 L 512 800 L 698 682 L 512 360 Z"/>
+      </svg>
+      <span>VAAKRITI</span>
+    </div>
+    <div class="doc-category">Speed &amp; Regulatory Safety</div>
+  </div>
+
+  <div class="sheet-body">
+    <div class="section-tag">05. Quality &amp; Governance</div>
+    <h2 class="page-headline">Speed, Audio Clarity &amp; Regulatory Safety</h2>
+    <p class="lead-subhead">
+      Natural conversational timing tuned for Indian telecommunication networks, paired with mandatory regulatory safeguards.
+    </p>
+
+    <!-- SECTION A: 4 BENEFIT TILES -->
+    <div style="margin-bottom: 14px;">
+      <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: #0f172a; margin-bottom: 6px; letter-spacing: 0.05em;">
+        A. Four Customer-Facing Speech Benefits
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+        
+        <div class="card">
+          <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 2px;">
+            <strong style="font-size: 11px; color: #0f172a;">Natural Conversation Pace</strong>
+            <span style="font-size: 9.5px; color: #16a34a; font-weight: 700;">FAST ONSET</span>
+          </div>
+          <p style="font-size: 11px; color: #475569;">
+            Responds in a natural, human-paced rhythm. When the customer finishes their sentence, the agent responds without awkward, robotic dead air.
+          </p>
+        </div>
+
+        <div class="card">
+          <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 2px;">
+            <strong style="font-size: 11px; color: #0f172a;">Crystal-Clear Phone Audio</strong>
+            <span style="font-size: 9.5px; color: #16a34a; font-weight: 700;">NO CRACKLES</span>
+          </div>
+          <p style="font-size: 11px; color: #475569;">
+            Natively formatted for Indian telecom carriers, eliminating digital distortion, voice crackles, and clipping across mobile devices.
+          </p>
+        </div>
+
+        <div class="card">
+          <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 2px;">
+            <strong style="font-size: 11px; color: #0f172a;">Instant Answers to Inquiries</strong>
+            <span style="font-size: 9.5px; color: #16a34a; font-weight: 700;">LOW DELAY</span>
+          </div>
+          <p style="font-size: 11px; color: #475569;">
+            Begins streaming answers immediately as customer finishes talking, keeping the conversation fluid, energetic, and engaging.
+          </p>
+        </div>
+
+        <div class="card">
+          <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 2px;">
+            <strong style="font-size: 11px; color: #0f172a;">Seamless Caller Interruption</strong>
+            <span style="font-size: 9.5px; color: #16a34a; font-weight: 700;">SMART BARGE-IN</span>
+          </div>
+          <p style="font-size: 11px; color: #475569;">
+            When a customer speaks while the agent is talking, the agent stops immediately and listens with polite attentiveness.
+          </p>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- SECTION B: COMPLIANCE BADGES & SAFEGUARDS -->
+    <div>
+      <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: #0f172a; margin-bottom: 6px; letter-spacing: 0.05em;">
+        B. Three Mandatory Regulatory Safeguards
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 6px;">
+        
+        <div style="background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 8px; padding: 8px 12px; display: flex; align-items: flex-start; gap: 10px;">
+          <div style="background: #0f172a; color: #ffffff; width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; shrink-0;">1</div>
+          <div>
+            <div style="font-size: 11px; font-weight: 700; color: #0f172a;">Mandatory AI Identity &amp; Recording Disclosure</div>
+            <p style="font-size: 10.5px; color: #475569; margin-top: 1px;">
+              Every call begins with clear disclosure: <em>"Main Vaakriti se bol rahi hoon, ek AI assistant. Service quality ke liye yeh call record ki ja sakti hai."</em>
+            </p>
+          </div>
+        </div>
+
+        <div style="background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 8px; padding: 8px 12px; display: flex; align-items: flex-start; gap: 10px;">
+          <div style="background: #0f172a; color: #ffffff; width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; shrink-0;">2</div>
+          <div>
+            <div style="font-size: 11px; font-weight: 700; color: #0f172a;">Statutory Calling Hours Floor (09:00 to 21:00 IST)</div>
+            <p style="font-size: 10.5px; color: #475569; margin-top: 1px;">
+              Hard technical safeguards prevent outbound marketing calls outside the legally permitted window under Indian telecom regulations.
+            </p>
+          </div>
+        </div>
+
+        <div style="background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 8px; padding: 8px 12px; display: flex; align-items: flex-start; gap: 10px;">
+          <div style="background: #0f172a; color: #ffffff; width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; shrink-0;">3</div>
+          <div>
+            <div style="font-size: 11px; font-weight: 700; color: #0f172a;">Real-Time Do-Not-Disturb (DND) &amp; Consent Scrubbing</div>
+            <p style="font-size: 10.5px; color: #475569; margin-top: 1px;">
+              Automatically verifies phone numbers against national and internal preference registries to prevent spam complaints.
+            </p>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+
+  <div class="sheet-footer">
+    <span>Vaakriti AI • Enterprise 2026-27 • Commercial in Confidence</span>
+    <span>Page 06</span>
+  </div>
+</section>
+
+<!-- ========================================================================= -->
+<!-- PAGE 7: WHY VAAKRITI (COMPARISON & KPIS)                                  -->
+<!-- ========================================================================= -->
+</body></html>

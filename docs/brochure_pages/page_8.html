@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Vaakriti AI — Enterprise Sales Brochure</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Playfair+Display:ital,wght@0,600;0,700;1,600&display=swap');
+
+  @page {
+    size: A4 portrait;
+    margin: 0;
+  }
+
+  *, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  body {
+    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: #e2e8f0;
+    color: #0f172a;
+    line-height: 1.45;
+    font-size: 13px;
+  }
+
+  .sheet {
+    width: 210mm;
+    height: 297mm;
+    max-height: 297mm;
+    position: relative;
+    overflow: hidden;
+    margin: 0; border: none; box-shadow: none;
+    background: #ffffff;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    page-break-after: always;
+    break-after: page;
+  }
+
+  @media print {
+    body { background: transparent; }
+    .sheet {
+      margin: 0;
+      box-shadow: none;
+      width: 210mm;
+      height: 297mm;
+    }
+  }
+
+  /* COLOR THEMES */
+  .dark-page {
+    background: #080312;
+    color: #f8fafc;
+  }
+
+  /* HEADER & FOOTER */
+  .sheet-header {
+    padding: 22mm 22mm 0 22mm;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #e2e8f0;
+    padding-bottom: 12px;
+  }
+  .dark-page .sheet-header {
+    border-bottom-color: rgba(255,255,255,0.12);
+  }
+
+  .sheet-body {
+    padding: 16px 22mm;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+  }
+
+  .sheet-footer {
+    padding: 0 22mm 18mm 22mm;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 10px;
+    font-family: monospace;
+    color: #64748b;
+    border-top: 1px solid #e2e8f0;
+    padding-top: 10px;
+  }
+  .dark-page .sheet-footer {
+    border-top-color: rgba(255,255,255,0.12);
+    color: #94a3b8;
+  }
+
+  /* TYPOGRAPHY */
+  .brand-logo-text {
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-weight: 800;
+    letter-spacing: 0.15em;
+    font-size: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .doc-category {
+    font-size: 10px;
+    font-family: monospace;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    color: #64748b;
+  }
+  .dark-page .doc-category { color: #94a3b8; }
+
+  h1.hero-headline {
+    font-family: 'Playfair Display', serif;
+    font-size: 42px;
+    line-height: 1.15;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: #ffffff;
+  }
+  h2.page-headline {
+    font-family: 'Playfair Display', serif;
+    font-size: 26px;
+    line-height: 1.25;
+    font-weight: 700;
+    color: #090314;
+    margin-bottom: 6px;
+  }
+  .dark-page h2.page-headline {
+    color: #ffffff;
+  }
+
+  .section-tag {
+    font-size: 11px;
+    font-family: monospace;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    font-weight: 700;
+    color: #6366f1;
+    margin-bottom: 4px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .dark-page .section-tag { color: #a5b4fc; }
+
+  p.lead-subhead {
+    font-size: 13px;
+    color: #475569;
+    line-height: 1.5;
+    margin-bottom: 14px;
+  }
+  .dark-page p.lead-subhead { color: #cbd5e1; }
+
+  /* CARDS & CONTAINERS */
+  .card {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 12px 14px;
+  }
+  .card-dark {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 10px;
+    padding: 12px 14px;
+  }
+
+  /* SOUNDWAVE MOTIF */
+  .soundwave {
+    display: inline-flex;
+    align-items: center;
+    gap: 2.5px;
+    height: 16px;
+  }
+  .soundwave span {
+    width: 2px;
+    background: #6366f1;
+    border-radius: 2px;
+  }
+  .soundwave span:nth-child(1) { height: 6px; }
+  .soundwave span:nth-child(2) { height: 12px; }
+  .soundwave span:nth-child(3) { height: 16px; }
+  .soundwave span:nth-child(4) { height: 9px; }
+  .soundwave span:nth-child(5) { height: 14px; }
+  .soundwave span:nth-child(6) { height: 7px; }
+
+  /* BADGES */
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 600;
+    border: 1px solid #cbd5e1;
+    background: #ffffff;
+    color: #0f172a;
+  }
+  .badge-dark {
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.15);
+    color: #f1f5f9;
+  }
+
+  /* PILL BUTTON */
+  .btn-gold {
+    background: linear-gradient(135deg, #f59e0b, #d97706);
+    color: #ffffff;
+    font-weight: 700;
+    padding: 8px 18px;
+    border-radius: 20px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  /* SPEECH HINDI QUOTE */
+  .speech-quote {
+    background: #f1f5f9;
+    border-left: 3px solid #6366f1;
+    padding: 8px 12px;
+    border-radius: 0 6px 6px 0;
+    margin: 6px 0;
+  }
+  .speech-hindi {
+    font-size: 12px;
+    font-weight: 600;
+    color: #1e1b4b;
+    display: block;
+  }
+  .speech-english {
+    font-size: 11px;
+    color: #64748b;
+    font-style: italic;
+    display: block;
+    margin-top: 2px;
+  }
+
+  /* COMPARISON TABLE */
+  table.comp-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 11px;
+    margin-top: 6px;
+  }
+  table.comp-table th {
+    padding: 8px 10px;
+    background: #0f172a;
+    color: #ffffff;
+    text-align: left;
+    font-size: 10px;
+    font-family: monospace;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+  table.comp-table th.highlight-th {
+    background: #312e81;
+    color: #a5b4fc;
+    border-top: 2px solid #6366f1;
+  }
+  table.comp-table td {
+    padding: 7px 10px;
+    border-bottom: 1px solid #e2e8f0;
+    vertical-align: middle;
+  }
+  table.comp-table tr:last-child td {
+    border-bottom: none;
+  }
+  table.comp-table td.highlight-td {
+    background: #eef2ff;
+    font-weight: 600;
+    color: #1e1b4b;
+    border-left: 1px solid #c7d2fe;
+    border-right: 1px solid #c7d2fe;
+  }
+
+  /* FOOTNOTE */
+  .footnote {
+    font-size: 9.5px;
+    color: #64748b;
+    font-style: italic;
+    margin-top: 8px;
+  }
+</style>
+</head>
+<body>
+
+<!-- ========================================================================= -->
+<!-- PAGE 1: COVER (DARK)                                                      -->
+<!-- ========================================================================= -->
+<section class="sheet dark-page">
+  <div style="padding: 22mm 22mm 0 22mm; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.12); padding-bottom: 12px;">
+    <div class="brand-logo-text">
+      <svg width="20" height="20" viewBox="175 120 673 783" fill="#ffffff">
+        <path d="M 326 682 L 512 800 L 698 682 L 512 360 Z"/>
+      </svg>
+      <span>VAAKRITI</span>
+    </div>
+    <div class="doc-category">Implementation &amp; Next Steps</div>
+  </div>
+
+  <div class="sheet-body">
+    <div class="section-tag">07. Fast Deployment</div>
+    <h2 class="page-headline">Live in 4 Days</h2>
+    <p class="lead-subhead">
+      A simple three-step deployment plan to take your enterprise from catalog setup to live carrier cutover.
+    </p>
+
+    <!-- 3-STEP TIMELINE -->
+    <div style="display: flex; flex-direction: column; gap: 10px; margin: 8px 0 16px 0;">
+      
+      <div class="card-dark" style="display: flex; gap: 12px; align-items: flex-start;">
+        <div style="background: #ffffff; color: #0f172a; width: 28px; height: 28px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 11px; shrink-0;">
+          D1
+        </div>
+        <div>
+          <strong style="font-size: 12px; color: #ffffff;">Day 1: Operations Brain Setup &amp; Knowledge Connection</strong>
+          <p style="font-size: 11px; color: #cbd5e1; margin-top: 2px;">
+            Connect your product catalog, service price lists, appointment slots, and attest non-custodial UPI settlement details.
+          </p>
+        </div>
+      </div>
+
+      <div class="card-dark" style="display: flex; gap: 12px; align-items: flex-start;">
+        <div style="background: #ffffff; color: #0f172a; width: 28px; height: 28px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 11px; shrink-0;">
+          D2-3
+        </div>
+        <div>
+          <strong style="font-size: 12px; color: #ffffff;">Days 2–3: Telephony Setup &amp; Verification Testing</strong>
+          <p style="font-size: 11px; color: #cbd5e1; margin-top: 2px;">
+            Provision virtual numbers, configure dual-SIM forwarding lines, test WhatsApp receipt callbacks, and verify Hindi/Hinglish speech accuracy.
+          </p>
+        </div>
+      </div>
+
+      <div class="card-dark" style="display: flex; gap: 12px; align-items: flex-start;">
+        <div style="background: #ffffff; color: #0f172a; width: 28px; height: 28px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 11px; shrink-0;">
+          D4
+        </div>
+        <div>
+          <strong style="font-size: 12px; color: #ffffff;">Day 4: Live Carrier Activation &amp; Go-Live</strong>
+          <p style="font-size: 11px; color: #cbd5e1; margin-top: 2px;">
+            Switch call routing to live lines, verify telecom registrations, and grant full analytics dashboard access to your management team.
+          </p>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- TRUST ROW -->
+    <div style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); border-radius: 10px; padding: 12px 16px; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 18px; text-align: center;">
+      <div>
+        <div style="font-size: 11px; font-weight: 700; color: #ffffff;">99.9% Uptime SLA</div>
+        <div style="font-size: 10px; color: #94a3b8; margin-top: 1px;">High-availability enterprise voice network</div>
+      </div>
+      <div style="border-left: 1px solid rgba(255,255,255,0.12); border-right: 1px solid rgba(255,255,255,0.12);">
+        <div style="font-size: 11px; font-weight: 700; color: #ffffff;">RBI-Aligned Payouts</div>
+        <div style="font-size: 10px; color: #94a3b8; margin-top: 1px;">Direct non-custodial bank settlement</div>
+      </div>
+      <div>
+        <div style="font-size: 11px; font-weight: 700; color: #ffffff;">Tamper-Proof Audit</div>
+        <div style="font-size: 10px; color: #94a3b8; margin-top: 1px;">Append-only verified transaction logs</div>
+      </div>
+    </div>
+
+    <!-- CALL TO ACTION BOX -->
+    <div style="background: #ffffff; color: #0f172a; border-radius: 10px; padding: 16px 20px; display: flex; justify-content: space-between; align-items: center;">
+      <div>
+        <div style="font-family: 'Playfair Display', serif; font-size: 17px; font-weight: 700;">
+          Schedule an Executive Voice Demonstration
+        </div>
+        <div style="font-size: 11px; color: #475569; margin-top: 2px;">
+          Experience Vaakriti live on your business scenario within 24 hours.
+        </div>
+      </div>
+      <div style="text-align: right;">
+        <div style="font-size: 12px; font-weight: 800; color: #4338ca;">enterprise@vaakriti.com</div>
+        <div style="font-size: 12px; font-weight: 800; color: #0f172a; margin-top: 2px;">+91 95138 86363</div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="sheet-footer">
+    <span>Vaakriti AI • Enterprise 2026-27 • Commercial in Confidence</span>
+    <span>Page 08</span>
+  </div>
+</section>
+
+</body></html>

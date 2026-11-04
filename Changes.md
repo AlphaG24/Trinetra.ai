@@ -93,3 +93,29 @@ Our aim is to achieve <100 ms latency to achieve like sarvam. Now we have to cho
 I have written nearly all rules and scenarios that are needed in our pplatform and wokring of our entire platform . Here I aksed some questions and some new features and some just need verifications that they are wokring or not.
 
 So first anwer my questions , then check for those features those are already implemented and verify that they are working as well in our custom pipeline flawlessly . Then we will start working on few remaining new features and fixes. 
+
+
+2. Phase 6: Voice Pipeline Latency Hardening (<100ms Target)
+
+Per Changes.md Item 91
+
+Streaming Pipeline Architecture: Evaluate dedicated WebSocket streaming audio chunking vs. LiveKit server-side agent.
+Provider Routing: Optimize Indian routes (Exotel + Sarvam/Groq streaming) vs. Global routes (Twilio + ElevenLabs/Deepgram).
+Anti-Jitter & Filler Management: Eliminate audio crackles, optimize conversational turn-taking, and tune VAD (Voice Activity Detection) sensitivity.
+3. Phase 7: WhatsApp Bot Intelligence (UTR & Payment Screenshot Verification)
+
+Per Changes.md Items 48, 66, 87
+
+In-Call Payment to Cash Verification: When customer pays via UPI/QR received during or after a call and submits UTR / screenshot on WhatsApp:
+Vision/OCR parsing of payment receipts.
+Automatic reconciliation against generated invoices and orders in the Cash-to-Call ledger.
+Automated confirmation dispatch back to the caller and business owner.
+4. Phase 8: Comprehensive Security Red-Teaming & Attack Simulations
+
+Per Changes.md Item 83 & Master Plan Section 18.2
+
+Run automated security scanners and attack simulations (evaluating prompt injection, SQL injection attempts, bypass vectors, race conditions on checkout/wallet balance, and token expiration).
+Verify all audit logs and immutable compliance registers remain tamper-proof.
+5. Phase 9: Carrier Live Verification & Founding Launch
+Live SIP/DLT carrier registration verification.
+Final production smoke tests on real mobile phones across Airtel, Jio, and Vi networks.

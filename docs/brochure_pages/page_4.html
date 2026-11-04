@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Vaakriti AI — Enterprise Sales Brochure</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Playfair+Display:ital,wght@0,600;0,700;1,600&display=swap');
+
+  @page {
+    size: A4 portrait;
+    margin: 0;
+  }
+
+  *, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  body {
+    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: #e2e8f0;
+    color: #0f172a;
+    line-height: 1.45;
+    font-size: 13px;
+  }
+
+  .sheet {
+    width: 210mm;
+    height: 297mm;
+    max-height: 297mm;
+    position: relative;
+    overflow: hidden;
+    margin: 0; border: none; box-shadow: none;
+    background: #ffffff;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    page-break-after: always;
+    break-after: page;
+  }
+
+  @media print {
+    body { background: transparent; }
+    .sheet {
+      margin: 0;
+      box-shadow: none;
+      width: 210mm;
+      height: 297mm;
+    }
+  }
+
+  /* COLOR THEMES */
+  .dark-page {
+    background: #080312;
+    color: #f8fafc;
+  }
+
+  /* HEADER & FOOTER */
+  .sheet-header {
+    padding: 22mm 22mm 0 22mm;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #e2e8f0;
+    padding-bottom: 12px;
+  }
+  .dark-page .sheet-header {
+    border-bottom-color: rgba(255,255,255,0.12);
+  }
+
+  .sheet-body {
+    padding: 16px 22mm;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+  }
+
+  .sheet-footer {
+    padding: 0 22mm 18mm 22mm;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 10px;
+    font-family: monospace;
+    color: #64748b;
+    border-top: 1px solid #e2e8f0;
+    padding-top: 10px;
+  }
+  .dark-page .sheet-footer {
+    border-top-color: rgba(255,255,255,0.12);
+    color: #94a3b8;
+  }
+
+  /* TYPOGRAPHY */
+  .brand-logo-text {
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-weight: 800;
+    letter-spacing: 0.15em;
+    font-size: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .doc-category {
+    font-size: 10px;
+    font-family: monospace;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    color: #64748b;
+  }
+  .dark-page .doc-category { color: #94a3b8; }
+
+  h1.hero-headline {
+    font-family: 'Playfair Display', serif;
+    font-size: 42px;
+    line-height: 1.15;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: #ffffff;
+  }
+  h2.page-headline {
+    font-family: 'Playfair Display', serif;
+    font-size: 26px;
+    line-height: 1.25;
+    font-weight: 700;
+    color: #090314;
+    margin-bottom: 6px;
+  }
+  .dark-page h2.page-headline {
+    color: #ffffff;
+  }
+
+  .section-tag {
+    font-size: 11px;
+    font-family: monospace;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    font-weight: 700;
+    color: #6366f1;
+    margin-bottom: 4px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .dark-page .section-tag { color: #a5b4fc; }
+
+  p.lead-subhead {
+    font-size: 13px;
+    color: #475569;
+    line-height: 1.5;
+    margin-bottom: 14px;
+  }
+  .dark-page p.lead-subhead { color: #cbd5e1; }
+
+  /* CARDS & CONTAINERS */
+  .card {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 12px 14px;
+  }
+  .card-dark {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 10px;
+    padding: 12px 14px;
+  }
+
+  /* SOUNDWAVE MOTIF */
+  .soundwave {
+    display: inline-flex;
+    align-items: center;
+    gap: 2.5px;
+    height: 16px;
+  }
+  .soundwave span {
+    width: 2px;
+    background: #6366f1;
+    border-radius: 2px;
+  }
+  .soundwave span:nth-child(1) { height: 6px; }
+  .soundwave span:nth-child(2) { height: 12px; }
+  .soundwave span:nth-child(3) { height: 16px; }
+  .soundwave span:nth-child(4) { height: 9px; }
+  .soundwave span:nth-child(5) { height: 14px; }
+  .soundwave span:nth-child(6) { height: 7px; }
+
+  /* BADGES */
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 600;
+    border: 1px solid #cbd5e1;
+    background: #ffffff;
+    color: #0f172a;
+  }
+  .badge-dark {
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.15);
+    color: #f1f5f9;
+  }
+
+  /* PILL BUTTON */
+  .btn-gold {
+    background: linear-gradient(135deg, #f59e0b, #d97706);
+    color: #ffffff;
+    font-weight: 700;
+    padding: 8px 18px;
+    border-radius: 20px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  /* SPEECH HINDI QUOTE */
+  .speech-quote {
+    background: #f1f5f9;
+    border-left: 3px solid #6366f1;
+    padding: 8px 12px;
+    border-radius: 0 6px 6px 0;
+    margin: 6px 0;
+  }
+  .speech-hindi {
+    font-size: 12px;
+    font-weight: 600;
+    color: #1e1b4b;
+    display: block;
+  }
+  .speech-english {
+    font-size: 11px;
+    color: #64748b;
+    font-style: italic;
+    display: block;
+    margin-top: 2px;
+  }
+
+  /* COMPARISON TABLE */
+  table.comp-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 11px;
+    margin-top: 6px;
+  }
+  table.comp-table th {
+    padding: 8px 10px;
+    background: #0f172a;
+    color: #ffffff;
+    text-align: left;
+    font-size: 10px;
+    font-family: monospace;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+  table.comp-table th.highlight-th {
+    background: #312e81;
+    color: #a5b4fc;
+    border-top: 2px solid #6366f1;
+  }
+  table.comp-table td {
+    padding: 7px 10px;
+    border-bottom: 1px solid #e2e8f0;
+    vertical-align: middle;
+  }
+  table.comp-table tr:last-child td {
+    border-bottom: none;
+  }
+  table.comp-table td.highlight-td {
+    background: #eef2ff;
+    font-weight: 600;
+    color: #1e1b4b;
+    border-left: 1px solid #c7d2fe;
+    border-right: 1px solid #c7d2fe;
+  }
+
+  /* FOOTNOTE */
+  .footnote {
+    font-size: 9.5px;
+    color: #64748b;
+    font-style: italic;
+    margin-top: 8px;
+  }
+</style>
+</head>
+<body>
+
+<!-- ========================================================================= -->
+<!-- PAGE 1: COVER (DARK)                                                      -->
+<!-- ========================================================================= -->
+<section class="sheet">
+  <div class="sheet-header">
+    <div class="brand-logo-text" style="color: #0f172a;">
+      <svg width="20" height="20" viewBox="175 120 673 783" fill="#0f172a">
+        <path d="M 326 682 L 512 800 L 698 682 L 512 360 Z"/>
+      </svg>
+      <span>VAAKRITI</span>
+    </div>
+    <div class="doc-category">Daily Brain &amp; Invoicing</div>
+  </div>
+
+  <div class="sheet-body">
+    <div class="section-tag">03. Adaptive Operations</div>
+    <h2 class="page-headline">Live Business Brain &amp; In-Call Payments</h2>
+    <p class="lead-subhead">
+      Your voice agent stays updated with today's real-world business status, and turns verbal promises into immediate bank settlements.
+    </p>
+
+    <!-- SECTION A: OPERATIONS BRAIN (3 FEATURES) -->
+    <div style="margin-bottom: 14px;">
+      <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: #0f172a; margin-bottom: 6px; letter-spacing: 0.05em;">
+        A. The Three Pillars of the Operations Brain
+      </div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px;">
+        
+        <div class="card">
+          <strong style="font-size: 11px; color: #0f172a; display: block;">Spoken Daily Directives</strong>
+          <p style="font-size: 10.5px; color: #475569; margin: 3px 0;">
+            Record a short voice note on your phone. The agent adopts the new schedule instantly.
+          </p>
+          <div class="speech-quote">
+            <span class="speech-hindi">"Aaj salon 10:00 baje tak band rahega to uske baad hi appointment book karna."</span>
+            <span class="speech-english">("The salon is closed until 10:00 AM today; please book appointments only after that.")</span>
+          </div>
+        </div>
+
+        <div class="card">
+          <strong style="font-size: 11px; color: #0f172a; display: block;">Live Slots &amp; Calendar</strong>
+          <p style="font-size: 10.5px; color: #475569; margin: 3px 0;">
+            Real-time appointment calendar sync prevents double bookings. Booked slots vanish immediately.
+          </p>
+          <div class="speech-quote">
+            <span class="speech-hindi">"11:30 baje ka slot book ho gaya hai, agla available samay 12:00 baje hai."</span>
+            <span class="speech-english">("The 11:30 slot is now reserved; the next opening is at 12:00 PM.")</span>
+          </div>
+        </div>
+
+        <div class="card">
+          <strong style="font-size: 11px; color: #0f172a; display: block;">Inventory &amp; Pricing</strong>
+          <p style="font-size: 10.5px; color: #475569; margin: 3px 0;">
+            Maintains available packages, transport routes, and lowest negotiation limits for accurate quotes.
+          </p>
+          <div class="speech-quote">
+            <span class="speech-hindi">"Humare paas 2 gaadiyan available hain Kanpur se Delhi route ke liye."</span>
+            <span class="speech-english">("We have 2 vehicles available for the Kanpur to Delhi route.")</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- SECTION B: IN-CALL INVOICE & PAYMENT FLOW (4 STEPS + MOCK INVOICE) -->
+    <div>
+      <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: #0f172a; margin-bottom: 6px; letter-spacing: 0.05em;">
+        B. 4-Step In-Call Invoice &amp; Payment Settlement
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 12px; align-items: stretch;">
+        
+        <!-- 4 Steps -->
+        <div style="display: flex; flex-direction: column; gap: 6px;">
+          <div class="card" style="padding: 8px 10px;">
+            <strong style="font-size: 11px; color: #0f172a;">1. Spoken Deal Extraction</strong>
+            <p style="font-size: 10.5px; color: #475569;">Listens to the agreed price and service description during the call.</p>
+          </div>
+          <div class="card" style="padding: 8px 10px;">
+            <strong style="font-size: 11px; color: #0f172a;">2. Statutory GST Invoice Built</strong>
+            <p style="font-size: 10.5px; color: #475569;">Generates a clean tax invoice with your company logo, GSTIN, and tax breakup.</p>
+          </div>
+          <div class="card" style="padding: 8px 10px;">
+            <strong style="font-size: 11px; color: #0f172a;">3. WhatsApp Invoice &amp; QR Sent</strong>
+            <p style="font-size: 10.5px; color: #475569;">Pushes the invoice PDF and scan-to-pay QR to caller's WhatsApp before call ends.</p>
+          </div>
+          <div class="card" style="padding: 8px 10px;">
+            <strong style="font-size: 11px; color: #0f172a;">4. Direct Settlement</strong>
+            <p style="font-size: 10.5px; color: #475569;">100% of customer funds transfer directly to your business account or UPI ID.</p>
+          </div>
+        </div>
+
+        <!-- WhatsApp Invoice Card Mockup -->
+        <div style="background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; padding: 10px 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.06); display: flex; flex-direction: column; justify-content: space-between;">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 1px solid #f1f5f9; pb-2;">
+            <div>
+              <div style="font-size: 12px; font-weight: 800; color: #0f172a;">Vaakriti Partner</div>
+              <div style="font-size: 9px; color: #64748b;">GSTIN: 23RAGHAVTHAKUR000</div>
+            </div>
+            <div style="text-align: right;">
+              <span style="font-size: 9px; font-family: monospace; background: #f1f5f9; padding: 2px 5px; border-radius: 3px; font-weight: 700;">TAX INVOICE</span>
+              <div style="font-size: 8.5px; color: #64748b; margin-top: 2px;">INV #VAAK/26-27/0001</div>
+            </div>
+          </div>
+
+          <div style="margin: 6px 0; font-size: 10.5px; line-height: 1.4;">
+            <div style="display: flex; justify-content: space-between; color: #475569;">
+              <span>Premium Consultation Service</span>
+              <span style="font-weight: 600; color: #0f172a;">₹1,200.00</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; color: #64748b; font-size: 9.5px;">
+              <span>GST (18% Included)</span>
+              <span>₹216.00</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; border-top: 1px solid #e2e8f0; padding-top: 3px; margin-top: 3px; font-weight: 700; color: #0f172a; font-size: 11px;">
+              <span>Total Payable</span>
+              <span>₹1,416.00</span>
+            </div>
+          </div>
+
+          <div style="background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 6px; padding: 6px; display: flex; align-items: center; justify-content: space-between;">
+            <div>
+              <div style="font-size: 9px; color: #64748b;">Scan &amp; Pay via UPI</div>
+              <div style="font-size: 10px; font-family: monospace; font-weight: 700; color: #0f172a;">vaak@hdfc</div>
+            </div>
+            <div style="width: 32px; height: 32px; background: #0f172a; border-radius: 4px; display: flex; align-items: center; justify-content: center; color: #ffffff; font-size: 8px; font-family: monospace;">
+              QR
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <div class="sheet-footer">
+    <span>Vaakriti AI • Enterprise 2026-27 • Commercial in Confidence</span>
+    <span>Page 04</span>
+  </div>
+</section>
+
+<!-- ========================================================================= -->
+<!-- PAGE 5: PAYMENT VERIFICATION + OWNER ESCALATION                           -->
+<!-- ========================================================================= -->
+</body></html>
