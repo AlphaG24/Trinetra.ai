@@ -6,133 +6,139 @@
     .sheet { width: 210mm; height: 297mm; max-height: 297mm; overflow: hidden; margin: 0 auto; padding: 16mm 18mm 14mm 18mm; display: flex; flex-direction: column; justify-content: space-between; }
     .sheet-dark { background: #000000 !important; color: #ffffff !important; }
     .sheet-light { background: #ffffff !important; color: #09090b !important; }
-    .hairline { border: none; height: 1px; background: #e4e4e7; margin: 12px 0; }
+    .top-running-bar { display: flex; justify-content: space-between; align-items: center; padding-bottom: 10px; margin-bottom: 14px; border-bottom: 1px solid #e4e4e7; }
+    .top-running-bar-dark { border-bottom: 1px solid #27272a; }
+    .hairline { border: none; height: 1px; background: #e4e4e7; margin: 14px 0; }
     .hairline-dark { border: none; height: 1px; background: #27272a; margin: 14px 0; }
     .section-label { font-size: 8pt; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: #71717a; margin-bottom: 4px; }
     .section-label-dark { color: #a1a1aa; }
-    .page-title { font-size: 19pt; font-weight: 800; letter-spacing: -0.03em; line-height: 1.2; color: #000000; margin-bottom: 6px; }
-    .page-title-dark { color: #ffffff; font-size: 24pt; line-height: 1.15; }
-    .page-desc { font-size: 9pt; font-weight: 400; line-height: 1.5; color: #52525b; max-width: 680px; }
+    .page-title { font-size: 20pt; font-weight: 800; letter-spacing: -0.03em; line-height: 1.2; color: #000000; margin-bottom: 8px; }
+    .page-title-dark { color: #ffffff; font-size: 26pt; line-height: 1.15; }
+    .page-desc { font-size: 9.5pt; font-weight: 400; line-height: 1.55; color: #52525b; max-width: 680px; margin-bottom: 4px; }
     .page-desc-dark { color: #a1a1aa; }
-    .card-bw { background: #ffffff; border: 1px solid #e4e4e7; border-radius: 6px; padding: 14px 16px; }
-    .card-bw-dark { background: #09090b; border: 1px solid #27272a; border-radius: 6px; padding: 15px 18px; }
-    .card-bw-highlight { background: #fafafa; border: 1.5px solid #000000; border-radius: 6px; padding: 14px 16px; }
+    .card-bw { background: #ffffff; border: 1px solid #e4e4e7; border-radius: 6px; padding: 16px 18px; }
+    .card-bw-dark { background: #09090b; border: 1px solid #27272a; border-radius: 6px; padding: 18px 20px; }
+    .card-bw-highlight { background: #fafafa; border: 1.5px solid #000000; border-radius: 6px; padding: 16px 18px; }
     .footer-bw { display: flex; justify-content: space-between; align-items: center; padding-top: 10px; border-top: 1px solid #e4e4e7; font-size: 7.5pt; color: #71717a; font-weight: 500; letter-spacing: 0.04em; }
     .footer-bw-dark { border-top: 1px solid #27272a; color: #71717a; }
     .tag-bw { display: inline-block; font-size: 7pt; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; padding: 3px 7px; border-radius: 3px; background: #000000; color: #ffffff; }
     .tag-bw-outline { display: inline-block; font-size: 7pt; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; padding: 2px 6px; border-radius: 3px; border: 1px solid #d4d4d8; color: #27272a; background: #ffffff; }
     .tag-bw-outline-dark { border: 1px solid #3f3f46; color: #e4e4e7; background: #18181b; padding: 2px 6px; border-radius: 3px; font-size: 7pt; font-weight: 600; text-transform: uppercase; }
-    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-    .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
-    .grid-4 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 10px; }
-    .feature-list { list-style: none; margin-top: 6px; }
-    .feature-list li { font-size: 8.5pt; color: #3f3f46; line-height: 1.5; margin-bottom: 6px; position: relative; padding-left: 15px; }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
+    .grid-4 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 12px; }
+    .feature-list { list-style: none; margin-top: 8px; }
+    .feature-list li { font-size: 8.5pt; color: #3f3f46; line-height: 1.55; margin-bottom: 7px; position: relative; padding-left: 16px; }
     .feature-list li::before { content: "✓"; position: absolute; left: 0; color: #000000; font-weight: 800; font-size: 8pt; }
     </style></head><body><div class="sheet sheet-light" id="page-4">
     <div>
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
-        <div>
-          <p class="section-label">03 • IN-CALL COMMERCE & INVOICE MANAGEMENT</p>
-          <h2 class="page-title">Send WhatsApp Invoices & Collect UPI On Call</h2>
-        </div>
-        <svg viewBox="0 0 1280 164" fill="#000000" xmlns="http://www.w3.org/2000/svg" style="height: 18px; width: auto; display: block;">
+      <div class="top-running-bar">
+        <svg viewBox="0 0 1280 164" fill="#000000" xmlns="http://www.w3.org/2000/svg" style="height: 12px; width: auto; display: inline-block; vertical-align: middle;">
   <path fill-rule="evenodd" clip-rule="evenodd" d="M 0 4 L 83 160 L 98 160 L 186 4 L 153 4 L 90.5 116 L 33 4 Z M 311 0 L 321 0 L 399 159 L 368 159 L 316 59 L 255 159 L 225 159 Z M 527 0 L 537 0 L 619 159 L 585 159 L 532 59 L 471 159 L 437 159 Z M 656 4 L 686 4 L 686 71 L 756 4 L 795 4 L 724 76 L 795 159 L 756 159 L 702 99 L 686 113 L 686 159 L 656 159 Z M 832 4 L 920 4 C 945 4 958 17 958 45 C 958 72 944 87 920 89 L 967 159 L 928 159 L 888 100 L 863 100 L 863 159 L 832 159 Z M 863 27 L 910 27 C 922 27 928 34 928 47 C 928 60 922 75 910 75 L 863 75 Z M 1005 4 L 1035 4 L 1035 159 L 1005 159 Z M 1072 4 L 1208 4 L 1208 27 L 1156 27 L 1156 159 L 1125 159 L 1125 27 L 1072 27 Z M 1248 4 L 1279 4 L 1279 159 L 1248 159 Z" />
 </svg>
+        <span style="font-size: 7.5pt; color: #71717a; letter-spacing: 0.08em; text-transform: uppercase;">
+          SECTION 03: IN-CALL COMMERCE & INVOICE MANAGEMENT
+        </span>
       </div>
-      <p class="page-desc">
-        Stop losing 85% of leads* by waiting hours to send a payment link. Vaakriti generates compliant GST tax invoices and dynamic UPI QR codes sent straight to the customer's WhatsApp while they are talking.
-      </p>
+
+      <div style="margin-bottom: 12px;">
+        <p class="section-label">INSTANT REVENUE CAPTURE ON LIVE CALLS</p>
+        <h2 class="page-title">Send WhatsApp Invoices & Collect UPI On Call</h2>
+        <p class="page-desc">
+          Stop losing 85% of leads* by waiting hours to send a payment link. Vaakriti generates compliant GST tax invoices and dynamic UPI QR codes sent straight to the customer's WhatsApp while they are talking.
+        </p>
+      </div>
 
       <hr class="hairline">
 
-      <div class="grid-2" style="margin-top: 10px; align-items: stretch;">
-        <!-- Left Column: Step-by-Step Flow -->
+      <div class="grid-2" style="margin-top: 12px; align-items: stretch;">
+        <!-- Left Column: Step-by-Step Flow with generous height -->
         <div>
-          <h3 style="font-size: 9.5pt; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px;">
+          <h3 style="font-size: 10pt; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 10px;">
             In-Call Checkout Workflow
           </h3>
 
-          <div style="margin-bottom: 8px; padding: 10px 12px; border: 1px solid #e4e4e7; border-radius: 4px; background: #ffffff;">
-            <strong style="font-size: 8.5pt;">1. Customer Confirms Order</strong>
-            <p style="font-size: 8pt; color: #52525b; margin-top: 3px;">
+          <div style="margin-bottom: 10px; padding: 12px 14px; border: 1px solid #e4e4e7; border-radius: 4px; background: #ffffff;">
+            <strong style="font-size: 9pt;">1. Customer Confirms Order</strong>
+            <p style="font-size: 8pt; color: #52525b; margin-top: 4px; line-height: 1.45;">
               Caller agrees to appointment or service. AI confirms customer name, phone number, and address.
             </p>
           </div>
 
-          <div style="margin-bottom: 8px; padding: 10px 12px; border: 1px solid #e4e4e7; border-radius: 4px; background: #ffffff;">
-            <strong style="font-size: 8.5pt;">2. Branded GST Invoice Created</strong>
-            <p style="font-size: 8pt; color: #52525b; margin-top: 3px;">
+          <div style="margin-bottom: 10px; padding: 12px 14px; border: 1px solid #e4e4e7; border-radius: 4px; background: #ffffff;">
+            <strong style="font-size: 9pt;">2. Branded GST Invoice Created</strong>
+            <p style="font-size: 8pt; color: #52525b; margin-top: 4px; line-height: 1.45;">
               Formats official PDF with your business logo, registered GSTIN, SAC/HSN codes, and sequential invoice numbering.
             </p>
           </div>
 
-          <div style="margin-bottom: 8px; padding: 10px 12px; border: 1px solid #e4e4e7; border-radius: 4px; background: #ffffff;">
-            <strong style="font-size: 8.5pt;">3. Dispatched to WhatsApp on Live Call</strong>
-            <p style="font-size: 8pt; color: #52525b; margin-top: 3px;">
+          <div style="margin-bottom: 10px; padding: 12px 14px; border: 1px solid #e4e4e7; border-radius: 4px; background: #ffffff;">
+            <strong style="font-size: 9pt;">3. Dispatched to WhatsApp on Live Call</strong>
+            <p style="font-size: 8pt; color: #52525b; margin-top: 4px; line-height: 1.45;">
               Caller receives the official PDF invoice and dynamic UPI QR code on their WhatsApp before hanging up.
             </p>
           </div>
 
-          <div style="padding: 10px 12px; border: 1.5px solid #000000; border-radius: 4px; background: #fafafa;">
-            <strong style="font-size: 8.5pt; color: #000000;">4. 100% Direct Settlement to Your Bank</strong>
-            <p style="font-size: 8pt; color: #3f3f46; margin-top: 3px;">
+          <div style="padding: 12px 14px; border: 1.5px solid #000000; border-radius: 4px; background: #fafafa;">
+            <strong style="font-size: 9pt; color: #000000;">4. 100% Direct Settlement to Your Bank</strong>
+            <p style="font-size: 8pt; color: #3f3f46; margin-top: 4px; line-height: 1.45;">
               Payments settle directly into your HDFC, ICICI, SBI or designated merchant account. We never hold your money.
             </p>
           </div>
         </div>
 
-        <!-- Right Column: Clean Sample Invoice Graphic -->
-        <div style="border: 1.5px solid #000000; border-radius: 6px; padding: 14px; background: #ffffff; display: flex; flex-direction: column; justify-content: space-between;">
+        <!-- Right Column: Clean Sample Invoice Graphic filling the right card -->
+        <div style="border: 1.5px solid #000000; border-radius: 6px; padding: 16px; background: #ffffff; display: flex; flex-direction: column; justify-content: space-between;">
           <div>
-            <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 1px solid #000000; padding-bottom: 8px;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 1px solid #000000; padding-bottom: 10px;">
               <div>
                 <strong style="font-size: 11pt;">TAX INVOICE</strong>
-                <p style="font-size: 7pt; color: #71717a;">GSTIN: 23RAGHAVTHAKUR000</p>
+                <p style="font-size: 7.5pt; color: #71717a;">GSTIN: 23RAGHAVTHAKUR000</p>
               </div>
               <div style="text-align: right;">
-                <p style="font-size: 8pt; font-weight: 700;">INV # VAAK/26-27/0042</p>
-                <p style="font-size: 7pt; color: #71717a;">Date: 04/11/2026</p>
+                <p style="font-size: 8.5pt; font-weight: 700;">INV # VAAK/26-27/0042</p>
+                <p style="font-size: 7.5pt; color: #71717a;">Date: 04/11/2026</p>
               </div>
             </div>
 
-            <div style="margin: 10px 0; font-size: 7.5pt;">
+            <div style="margin: 12px 0; font-size: 8pt;">
               <p><strong>Customer:</strong> Rahul Sharma (+91 98765 43210)</p>
-              <p style="color: #71717a;">Origin: Vaakriti AI Live Phone Booking</p>
+              <p style="color: #71717a; margin-top: 2px;">Origin: Vaakriti AI Live Phone Booking</p>
             </div>
 
-            <table style="width: 100%; border-collapse: collapse; font-size: 7.5pt; margin-top: 6px;">
+            <table style="width: 100%; border-collapse: collapse; font-size: 8pt; margin-top: 8px;">
               <thead>
                 <tr style="border-bottom: 1px solid #d4d4d8; background: #f4f4f5;">
-                  <th style="text-align: left; padding: 4px;">Service</th>
-                  <th style="text-align: center; padding: 4px;">HSN</th>
-                  <th style="text-align: right; padding: 4px;">Amount</th>
+                  <th style="text-align: left; padding: 6px;">Service</th>
+                  <th style="text-align: center; padding: 6px;">HSN</th>
+                  <th style="text-align: right; padding: 6px;">Amount</th>
                 </tr>
               </thead>
               <tbody>
                 <tr>
-                  <td style="padding: 5px 4px;">Health Consultation</td>
-                  <td style="text-align: center; padding: 5px 4px; color: #71717a;">998311</td>
-                  <td style="text-align: right; padding: 5px 4px; font-weight: 600;">₹1,200.00</td>
+                  <td style="padding: 7px 6px;">Health Consultation</td>
+                  <td style="text-align: center; padding: 7px 6px; color: #71717a;">998311</td>
+                  <td style="text-align: right; padding: 7px 6px; font-weight: 600;">₹1,200.00</td>
                 </tr>
                 <tr style="border-top: 1px solid #e4e4e7;">
-                  <td colspan="2" style="padding: 4px; text-align: right; color: #71717a;">Subtotal:</td>
-                  <td style="padding: 4px; text-align: right;">₹1,200.00</td>
+                  <td colspan="2" style="padding: 6px; text-align: right; color: #71717a;">Subtotal:</td>
+                  <td style="padding: 6px; text-align: right;">₹1,200.00</td>
                 </tr>
                 <tr>
-                  <td colspan="2" style="padding: 4px; text-align: right; color: #71717a;">GST (18%):</td>
-                  <td style="padding: 4px; text-align: right;">₹216.00</td>
+                  <td colspan="2" style="padding: 6px; text-align: right; color: #71717a;">GST (18%):</td>
+                  <td style="padding: 6px; text-align: right;">₹216.00</td>
                 </tr>
                 <tr style="border-top: 1.5px solid #000000; font-weight: 800;">
-                  <td colspan="2" style="padding: 5px 4px; text-align: right;">Total Amount:</td>
-                  <td style="padding: 5px 4px; text-align: right; font-size: 9pt;">₹1,416.00</td>
+                  <td colspan="2" style="padding: 7px 6px; text-align: right;">Total Amount:</td>
+                  <td style="padding: 7px 6px; text-align: right; font-size: 9.5pt;">₹1,416.00</td>
                 </tr>
               </tbody>
             </table>
           </div>
 
-          <div style="margin-top: 12px; padding: 8px; background: #f4f4f5; border: 1px dashed #a1a1aa; border-radius: 4px; text-align: center;">
-            <p style="font-size: 7.5pt; font-weight: 700; text-transform: uppercase;">Direct UPI Instant Pay</p>
-            <p style="font-size: 7.5pt; color: #52525b; margin-top: 2px;">VPA: vaakriti@hdfc • Dynamic QR code embedded in WhatsApp dispatch</p>
+          <div style="margin-top: 14px; padding: 10px; background: #f4f4f5; border: 1px dashed #a1a1aa; border-radius: 4px; text-align: center;">
+            <p style="font-size: 8pt; font-weight: 700; text-transform: uppercase;">Direct UPI Instant Pay</p>
+            <p style="font-size: 7.5pt; color: #52525b; margin-top: 3px;">UPI ID: vaakriti@hdfc • Dynamic QR code embedded in WhatsApp dispatch</p>
           </div>
         </div>
       </div>
