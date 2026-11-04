@@ -3,45 +3,46 @@
     @page { size: A4 portrait; margin: 0; }
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
     body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #ffffff; color: #09090b; }
-    .sheet { width: 210mm; height: 297mm; max-height: 297mm; overflow: hidden; margin: 0 auto; padding: 16mm 18mm 14mm 18mm; display: flex; flex-direction: column; justify-content: space-between; }
+    .sheet { width: 210mm; height: 297mm; max-height: 297mm; min-height: 297mm; overflow: hidden; margin: 0 auto; padding: 14mm 16mm 12mm 16mm; display: flex; flex-direction: column; justify-content: space-between; }
     .sheet-dark { background: #000000 !important; color: #ffffff !important; }
     .sheet-light { background: #ffffff !important; color: #09090b !important; }
-    .top-running-bar { display: flex; justify-content: space-between; align-items: center; padding-bottom: 10px; margin-bottom: 14px; border-bottom: 1px solid #e4e4e7; }
+    .content-body { flex: 1; display: flex; flex-direction: column; justify-content: space-between; }
+    .top-running-bar { display: flex; justify-content: space-between; align-items: center; padding-bottom: 8px; margin-bottom: 10px; border-bottom: 1px solid #e4e4e7; }
     .top-running-bar-dark { border-bottom: 1px solid #27272a; }
-    .hairline { border: none; height: 1px; background: #e4e4e7; margin: 14px 0; }
-    .hairline-dark { border: none; height: 1px; background: #27272a; margin: 14px 0; }
-    .section-label { font-size: 8pt; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: #71717a; margin-bottom: 4px; }
+    .hairline { border: none; height: 1px; background: #e4e4e7; margin: 10px 0; }
+    .hairline-dark { border: none; height: 1px; background: #27272a; margin: 10px 0; }
+    .section-label { font-size: 7.5pt; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: #71717a; margin-bottom: 3px; }
     .section-label-dark { color: #a1a1aa; }
-    .page-title { font-size: 20pt; font-weight: 800; letter-spacing: -0.03em; line-height: 1.2; color: #000000; margin-bottom: 8px; }
-    .page-title-dark { color: #ffffff; font-size: 26pt; line-height: 1.15; }
-    .page-desc { font-size: 9.5pt; font-weight: 400; line-height: 1.55; color: #52525b; max-width: 680px; margin-bottom: 4px; }
+    .page-title { font-size: 19pt; font-weight: 800; letter-spacing: -0.03em; line-height: 1.15; color: #000000; margin-bottom: 6px; }
+    .page-title-dark { color: #ffffff; font-size: 25pt; line-height: 1.15; }
+    .page-desc { font-size: 9pt; font-weight: 400; line-height: 1.5; color: #52525b; margin-bottom: 4px; }
     .page-desc-dark { color: #a1a1aa; }
-    .card-bw { background: #ffffff; border: 1px solid #e4e4e7; border-radius: 6px; padding: 16px 18px; }
-    .card-bw-dark { background: #09090b; border: 1px solid #27272a; border-radius: 6px; padding: 18px 20px; }
-    .card-bw-highlight { background: #fafafa; border: 1.5px solid #000000; border-radius: 6px; padding: 16px 18px; }
-    .footer-bw { display: flex; justify-content: space-between; align-items: center; padding-top: 10px; border-top: 1px solid #e4e4e7; font-size: 7.5pt; color: #71717a; font-weight: 500; letter-spacing: 0.04em; }
+    .card-bw { background: #ffffff; border: 1px solid #e4e4e7; border-radius: 6px; padding: 12px 14px; }
+    .card-bw-dark { background: #09090b; border: 1px solid #27272a; border-radius: 6px; padding: 14px 16px; }
+    .card-bw-highlight { background: #fafafa; border: 1.5px solid #000000; border-radius: 6px; padding: 12px 14px; }
+    .footer-bw { display: flex; justify-content: space-between; align-items: center; padding-top: 8px; border-top: 1px solid #e4e4e7; font-size: 7.5pt; color: #71717a; font-weight: 500; letter-spacing: 0.04em; }
     .footer-bw-dark { border-top: 1px solid #27272a; color: #71717a; }
-    .tag-bw { display: inline-block; font-size: 7pt; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; padding: 3px 7px; border-radius: 3px; background: #000000; color: #ffffff; }
+    .tag-bw { display: inline-block; font-size: 7pt; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; padding: 2px 6px; border-radius: 3px; background: #000000; color: #ffffff; }
     .tag-bw-outline { display: inline-block; font-size: 7pt; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; padding: 2px 6px; border-radius: 3px; border: 1px solid #d4d4d8; color: #27272a; background: #ffffff; }
     .tag-bw-outline-dark { border: 1px solid #3f3f46; color: #e4e4e7; background: #18181b; padding: 2px 6px; border-radius: 3px; font-size: 7pt; font-weight: 600; text-transform: uppercase; }
-    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-    .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
-    .grid-4 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 12px; }
-    .feature-list { list-style: none; margin-top: 8px; }
-    .feature-list li { font-size: 8.5pt; color: #3f3f46; line-height: 1.55; margin-bottom: 7px; position: relative; padding-left: 16px; }
-    .feature-list li::before { content: "✓"; position: absolute; left: 0; color: #000000; font-weight: 800; font-size: 8pt; }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+    .grid-4 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 10px; }
+    .feature-list { list-style: none; margin-top: 6px; }
+    .feature-list li { font-size: 8pt; color: #3f3f46; line-height: 1.45; margin-bottom: 5px; position: relative; padding-left: 14px; }
+    .feature-list li::before { content: "✓"; position: absolute; left: 0; color: #000000; font-weight: 800; font-size: 7.5pt; }
     </style></head><body><div class="sheet sheet-light" id="page-5">
-    <div>
+    <div class="content-body">
       <div class="top-running-bar">
-        <svg viewBox="0 0 1280 164" fill="#000000" xmlns="http://www.w3.org/2000/svg" style="height: 12px; width: auto; display: inline-block; vertical-align: middle;">
+        <svg viewBox="0 0 1280 164" fill="#000000" xmlns="http://www.w3.org/2000/svg" style="height: 13px; width: auto; display: inline-block; vertical-align: middle;">
   <path fill-rule="evenodd" clip-rule="evenodd" d="M 0 4 L 83 160 L 98 160 L 186 4 L 153 4 L 90.5 116 L 33 4 Z M 311 0 L 321 0 L 399 159 L 368 159 L 316 59 L 255 159 L 225 159 Z M 527 0 L 537 0 L 619 159 L 585 159 L 532 59 L 471 159 L 437 159 Z M 656 4 L 686 4 L 686 71 L 756 4 L 795 4 L 724 76 L 795 159 L 756 159 L 702 99 L 686 113 L 686 159 L 656 159 Z M 832 4 L 920 4 C 945 4 958 17 958 45 C 958 72 944 87 920 89 L 967 159 L 928 159 L 888 100 L 863 100 L 863 159 L 832 159 Z M 863 27 L 910 27 C 922 27 928 34 928 47 C 928 60 922 75 910 75 L 863 75 Z M 1005 4 L 1035 4 L 1035 159 L 1005 159 Z M 1072 4 L 1208 4 L 1208 27 L 1156 27 L 1156 159 L 1125 159 L 1125 27 L 1072 27 Z M 1248 4 L 1279 4 L 1279 159 L 1248 159 Z" />
 </svg>
-        <span style="font-size: 7.5pt; color: #71717a; letter-spacing: 0.08em; text-transform: uppercase;">
+        <span style="font-size: 7pt; color: #71717a; letter-spacing: 0.08em; text-transform: uppercase;">
           SECTION 04: RECEIPT VERIFICATION & SAFE ESCALATION
         </span>
       </div>
 
-      <div style="margin-bottom: 12px;">
+      <div>
         <p class="section-label">AUTOMATED SETTLEMENT PROOF & LOOP-PROOF ROUTING</p>
         <h2 class="page-title">Automatic Payment Checks & Loop-Proof Transfers</h2>
         <p class="page-desc">
@@ -51,15 +52,15 @@
 
       <hr class="hairline">
 
-      <div class="grid-2" style="gap: 16px; margin-top: 14px;">
+      <div class="grid-2" style="gap: 12px; margin-top: 8px;">
         <!-- Left: WhatsApp Bot Screenshot Verification -->
-        <div class="card-bw" style="border: 1.5px solid #000000; padding: 20px;">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+        <div class="card-bw" style="border: 1.5px solid #000000; padding: 14px 16px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
             <span class="tag-bw">PAYMENT VERIFICATION</span>
-            <span style="font-size: 7.5pt; font-weight: 700; color: #71717a;">AUTOMATIC OCR</span>
+            <span style="font-size: 7pt; font-weight: 700; color: #71717a;">AUTOMATIC OCR</span>
           </div>
-          <h3 style="font-size: 11pt; font-weight: 800; margin-bottom: 8px;">WhatsApp Screenshot Verification</h3>
-          <p style="font-size: 8.5pt; color: #52525b; line-height: 1.55;">
+          <h3 style="font-size: 10pt; font-weight: 800; margin-bottom: 6px;">WhatsApp Screenshot Verification</h3>
+          <p style="font-size: 8pt; color: #52525b; line-height: 1.45;">
             Customers frequently pay via Google Pay, PhonePe, or Paytm and send a screenshot. The system automatically reads and verifies the proof:
           </p>
 
@@ -72,13 +73,13 @@
         </div>
 
         <!-- Right: Safe Call Transfer -->
-        <div class="card-bw" style="border: 1.5px solid #000000; padding: 20px;">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+        <div class="card-bw" style="border: 1.5px solid #000000; padding: 14px 16px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
             <span class="tag-bw">CALL ESCALATION</span>
-            <span style="font-size: 7.5pt; font-weight: 700; color: #71717a;">ANTI-LOOP SAFEGUARD</span>
+            <span style="font-size: 7pt; font-weight: 700; color: #71717a;">ANTI-LOOP SAFEGUARD</span>
           </div>
-          <h3 style="font-size: 11pt; font-weight: 800; margin-bottom: 8px;">Smooth Call Transfer to Owner</h3>
-          <p style="font-size: 8.5pt; color: #52525b; line-height: 1.55;">
+          <h3 style="font-size: 10pt; font-weight: 800; margin-bottom: 6px;">Smooth Call Transfer to Owner</h3>
+          <p style="font-size: 8pt; color: #52525b; line-height: 1.45;">
             When a customer specifically needs to talk to the business owner, or in family/sensitive situations, the call transfers smoothly:
           </p>
 
@@ -88,6 +89,24 @@
             <li><strong>Spoken Reassurance:</strong> Keeps the caller engaged with status updates every 20 seconds so they don't hang up in silence.</li>
             <li><strong>Pre-Call Briefing:</strong> You see the customer's name and previous discussion notes before saying hello.</li>
           </ul>
+        </div>
+      </div>
+
+      <!-- Lower Half: Multi-App Screenshot Recognition Matrix (Filling Bottom) -->
+      <div class="card-bw-highlight" style="margin-top: 10px; padding: 14px 16px;">
+        <h4 style="font-size: 8.5pt; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; color: #000000; margin-bottom: 6px;">
+          Multi-App Receipt Parsing & Replay Attack Defense
+        </h4>
+        <div class="grid-3" style="font-size: 7.5pt; color: #3f3f46; line-height: 1.45;">
+          <div>
+            <strong>Universal App Support:</strong> Accurately reads receipt designs across Google Pay, PhonePe, Paytm, BHIM UPI, and mobile banking apps.
+          </div>
+          <div>
+            <strong>Fraud & Duplicate Blocking:</strong> Detects and flags any recycled screenshot or edited image before updating your accounting records.
+          </div>
+          <div>
+            <strong>Automated Owner Dispatch:</strong> Immediately pings the owner's WhatsApp or Telegram with the verified UTR number and receipt snapshot.
+          </div>
         </div>
       </div>
     </div>
