@@ -364,3 +364,4 @@ class WhatsAppReceiptVerifier:
             "utr_number": verification.utr_number,
             "is_verified": verification.is_verified
         }
+

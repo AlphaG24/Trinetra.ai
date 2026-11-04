@@ -113,9 +113,9 @@ def get_vad_model():
     if _vad_model is None:
         logger.info("Loading Silero VAD model on-demand...")
         _vad_model = silero.VAD.load(
-            min_speech_duration=0.25,
-            min_silence_duration=0.55,
-            activation_threshold=0.6,
+            min_speech_duration=0.15,
+            min_silence_duration=0.25,
+            activation_threshold=0.50,
         )
         logger.info("Silero VAD model loaded successfully with noise-resistant activation threshold (0.6)!")
     return _vad_model
@@ -2007,6 +2007,7 @@ class VikramAgent(Agent):
         llm_model: str | None = None,
         temperature: float | None = None,
         tools: list | None = None,
+        sample_rate: int | None = None,
     ):
         groq_api_key = os.getenv("GROQ_API_KEY", "")
         logger.info(f"[VikramAgent] __init__: GROQ_API_KEY length is {len(groq_api_key)}")
@@ -2051,7 +2052,11 @@ class VikramAgent(Agent):
             target_lang = "hi-IN" if language in ['hinglish', 'hi-IN', 'english'] else "en-IN"
             # WebRTC native sample rate: 24000 Hz (exact integer divisor of WebRTC 48kHz Opus)
             # linear16 sends raw uncompressed PCM, eliminating MP3 decode chunking jitter, clicks and voice breakages
-            sarvam_sample_rate = int(os.getenv("SARVAM_SAMPLE_RATE", "24000"))
+            # Telephony native passthrough: use 8000Hz on telephony to eliminate audioop.ratecv overhead and crackles
+            if sample_rate:
+                sarvam_sample_rate = sample_rate
+            else:
+                sarvam_sample_rate = int(os.getenv("SARVAM_SAMPLE_RATE", "24000"))
 
             # Optimal clarity & loudness: loudness=1.15 provides loud, punchy, and crystal-clear
             # audio without digital distortion or low volume issues across browsers and mobile devices.
@@ -2237,9 +2242,9 @@ class VikramAgent(Agent):
             llm=llm_plugin,
             tts=wrapped_tts,
             vad=get_vad_model(),
-            min_endpointing_delay=0.9,
-            max_endpointing_delay=2.5,
-            min_consecutive_speech_delay=0.4,
+            min_endpointing_delay=0.30,
+            max_endpointing_delay=1.2,
+            min_consecutive_speech_delay=0.15,
             use_tts_aligned_transcript=True,
             tools=tools or [],
         )
@@ -4497,6 +4502,9 @@ async def entrypoint(ctx: JobContext):
     )
 
     # 2. Create the agent instance with actual settings
+    is_telephony_room = bool(ctx.room and any(p in ctx.room.name.lower() for p in ["exotel", "twilio", "call", "pstn"]))
+    telephony_sample_rate = 8000 if is_telephony_room else None
+
     agent_instance = VikramAgent(
         instructions=system_prompt,
         voice_provider=provider,
@@ -4508,6 +4516,7 @@ async def entrypoint(ctx: JobContext):
         llm_model=agent_data.get('llm_model') if agent_data else None,
         temperature=agent_data.get('temperature') if agent_data else None,
         tools=appointment_tools,
+        sample_rate=telephony_sample_rate,
     )
 
     agent_instance_ref[0] = agent_instance
@@ -4558,11 +4567,11 @@ async def entrypoint(ctx: JobContext):
     session = AgentSession(
         vad=get_vad_model(),
         turn_detection="vad",
-        min_endpointing_delay=0.85,
-        max_endpointing_delay=2.2,
+        min_endpointing_delay=0.30,
+        max_endpointing_delay=1.2,
         preemptive_generation=True,
-        min_interruption_duration=0.6,
-        min_interruption_words=4,
+        min_interruption_duration=0.30,
+        min_interruption_words=2,
         resume_false_interruption=True,
     )
     call_start_time = time.time()
@@ -5593,6 +5602,9 @@ async def run_agent(room_name: str, agent_id: str | None = None, contact_id: str
 
     from livekit.agents import utils
     async with utils.http_context.open():
+        is_telephony_room_ra = bool(ctx.room and any(p in ctx.room.name.lower() for p in ["exotel", "twilio", "call", "pstn"]))
+        telephony_sample_rate_ra = 8000 if is_telephony_room_ra else None
+
         agent_instance = VikramAgent(
             instructions=safe_system_prompt,
             voice_provider=safe_provider,
@@ -5604,6 +5616,7 @@ async def run_agent(room_name: str, agent_id: str | None = None, contact_id: str
             llm_model=agent_data.get('llm_model') if agent_data else None,
             temperature=agent_data.get('temperature') if agent_data else None,
             tools=appointment_tools,
+            sample_rate=telephony_sample_rate_ra,
         )
 
         if locals().get('greeting_message'):
@@ -5640,11 +5653,11 @@ async def run_agent(room_name: str, agent_id: str | None = None, contact_id: str
         session = AgentSession(
             vad=get_vad_model(),
             turn_detection="vad",
-            min_endpointing_delay=0.85,
-            max_endpointing_delay=2.2,
+            min_endpointing_delay=0.30,
+            max_endpointing_delay=1.2,
             preemptive_generation=True,
-            min_interruption_duration=0.6,
-            min_interruption_words=4,
+            min_interruption_duration=0.30,
+            min_interruption_words=2,
             resume_false_interruption=True,
         )
         done = asyncio.Event()

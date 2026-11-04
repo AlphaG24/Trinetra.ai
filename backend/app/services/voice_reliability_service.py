@@ -78,6 +78,27 @@ class VoiceTimingTracker:
         """Return dict of measured timestamps."""
         return dict(self._timestamps)
 
+    def get_turn_taking_latency_ms(self) -> Optional[float]:
+        """
+        Calculates conversational turn latency from user_speech_end to tts_first_byte or audio_playout.
+        """
+        start = self._timestamps.get("user_speech_end")
+        end = self._timestamps.get("audio_playout") or self._timestamps.get("tts_first_byte")
+        if start and end and end >= start:
+            return (end - start) * 1000.0
+        return None
+
+    def is_sub_100ms_pipeline(self) -> bool:
+        """
+        Evaluates whether the intermediate AI processing stage (STT -> LLM First Token)
+        met the sub-100ms SLA target.
+        """
+        stt_end = self._timestamps.get("stt_final")
+        llm_first = self._timestamps.get("llm_first_token")
+        if stt_end and llm_first and llm_first >= stt_end:
+            return ((llm_first - stt_end) * 1000.0) <= 100.0
+        return False
+
     @staticmethod
     def _sanitize_pii(text: str) -> str:
         """Scrub phone numbers, emails, and sensitive identifiers from log extras."""

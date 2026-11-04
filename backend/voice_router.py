@@ -2682,7 +2682,7 @@ async def telephony_audio_stream(websocket: WebSocket, room_name: Optional[str] 
     frame_size = 640 if is_exotel else 320
     pacing_interval = 0.040 if is_exotel else 0.020
     max_silence_ticks = 15 if is_exotel else 25
-    min_prebuffer_bytes = frame_size * 3  # 120ms jitter buffer on Exotel (1920B), 60ms on Twilio (960B)
+    min_prebuffer_bytes = frame_size  # Zero-latency playout on first audio chunk (40ms Exotel, 20ms Twilio)
 
     async def send_to_twilio():
         nonlocal stream_sid, is_ws_closed, is_playing

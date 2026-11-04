@@ -214,3 +214,4 @@ async def handle_twilio_whatsapp_inbound(request: Request):
     # Return valid TwiML response
     twiml_response = '<?xml version="1.0" encoding="UTF-8"?><Response></Response>'
     return FastAPIResponse(content=twiml_response, media_type="application/xml")
+
