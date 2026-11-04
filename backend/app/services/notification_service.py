@@ -25,7 +25,9 @@ DEFAULT_PREFERENCES = {
         "plan_expired": { "email": True, "telegram": True, "dashboard": True },
         "callback_scheduled": { "email": True, "telegram": True, "dashboard": True },
         "agent_paused": { "email": True, "telegram": False, "dashboard": True },
-        "weekly_report": { "email": True, "telegram": False, "dashboard": False }
+        "weekly_report": { "email": True, "telegram": False, "dashboard": False },
+        "missed_call": { "email": True, "telegram": True, "dashboard": True, "whatsapp": True },
+        "call_transfer_requested": { "email": True, "telegram": True, "dashboard": True, "whatsapp": True }
     },
     "quiet_hours": {
         "enabled": False,
@@ -112,7 +114,9 @@ class NotificationService:
                         "usage_warning": "warning",
                         "plan_expired": "warning",
                         "agent_paused": "warning",
-                        "weekly_report": "info"
+                        "weekly_report": "info",
+                        "missed_call": "warning",
+                        "call_transfer_requested": "warning"
                     }
                     db_type = type_map.get(event_type, "info")
                     insert_data = {

@@ -792,7 +792,7 @@ export default function UnifiedOperationsBrainPage() {
       setSavingForwarding(true)
       const payload = {
         id: forwardingDocId || undefined,
-        title: 'Owner Direct Line (Dual SIM Option A)',
+        title: 'Owner Direct Transfer Line',
         category: 'call_forwarding',
         status: 'available',
         metadata: {
@@ -1022,15 +1022,11 @@ export default function UnifiedOperationsBrainPage() {
                         <h3 className="text-sm font-bold text-[var(--heading)]">{item.title}</h3>
                       </div>
 
-                      <span
-                        className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                          isActive
-                            ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300'
-                            : 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400'
-                        }`}
-                      >
-                        {isActive ? 'Active in Calls' : 'Paused'}
-                      </span>
+                      {!isActive && (
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
+                          Paused
+                        </span>
+                      )}
                     </div>
 
                     {meta.voice_transcript && (
@@ -1607,27 +1603,21 @@ export default function UnifiedOperationsBrainPage() {
         <div className="space-y-6">
           {/* Card 1: Owner Secondary Line & Warm Transfer Settings */}
           <div className="p-6 rounded-2xl bg-[var(--card-bg)] border border-[var(--border)] shadow-xs space-y-4">
-            <div className="flex items-start justify-between">
-              <div>
-                <h3 className="text-base font-bold text-[var(--heading)] flex items-center gap-2">
-                  <PhoneForwarded className="w-5 h-5 text-[var(--heading)]" />
-                  <span>Owner Direct Transfer Line (Dual SIM Option A)</span>
-                </h3>
-                <p className="text-xs text-[var(--muted)] mt-1 max-w-2xl">
-                  Configure your personal direct phone number. When calls from family members arrive, or when customers insist on talking to the owner, the AI bot performs an immediate Warm Transfer directly to this number without infinite looping.
-                </p>
-              </div>
-
-              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800">
-                Warm Transfer Active
-              </span>
+            <div>
+              <h3 className="text-base font-bold text-[var(--heading)] flex items-center gap-2">
+                <PhoneForwarded className="w-5 h-5 text-[var(--heading)]" />
+                <span>Owner Direct Transfer Line</span>
+              </h3>
+              <p className="text-xs text-[var(--muted)] mt-1 max-w-2xl">
+                Configure your personal direct phone number. When calls from family members arrive, or when customers insist on talking to the owner, the AI bot performs an immediate Warm Transfer directly to this number without infinite looping.
+              </p>
             </div>
 
             <form onSubmit={handleSaveForwardingConfig} className="space-y-4 text-xs pt-2">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block font-semibold text-[var(--heading)] mb-1">
-                    Owner Direct Mobile Phone (SIM 2 / Personal Line) *
+                    Owner Direct Mobile Phone *
                   </label>
                   <input
                     type="tel"

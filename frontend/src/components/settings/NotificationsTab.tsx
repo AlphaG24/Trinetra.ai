@@ -19,6 +19,8 @@ interface PreferencesSchema {
     callback_scheduled: EventPreference
     agent_paused: EventPreference
     weekly_report: EventPreference
+    missed_call?: EventPreference
+    call_transfer_requested?: EventPreference
   }
   quiet_hours: {
     enabled: boolean
@@ -38,7 +40,9 @@ const defaultPreferences: PreferencesSchema = {
     usage_warning: { email: true, telegram: true, dashboard: true },
     callback_scheduled: { email: true, telegram: true, dashboard: true },
     agent_paused: { email: true, telegram: false, dashboard: true },
-    weekly_report: { email: true, telegram: false, dashboard: false }
+    weekly_report: { email: true, telegram: false, dashboard: false },
+    missed_call: { email: true, telegram: true, dashboard: true },
+    call_transfer_requested: { email: true, telegram: true, dashboard: true }
   },
   quiet_hours: {
     enabled: false,
@@ -57,7 +61,9 @@ const eventTypesList = [
   { id: 'usage_warning', label: 'Usage Limits & Quota Alert', desc: 'Trigger warning when plan minutes reach 80% or 100% capacity.' },
   { id: 'callback_scheduled', label: 'Callback Scheduled', desc: 'Get notified when an agent schedules a callback task with a customer.' },
   { id: 'agent_paused', label: 'Agent Health & Status', desc: 'Alert if dropped call rates increase or API integrations fail.' },
-  { id: 'weekly_report', label: 'Weekly Summary Digest', desc: 'Weekly metrics report for agent engagements and leads captured.' }
+  { id: 'weekly_report', label: 'Weekly Summary Digest', desc: 'Weekly metrics report for agent engagements and leads captured.' },
+  { id: 'missed_call', label: 'Missed & Unanswered Calls', desc: 'Alert when an incoming call is unanswered, busy, or fails to connect.' },
+  { id: 'call_transfer_requested', label: 'Owner Call Transfer Request', desc: 'Alert when a customer or VIP requests to speak with the owner directly.' }
 ]
 
 export function NotificationsTab() {

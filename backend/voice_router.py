@@ -1960,11 +1960,55 @@ async def handle_twilio_voice_status(
                         print(f"[Twilio Status Webhook] Proactive recording fetch notice for {sid}: {f_err}", flush=True)
                 asyncio.create_task(_fetch_twilio_recording_fallback(call_sid))
 
-            # Also update campaign_contacts immediately
+            # Query call record to update campaign_contacts and dispatch notifications
             try:
-                vc = supabase_admin.table("voice_calls").select("metadata, id").eq("metadata->>provider_call_id", call_sid).limit(1).execute()
+                vc = supabase_admin.table("voice_calls").select("id, user_id, organization_id, agent_id, caller_phone, metadata").eq("metadata->>provider_call_id", call_sid).limit(1).execute()
                 if not getattr(vc, "data", None):
-                    vc = supabase_admin.table("voice_calls").select("metadata, id").eq("metadata->>session_id", call_sid).limit(1).execute()
+                    vc = supabase_admin.table("voice_calls").select("id, user_id, organization_id, agent_id, caller_phone, metadata").eq("metadata->>session_id", call_sid).limit(1).execute()
+
+                # Dispatch missed call notification if call was unanswered, busy, or failed
+                if final_voice_status in ["no_answer", "busy", "failed"]:
+                    try:
+                        row_data = (vc.data[0] if (vc and getattr(vc, "data", None) and len(vc.data) > 0) else {})
+                        target_uid = row_data.get("user_id")
+                        target_aid = row_data.get("agent_id")
+                        c_phone = (
+                            row_data.get("caller_phone")
+                            or form_data.get("From")
+                            or form_data.get("Caller")
+                            or "Unknown"
+                        )
+                        if not target_uid and target_aid:
+                            ag_res = supabase_admin.table("agents").select("user_id").eq("id", target_aid).maybe_single().execute()
+                            if ag_res and ag_res.data:
+                                target_uid = ag_res.data.get("user_id")
+
+                        if target_uid:
+                            status_labels = {
+                                "no_answer": "No answer / Ringing timed out",
+                                "busy": "Line busy / Declined",
+                                "failed": "Call connection failed"
+                            }
+                            desc = status_labels.get(final_voice_status, final_voice_status)
+                            from app.services.notification_service import NotificationService
+                            asyncio.create_task(
+                                NotificationService.dispatch(
+                                    user_id=target_uid,
+                                    event_type="missed_call",
+                                    title="📞 Missed Inbound Call",
+                                    message=f"Missed incoming call from {c_phone}. Status: {desc}.",
+                                    payload={
+                                        "caller_phone": c_phone,
+                                        "call_sid": call_sid,
+                                        "status": final_voice_status,
+                                        "action_url": "/dashboard/calls",
+                                        "action_label": "View Call Details"
+                                    }
+                                )
+                            )
+                            print(f"[Twilio Status Webhook] Dispatched missed_call alert for {call_sid} to user {target_uid}", flush=True)
+                    except Exception as mc_err:
+                        print(f"[Twilio Status Webhook] Missed call notification notice: {mc_err}", flush=True)
                 if vc and getattr(vc, "data", None) and len(vc.data) > 0 and isinstance(vc.data[0], dict) and vc.data[0].get("metadata"):
                     cid = vc.data[0]["metadata"].get("contact_id")
                     camp_id = vc.data[0]["metadata"].get("campaign_id")
