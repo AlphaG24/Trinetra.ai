@@ -93,7 +93,7 @@ export async function sendEmailTemplate({
     })
 
     // Setup Resend Payload
-    const fromAddress = 'Trinetra AI <alerts@trinetraedu-ai.com>'
+    const fromAddress = 'Vaakriti AI <alerts@vaakriti.com>'
     const payload: Record<string, any> = {
       from: fromAddress,
       to: [to],

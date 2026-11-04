@@ -51,7 +51,7 @@ from app.routers.backup_router import backup_router
 from app.routers.load_benchmark_router import load_benchmark_router
 from app.services.observability_service import ObservabilityService
 
-app = FastAPI(title="Trinetra API")
+app = FastAPI(title="Vaakriti API")
 
 # Configure CORS so Next.js can talk to this backend securely
 app.add_middleware(
@@ -172,7 +172,7 @@ async def app_shutdown():
 
 @app.api_route("/", methods=["GET", "HEAD"])
 def read_root():
-    return {"message": "Trinetra Voice AI Backend is Active"}
+    return {"message": "Vaakriti Voice AI Backend is Active"}
 
 
 @app.get("/api/debug-env")

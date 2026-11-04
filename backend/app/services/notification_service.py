@@ -229,7 +229,7 @@ class NotificationService:
                             "https://api.resend.com/emails",
                             headers={"Authorization": f"Bearer {resend_key}", "Content-Type": "application/json"},
                             json={
-                                "from": "Vaakriti AI Alerts <alerts@trinetraedu-ai.com>",
+                                "from": "Vaakriti AI Alerts <alerts@vaakriti.com>",
                                 "to": [email_address],
                                 "subject": title,
                                 "text": message
@@ -246,15 +246,15 @@ class NotificationService:
                                 "https://api.resend.com/emails",
                                 headers={"Authorization": f"Bearer {resend_key}", "Content-Type": "application/json"},
                                 json={
-                                    "from": "Vaakriti AI Alerts <alerts@trinetraedu-ai.com>",
-                                    "to": ["support@trinetraedu-ai.com"],
+                                    "from": "Vaakriti AI Alerts <alerts@vaakriti.com>",
+                                    "to": ["support@vaakriti.com"],
                                     "subject": f"[Target: {email_address}] {title}",
-                                    "text": f"NOTE: Delivered to verified account owner because custom domain 'trinetraedu-ai.com' is not yet verified in Resend for direct delivery to {email_address}.\n\n" + message
+                                    "text": f"NOTE: Delivered to verified account owner because custom domain 'vaakriti.com' is not yet verified in Resend for direct delivery to {email_address}.\n\n" + message
                                 },
                                 timeout=10.0
                             )
                             if owner_res.status_code in (200, 201):
-                                print(f"[NotificationService] Fallback alert email sent via Resend to support@trinetraedu-ai.com", flush=True)
+                                print(f"[NotificationService] Fallback alert email sent via Resend to support@vaakriti.com", flush=True)
                                 return
                         else:
                             print(f"[NotificationService] Resend error {res.status_code}: {res.text}", flush=True)

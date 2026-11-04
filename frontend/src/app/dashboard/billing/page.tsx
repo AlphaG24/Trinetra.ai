@@ -39,6 +39,7 @@ import CheckoutPromoAndGSTSection, { AppliedCouponInfo } from '@/components/chec
 import { calculateGSTBreakdown } from '@/lib/gst'
 import TrialSetupModal from '@/components/billing/TrialSetupModal'
 import EnterpriseContactModal from '@/components/enterprise/EnterpriseContactModal'
+import ClientInvoiceSetupTab from '@/src/components/billing/ClientInvoiceSetupTab'
 
 interface UserLimits {
   plan_tier: string
@@ -157,6 +158,7 @@ function BillingContent() {
   // Modals & Invoicing Tabs State
   const [isTrialModalOpen, setIsTrialModalOpen] = useState(false)
   const [isEnterpriseModalOpen, setIsEnterpriseModalOpen] = useState(false)
+  const [mainTab, setMainTab] = useState<'platform' | 'client_invoices'>('platform')
   const [invoiceTab, setInvoiceTab] = useState<'paid' | 'trial'>('paid')
 
   useEffect(() => {
@@ -1141,8 +1143,45 @@ function BillingContent() {
           <CreditCard className="w-6 h-6 text-[var(--heading)]" />
           Subscription & Billing
         </h1>
-        <p className="text-xs text-[var(--muted)] mt-1">Manage plans, provision dedicated numbers, or purchase bundle packs with bulk discounts.</p>
+        <p className="text-xs text-[var(--muted)] mt-1">Manage plans, provision dedicated numbers, or configure client invoice dispatch for your business.</p>
       </div>
+
+      {/* Top Main Navigation Tabs */}
+      <div className="flex items-center gap-2 border-b border-[var(--border)] pb-3">
+        <button
+          type="button"
+          onClick={() => setMainTab('platform')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+            mainTab === 'platform'
+              ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 shadow-sm'
+              : 'text-[var(--muted)] hover:text-[var(--heading)] hover:bg-[var(--hover-bg)]'
+          }`}
+        >
+          <CreditCard className="w-4 h-4" />
+          <span>Vaakriti Subscriptions & Wallet</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setMainTab('client_invoices')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+            mainTab === 'client_invoices'
+              ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 shadow-sm'
+              : 'text-[var(--muted)] hover:text-[var(--heading)] hover:bg-[var(--hover-bg)]'
+          }`}
+        >
+          <Building2 className="w-4 h-4" />
+          <span>Client Invoice & Payment Setup</span>
+          <span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400">
+            For Callers
+          </span>
+        </button>
+      </div>
+
+      {mainTab === 'client_invoices' ? (
+        <ClientInvoiceSetupTab />
+      ) : (
+        <>
 
       {/* 1. Prepaid Wallet & Spend Limits Engine (Master Plan Section 18.9 & 18.10) - Prominent Full Width */}
       <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-6 shadow-sm space-y-6">
@@ -1937,6 +1976,9 @@ function BillingContent() {
         configs={configs}
         onProceedToCheckout={handleTrialModalCheckout}
       />
+
+        </>
+      )}
 
       {/* Enterprise Contact Modal */}
       <EnterpriseContactModal

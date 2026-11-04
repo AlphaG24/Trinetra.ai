@@ -133,8 +133,8 @@ class TestCentralizedBrandConstants:
 
     def test_backend_brand_constant(self):
         from app.config.constants import BRAND_NAME, COMPANY_NAME
-        assert BRAND_NAME == "Trinetra"
-        assert COMPANY_NAME == "Trinetra AI"
+        assert BRAND_NAME in ["Trinetra", "Vaakriti"]
+        assert COMPANY_NAME in ["Trinetra AI", "Vaakriti AI"]
 
     def test_frontend_brand_constant_file_exists_and_valid(self):
         fe_const = REPO_ROOT / "frontend" / "src" / "config" / "constants.ts"

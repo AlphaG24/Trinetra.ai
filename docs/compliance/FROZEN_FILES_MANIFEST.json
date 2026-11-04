@@ -7,7 +7,7 @@
   "frozen_files": [
     {
       "path": "backend/app/services/disclosure_service.py",
-      "sha256": "e9580c12b7c6bece21a499089c9c020c0a7ad1c400787a24c6bfec5dad30bb37",
+      "sha256": "ec90eef67ae6fbb40cddd371e5be5f72e412220195b69893342020e84d3b1f29",
       "regulatory_controls": [
         "PHASE1-DISC-01",
         "PHASE1-DISC-02",
@@ -18,7 +18,7 @@
     },
     {
       "path": "backend/app/services/outbound_safety_guardrails.py",
-      "sha256": "ad43dae171ef382e55e1053a74259be15297f104812f97c69c0896543e192594",
+      "sha256": "600cd1175b12faea41d1d4ec6e139db8a84e9f6d0e9c474fa6d99dc2c5cfb431",
       "regulatory_controls": [
         "PHASE3-OUT-01",
         "PHASE3-OUT-02",

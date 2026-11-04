@@ -84,7 +84,7 @@ def _start_health_server():
                 self.send_response(200)
                 self.send_header("Content-type", "application/json")
                 self.end_headers()
-                self.wfile.write(b'{"status":"healthy","service":"trinetra-livekit-agent"}')
+                self.wfile.write(b'{"status":"healthy","service":"vaakriti-livekit-agent"}')
 
             def log_message(self, format, *args):
                 return
@@ -280,7 +280,7 @@ def clean_ssml(text: str, is_transcript: bool = False) -> str:
     text = re.sub(r'\b24/7\b', 'twenty-four seven', text)
     text = re.sub(r'24/7', 'twenty-four seven', text)
     # Eliminate accidental double AI acronyms (e.g. "Trinetra AI AI voice agents" -> "Trinetra AI voice agents")
-    text = re.sub(r'\b(Trinetra\s+AI)\s+AI\b', r'\1', text, flags=re.IGNORECASE)
+    text = re.sub(r'\b(Trinetra\s+AI|Vaakriti\s+AI)\s+AI\b', r'\1', text, flags=re.IGNORECASE)
     text = re.sub(r'\bAI\s+AI\b', 'AI', text, flags=re.IGNORECASE)
     # Clean whitespace and strip stray enclosing quotes
     text = re.sub(r'\s+', ' ', text).strip()
@@ -998,7 +998,7 @@ def build_agent_expressive_rules(bot_name: str = "Agent", gender_tag: str = "fem
     v_kar = "kar doon"
 
     return f"""
-## TRINETRA AGENT BEHAVIOR & TALKING STYLE RULES (MANDATORY & NON-NEGOTIABLE):
+## VAAKRITI AGENT BEHAVIOR & TALKING STYLE RULES (MANDATORY & NON-NEGOTIABLE):
 
 ### 1. Demeanor & Professional Presence (Rule 2, 5-24):
 - Maintain a calm, polite, respectful, and confident tone at all times. Never sound desperate, aggressive, defensive, or robotic.
@@ -1206,7 +1206,7 @@ def normalize_user_transcript(text: str, agent_name: str = "Aditi", is_female: b
     t = rep_deva(t, 'त्रिनेत्र', 'त्रिनेत्रा')
     t = rep_deva(t, 'त्रिनेत्री', 'त्रिनेत्रा')
     t = rep_deva(t, 'त्रिनेत्रम', 'त्रिनेत्रा')
-    t = re.sub(r'\b(trinetr|trinetri)\b', r'Trinetra', t, flags=re.IGNORECASE)
+    t = re.sub(r'\b(trinetr|trinetri|vaakrit|vakriti)\b', r'Vaakriti', t, flags=re.IGNORECASE)
 
     return re.sub(r'\s+', ' ', t).strip()
 
@@ -1628,6 +1628,30 @@ def create_appointment_tools(
 
                 res = await asyncio.to_thread(query.maybe_single().execute)
                 payout = res.data if res else None
+                if not payout or (not payout.get("upi_id") and not payout.get("payment_link_url") and not payout.get("qr_code_url")):
+                    # Check custom_invoice_config in business_operations_catalog
+                    try:
+                        cat_q = supabase_admin.table("business_operations_catalog").select("*").eq("category", "custom_invoice_config").eq("status", "active").limit(1)
+                        if organization_id:
+                            cat_q = cat_q.eq("organization_id", organization_id)
+                        elif user_id:
+                            cat_q = cat_q.eq("user_id", user_id)
+                        cat_res = await asyncio.to_thread(cat_q.execute)
+                        if cat_res and cat_res.data and len(cat_res.data) > 0:
+                            c_item = cat_res.data[0]
+                            c_meta = c_item.get("metadata") or {}
+                            if c_meta.get("upi_id") or c_meta.get("upi_qr_url"):
+                                payout = {
+                                    "upi_id": c_meta.get("upi_id"),
+                                    "qr_code_url": c_meta.get("upi_qr_url"),
+                                    "account_number": c_meta.get("bank_account_no"),
+                                    "ifsc_code": c_meta.get("bank_ifsc"),
+                                    "bank_name": c_meta.get("bank_name"),
+                                    "business_name": c_meta.get("business_name") or c_item.get("title")
+                                }
+                    except Exception as cat_err:
+                        logger.warning(f"[dispatch_payment_request] Fallback catalog lookup notice: {cat_err}")
+
                 if not payout or (not payout.get("upi_id") and not payout.get("payment_link_url") and not payout.get("qr_code_url")):
                     return "PAYMENT_UNAVAILABLE: No active payment link or UPI is configured in the business vault. Advise caller that our billing desk will share payment instructions shortly."
 
@@ -2758,7 +2782,7 @@ async def extract_and_save_lead(transcript: str, agent_id: str, user_id: str, or
         user_id = existing_call.get("user_id")
     if not agent_id and existing_call and existing_call.get("agent_id"):
         agent_id = existing_call.get("agent_id")
-    b_name_extracted = "Trinetra AI"
+    b_name_extracted = "Vaakriti AI"
     if agent_id:
         try:
             ag_lookup = await asyncio.to_thread(
@@ -3605,7 +3629,7 @@ Only return valid JSON."""
                     from app.services.revenue_service import RevenueService
                     q_amt = rev_event["quoted_amount"]
                     q_cur = rev_event.get("currency", "INR")
-                    app_base = os.getenv("NEXT_PUBLIC_APP_URL", "https://trinetraedu-ai.com").rstrip("/")
+                    app_base = os.getenv("NEXT_PUBLIC_APP_URL", "https://vaakriti.com").rstrip("/")
                     won_token = RevenueService.generate_action_token(rev_event["id"], user_id, "won")
                     lost_token = RevenueService.generate_action_token(rev_event["id"], user_id, "lost")
                     won_url = f"{app_base}/api/revenue/action?token={won_token}"
@@ -3984,7 +4008,7 @@ async def entrypoint(ctx: JobContext):
 
                 # 6. Append Expressiveness rules
                 expressive_instructions = build_agent_expressive_rules(bot_name=bot_name, gender_tag=gender_tag, business_name=business_name_val)
-                if "## TRINETRA AGENT BEHAVIOR" not in system_prompt and "## HUMAN EXPRESSIVENESS RULES" not in system_prompt:
+                if "## VAAKRITI AGENT BEHAVIOR" not in system_prompt and "## TRINETRA AGENT BEHAVIOR" not in system_prompt and "## HUMAN EXPRESSIVENESS RULES" not in system_prompt:
                     system_prompt += expressive_instructions
 
                 # 7. Extract default greeting from system_prompt
@@ -5185,7 +5209,7 @@ async def run_agent(room_name: str, agent_id: str | None = None, contact_id: str
 
                 # 6. Append Expressiveness rules
                 expressive_instructions = build_agent_expressive_rules(bot_name=bot_name, gender_tag=gender_tag, business_name=business_name_val)
-                if "## TRINETRA AGENT BEHAVIOR" not in system_prompt and "## HUMAN EXPRESSIVENESS RULES" not in system_prompt:
+                if "## VAAKRITI AGENT BEHAVIOR" not in system_prompt and "## TRINETRA AGENT BEHAVIOR" not in system_prompt and "## HUMAN EXPRESSIVENESS RULES" not in system_prompt:
                     system_prompt += expressive_instructions
 
                 # 7. Extract default greeting from system_prompt

@@ -486,7 +486,7 @@ def resolve_gendered_phrases(
     agent_name: Optional[str] = None,
     language: str = "hinglish",
     caller_name: Optional[str] = None,
-    business_name: str = "Trinetra AI"
+    business_name: str = "Vaakriti AI"
 ) -> Dict[str, Any]:
     """
     Unified gender resolution engine for all spoken and system strings:
@@ -507,7 +507,7 @@ def resolve_gendered_phrases(
     resolved_gender, gender_source = resolve_agent_gender(gender=gender, voice=voice, agent_name=agent_name)
     norm_lang = normalize_language_code(language)
     agent_display = (agent_name or "Agent").strip()
-    biz_display = (business_name or "Trinetra AI").strip()
+    biz_display = (business_name or "Vaakriti AI").strip()
 
     # Determine addressed caller name
     addressed_name = ""
@@ -869,7 +869,7 @@ def compose_single_opening_greeting(
             clean_agent = "Ritu" if resolved_gender == "female" else "Shubh"
 
     agent_display = clean_agent or "Arika"
-    biz_display = (business_name or "Trinetra AI").strip()
+    biz_display = (business_name or "Vaakriti AI").strip()
     is_outbound = str(direction).lower() == "outbound" 
     if resolved_gender == "male":
         verb = "raha"
