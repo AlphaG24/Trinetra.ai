@@ -1248,6 +1248,37 @@ Respond ONLY with valid JSON."""
                         except Exception as pay_err:
                             logger.warning(f"[Sarvam Sync] Call-to-Cash dispatch error: {pay_err}")
 
+                        # 6.5 Dispatch Post-Call Summary & Audio Recording to Owner (Changes.md Item 12)
+                        try:
+                            from app.services.notification_service import NotificationService
+                            if target_user and duration > 0:
+                                await NotificationService.dispatch(
+                                    user_id=target_user,
+                                    event_type="call_completed",
+                                    title=f"Call Completed with {resolved_name}",
+                                    message=(
+                                        f"📞 Call with {resolved_name} ({phone_for_lead}) ended.\n"
+                                        f"⏱ Duration: {duration}s | Outcome: {final_outcome}\n\n"
+                                        f"📝 Summary: {final_summary[:250] if final_summary else 'No summary available.'}\n"
+                                        f"🎙 Audio: {audio_url if audio_url else 'Processing'}"
+                                    ),
+                                    payload={
+                                        "caller_name": resolved_name,
+                                        "caller_phone": phone_for_lead,
+                                        "duration": duration,
+                                        "outcome": final_outcome,
+                                        "summary": final_summary,
+                                        "recording_url": audio_url,
+                                        "transcript": transcript_text[:500] if transcript_text else "",
+                                        "action_url": f"/dashboard/calls?id={call_id}",
+                                        "action_label": "View Call Details",
+                                        "call_id": call_id,
+                                    }
+                                )
+                                logger.info(f"[Sarvam Sync] Dispatched call_completed notification for call {call_id}")
+                        except Exception as notif_call_err:
+                            logger.warning(f"[Sarvam Sync] Call completed notification dispatch error: {notif_call_err}")
+
                         # 7. Token-to-Minute Safe Deduction
                         # Benchmark Metrics for Conversational Hindi/Hinglish TTS:
                         # - Avg Human speech rate: 130-150 words/min
