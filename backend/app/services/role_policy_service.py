@@ -66,9 +66,11 @@ def normalize_role(role_raw: Optional[str]) -> UserRole:
     - developer_tester
     - admin (maps legacy 'super_admin')
     """
-    if not role_raw:
+    if role_raw is None or (not role_raw and role_raw != 0):
         return UserRole.CUSTOMER
-    
+    # If already a canonical UserRole enum, return directly (prevents str() mangling)
+    if isinstance(role_raw, UserRole):
+        return role_raw
     clean = str(role_raw).strip().lower()
     if clean in ("developer_tester", "dev_test", "tester"):
         return UserRole.DEVELOPER_TESTER
