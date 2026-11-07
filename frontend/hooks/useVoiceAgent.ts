@@ -386,11 +386,6 @@ export function useVoiceAgent() {
         if (!timerRef.current) startTimer()
       })
 
-      room.on(RoomEvent.ParticipantDisconnected, (participant: RemoteParticipant) => {
-        console.log('[useVoiceAgent] Remote agent participant left:', participant.identity)
-        disconnect()
-      })
-
       room.on(RoomEvent.Disconnected, () => {
         disconnect()
       })

@@ -3878,6 +3878,15 @@ _running_agent_rooms: set[str] = set()
 
 async def entrypoint(ctx: JobContext):
     r_name = ctx.room.name if (ctx.room and hasattr(ctx.room, 'name')) else ""
+    if r_name and "sandbox" in r_name:
+        # Local browser sandbox test: Defer exclusively to the local in-process agent.
+        # This completely prevents Render cloud worker from intercepting and causing double audio/stalls.
+        logger.info(f"[Entrypoint] Room '{r_name}' is a local sandbox test. Cloud worker deferring to local in-process agent.")
+        try:
+            await ctx.shutdown()
+        except Exception:
+            pass
+        return
     if r_name and r_name in _running_agent_rooms:
         logger.warning(f"[Entrypoint] Room '{r_name}' is already being handled by this worker process. Skipping duplicate dispatch.")
         # Must call ctx.shutdown() to properly complete the job without connecting

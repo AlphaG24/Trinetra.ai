@@ -233,7 +233,7 @@ export function AgentOverviewTab({
     } else {
       limit = parseInt(sysConfig?.free_demo_minutes || '10', 10)
     }
-    used = statsLoading ? 0 : stats.minutesUsed
+    used = agentUsage?.used !== undefined ? agentUsage.used : (statsLoading ? 0 : stats.minutesUsed)
   }
 
   const emergencyMinutes = agentUsage?.emergency_minutes_available || stats.emergencyMinutes || 0
@@ -301,22 +301,21 @@ export function AgentOverviewTab({
     return () => window.removeEventListener('trinetra:call_completed', handleCallCompleted)
   }, [agent.id, onRefreshCalls])
 
-  // Initialize remaining seconds when modal opens — use backend agentUsage as single source of truth
+  // Initialize remaining seconds when modal opens — use plan quota as single source of truth
   useEffect(() => {
     if (showCallModal) {
       clearTranscripts()
       let remainingSecs = 0
-      const effectiveLimit = (agentUsage && agentUsage.effective_limit)
-        ? agentUsage.effective_limit
-        : (limit + emergencyMinutes)
+      const planQuota = (limit + emergencyMinutes)
+      const currentUsed = agentUsage?.used !== undefined ? agentUsage.used : used
+      const remainingPlanMins = Math.max(0, planQuota - currentUsed)
 
-      if (agentUsage && agentUsage.limit === 0) {
-        // unlimited plan
-        remainingSecs = 99999 * 60
-      } else if (effectiveLimit > 0) {
-        remainingSecs = Math.max(0, (effectiveLimit - used) * 60)
+      if (remainingPlanMins > 0) {
+        remainingSecs = remainingPlanMins * 60
+      } else if (agentUsage && agentUsage.wallet_minutes_credit > 0) {
+        remainingSecs = agentUsage.wallet_minutes_credit * 60
       } else {
-        remainingSecs = Math.max(0, (limit - used) * 60)
+        remainingSecs = 0
       }
       setRemainingSeconds(remainingSecs)
       setMicPermissionError(null)
@@ -467,7 +466,7 @@ export function AgentOverviewTab({
 
     setMicPermissionError(null)
     clearTranscripts()
-    const roomName = `room-${agent.id}-${Date.now().toString().slice(-6)}`
+    const roomName = `sandbox-${agent.id}-${Date.now().toString().slice(-6)}`
 
     try {
       toast.success(`Launching browser sandbox call...`)
@@ -567,7 +566,7 @@ export function AgentOverviewTab({
             <Clock className="w-4 h-4 text-amber-500" />
           </div>
           <div className="text-2xl font-bold font-display text-[var(--heading)]">
-            {statsLoading ? <Loader2 className="w-5 h-5 animate-spin inline" /> : `${stats.minutesUsed} min`}
+            {statsLoading ? <Loader2 className="w-5 h-5 animate-spin inline" /> : `${used} min`}
           </div>
         </div>
 

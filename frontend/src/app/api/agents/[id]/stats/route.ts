@@ -46,8 +46,7 @@ export async function GET(
     const { data: allCalls, error: errAllCalls } = await supabase
       .from('voice_calls')
       .select('duration_seconds')
-      .eq('agent_id', agentId)
-      .or(`organization_id.eq.${profile?.organization_id || user.id},user_id.eq.${user.id}`);
+      .eq('agent_id', agentId);
 
     const allSeconds = allCalls?.reduce((acc, c) => acc + (c.duration_seconds || 0), 0) || 0;
     const avgDurationSeconds = allCalls && allCalls.length > 0 ? allSeconds / allCalls.length : 0;
