@@ -2623,18 +2623,14 @@ class VikramAgent(Agent):
             self.timing_tracker.mark("disclosure_composed")
             self.timing_tracker.mark("first_tts_byte")
 
-        # Guard: session may have been closed if participant disconnected during the brief settle wait
-        if not getattr(self.session, '_session', None) and not getattr(self.session, 'room', None):
-            logger.warning("[VikramAgent] Session already closed before say(). Skipping greeting.")
-            return
         try:
             speech_handle = self.session.say(
                 greeting,
                 allow_interruptions=True,
                 add_to_chat_ctx=True
             )
-        except RuntimeError as _say_err:
-            logger.warning(f"[VikramAgent] Could not say greeting (session closed early): {_say_err}")
+        except Exception as _say_err:
+            logger.warning(f"[VikramAgent] Could not say greeting: {_say_err}")
             return
 
         # Immediately publish greeting transcript to room data channel for live UI feed
