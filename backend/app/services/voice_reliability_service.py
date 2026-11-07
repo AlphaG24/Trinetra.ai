@@ -268,14 +268,14 @@ class InCallNoAudioWatchdog:
     """
     def __init__(
         self,
-        silence_threshold_seconds: float = 9.0,
+        silence_threshold_seconds: float = 10.0,
         speak_fn: Optional[Callable[[str], Awaitable[None]]] = None,
         disconnect_fn: Optional[Callable[[], Awaitable[None]]] = None,
         tool_guard: Optional[ToolExecutionGuard] = None,
         language: str = "hinglish",
         gender: str = "female",
         check_interval_seconds: Optional[float] = None,
-        repeat_interval_seconds: float = 5.0,
+        repeat_interval_seconds: float = 9.0,
         max_repeats: int = 3,
         goodbye_delay_seconds: float = 4.0,
     ):
@@ -291,6 +291,7 @@ class InCallNoAudioWatchdog:
         self.gender = gender
         self.last_speech_time = time.perf_counter()
         self.is_agent_speaking = False
+        self.is_agent_thinking = False
         self.is_user_speaking = False
         self._watchdog_task: Optional[asyncio.Task] = None
         self._retried = False
@@ -298,13 +299,37 @@ class InCallNoAudioWatchdog:
         self._stop_event = asyncio.Event()
 
     def record_activity(self):
-        """Reset the silence clock on any valid speech event."""
+        """Reset the silence clock and prompt count on any valid conversational event."""
         self.last_speech_time = time.perf_counter()
+        self.silence_prompts_count = 0
         self._retried = False
+
+    def on_user_state_changed(self, new_state: str):
+        st = str(new_state).lower()
+        if st == "speaking":
+            self.is_user_speaking = True
+            self.record_activity()
+        else:
+            self.is_user_speaking = False
+            self.last_speech_time = time.perf_counter()
+
+    def on_agent_state_changed(self, new_state: str):
+        st = str(new_state).lower()
+        if st == "speaking":
+            self.is_agent_speaking = True
+            self.is_agent_thinking = False
+            self.record_activity()
+        elif st == "thinking":
+            self.is_agent_thinking = True
+            self.is_agent_speaking = False
+            self.record_activity()
+        else:
+            self.is_agent_speaking = False
+            self.is_agent_thinking = False
+            self.last_speech_time = time.perf_counter()
 
     def on_user_speech_start(self):
         self.is_user_speaking = True
-        self.silence_prompts_count = 0
         self.record_activity()
 
     def on_user_speech_end(self):
@@ -313,6 +338,7 @@ class InCallNoAudioWatchdog:
 
     def on_agent_speech_start(self):
         self.is_agent_speaking = True
+        self.is_agent_thinking = False
         self.record_activity()
 
     def on_agent_speech_end(self):
@@ -332,19 +358,25 @@ class InCallNoAudioWatchdog:
             self._watchdog_task.cancel()
 
     async def _watchdog_loop(self):
-        logger.info(f"[NoAudioWatchdog] In-call watchdog active (threshold: {self.silence_threshold}s, repeats: {self.max_repeats})")
+        logger.info(f"[NoAudioWatchdog] In-call watchdog active (threshold: {self.silence_threshold}s, repeats: {self.max_repeats}, repeat_interval: {self.repeat_interval}s)")
         while not self._stop_event.is_set():
             try:
                 await asyncio.sleep(self.check_interval)
-                # Check condition: if user is not speaking, agent is not speaking, and tool is not running
+                # Check condition: if user is speaking, agent is speaking, agent is thinking, or tool is executing: NEVER prompt
                 tool_active = self.tool_guard.is_tool_running if self.tool_guard else False
-                if self.is_user_speaking or self.is_agent_speaking or tool_active:
+                if self.is_user_speaking or self.is_agent_speaking or self.is_agent_thinking or tool_active:
+                    self.last_speech_time = time.perf_counter()
                     continue
 
                 silent_duration = time.perf_counter() - self.last_speech_time
                 active_threshold = self.silence_threshold if self.silence_prompts_count == 0 else self.repeat_interval
 
                 if silent_duration >= active_threshold:
+                    # Final safety check before speaking: ensure user didn't start speaking
+                    if self.is_user_speaking or self.is_agent_speaking or self.is_agent_thinking:
+                        self.last_speech_time = time.perf_counter()
+                        continue
+
                     if not self._retried and self.silence_prompts_count == 0:
                         self._retried = True
                         self.last_speech_time = time.perf_counter()
@@ -373,10 +405,11 @@ class InCallNoAudioWatchdog:
 
                         logger.info(f"[NoAudioWatchdog] Prompting caller due to silence (repeat {self.silence_prompts_count}/{self.max_repeats}): '{prompt}'")
                         if self.speak_fn:
+                            self.is_agent_speaking = True
                             await self.speak_fn(prompt)
                     else:
-                        # Exceeded max silence repeats (approx 20s+ total dead air) -> Gracefully disconnect
-                        logger.info(f"[NoAudioWatchdog] Dead air exceeded max {self.max_repeats} repeats (~20-25s). Disconnecting call to protect user minutes.")
+                        # Exceeded max silence repeats (~25-30s dead air) -> Gracefully disconnect
+                        logger.info(f"[NoAudioWatchdog] Dead air exceeded max {self.max_repeats} repeats (~25-30s). Disconnecting call to protect user minutes.")
                         goodbye_prompt = (
                             "I am unable to hear you, so I'm concluding the call now. Feel free to call us back anytime. Thank you!"
                             if is_en else
@@ -384,6 +417,7 @@ class InCallNoAudioWatchdog:
                         )
                         if self.speak_fn:
                             try:
+                                self.is_agent_speaking = True
                                 await self.speak_fn(goodbye_prompt)
                                 if self.goodbye_delay > 0:
                                     await asyncio.sleep(self.goodbye_delay)

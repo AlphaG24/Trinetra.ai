@@ -4686,8 +4686,8 @@ async def entrypoint(ctx: JobContext):
         min_endpointing_delay=0.60,
         max_endpointing_delay=1.5,
         preemptive_generation=True,
-        min_interruption_duration=0.85,
-        min_interruption_words=4,
+        min_interruption_duration=0.40,
+        min_interruption_words=1,
         resume_false_interruption=True,
     )
     call_start_time = time.time()
@@ -4937,8 +4937,8 @@ async def entrypoint(ctx: JobContext):
                 pass
 
     watchdog = InCallNoAudioWatchdog(
-        silence_threshold_seconds=9.0,
-        repeat_interval_seconds=5.0,
+        silence_threshold_seconds=10.0,
+        repeat_interval_seconds=9.0,
         max_repeats=3,
         speak_fn=lambda prompt: agent_instance.session.say(prompt, allow_interruptions=True, add_to_chat_ctx=True) if agent_instance and getattr(agent_instance, 'session', None) else None,
         disconnect_fn=_on_watchdog_disconnect,
@@ -4947,25 +4947,24 @@ async def entrypoint(ctx: JobContext):
         gender=resolved_gender,
     )
 
+    @session.on("user_state_changed")
+    def _on_user_state_changed_watchdog(event):
+        new_st = getattr(event, "new_state", "")
+        watchdog.on_user_state_changed(new_st)
 
-    @session.on("user_speech_started")
-    def _on_user_speech_started_watchdog(event):
-        watchdog.on_user_speech_start()
+    @session.on("agent_state_changed")
+    def _on_agent_state_changed_watchdog(event):
+        new_st = getattr(event, "new_state", "")
+        if new_st == "speaking":
+            timing_tracker.mark("audio_playout")
+        watchdog.on_agent_state_changed(new_st)
 
-    @session.on("user_speech_committed")
-    def _on_user_speech_watchdog(event):
-        timing_tracker.mark("user_speech_end")
-        timing_tracker.mark("stt_final")
-        watchdog.on_user_speech_end()
-
-    @session.on("agent_speech_started")
-    def _on_agent_speech_started_watchdog(event):
-        timing_tracker.mark("audio_playout")
-        watchdog.on_agent_speech_start()
-
-    @session.on("agent_speech_committed")
-    def _on_agent_speech_committed_watchdog(event):
-        watchdog.on_agent_speech_end()
+    @session.on("user_input_transcribed")
+    def _on_user_input_transcribed_watchdog(event):
+        if getattr(event, "is_final", False):
+            timing_tracker.mark("user_speech_end")
+            timing_tracker.mark("stt_final")
+        watchdog.record_activity()
 
     session_done = asyncio.Event()
 
@@ -5883,8 +5882,8 @@ async def run_agent(room_name: str, agent_id: str | None = None, contact_id: str
             min_endpointing_delay=0.60,
             max_endpointing_delay=1.5,
             preemptive_generation=True,
-            min_interruption_duration=0.85,
-            min_interruption_words=4,
+            min_interruption_duration=0.40,
+            min_interruption_words=1,
             resume_false_interruption=True,
         )
         done = asyncio.Event()
@@ -6200,8 +6199,8 @@ async def run_agent(room_name: str, agent_id: str | None = None, contact_id: str
                         pass
 
             watchdog_ra = InCallNoAudioWatchdog(
-                silence_threshold_seconds=9.0,
-                repeat_interval_seconds=5.0,
+                silence_threshold_seconds=10.0,
+                repeat_interval_seconds=9.0,
                 max_repeats=3,
                 speak_fn=lambda prompt: agent_instance.session.say(prompt, allow_interruptions=True, add_to_chat_ctx=True) if agent_instance and getattr(agent_instance, 'session', None) else None,
                 disconnect_fn=_on_watchdog_disconnect_ra,
@@ -6209,21 +6208,19 @@ async def run_agent(room_name: str, agent_id: str | None = None, contact_id: str
                 gender=resolved_gender_ra,
             )
 
-            @session.on("user_speech_started")
-            def _on_user_speech_started_watchdog_ra(event):
-                watchdog_ra.on_user_speech_start()
+            @session.on("user_state_changed")
+            def _on_user_state_changed_watchdog_ra(event):
+                new_st = getattr(event, "new_state", "")
+                watchdog_ra.on_user_state_changed(new_st)
 
-            @session.on("user_speech_committed")
-            def _on_user_speech_watchdog_ra(event):
-                watchdog_ra.on_user_speech_end()
+            @session.on("agent_state_changed")
+            def _on_agent_state_changed_watchdog_ra(event):
+                new_st = getattr(event, "new_state", "")
+                watchdog_ra.on_agent_state_changed(new_st)
 
-            @session.on("agent_speech_started")
-            def _on_agent_speech_started_watchdog_ra(event):
-                watchdog_ra.on_agent_speech_start()
-
-            @session.on("agent_speech_committed")
-            def _on_agent_speech_committed_watchdog_ra(event):
-                watchdog_ra.on_agent_speech_end()
+            @session.on("user_input_transcribed")
+            def _on_user_input_transcribed_watchdog_ra(event):
+                watchdog_ra.record_activity()
 
             await session.start(agent=agent_instance, room=room)
             watchdog_ra.start()

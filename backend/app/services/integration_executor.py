@@ -869,15 +869,15 @@ class IntegrationExecutor:
             formatted_msg = self._replace_placeholders(template, context)
             
             if slug == "telegram":
-                await self._send_telegram(config, formatted_msg)
+                return await self._send_telegram(config, formatted_msg)
             elif slug == "webhook":
-                await self._send_webhook(config, event_type, formatted_msg, data)
+                return await self._send_webhook(config, event_type, formatted_msg, data)
             elif slug == "smtp-email":
-                await self._send_email(config, event_type, formatted_msg, data)
+                return await self._send_email(config, event_type, formatted_msg, data)
             elif slug == "whatsapp":
-                await self._send_whatsapp(config, formatted_msg, {**data, "event_type": event_type})
+                return await self._send_whatsapp(config, formatted_msg, {**data, "event_type": event_type})
             elif slug in ("calendar", "cal.com"):
-                await self._book_cal_com(config, data)
+                return await self._book_cal_com(config, data)
         except Exception as e:
             logger.error(f"Failed to dispatch integration {slug} for event {event_type}: {e}")
 
