@@ -285,7 +285,7 @@ class UsageService:
         minutes = max(1, math.ceil(duration_seconds / 60))
         
         agent_res = await asyncio.to_thread(
-            self.supabase.table("agents").select("minutes_used, organization_id, minutes_limit").eq("id", agent_id).single().execute
+            self.supabase.table("agents").select("minutes_used, organization_id, user_id, minutes_limit").eq("id", agent_id).single().execute
         )
         
         current = 0
@@ -293,6 +293,7 @@ class UsageService:
             current = agent_res.data.get("minutes_used", 0) or 0
             new_used = current + minutes
             org_id = agent_res.data.get("organization_id")
+            user_id = agent_res.data.get("user_id")
             db_limit = agent_res.data.get("minutes_limit", 0) or 0
 
             await asyncio.to_thread(
@@ -300,6 +301,17 @@ class UsageService:
                     "minutes_used": new_used
                 }).eq("id", agent_id).execute
             )
+
+            # Sync user profile paid_minutes_used so dashboard/agents metrics stay unified
+            if user_id:
+                try:
+                    await asyncio.to_thread(
+                        self.supabase.table("profiles").update({
+                            "paid_minutes_used": new_used
+                        }).eq("id", user_id).execute
+                    )
+                except Exception as pe:
+                    logger.warning(f"[UsageService] Profile minutes sync notice: {pe}")
             logger.info(f"[UsageService] Incremented agent {agent_id} minutes_used: raw_duration={duration_seconds}s -> ceil_minutes={minutes}m | previous={current}m -> new={new_used}m written to DB")
 
             # Check if this consumption exceeded plan quota and should debit prepaid wallet

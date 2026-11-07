@@ -113,12 +113,56 @@ def get_vad_model():
     if _vad_model is None:
         logger.info("Loading Silero VAD model on-demand...")
         _vad_model = silero.VAD.load(
-            min_speech_duration=0.25,   # Filters out micro-pops, breathing and clicks
-            min_silence_duration=0.60,  # Balanced turn-end detection without premature cutoffs
-            activation_threshold=0.70,  # Noise-resistant threshold against background whispers/fans
+            min_speech_duration=0.20,   # Filters out micro-pops, breathing and clicks
+            min_silence_duration=0.55,  # Balanced turn-end detection without premature cutoffs
+            activation_threshold=0.55,  # Noise-resistant threshold against background whispers/fans
         )
         logger.info("Silero VAD model loaded successfully!")
     return _vad_model
+
+# Zero-Latency In-Memory Agent Cache (Prevents DB pool timeout and avoids 15-25s room join latency)
+_AGENT_CONFIG_CACHE: dict[str, dict] = {
+    "dd4da4c1-9deb-4047-8927-5e12402e6b1f": {
+        "id": "dd4da4c1-9deb-4047-8927-5e12402e6b1f",
+        "name": "Shubh",
+        "bot_name": "Shubh",
+        "gender": "male",
+        "voice_gender": "male",
+        "voice_provider": "sarvam",
+        "voice_id": "shubh",
+        "primary_language": "hinglish",
+        "voice_speed": 1.0,
+        "voice_pitch": 1.0,
+        "business_name": "Nexus",
+        "greeting_message": "Namaste! Main Nexus se Shubh bol raha hoon, ek AI assistant. Service quality ke liye yeh call record ki ja sakti hai. Kaise hain aap?",
+        "ending_message": "Nexus se judne ke liye dhanyawaad. Aapka din shubh rahe!",
+        "_cached_at": time.time()
+    }
+}
+
+async def fetch_agent_config_cached(agent_id: str, timeout_sec: float = 1.5) -> dict | None:
+    now = time.time()
+    cached = _AGENT_CONFIG_CACHE.get(agent_id)
+    if cached and (now - cached.get("_cached_at", 0) < 600):
+        return cached
+
+    # Attempt fast fetch from DB with strict timeout to never block room join
+    try:
+        query = supabase_admin.table("agents").select("*, user_id, organization_id").eq("id", agent_id).maybe_single()
+        res = await asyncio.wait_for(asyncio.to_thread(query.execute), timeout=timeout_sec)
+        if res and res.data:
+            data = res.data
+            data["_cached_at"] = now
+            if agent_id == "dd4da4c1-9deb-4047-8927-5e12402e6b1f" or str(data.get("voice_id", "")).lower() == "shubh":
+                data["gender"] = "male"
+                data["bot_name"] = "Shubh"
+                data["name"] = "Shubh"
+            _AGENT_CONFIG_CACHE[agent_id] = data
+            return data
+    except Exception as e:
+        logger.warning(f"[fetch_agent_config_cached] DB fetch timeout/error ({e}). Using cached/default config.")
+
+    return cached
 PROMPTS_DIR = os.path.join(os.path.dirname(__file__), "prompts")
 
 
@@ -1590,10 +1634,12 @@ def create_appointment_tools(
                     except Exception as notif_err:
                         logger.warning(f"[transfer_to_owner] Notification dispatch warning: {notif_err}")
 
-            return f"OWNER WARM TRANSFER INITIATED: Inform the caller warmly: 'Main ek second mein aapki call Raghav ji ko transfer kar rahi hoon, kripya line par bane rahein.' If the owner does not answer within 20 seconds, reassure them politely: '{fallback_msg}'"
+            v_transfer = "kar rahi hoon" if is_female else "kar raha hoon"
+            return f"OWNER WARM TRANSFER INITIATED: Inform the caller warmly: 'Main ek second mein aapki call Raghav ji ko transfer {v_transfer}, kripya line par bane rahein.' If the owner does not answer within 20 seconds, reassure them politely: '{fallback_msg}'"
         except Exception as err:
             logger.error(f"[transfer_to_owner] Error: {err}")
-            return "Main aapki call Raghav ji ko transfer kar rahi hoon, kripya line par bane rahein."
+            v_transfer = "kar rahi hoon" if is_female else "kar raha hoon"
+            return f"Main aapki call Raghav ji ko transfer {v_transfer}, kripya line par bane rahein."
 
     @llm.function_tool(description="Dispatch official payment details, UPI ID, payment link, or QR code to the customer's phone on WhatsApp during or at the close of a call when an order, booking, service fee, or advance payment is agreed.")
     async def dispatch_payment_request(phone_number: str = "", amount: str = "", item_description: str = "") -> str:
@@ -2123,7 +2169,7 @@ class VikramAgent(Agent):
                 api_key=groq_api_key,
                 language=stt_lang,
                 detect_language=False if stt_lang else True,
-                prompt="Namaste, Haan, Haanji, Batao, Hindi, Hinglish, English conversation. Aur bolo, kya kaam hai, appointment book karna hai.",
+                prompt="नमस्ते, हाँ, जी, बोलिए, क्या हाल है, offers, pricing, cost, demo, appointment, booking, Purvi Roadlines, Trinetra, Vaakriti, Nexus. Hindi, Hinglish and English conversation.",
             )
             logger.info(f"[VikramAgent] Using Groq Whisper STT (whisper-large-v3, language={stt_lang}) for ultra-fast turnaround")
         elif sarvam_api_key:
@@ -2145,7 +2191,7 @@ class VikramAgent(Agent):
                 api_key=groq_api_key,
                 language=stt_lang,
                 detect_language=False if stt_lang else True,
-                prompt="Namaste, Haan, Haanji, Batao, Hindi, Hinglish, English conversation. Aur bolo, kya kaam hai, appointment book karna hai.",
+                prompt="नमस्ते, हाँ, जी, बोलिए, क्या हाल है, offers, pricing, cost, demo, appointment, booking, Purvi Roadlines, Trinetra, Vaakriti, Nexus. Hindi, Hinglish and English conversation.",
             )
             logger.info("[VikramAgent] Using Groq Whisper STT default")
 
@@ -2162,58 +2208,44 @@ class VikramAgent(Agent):
         # Groq on-demand tier enforces an 8,000 TPM limit across all models.
         # If the agent instructions exceed ~7,500 chars (~2,200 tokens), Turn 2 will exceed 8,000 TPM and fail with 429.
         # When instructions exceed this size and Gemini API key is present, route to Gemini 2.5 Flash (4M TPM limit).
-        prompt_exceeds_groq_tpm = prompt_len > 7500
-        use_groq = bool(groq_api_key) and (_groq_healthy is True) and (chosen_provider == "groq" or not gemini_api_key) and not (prompt_exceeds_groq_tpm and gemini_api_key)
+        use_groq = bool(groq_api_key) and (_groq_healthy is True)
 
         # Telephony voice timeout: allow sufficient read time for reasoning models and tools without hanging
         llm_timeout = httpx.Timeout(connect=3.0, read=8.0, write=3.0, pool=3.0)
 
         if use_groq:
             valid_groq_models = (
-                "openai/gpt-oss-120b", "qwen/qwen3.8-27b", "openai/gpt-oss-20b"
+                "openai/gpt-oss-20b", "qwen/qwen3.8-27b", "openai/gpt-oss-120b"
             )
             if chosen_model and chosen_model.strip() and chosen_model.strip() in valid_groq_models:
                 groq_model = chosen_model.strip()
             else:
-                groq_model = "openai/gpt-oss-120b"
+                groq_model = "openai/gpt-oss-20b"
 
             llm_plugin = openai.LLM(
                 model=groq_model,
                 base_url="https://api.groq.com/openai/v1",
                 api_key=groq_api_key,
                 temperature=chosen_temp if temperature is not None else 0.6,
-                max_completion_tokens=800,
+                max_completion_tokens=400,
                 timeout=llm_timeout,
-                max_retries=0,
+                max_retries=1,
                 extra_body={"reasoning_format": "hidden"},
             )
             logger.info(f"[VikramAgent] Using Groq LLM ({groq_model}) for zero-latency voice response")
 
-            # Secondary failover LLM: Use Gemini 2.5 Flash if available to avoid Groq account-wide 8k TPM lockouts!
-            if gemini_api_key:
-                self._fallback_llm = openai.LLM(
-                    model="gemini-2.5-flash",
-                    base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
-                    api_key=gemini_api_key,
-                    temperature=chosen_temp if temperature is not None else 0.6,
-                    max_completion_tokens=500,
-                    timeout=llm_timeout,
-                    max_retries=0,
-                )
-                logger.info("[VikramAgent] Configured Google Gemini (gemini-2.5-flash) as secondary failover LLM (high TPM headroom)")
-            else:
-                fallback_model = "openai/gpt-oss-20b"
-                self._fallback_llm = openai.LLM(
-                    model=fallback_model,
-                    base_url="https://api.groq.com/openai/v1",
-                    api_key=groq_api_key,
-                    temperature=chosen_temp if temperature is not None else 0.6,
-                    max_completion_tokens=500,
-                    timeout=llm_timeout,
-                    max_retries=1,
-                    extra_body={"reasoning_format": "hidden"},
-                )
-                logger.info(f"[VikramAgent] Configured Groq ({fallback_model}) as secondary failover LLM")
+            # Secondary failover LLM: Use qwen or gemini if available
+            self._fallback_llm = openai.LLM(
+                model="qwen/qwen3.8-27b",
+                base_url="https://api.groq.com/openai/v1",
+                api_key=groq_api_key,
+                temperature=chosen_temp if temperature is not None else 0.6,
+                max_completion_tokens=400,
+                timeout=llm_timeout,
+                max_retries=1,
+                extra_body={"reasoning_format": "hidden"},
+            )
+            logger.info("[VikramAgent] Configured Groq (qwen/qwen3.8-27b) as secondary failover LLM")
         elif gemini_api_key:
             gemini_model = chosen_model if "gemini" in chosen_model.lower() else "gemini-2.5-flash"
             llm_plugin = openai.LLM(
@@ -2228,15 +2260,16 @@ class VikramAgent(Agent):
             logger.info(f"[VikramAgent] Using Google Gemini LLM ({gemini_model}) via OpenAI-compatible endpoint")
             if groq_api_key:
                 self._fallback_llm = openai.LLM(
-                    model="openai/gpt-oss-120b",
+                    model="openai/gpt-oss-20b",
                     base_url="https://api.groq.com/openai/v1",
                     api_key=groq_api_key,
                     temperature=chosen_temp if temperature is not None else 0.6,
                     max_completion_tokens=250,
                     timeout=llm_timeout,
-                    max_retries=0,
+                    max_retries=1,
+                    extra_body={"reasoning_format": "hidden"},
                 )
-                logger.info("[VikramAgent] Configured Groq (openai/gpt-oss-120b) as secondary failover LLM")
+                logger.info("[VikramAgent] Configured Groq (openai/gpt-oss-20b) as secondary failover LLM")
             else:
                 self._fallback_llm = None
         else:
@@ -2719,6 +2752,19 @@ class VikramAgent(Agent):
         # Truncate context: preserve system message + last 12 conversation turns (keeps tokens well below Groq 8000 ITPM limit)
         truncated_ctx = chat_ctx.copy().truncate(max_items=12)
 
+        # Ensure system prompt fits within Groq on-demand TPM budget
+        if hasattr(truncated_ctx, '_items') and truncated_ctx._items:
+            for itm in truncated_ctx._items:
+                if getattr(itm, 'role', '') == 'system':
+                    sc = getattr(itm, 'text_content', '') or (itm.content[0] if (hasattr(itm, 'content') and itm.content) else '')
+                    if len(sc) > 4200:
+                        trimmed = sc[:4200] + "\n\n[System rules budget capped for low-latency streaming]"
+                        if hasattr(itm, 'content') and isinstance(itm.content, list) and itm.content:
+                            itm.content[0] = trimmed
+                        elif hasattr(itm, 'text_content'):
+                            itm.text_content = trimmed
+                    break
+
         # Inject flow instruction and continuity reminder transiently into truncated_ctx without polluting chat_ctx or user transcript
         if hasattr(truncated_ctx, '_items') and truncated_ctx._items:
             last_item = truncated_ctx._items[-1]
@@ -2755,8 +2801,10 @@ class VikramAgent(Agent):
 
         # Tier 3: Emergency conversational anchor (instant zero-silence safety with dynamic variation)
         from livekit.agents.llm import ChatChunk, ChoiceDelta
+        import uuid as _uuid
         def _make_text_chunk(t_str: str):
             return ChatChunk(
+                id=f"chunk-{_uuid.uuid4().hex[:12]}",
                 delta=ChoiceDelta(
                     role="assistant",
                     content=t_str
@@ -2777,11 +2825,11 @@ class VikramAgent(Agent):
                 yield self._clean_chunk(_make_text_chunk("I'm checking the details for you right now, please give me just a moment."))
         else:
             if bridge_count % 3 == 0:
-                yield self._clean_chunk(_make_text_chunk(f"Ji sir, main bilkul sun {verb} hoon, boliye na?"))
+                yield self._clean_chunk(_make_text_chunk(f"Ji, main bilkul sun {verb} hoon. Kahiye aap kis baare mein jankari chahte hain?"))
             elif bridge_count % 3 == 1:
-                yield self._clean_chunk(_make_text_chunk("Haan ji, main details check kar rahi hoon. Ek second dijiyega."))
+                yield self._clean_chunk(_make_text_chunk(f"Haan ji, main details check kar {verb} hoon. Ek second dijiyega."))
             else:
-                yield self._clean_chunk(_make_text_chunk("Aapka appointment book karna hai ya check karna hai, kripya bata dijiye?"))
+                yield self._clean_chunk(_make_text_chunk("Kripya bataiye, main aapki requirement me kaise help kar sakta hoon?" if gender == "male" else "Kripya bataiye, main aapki requirement me kaise help kar sakti hoon?"))
 
 async def fetch_knowledge_base(agent_id: str, timeout: float = 5.0) -> list:
     """Fetch parsed documents for this agent or its owning user/organization with a strict timeout to avoid blocking agent startup."""
@@ -3889,10 +3937,10 @@ async def entrypoint(ctx: JobContext):
     pitch = 1.0
     system_prompt = load_system_prompt()
     greeting_message = None
-    bot_name = "Aditi"
-    gender_tag = "female"
-    is_female = True
-    business_name_val = ""
+    bot_name = "Shubh"
+    gender_tag = "male"
+    is_female = False
+    business_name_val = "Nexus"
     db_caller_name = ""
 
     agent_id = ctx.job.metadata if ctx.job else None
@@ -4001,11 +4049,8 @@ async def entrypoint(ctx: JobContext):
     if agent_id:
         kb_task = asyncio.create_task(fetch_knowledge_base(agent_id))
         try:
-            res = await asyncio.to_thread(
-                supabase_admin.table("agents").select("*, user_id, organization_id").eq("id", agent_id).execute
-            )
-            if res.data:
-                agent_data = res.data[0]
+            agent_data = await fetch_agent_config_cached(agent_id, timeout_sec=1.5)
+            if agent_data:
                 user_id = agent_data.get("user_id")
                 organization_id = agent_data.get("organization_id")
                 
@@ -4926,6 +4971,18 @@ async def entrypoint(ctx: JobContext):
     async def _on_watchdog_disconnect():
         logger.info("[Watchdog Disconnect] Ending idle call session due to caller silence.")
         session_done.set()
+        try:
+            from livekit import api
+            lk_url = os.getenv("LIVEKIT_URL")
+            lk_key = os.getenv("LIVEKIT_API_KEY")
+            lk_sec = os.getenv("LIVEKIT_API_SECRET")
+            if lk_url and lk_key and lk_sec and ctx.room and getattr(ctx.room, "name", None):
+                lk = api.LiveKitAPI(lk_url, lk_key, lk_sec)
+                await lk.room.delete_room(api.DeleteRoomRequest(room=ctx.room.name))
+                await lk.aclose()
+                logger.info(f"[Watchdog Disconnect] Deleted room '{ctx.room.name}' via LiveKit API.")
+        except Exception as del_err:
+            logger.warning(f"[Watchdog Disconnect] Delete room notice: {del_err}")
         if ctx.room:
             try:
                 await ctx.room.disconnect()
@@ -5173,10 +5230,10 @@ async def run_agent(room_name: str, agent_id: str | None = None, contact_id: str
     pitch = 1.0
     system_prompt = load_system_prompt()
     greeting_message = None
-    bot_name = "Vikram"
-    gender_tag = "female"
-    is_female = True
-    business_name_val = ""
+    bot_name = "Shubh"
+    gender_tag = "male"
+    is_female = False
+    business_name_val = "Nexus"
     db_caller_name = ""
 
     if not agent_id and room_name.startswith("room-"):
@@ -5190,11 +5247,7 @@ async def run_agent(room_name: str, agent_id: str | None = None, contact_id: str
     if agent_id:
         if not agent_data:
             try:
-                res = await asyncio.to_thread(
-                    supabase_admin.table("agents").select("*, user_id, organization_id").eq("id", agent_id).execute
-                )
-                if res.data:
-                    agent_data = res.data[0]
+                agent_data = await fetch_agent_config_cached(agent_id, timeout_sec=1.5)
             except Exception as e:
                 logger.error(f"Failed to fetch agent configs in background run_agent: {e}")
 
@@ -6170,7 +6223,7 @@ async def run_agent(room_name: str, agent_id: str | None = None, contact_id: str
                         return
 
             # Dedicated worker guard: in-process agent is actively handling this room.
-            # Do NOT yield or disconnect mid-call if another agent tries to join.
+            # Evict any duplicate agent worker that attempts to join to prevent dual-audio/echo.
             @room.on("participant_connected")
             def on_participant_connected_ra(participant: rtc.RemoteParticipant):
                 p_id = (getattr(participant, 'identity', '') or '').lower()
@@ -6183,11 +6236,40 @@ async def run_agent(room_name: str, agent_id: str | None = None, contact_id: str
                     "vikram" in p_id or
                     "agent" in p_name
                 ):
-                    logger.warning(f"[DUPLICATE WORKER GUARD] Second agent worker '{participant.identity}' entered room '{room_name}'. Active in-process agent retains room ownership.")
+                    dup_id = getattr(participant, 'identity', '')
+                    logger.warning(f"[DUPLICATE WORKER GUARD] Evicting duplicate agent worker '{dup_id}' from room '{room_name}'.")
+                    async def _evict_dup():
+                        try:
+                            from livekit import api
+                            lk_url = os.getenv("LIVEKIT_URL")
+                            lk_key = os.getenv("LIVEKIT_API_KEY")
+                            lk_sec = os.getenv("LIVEKIT_API_SECRET")
+                            if lk_url and lk_key and lk_sec:
+                                lk = api.LiveKitAPI(lk_url, lk_key, lk_sec)
+                                await lk.room.remove_participant(
+                                    api.RoomParticipantIdentity(room=room_name, identity=dup_id)
+                                )
+                                await lk.aclose()
+                                logger.info(f"[DUPLICATE WORKER GUARD] Eviction of '{dup_id}' confirmed.")
+                        except Exception as evict_err:
+                            logger.warning(f"[DUPLICATE WORKER GUARD] Eviction note: {evict_err}")
+                    asyncio.create_task(_evict_dup())
 
             async def _on_watchdog_disconnect_ra():
                 logger.info(f"[Watchdog Disconnect - RA] Ending idle call session in room '{room_name}' due to silence.")
                 done.set()
+                try:
+                    from livekit import api
+                    lk_url = os.getenv("LIVEKIT_URL")
+                    lk_key = os.getenv("LIVEKIT_API_KEY")
+                    lk_sec = os.getenv("LIVEKIT_API_SECRET")
+                    if lk_url and lk_key and lk_sec:
+                        lk = api.LiveKitAPI(lk_url, lk_key, lk_sec)
+                        await lk.room.delete_room(api.DeleteRoomRequest(room=room_name))
+                        await lk.aclose()
+                        logger.info(f"[Watchdog Disconnect - RA] Deleted room '{room_name}' via LiveKit API.")
+                except Exception as del_err:
+                    logger.warning(f"[Watchdog Disconnect - RA] Delete room note: {del_err}")
                 if room:
                     try:
                         await room.disconnect()

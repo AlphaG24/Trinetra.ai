@@ -226,20 +226,28 @@ export default function AgentsDashboardPage() {
                         </div>
                       </div>
 
-                      <div className="mt-3 pt-2.5 border-t border-[var(--border)] relative z-10">
+                      <div className="mt-3 pt-2.5 border-t border-[var(--border)] relative z-10 space-y-1.5">
                         {(() => {
-                          const paidLimit = authProfile?.paid_minutes_limit ?? (agent as any).minutes_limit ?? 100
-                          const paidUsed = authProfile?.paid_minutes_used ?? (agent as any).minutes_used ?? 0
+                          const paidLimit = Number((agent as any).minutes_limit || (agent as any).config?.minutes_limit || authProfile?.paid_minutes_limit || 100)
+                          const paidUsed = Number((agent as any).minutes_used ?? authProfile?.paid_minutes_used ?? 0)
                           const hasPaidQuota = (paidLimit > paidUsed) || authProfile?.plan_tier === 'enterprise'
                           return (
-                            <PlanValidityTimer
-                              createdAt={agent.created_at}
-                              expiresAt={(agent as any).subscription_expires_at}
-                              validityDays={(agent as any).validity_days || 30}
-                              size="xs"
-                              showProgress={true}
-                              hasRemainingQuota={hasPaidQuota}
-                            />
+                            <>
+                              <PlanValidityTimer
+                                createdAt={agent.created_at}
+                                expiresAt={(agent as any).subscription_expires_at}
+                                validityDays={(agent as any).validity_days || 30}
+                                size="xs"
+                                showProgress={true}
+                                hasRemainingQuota={hasPaidQuota}
+                              />
+                              <div className="flex items-center justify-between text-[11px] font-mono text-[var(--muted)]">
+                                <span>Used: <strong className="text-[var(--heading)] font-semibold">{paidUsed}m</strong> / {paidLimit}m</span>
+                                <span className={paidLimit > paidUsed ? "text-emerald-500 font-semibold" : "text-amber-500 font-semibold"}>
+                                  {Math.max(0, paidLimit - paidUsed)}m left
+                                </span>
+                              </div>
+                            </>
                           )
                         })()}
                       </div>

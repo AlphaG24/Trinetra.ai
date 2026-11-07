@@ -299,7 +299,7 @@ class InCallNoAudioWatchdog:
         self._stop_event = asyncio.Event()
 
     def record_activity(self):
-        """Reset the silence clock and prompt count on any valid conversational event."""
+        """Reset the silence clock and prompt count when the USER actively speaks."""
         self.last_speech_time = time.perf_counter()
         self.silence_prompts_count = 0
         self._retried = False
@@ -318,11 +318,11 @@ class InCallNoAudioWatchdog:
         if st == "speaking":
             self.is_agent_speaking = True
             self.is_agent_thinking = False
-            self.record_activity()
+            self.last_speech_time = time.perf_counter()
         elif st == "thinking":
             self.is_agent_thinking = True
             self.is_agent_speaking = False
-            self.record_activity()
+            self.last_speech_time = time.perf_counter()
         else:
             self.is_agent_speaking = False
             self.is_agent_thinking = False
@@ -339,7 +339,7 @@ class InCallNoAudioWatchdog:
     def on_agent_speech_start(self):
         self.is_agent_speaking = True
         self.is_agent_thinking = False
-        self.record_activity()
+        self.last_speech_time = time.perf_counter()
 
     def on_agent_speech_end(self):
         self.is_agent_speaking = False
