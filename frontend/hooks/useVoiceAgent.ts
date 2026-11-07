@@ -28,6 +28,10 @@ export function useVoiceAgent() {
   const [isMuted, setIsMuted] = useState(false)
   const [secondsConnected, setSecondsConnected] = useState(0)
   const [transcripts, setTranscripts] = useState<TranscriptMessage[]>([])
+  const transcriptsRef = useRef<TranscriptMessage[]>([])
+  useEffect(() => {
+    transcriptsRef.current = transcripts
+  }, [transcripts])
 
   const roomRef = useRef<Room | null>(null)
   const timerRef = useRef<NodeJS.Timeout | null>(null)
@@ -100,19 +104,24 @@ export function useVoiceAgent() {
     chunks: Blob[],
     mimeType: string,
     callMeta: { roomName: string; agentId?: string } | null,
-    duration: number
+    duration: number,
+    transcriptText?: string
   ): Promise<boolean> => {
-    if (chunks.length === 0) return false
-    const audioBlob = new Blob(chunks, { type: mimeType || 'audio/webm' })
-    if (audioBlob.size < 200) return false
+    if (chunks.length === 0 && !transcriptText) return false
+    const audioBlob = chunks.length > 0 ? new Blob(chunks, { type: mimeType || 'audio/webm' }) : new Blob([], { type: 'audio/webm' })
 
     const formData = new FormData()
-    formData.append('file', audioBlob, `call_${callMeta?.roomName || 'web'}_${Date.now()}.webm`)
+    if (audioBlob.size > 100) {
+      formData.append('file', audioBlob, `call_${callMeta?.roomName || 'web'}_${Date.now()}.webm`)
+    }
     formData.append('room_name', callMeta?.roomName || 'trinetra-web-call')
     if (callMeta?.agentId) {
       formData.append('agent_id', callMeta.agentId)
     }
     formData.append('duration_seconds', String(duration))
+    if (transcriptText && transcriptText.trim()) {
+      formData.append('transcript', transcriptText.trim())
+    }
 
     // 1. Primary: Upload via internal Next.js API route
     try {
@@ -166,6 +175,11 @@ export function useVoiceAgent() {
     cleanupCallResources()
 
     // 3. Finalize recording: wait for all data to be flushed, then upload
+    const currentTranscripts = transcriptsRef.current || []
+    const transcriptText = currentTranscripts
+      .map((t) => `${t.speaker}: ${t.text}`)
+      .join('\n')
+
     if (rec && rec.state !== 'inactive') {
       const recordingDone = new Promise<void>((resolve) => {
         rec.onstop = async () => {
@@ -173,7 +187,7 @@ export function useVoiceAgent() {
           const mimeType = rec.mimeType || 'audio/webm'
           
           try {
-            const uploaded = await uploadRecording(chunks, mimeType, callMeta, dur)
+            const uploaded = await uploadRecording(chunks, mimeType, callMeta, dur, transcriptText)
             if (uploaded) {
               window.dispatchEvent(new CustomEvent('trinetra:call_completed', {
                 detail: { roomName: callMeta?.roomName, agentId: callMeta?.agentId, duration: dur }
@@ -210,8 +224,14 @@ export function useVoiceAgent() {
           new Promise<void>((resolve) => setTimeout(resolve, 8000))
         ])
       } catch {}
-    } else if (activeCtx) {
-      try { activeCtx.close() } catch {}
+    } else {
+      // In case mediaRecorder was not active, still upload transcript
+      if (transcriptText) {
+        uploadRecording([], '', callMeta, dur, transcriptText).catch(() => {})
+      }
+      if (activeCtx) {
+        try { activeCtx.close() } catch {}
+      }
     }
 
     audioContextRef.current = null

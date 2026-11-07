@@ -24,6 +24,7 @@ export async function POST(req: Request) {
     const roomName = (formData.get('room_name') as string | null) || 'trinetra-web-call'
     const agentId = formData.get('agent_id') as string | null
     const durationSeconds = parseInt((formData.get('duration_seconds') as string | null) || '0', 10)
+    const clientTranscript = (formData.get('transcript') as string | null) || null
 
     if (!file || file.size < 100) {
       return NextResponse.json({ error: 'Audio file is empty or invalid' }, { status: 400 })
@@ -61,6 +62,9 @@ export async function POST(req: Request) {
     }
     if (durationSeconds > 0) {
       updatePayload.duration_seconds = durationSeconds
+    }
+    if (clientTranscript && clientTranscript.trim()) {
+      updatePayload.transcript = clientTranscript.trim()
     }
 
     const { data: updatedCalls, error: updateErr } = await supabaseAdmin
@@ -102,6 +106,7 @@ export async function POST(req: Request) {
         ended_at: new Date().toISOString(),
         duration_seconds: durationSeconds || 0,
         recording_url: publicUrl,
+        transcript: clientTranscript?.trim() || null,
         metadata: {
           room_name: roomName,
           provider_call_id: roomName,

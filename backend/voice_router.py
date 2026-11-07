@@ -114,9 +114,16 @@ async def safe_run_agent(r_name: str, a_id: str | None = None):
         import traceback
         print(f"[LIVEKIT AGENT RUN ERROR] Exception in run_agent: {run_err}", flush=True)
         traceback.print_exc()
+    finally:
+        _active_agent_spawns.discard(r_name)
 
 def dispatch_agent_to_room(room_name: str, agent_id: str | None = None):
     # Guard against duplicate concurrent spawns for the exact same room
+    try:
+        from agent import _running_agent_rooms
+    except Exception:
+        _running_agent_rooms = set()
+
     if room_name in _running_agent_rooms or room_name in _active_agent_spawns:
         print(f"[LIVEKIT AGENT] Agent already running or spawned for room '{room_name}'. Skipping duplicate dispatch.", flush=True)
         return
@@ -2112,6 +2119,7 @@ async def upload_call_recording(
     room_name: str = Form(...),
     agent_id: Optional[str] = Form(None),
     duration_seconds: Optional[int] = Form(0),
+    transcript: Optional[str] = Form(None),
 ):
     """
     Accepts browser web call audio recordings, saves them to persistent disk storage and Supabase storage,
@@ -2165,6 +2173,8 @@ async def upload_call_recording(
         }
         if duration_seconds and duration_seconds > 0:
             update_data["duration_seconds"] = duration_seconds
+        if transcript and transcript.strip():
+            update_data["transcript"] = transcript.strip()
 
         # Match record with retries to handle post-call summarization delay (agent.py LLM run)
         updated = False
@@ -2213,6 +2223,7 @@ async def upload_call_recording(
                     "ended_at": datetime.utcnow().isoformat(),
                     "duration_seconds": duration_seconds or 0,
                     "recording_url": public_url,
+                    "transcript": transcript.strip() if (transcript and transcript.strip()) else None,
                     "metadata": {
                         "room_name": room_name,
                         "provider_call_id": room_name,

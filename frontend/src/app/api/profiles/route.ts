@@ -50,7 +50,7 @@ export async function GET() {
         const supabase = await createClient()
         const authPromise = supabase.auth.getUser()
         const timeoutPromise = new Promise<any>((_, reject) =>
-          setTimeout(() => reject(new Error('Auth timeout')), 3500)
+          setTimeout(() => reject(new Error('Auth timeout')), 12000)
         )
         const authRes = await Promise.race([authPromise, timeoutPromise])
         user = authRes?.data?.user ?? null

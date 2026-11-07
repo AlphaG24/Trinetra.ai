@@ -268,15 +268,21 @@ class InCallNoAudioWatchdog:
     """
     def __init__(
         self,
-        silence_threshold_seconds: float = 35.0,
+        silence_threshold_seconds: float = 9.0,
         speak_fn: Optional[Callable[[str], Awaitable[None]]] = None,
         disconnect_fn: Optional[Callable[[], Awaitable[None]]] = None,
         tool_guard: Optional[ToolExecutionGuard] = None,
         language: str = "hinglish",
         gender: str = "female",
         check_interval_seconds: Optional[float] = None,
+        repeat_interval_seconds: float = 5.0,
+        max_repeats: int = 3,
+        goodbye_delay_seconds: float = 4.0,
     ):
         self.silence_threshold = silence_threshold_seconds
+        self.repeat_interval = repeat_interval_seconds
+        self.max_repeats = max_repeats
+        self.goodbye_delay = goodbye_delay_seconds
         self.check_interval = check_interval_seconds if check_interval_seconds is not None else min(0.5, max(0.05, silence_threshold_seconds / 6.0))
         self.speak_fn = speak_fn
         self.disconnect_fn = disconnect_fn
@@ -326,7 +332,7 @@ class InCallNoAudioWatchdog:
             self._watchdog_task.cancel()
 
     async def _watchdog_loop(self):
-        logger.info(f"[NoAudioWatchdog] In-call watchdog active (threshold: {self.silence_threshold}s)")
+        logger.info(f"[NoAudioWatchdog] In-call watchdog active (threshold: {self.silence_threshold}s, repeats: {self.max_repeats})")
         while not self._stop_event.is_set():
             try:
                 await asyncio.sleep(self.check_interval)
@@ -336,52 +342,59 @@ class InCallNoAudioWatchdog:
                     continue
 
                 silent_duration = time.perf_counter() - self.last_speech_time
-                if silent_duration >= self.silence_threshold:
-                    if not self._retried:
-                        # Wait an additional 3-second buffer before prompting to avoid interrupting thought pauses
-                        logger.warning(
-                            f"[NoAudioWatchdog] Dead air detected ({silent_duration:.1f}s > {self.silence_threshold}s). "
-                            "Tool is NOT running. Arming watchdog check-in..."
-                        )
+                active_threshold = self.silence_threshold if self.silence_prompts_count == 0 else self.repeat_interval
+
+                if silent_duration >= active_threshold:
+                    if not self._retried and self.silence_prompts_count == 0:
                         self._retried = True
                         self.last_speech_time = time.perf_counter()
-                    else:
-                        is_en = self.language.lower() in ("en", "en-us", "en-in", "english")
-                        is_fem = self.gender.lower() == "female"
-                        from app.services.disclosure_service import resolve_gendered_phrases
-                        phrases = resolve_gendered_phrases(gender=self.gender, language=self.language)
-                        v_madad = phrases.get("v_madad", "kar sakti hoon" if is_fem else "kar sakta hoon")
-                        v_rahi = "rahi hoon" if is_fem else "raha hoon"
+                        logger.warning(
+                            f"[NoAudioWatchdog] Audio stalled for {silent_duration:.2f}s (threshold: {active_threshold}s). Retrying before prompt."
+                        )
+                        continue
 
-                        if self.silence_prompts_count == 0:
-                            # 1st silence prompt: Ask politely once
-                            self.silence_prompts_count = 1
-                            self.last_speech_time = time.perf_counter()
-                            self._retried = False
+                    is_en = self.language.lower() in ("en", "en-us", "en-in", "english")
+                    is_fem = self.gender.lower() == "female"
+                    from app.services.disclosure_service import resolve_gendered_phrases
+                    phrases = resolve_gendered_phrases(gender=self.gender, language=self.language)
+                    v_madad = phrases.get("v_madad", "kar sakti hoon" if is_fem else "kar sakta hoon")
+                    v_rahi = "rahi hoon" if is_fem else "raha hoon"
+
+                    if self.silence_prompts_count < self.max_repeats:
+                        self.silence_prompts_count += 1
+                        self.last_speech_time = time.perf_counter()
+
+                        if self.silence_prompts_count == 1:
                             prompt = "Are you able to hear me? Please let me know how I can help." if is_en else f"Ji, kya aap mujhe sun pa rahe hain? Kahiye, main aapki kya madad {v_madad}?"
-                            logger.info(f"[NoAudioWatchdog] Prompting caller due to silence (turn 1): '{prompt}'")
-                            if self.speak_fn:
-                                await self.speak_fn(prompt)
+                        elif self.silence_prompts_count == 2:
+                            prompt = "Hello? Are you still there?" if is_en else "Hello? Sun pa rahe hain aap? Kahiye na?"
                         else:
-                            # 2nd silence prompt: Caller has not responded for another 12+ seconds -> Auto disconnect to save user minutes
-                            logger.info("[NoAudioWatchdog] Prolonged dead air after prompt. Disconnecting call to prevent minute consumption.")
-                            goodbye_prompt = (
-                                "I am unable to hear you, so I'm concluding the call now. Feel free to call us back anytime. Thank you!"
-                                if is_en else
-                                f"Aapki taraf se koi aawaz nahi aa rahi hai, isliye main call disconnect kar {v_rahi}. Aap baad mein call kar sakte hain. Dhanyawaad!"
-                            )
-                            if self.speak_fn:
-                                try:
-                                    await self.speak_fn(goodbye_prompt)
-                                    await asyncio.sleep(4.0)
-                                except Exception as sp_err:
-                                    logger.warning(f"[NoAudioWatchdog] Final goodbye speak error: {sp_err}")
-                            if self.disconnect_fn:
-                                try:
-                                    await self.disconnect_fn()
-                                except Exception as disc_err:
-                                    logger.warning(f"[NoAudioWatchdog] Disconnect fn error: {disc_err}")
-                            break
+                            prompt = "Can you hear me?" if is_en else "Ji, kya meri aawaz aa rahi hai?"
+
+                        logger.info(f"[NoAudioWatchdog] Prompting caller due to silence (repeat {self.silence_prompts_count}/{self.max_repeats}): '{prompt}'")
+                        if self.speak_fn:
+                            await self.speak_fn(prompt)
+                    else:
+                        # Exceeded max silence repeats (approx 20s+ total dead air) -> Gracefully disconnect
+                        logger.info(f"[NoAudioWatchdog] Dead air exceeded max {self.max_repeats} repeats (~20-25s). Disconnecting call to protect user minutes.")
+                        goodbye_prompt = (
+                            "I am unable to hear you, so I'm concluding the call now. Feel free to call us back anytime. Thank you!"
+                            if is_en else
+                            f"Aapki taraf se koi aawaz nahi aa rahi hai, isliye main call disconnect kar {v_rahi}. Aap baad mein call kar sakte hain. Dhanyawaad!"
+                        )
+                        if self.speak_fn:
+                            try:
+                                await self.speak_fn(goodbye_prompt)
+                                if self.goodbye_delay > 0:
+                                    await asyncio.sleep(self.goodbye_delay)
+                            except Exception as sp_err:
+                                logger.warning(f"[NoAudioWatchdog] Final goodbye speak error: {sp_err}")
+                        if self.disconnect_fn:
+                            try:
+                                await self.disconnect_fn()
+                            except Exception as disc_err:
+                                logger.warning(f"[NoAudioWatchdog] Disconnect fn error: {disc_err}")
+                        break
             except asyncio.CancelledError:
                 break
             except Exception as e:

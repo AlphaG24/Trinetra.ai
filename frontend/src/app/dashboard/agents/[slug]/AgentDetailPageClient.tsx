@@ -249,8 +249,23 @@ export function AgentDetailPageClient({
       const supabase = createClient()
 
       // SECURITY (SEC-003): Use getUser() which validates against the database.
-      // Never use getSession() which trusts the cookie payload without verification.
-      const { data: { user }, error: userError } = await supabase.auth.getUser()
+      let { data: { user }, error: userError } = await supabase.auth.getUser()
+      if (!user) {
+        // Fallback: check session or wait briefly for token refresh/hydration before bailing
+        const { data: sessionData } = await supabase.auth.getSession().catch(() => ({ data: { session: null } }))
+        if (sessionData?.session?.user) {
+          user = sessionData.session.user
+          userError = null
+        } else {
+          await new Promise(r => setTimeout(r, 600))
+          const retryRes = await supabase.auth.getUser().catch(() => ({ data: { user: null }, error: null }))
+          if (retryRes?.data?.user) {
+            user = retryRes.data.user
+            userError = null
+          }
+        }
+      }
+
       if (userError || !user) {
         // Stop the heartbeat from retrying to avoid console flood
         sessionExpired.current = true

@@ -26,6 +26,7 @@ export async function POST(req: Request) {
       user: data.user,
       session: {
         access_token: data.session.access_token,
+        refresh_token: data.session.refresh_token,
         expires_at: data.session.expires_at,
       },
     })

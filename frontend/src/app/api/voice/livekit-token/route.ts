@@ -136,7 +136,7 @@ async function generateLiveKitToken({
     if (!isCloudEnv) {
       try {
         const localController = new AbortController();
-        const localTimeout = setTimeout(() => localController.abort(), 300);
+        const localTimeout = setTimeout(() => localController.abort(), 6000);
         const localRes = await fetch('http://127.0.0.1:8000/api/voice/livekit-token', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -147,11 +147,13 @@ async function generateLiveKitToken({
         if (localRes.ok) {
           dispatched = true;
         }
-      } catch {}
+      } catch (lErr) {
+        console.warn('[livekit-token] Local FastAPI dispatch notice:', lErr);
+      }
     }
 
-    // 2. If local backend did not dispatch, dispatch via Render cloud backend
-    if (!dispatched) {
+    // 2. If local backend did not dispatch, dispatch via Render cloud backend ONLY in cloud/production environments
+    if (!dispatched && isCloudEnv) {
       try {
         const backendBase = (process.env.NEXT_PUBLIC_BACKEND_URL || process.env.BACKEND_URL || 'https://trinetra-ai-1-6f2n.onrender.com').replace(/\/$/, '');
         const renderRes = await fetch(`${backendBase}/api/voice/livekit-token`, {

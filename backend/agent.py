@@ -113,11 +113,11 @@ def get_vad_model():
     if _vad_model is None:
         logger.info("Loading Silero VAD model on-demand...")
         _vad_model = silero.VAD.load(
-            min_speech_duration=0.15,
-            min_silence_duration=0.25,
-            activation_threshold=0.50,
+            min_speech_duration=0.25,   # Filters out micro-pops, breathing and clicks
+            min_silence_duration=0.60,  # Balanced turn-end detection without premature cutoffs
+            activation_threshold=0.70,  # Noise-resistant threshold against background whispers/fans
         )
-        logger.info("Silero VAD model loaded successfully with noise-resistant activation threshold (0.6)!")
+        logger.info("Silero VAD model loaded successfully!")
     return _vad_model
 PROMPTS_DIR = os.path.join(os.path.dirname(__file__), "prompts")
 
@@ -1689,7 +1689,7 @@ def create_appointment_tools(
 
 
     @llm.function_tool(
-        description="Query the live business operations brain for real-time truck loads, logistics routes, container availability, inventory items, and appointment slots. Returns live availability, base price, and the strict minimum negotiation floor price."
+        description="Query the live business operations brain for knowledge base articles, company offerings, product details, services, business catalog items, and appointment slots. Returns live availability, details, and pricing."
     )
     async def query_live_inventory(
         category: str = "",
@@ -1699,12 +1699,12 @@ def create_appointment_tools(
         max_budget_inr: float = 0.0
     ) -> str:
         """
-        Query real-time business operations catalog.
+        Query real-time business operations catalog and knowledge base.
         Args:
-            category: Operational category (e.g., 'logistics', 'containers', 'appointment_slots', 'inventory', 'pricing').
-            query: Freeform search query or item title (e.g., 'truck', '20ft container', 'Jaipur to Delhi').
-            origin: Route starting city/hub (optional, e.g., 'Delhi', 'Jaipur', 'Mumbai').
-            destination: Route ending city/hub (optional, e.g., 'Mumbai', 'Ahmedabad', 'Kolkata').
+            category: Operational category (e.g., 'services', 'products', 'appointment_slots', 'inventory', 'pricing').
+            query: Freeform search query or item title (e.g., 'AI voice agent', 'consultation', 'starter plan').
+            origin: Optional starting context/region.
+            destination: Optional target context/region.
             max_budget_inr: Maximum customer budget in INR if specified (optional).
         """
         async def _execute() -> str:
@@ -2060,7 +2060,7 @@ class VikramAgent(Agent):
 
             # Optimal clarity & loudness: loudness=1.15 provides loud, punchy, and crystal-clear
             # audio without digital distortion or low volume issues across browsers and mobile devices.
-            sarvam_loudness = float(os.getenv("SARVAM_LOUDNESS", "1.15"))
+            sarvam_loudness = float(os.getenv("SARVAM_LOUDNESS", "1.0"))
 
 
             # Task 1: Setting max_session_duration=0 forces a fresh WebSocket connection per TTS request,
@@ -2092,8 +2092,9 @@ class VikramAgent(Agent):
         sarvam_api_key = os.getenv("SARVAM_API_KEY", "").strip()
         gemini_api_key = (os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY") or "").strip()
 
-        # 1. Speech-to-Text: Use Sarvam Saaras v3 in codemix mode for authentic Hinglish & English digits recognition
-        if sarvam_api_key and (voice_provider == 'sarvam' or language in ['hinglish', 'hi-IN']):
+        # 1. Speech-to-Text: Prioritize Groq Whisper for ultra-fast (sub-150ms) zero-dropout Hindi/Hinglish transcription
+        stt_pref = os.getenv("STT_PROVIDER", "groq").strip().lower()
+        if stt_pref == "sarvam" and sarvam_api_key:
             stt_prompt = "Haan, batao, haanji, mera naam Raghav hai, contact number 9876543210, appointment schedule karna hai, Hello"
             try:
                 stt_target_lang = "hi-IN" if language in ['hinglish', 'hi-IN'] else ("en-IN" if language in ['en', 'en-US', 'en-IN'] else language)
@@ -2104,25 +2105,49 @@ class VikramAgent(Agent):
                     api_key=sarvam_api_key,
                     prompt=stt_prompt,
                 )
-                logger.info(f"[VikramAgent] Using Sarvam STT (saaras:v3, mode=codemix, language={stt_target_lang}) for Hinglish & English digits")
+                logger.info(f"[VikramAgent] Using Sarvam STT (saaras:v3, mode=codemix, language={stt_target_lang})")
             except Exception as sarvam_stt_err:
-                logger.warning(f"[VikramAgent] saaras:v3 codemix init failed ({sarvam_stt_err}), falling back to saarika:v2.5")
-                stt_plugin = sarvam.STT(
-                    model="saarika:v2.5",
-                    language="hi-IN",
-                    mode="transcribe",
-                    api_key=sarvam_api_key,
-                    prompt=stt_prompt,
+                logger.warning(f"[VikramAgent] saaras:v3 codemix init failed ({sarvam_stt_err}), falling back to Groq Whisper")
+                stt_plugin = openai.STT(
+                    model="whisper-large-v3",
+                    base_url="https://api.groq.com/openai/v1",
+                    api_key=groq_api_key,
+                    detect_language=True,
+                    prompt="Namaste, Haan, Haanji, Batao, Hindi, Hinglish, English conversation.",
                 )
-        else:
+        elif groq_api_key:
+            stt_lang = "hi" if (language or "").lower() in ["hinglish", "hindi", "hi", "hi-in"] else None
             stt_plugin = openai.STT(
                 model="whisper-large-v3",
                 base_url="https://api.groq.com/openai/v1",
                 api_key=groq_api_key,
-                detect_language=True,
-                prompt="Namaste, Haan, Haanji, Batao, Hindi, Hinglish, English conversation.",
+                language=stt_lang,
+                detect_language=False if stt_lang else True,
+                prompt="Namaste, Haan, Haanji, Batao, Hindi, Hinglish, English conversation. Aur bolo, kya kaam hai, appointment book karna hai.",
             )
-            logger.info("[VikramAgent] Using Groq Whisper STT (whisper-large-v3, detect_language=True)")
+            logger.info(f"[VikramAgent] Using Groq Whisper STT (whisper-large-v3, language={stt_lang}) for ultra-fast turnaround")
+        elif sarvam_api_key:
+            stt_prompt = "Haan, batao, haanji, mera naam Raghav hai, contact number 9876543210, appointment schedule karna hai, Hello"
+            stt_target_lang = "hi-IN" if language in ['hinglish', 'hi-IN'] else ("en-IN" if language in ['en', 'en-US', 'en-IN'] else language)
+            stt_plugin = sarvam.STT(
+                model="saaras:v3",
+                mode="codemix",
+                language=stt_target_lang,
+                api_key=sarvam_api_key,
+                prompt=stt_prompt,
+            )
+            logger.info(f"[VikramAgent] Using Sarvam STT fallback (saaras:v3)")
+        else:
+            stt_lang = "hi" if (language or "").lower() in ["hinglish", "hindi", "hi", "hi-in"] else None
+            stt_plugin = openai.STT(
+                model="whisper-large-v3",
+                base_url="https://api.groq.com/openai/v1",
+                api_key=groq_api_key,
+                language=stt_lang,
+                detect_language=False if stt_lang else True,
+                prompt="Namaste, Haan, Haanji, Batao, Hindi, Hinglish, English conversation. Aur bolo, kya kaam hai, appointment book karna hai.",
+            )
+            logger.info("[VikramAgent] Using Groq Whisper STT default")
 
         # Determine LLM Provider: Test Groq health if key present; automatically use Gemini 2.5 Flash if Groq invalid or unavailable
         chosen_provider = (llm_provider or os.getenv("LLM_PROVIDER", "groq")).strip().lower()
@@ -2157,9 +2182,10 @@ class VikramAgent(Agent):
                 base_url="https://api.groq.com/openai/v1",
                 api_key=groq_api_key,
                 temperature=chosen_temp if temperature is not None else 0.6,
-                max_completion_tokens=150,
+                max_completion_tokens=800,
                 timeout=llm_timeout,
                 max_retries=0,
+                extra_body={"reasoning_format": "hidden"},
             )
             logger.info(f"[VikramAgent] Using Groq LLM ({groq_model}) for zero-latency voice response")
 
@@ -2170,7 +2196,7 @@ class VikramAgent(Agent):
                     base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
                     api_key=gemini_api_key,
                     temperature=chosen_temp if temperature is not None else 0.6,
-                    max_completion_tokens=150,
+                    max_completion_tokens=500,
                     timeout=llm_timeout,
                     max_retries=0,
                 )
@@ -2182,9 +2208,10 @@ class VikramAgent(Agent):
                     base_url="https://api.groq.com/openai/v1",
                     api_key=groq_api_key,
                     temperature=chosen_temp if temperature is not None else 0.6,
-                    max_completion_tokens=150,
+                    max_completion_tokens=500,
                     timeout=llm_timeout,
                     max_retries=1,
+                    extra_body={"reasoning_format": "hidden"},
                 )
                 logger.info(f"[VikramAgent] Configured Groq ({fallback_model}) as secondary failover LLM")
         elif gemini_api_key:
@@ -2194,7 +2221,7 @@ class VikramAgent(Agent):
                 base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
                 api_key=gemini_api_key,
                 temperature=chosen_temp,
-                max_completion_tokens=150,
+                max_completion_tokens=250,
                 timeout=llm_timeout,
                 max_retries=0,
             )
@@ -2205,7 +2232,7 @@ class VikramAgent(Agent):
                     base_url="https://api.groq.com/openai/v1",
                     api_key=groq_api_key,
                     temperature=chosen_temp if temperature is not None else 0.6,
-                    max_completion_tokens=150,
+                    max_completion_tokens=250,
                     timeout=llm_timeout,
                     max_retries=0,
                 )
@@ -2396,16 +2423,39 @@ class VikramAgent(Agent):
 
                 flow_instruction = None
 
-                # 1. Zero Re-Introduction Guard: If caller says "hello", "sun rahe ho", "are you there" mid-call
-                liveness_words = ["hello", "helo", "hello?", "are you there", "sun rahe ho", "sun rhe ho", "sunai de raha", "awaaz aa rahi", "hello hello", "sun rahe"]
-                # Only treat as liveness check if utterance is short (<= 3 words), so full sentences like "Hello, main kal baat karunga" are not hijacked!
-                is_liveness_check = any((t_lower == lw or t_lower.startswith(lw)) and len(t_lower.split()) <= 3 for lw in liveness_words)
+                # 1. Direct Inquiry vs Greeting Acknowledgment vs Liveness Check Separation (Rules 4, 39, 45, 46)
+                inquiry_words = [
+                    "batao", "bataiye", "bata", "btao", "btaiye", "bta", "bolo", "boliye", "bol",
+                    "बता", "बताओ", "बताइए", "बोल", "बोलो", "बोलिए", "सुना", "सुनाओ", "क्या काम", "काम क्या",
+                    "kya hai", "samjhao", "sunao", "details", "jankari", "kya karte", "kya solution", "offer",
+                    "kaam", "kya kaam", "tum batao", "kyun call", "kisliye", "kis liye"
+                ]
+                is_pitch_request = any(iw in t_lower for iw in inquiry_words)
 
-                if is_liveness_check and (turn_count >= 1 or getattr(self, '_has_introduced_self', False)):
+                ack_words = ["theek hai", "theek", "thik hai", "thik", "badhiya", "badhiya hai", "sab theek", "haan", "ha", "yes", "sahi hai", "all good", "fine", "good", "sahi", "wah theek"]
+                is_greeting_ack = any(aw in t_lower for aw in ack_words) and not is_pitch_request and (turn_count <= 3)
+
+                liveness_exact = {"hello", "helo", "hello?", "are you there", "are you there?", "sun rahe ho", "sun rhe ho", "sunai de raha", "sunai de raha hai", "awaaz aa rahi", "awaaz aa rahi hai", "hello hello", "am i audible"}
+                clean_t = t_lower.rstrip(".!? ")
+                is_liveness_check = (clean_t in liveness_exact) and not is_pitch_request and not is_greeting_ack
+
+                if is_pitch_request:
                     flow_instruction = (
-                        f"[CRITICAL FLOW NOTE: The caller is checking if you are still on the line ('{norm_txt}'). "
-                        f"STRICTLY DO NOT RE-INTRODUCE YOURSELF! DO NOT say 'Main {agent_name} {v_bol}' or repeat your greeting or purpose! "
-                        f"Simply confirm you are listening and ask how to proceed: e.g. 'Ji sir, main bilkul {v_sun}, boliye na?' or 'Haan ji sir, main yahin hoon.']"
+                        f"[DIRECT INQUIRY: The caller asked what your work is / to share details ('{norm_txt}'). "
+                        f"STRICTLY DO NOT say 'main sun raha hoon' or repeat your intro. "
+                        f"Directly and confidently explain your core business value in 1-2 natural sentences: Trinetra AI automates customer calls, schedules appointments, and qualifies leads 24/7 without delays. Ask an engaging question to see their current setup.]"
+                    )
+                elif is_greeting_ack:
+                    flow_instruction = (
+                        f"[CONVERSATION PROGRESSION: The caller acknowledged your greeting ('{norm_txt}'). "
+                        f"STRICTLY DO NOT say 'main sun raha hoon' or repeat 'kaise madad kar sakta hoon'. "
+                        f"Smoothly introduce the purpose of your call in 1-2 conversational sentences: explain that you help businesses automate customer calls and inquiries 24/7, and ask how they currently manage their inbound customer calls.]"
+                    )
+                elif is_liveness_check and (turn_count >= 1 or getattr(self, '_has_introduced_self', False)):
+                    flow_instruction = (
+                        f"[CONVERSATION GUIDANCE: The caller said '{norm_txt}'. "
+                        f"STRICTLY DO NOT RE-INTRODUCE YOURSELF! Respond naturally with dynamic variation: "
+                        f"e.g. 'Haanji bilkul, kahiye na?', 'Ji, main yahin hoon, batayein?', 'Haanji, kahiye?']"
                     )
 
                 # 2. Outside / In-Transit Objection Handling (Saad 15-second walking hook)
@@ -2573,11 +2623,31 @@ class VikramAgent(Agent):
             self.timing_tracker.mark("disclosure_composed")
             self.timing_tracker.mark("first_tts_byte")
 
-        speech_handle = self.session.say(
-            greeting,
-            allow_interruptions=True,
-            add_to_chat_ctx=True
-        )
+        # Guard: session may have been closed if participant disconnected during the brief settle wait
+        if not getattr(self.session, '_session', None) and not getattr(self.session, 'room', None):
+            logger.warning("[VikramAgent] Session already closed before say(). Skipping greeting.")
+            return
+        try:
+            speech_handle = self.session.say(
+                greeting,
+                allow_interruptions=True,
+                add_to_chat_ctx=True
+            )
+        except RuntimeError as _say_err:
+            logger.warning(f"[VikramAgent] Could not say greeting (session closed early): {_say_err}")
+            return
+
+        # Immediately publish greeting transcript to room data channel for live UI feed
+        if hasattr(self, 'room') and self.room and getattr(self.room, 'local_participant', None):
+            try:
+                g_payload = json.dumps({
+                    "type": "transcript",
+                    "speaker": "agent",
+                    "text": clean_ssml(greeting, is_transcript=True)
+                }).encode("utf-8")
+                asyncio.create_task(self.room.local_participant.publish_data(g_payload))
+            except Exception:
+                pass
 
         # If speech handle is already done (e.g. mock in unit test or instant synthesis)
         if isinstance(speech_handle, asyncio.Future) and speech_handle.done():
@@ -2660,7 +2730,7 @@ class VikramAgent(Agent):
                 orig_text = getattr(last_item, 'text_content', '') or (last_item.content[0] if last_item.content else '')
                 guidance_parts = []
                 if getattr(self, '_has_introduced_self', False):
-                    guidance_parts.append("[CONTINUITY: You have ALREADY introduced yourself. STRICTLY NEVER repeat 'Hello, mai...' or re-introduce yourself. Respond directly.]")
+                    guidance_parts.append("[CONTINUITY MANDATE: You have ALREADY introduced yourself in the opening greeting. STRICTLY NEVER repeat 'Hello, main...', 'Main [company] se...', or ask for identity confirmation ('Kya meri baat...'). STRICTLY NEVER repeat canned filler lines like 'main sun raha hoon' or 'kaise madad kar sakta hoon'. Respond dynamically, proactively, and directly to the user's statement in 1-2 concise, conversational sentences.]")
                 if flow_instruction:
                     guidance_parts.append(f"[CONVERSATION GUIDANCE FOR THIS TURN]:\n{flow_instruction}")
                 if guidance_parts:
@@ -2718,19 +2788,43 @@ class VikramAgent(Agent):
                 yield self._clean_chunk(_make_text_chunk("Aapka appointment book karna hai ya check karna hai, kripya bata dijiye?"))
 
 async def fetch_knowledge_base(agent_id: str, timeout: float = 5.0) -> list:
-    """Fetch parsed documents for this agent with a strict timeout to avoid blocking agent startup."""
+    """Fetch parsed documents for this agent or its owning user/organization with a strict timeout to avoid blocking agent startup."""
     try:
-        data = await asyncio.wait_for(
-            asyncio.to_thread(
+        def _get_kb():
+            # 1. Fetch direct agent knowledge (matching agent_id)
+            res = (
                 supabase_admin.table('agent_knowledge')
-                .select('name, content_excerpt')
+                .select('name, content_excerpt, status, agent_id, user_id')
                 .eq('agent_id', agent_id)
-                .eq('status', 'ready')
-                .execute
-            ),
+                .execute()
+            )
+            docs = [d for d in (res.data or []) if d.get('status') in ('ready', 'parsed', 'active')]
+            if docs:
+                return docs
+            
+            # 2. If agent has no specific documents, fetch user-level general knowledge
+            try:
+                ag_res = supabase_admin.table('agents').select('user_id').eq('id', agent_id).maybe_single().execute()
+                u_id = ag_res.data.get('user_id') if ag_res.data else None
+                if u_id:
+                    user_docs = (
+                        supabase_admin.table('agent_knowledge')
+                        .select('name, content_excerpt, status, agent_id, user_id')
+                        .eq('user_id', u_id)
+                        .execute()
+                    )
+                    docs = [d for d in (user_docs.data or []) if d.get('status') in ('ready', 'parsed', 'active')]
+                    if docs:
+                        return docs
+            except Exception:
+                pass
+            return []
+
+        data = await asyncio.wait_for(
+            asyncio.to_thread(_get_kb),
             timeout=timeout
         )
-        return data.data or []
+        return data or []
     except asyncio.TimeoutError:
         logger.warning(f"[fetch_knowledge_base] Timed out after {timeout}s for agent {agent_id} — skipping KB")
         return []
@@ -2912,7 +3006,7 @@ Only return valid JSON."""
                     "https://api.groq.com/openai/v1/chat/completions",
                     headers={"Authorization": f"Bearer {groq_key}", "Content-Type": "application/json"},
                     json={
-                        "model": os.getenv("GROQ_LLM_MODEL", "llama-3.3-70b-versatile"),
+                        "model": os.getenv("GROQ_LLM_MODEL", "openai/gpt-oss-120b"),
                         "messages": [{"role": "user", "content": prompt}],
                         "temperature": 0.1,
                         "max_completion_tokens": 600,
@@ -3736,11 +3830,30 @@ try:
 except Exception:
     pass
 
+_running_agent_rooms: set[str] = set()
+
 async def entrypoint(ctx: JobContext):
-    timing_tracker = VoiceTimingTracker(room_id=ctx.room.name if ctx.room else "unknown")
+    r_name = ctx.room.name if (ctx.room and hasattr(ctx.room, 'name')) else ""
+    if r_name and r_name in _running_agent_rooms:
+        logger.warning(f"[Entrypoint] Room '{r_name}' is already being handled by this worker process. Skipping duplicate dispatch.")
+        # Must call ctx.shutdown() to properly complete the job without connecting
+        try:
+            await ctx.shutdown()
+        except Exception:
+            pass
+        return
+    if r_name:
+        _running_agent_rooms.add(r_name)
+
+    timing_tracker = VoiceTimingTracker(room_id=r_name or "unknown")
     timing_tracker.mark("answer")
-    logger.info(f"Connecting to room: {ctx.room.name}")
-    await ctx.connect(auto_subscribe=AutoSubscribe.AUDIO_ONLY)
+    logger.info(f"Connecting to room: {r_name}")
+    try:
+        await ctx.connect(auto_subscribe=AutoSubscribe.AUDIO_ONLY)
+    except Exception as c_err:
+        if r_name:
+            _running_agent_rooms.discard(r_name)
+        raise c_err
     timing_tracker.mark("session_start")
     logger.info(f"Connected to room: {ctx.room.name}")
     
@@ -3761,6 +3874,8 @@ async def entrypoint(ctx: JobContext):
             )
             if (getattr(p, 'identity', '') or '') != local_id and is_agent:
                 logger.warning(f"[DUPLICATE WORKER GUARD] Room '{ctx.room.name}' already has connected agent participant '{getattr(p, 'identity', '')}'. Disconnecting duplicate worker join.")
+                if r_name:
+                    _running_agent_rooms.discard(r_name)
                 try:
                     await ctx.room.disconnect()
                 except Exception:
@@ -3782,6 +3897,7 @@ async def entrypoint(ctx: JobContext):
     gender_tag = "female"
     is_female = True
     business_name_val = ""
+    db_caller_name = ""
 
     agent_id = ctx.job.metadata if ctx.job else None
     contact_id = None
@@ -4342,7 +4458,7 @@ async def entrypoint(ctx: JobContext):
                     db_caller_name or
                     ""
                 ).strip()
-                if resolved_c_name.lower() in ("unknown", "unknown caller"):
+                if resolved_c_name.lower() in ("unknown", "unknown caller", "consoletester", "studioguest", "browser sandbox", "web sandbox", "user", "guest", "none"):
                     resolved_c_name = ""
                 resolved_c_first = resolved_c_name.split()[0] if resolved_c_name else ""
                 resolved_c_salut = f"{resolved_c_first} ji" if resolved_c_first else "sir"
@@ -4354,12 +4470,12 @@ async def entrypoint(ctx: JobContext):
                 resolved_intent = (
                     (campaign_contact.get("intent") if campaign_contact else None) or
                     (campaign_contact.get("lead_intent") if campaign_contact else None) or
-                    "consultative inquiry and freight solutions"
+                    (f"consultative inquiry regarding AI voice automation for {business_name_val}" if business_name_val else "consultative business inquiry")
                 )
                 resolved_notes = (
                     (campaign_contact.get("notes") if campaign_contact else None) or
                     (f"Prospect Company: {resolved_prospect_co}" if resolved_prospect_co else "") or
-                    "Standard logistics consultation"
+                    (f"Discussion regarding AI voice automation and operations for {business_name_val}" if business_name_val else "Discussion regarding AI voice automation operations")
                 )
 
                 system_prompt = system_prompt.replace('{{customer_name}}', resolved_c_name or 'the customer')
@@ -4567,11 +4683,11 @@ async def entrypoint(ctx: JobContext):
     session = AgentSession(
         vad=get_vad_model(),
         turn_detection="vad",
-        min_endpointing_delay=0.30,
-        max_endpointing_delay=1.2,
+        min_endpointing_delay=0.60,
+        max_endpointing_delay=1.5,
         preemptive_generation=True,
-        min_interruption_duration=0.30,
-        min_interruption_words=2,
+        min_interruption_duration=0.85,
+        min_interruption_words=4,
         resume_false_interruption=True,
     )
     call_start_time = time.time()
@@ -4747,6 +4863,16 @@ async def entrypoint(ctx: JobContext):
             clean_txt = clean_ssml(text, is_transcript=True)
             clean_txt = re.sub(r'\[(?:CRITICAL|FLOW NOTE|OBJECTION|CONVERSATION GUIDANCE)[^\]]*\]', '', clean_txt, flags=re.IGNORECASE).strip()
             if role == "user" and clean_txt:
+                # Filter out notorious Whisper silence/background noise hallucination tokens
+                low_check = clean_txt.lower().strip().strip(".?!,[]()")
+                if low_check in (
+                    "music", "[music]", "you", "thank you", "bye", "bye.", "thank you.",
+                    "हाँ। आओ", "हाँ आओ", "हा आओ", "subtitles by", "amara.org", "listening",
+                    "silence", "applause", "cheering", "laughter", "cough", "throat clearing"
+                ) or re.match(r'^(music|\[music\]|\.|\?|!)+$', low_check):
+                    logger.info(f"[AgentSession - EP] Filtered out Whisper silence hallucination: '{clean_txt}'")
+                    return
+
                 fem_flag = getattr(agent_instance, 'gender', 'female') == 'female' if agent_instance else locals().get('is_female', True)
                 bot_nm = getattr(agent_instance, 'bot_name', None) or locals().get('bot_name') or 'Aditi'
                 clean_txt = normalize_user_transcript(clean_txt, agent_name=bot_nm, is_female=fem_flag)
@@ -4811,7 +4937,9 @@ async def entrypoint(ctx: JobContext):
                 pass
 
     watchdog = InCallNoAudioWatchdog(
-        silence_threshold_seconds=35.0,
+        silence_threshold_seconds=9.0,
+        repeat_interval_seconds=5.0,
+        max_repeats=3,
         speak_fn=lambda prompt: agent_instance.session.say(prompt, allow_interruptions=True, add_to_chat_ctx=True) if agent_instance and getattr(agent_instance, 'session', None) else None,
         disconnect_fn=_on_watchdog_disconnect,
         tool_guard=tool_guard,
@@ -4916,6 +5044,8 @@ async def entrypoint(ctx: JobContext):
         finally:
             if ctx.room:
                 _active_livekit_rooms.discard(ctx.room)
+                if hasattr(ctx.room, 'name') and ctx.room.name:
+                    _running_agent_rooms.discard(ctx.room.name)
 
 
 
@@ -5052,6 +5182,7 @@ async def run_agent(room_name: str, agent_id: str | None = None, contact_id: str
     gender_tag = "female"
     is_female = True
     business_name_val = ""
+    db_caller_name = ""
 
     if not agent_id and room_name.startswith("room-"):
         parts = room_name.split("-")
@@ -5410,6 +5541,104 @@ async def run_agent(room_name: str, agent_id: str | None = None, contact_id: str
                 except Exception as apt_lookup_err:
                     logger.warning(f"Could not load appointment records in run_agent: {apt_lookup_err}")
 
+                # 10b. Live Business Operations Brain Injection in run_agent (Voice Directives, Real-Time Catalog, Inventory & Floor Pricing)
+                try:
+                    cat_query = supabase_admin.table("business_operations_catalog").select(
+                        "identifier_code, title, category, route_origin, route_destination, available_units, base_price_inr, minimum_price_inr, booking_slot_start, metadata"
+                    ).eq("status", "available")
+                    if organization_id:
+                        cat_query = cat_query.eq("organization_id", organization_id)
+                    elif user_id:
+                        cat_query = cat_query.eq("user_id", user_id)
+
+                    cat_res = await asyncio.to_thread(cat_query.limit(30).execute)
+                    if cat_res.data and len(cat_res.data) > 0:
+                        voice_directives = []
+                        cat_lines = []
+                        family_members = []
+                        owner_secondary_info = None
+
+                        for item in cat_res.data:
+                            cat = item.get("category") or "general"
+                            meta = item.get("metadata") or {}
+
+                            # Check for Owner Spoken Voice Directives
+                            if cat == "voice_directive":
+                                prompt_override = meta.get("prompt_override") or item.get("title")
+                                voice_directives.append(f"- ⚡ [OWNER VOICE OVERRIDE]: {prompt_override}")
+                                continue
+
+                            # Check for Family Members & VIP Exclusion / Auto-Transfer List
+                            if cat == "family_vip":
+                                fam_name = item.get("title") or "Family Contact"
+                                rel = meta.get("relationship") or "Family"
+                                fam_phone = meta.get("phone") or item.get("identifier_code") or ""
+                                family_members.append(f"- {fam_name} ({rel}, Phone: {fam_phone})")
+                                continue
+
+                            # Check for Call Forwarding Configuration
+                            if cat == "call_forwarding":
+                                sec_phone = meta.get("owner_secondary_phone")
+                                if sec_phone:
+                                    owner_secondary_info = sec_phone
+                                continue
+
+                            code = item.get("identifier_code") or "ITEM"
+                            title = item.get("title") or "Item"
+                            orig = item.get("route_origin")
+                            dest = item.get("route_destination")
+                            units = item.get("available_units", 1)
+                            base_p = item.get("base_price_inr")
+                            min_p = item.get("minimum_price_inr")
+
+                            desc = f"- [{code}] {title} ({cat}, Units/Slots: {units})"
+                            if orig and dest:
+                                desc += f", Route: {orig} -> {dest}"
+                            if base_p is not None:
+                                desc += f", Quoted Price: Rs. {base_p}"
+                            if min_p is not None:
+                                desc += f", Strict Floor Limit: Rs. {min_p}"
+                            cat_lines.append(desc)
+
+                        # Inject Active Spoken Voice Directives with highest operational precedence
+                        if voice_directives:
+                            system_prompt += (
+                                f"\n\n## CRITICAL OWNER DAILY VOICE DIRECTIVES (HIGH PRIORITY SPOKEN OVERRIDES)\n"
+                                f"The business owner has given direct verbal instructions for today's operations. "
+                                f"You MUST follow these rules strictly over standard behavior:\n"
+                                + "\n".join(voice_directives) +
+                                f"\n- MANDATORY ENFORCEMENT: Never schedule or quote against an active owner directive above.\n"
+                            )
+
+                        # Inject Catalog Inventory & Floor limits
+                        if cat_lines:
+                            system_prompt += (
+                                f"\n\n## LIVE BUSINESS OPERATIONS BRAIN (REAL-TIME CATALOG, INVENTORY & PRICING)\n"
+                                + "\n".join(cat_lines) +
+                                "\n- REAL-TIME INVENTORY & PRICING DIRECTIVES:\n"
+                                "  1. Use this real data directly during the call to quote routes, vehicle types, container fleet, or open appointment slots.\n"
+                                "  2. First quote the base Quoted Price. If the caller asks for discount or negotiates, you may offer a discount down to the Strict Floor Limit, but NEVER accept or quote below the Floor Limit.\n"
+                                "  3. Use 'reserve_business_inventory' to lock in any confirmed booking so slots/routes never overlap.\n"
+                                "  4. If the customer requests demo links or payment details, use 'dispatch_demo_or_business_link' or 'dispatch_payment_request' immediately during the call.\n"
+                            )
+
+                        # Inject Family Members & VIP Callers
+                        if family_members:
+                            system_prompt += (
+                                f"\n\n## OWNER FAMILY MEMBERS & VIP EXCLUSIONS (IMMEDIATE WARM TRANSFER)\n"
+                                f"The following individuals are verified family members and personal VIP contacts of the business owner:\n"
+                                + "\n".join(family_members) +
+                                f"\n- MANDATORY INSTRUCTION: If caller is identified as one of these family members, or states they are family/relatives of the owner, greet them warmly with utmost respect, and IMMEDIATELY invoke `transfer_to_owner` (Warm Transfer). Do NOT pitch business services or treat them like a random customer!\n"
+                            )
+
+                        if owner_secondary_info:
+                            system_prompt += (
+                                f"\n\n## OWNER CALL FORWARDING DIRECTIVE:\n"
+                                f"Owner's secondary direct line is configured ({owner_secondary_info}). Whenever a caller requests to speak directly to the owner, or is a family member, or demands human perception, invoke `transfer_to_owner`.\n"
+                            )
+                except Exception as cat_err:
+                    logger.debug(f"Catalog prompt injection note in run_agent: {cat_err}")
+
                 raw_greeting = agent_data.get('greeting_message') or default_greeting
                 is_inbound_call = not bool(campaign_contact)
                 call_direction = "inbound" if is_inbound_call else "outbound"
@@ -5472,7 +5701,7 @@ async def run_agent(room_name: str, agent_id: str | None = None, contact_id: str
                     db_caller_name or
                     ""
                 ).strip()
-                if resolved_c_name.lower() in ("unknown", "unknown caller"):
+                if resolved_c_name.lower() in ("unknown", "unknown caller", "consoletester", "studioguest", "browser sandbox", "web sandbox", "user", "guest", "none"):
                     resolved_c_name = ""
                 resolved_c_first = resolved_c_name.split()[0] if resolved_c_name else ""
                 resolved_c_salut = f"{resolved_c_first} ji" if resolved_c_first else "sir"
@@ -5484,12 +5713,12 @@ async def run_agent(room_name: str, agent_id: str | None = None, contact_id: str
                 resolved_intent = (
                     (campaign_contact.get("intent") if campaign_contact else None) or
                     (campaign_contact.get("lead_intent") if campaign_contact else None) or
-                    "consultative inquiry and freight solutions"
+                    (f"consultative inquiry regarding AI voice automation for {business_name_val}" if business_name_val else "consultative business inquiry")
                 )
                 resolved_notes = (
                     (campaign_contact.get("notes") if campaign_contact else None) or
                     (f"Prospect Company: {resolved_prospect_co}" if resolved_prospect_co else "") or
-                    "Standard logistics consultation"
+                    (f"Discussion regarding AI voice automation and operations for {business_name_val}" if business_name_val else "Discussion regarding AI voice automation operations")
                 )
 
                 system_prompt = system_prompt.replace('{{customer_name}}', resolved_c_name or 'the customer')
@@ -5580,8 +5809,6 @@ async def run_agent(room_name: str, agent_id: str | None = None, contact_id: str
 
     room = rtc.Room()
     token = generate_agent_token(room_name)
-    # Start LiveKit room handshake in background early to eliminate connection delay
-    room_connect_task = asyncio.create_task(room.connect(livekit_url, token))
 
     agent_instance = None
     safe_provider = locals().get('provider') or (agent_data.get('voice_provider') if agent_data else None) or 'sarvam'
@@ -5602,7 +5829,7 @@ async def run_agent(room_name: str, agent_id: str | None = None, contact_id: str
 
     from livekit.agents import utils
     async with utils.http_context.open():
-        is_telephony_room_ra = bool(ctx.room and any(p in ctx.room.name.lower() for p in ["exotel", "twilio", "call", "pstn"]))
+        is_telephony_room_ra = bool(room_name and any(p in room_name.lower() for p in ["exotel", "twilio", "call", "pstn"]))
         telephony_sample_rate_ra = 8000 if is_telephony_room_ra else None
 
         agent_instance = VikramAgent(
@@ -5653,11 +5880,11 @@ async def run_agent(room_name: str, agent_id: str | None = None, contact_id: str
         session = AgentSession(
             vad=get_vad_model(),
             turn_detection="vad",
-            min_endpointing_delay=0.30,
-            max_endpointing_delay=1.2,
+            min_endpointing_delay=0.60,
+            max_endpointing_delay=1.5,
             preemptive_generation=True,
-            min_interruption_duration=0.30,
-            min_interruption_words=2,
+            min_interruption_duration=0.85,
+            min_interruption_words=4,
             resume_false_interruption=True,
         )
         done = asyncio.Event()
@@ -5856,6 +6083,16 @@ async def run_agent(room_name: str, agent_id: str | None = None, contact_id: str
                 clean_txt = clean_ssml(text, is_transcript=True)
                 clean_txt = re.sub(r'\[(?:CRITICAL|FLOW NOTE|OBJECTION|CONVERSATION GUIDANCE)[^\]]*\]', '', clean_txt, flags=re.IGNORECASE).strip()
                 if role == "user" and clean_txt:
+                    # Filter out notorious Whisper silence/background noise hallucination tokens
+                    low_check = clean_txt.lower().strip().strip(".?!,[]()")
+                    if low_check in (
+                        "music", "[music]", "you", "thank you", "bye", "bye.", "thank you.",
+                        "हाँ। आओ", "हाँ आओ", "हा आओ", "subtitles by", "amara.org", "listening",
+                        "silence", "applause", "cheering", "laughter", "cough", "throat clearing"
+                    ) or re.match(r'^(music|\[music\]|\.|\?|!)+$', low_check):
+                        logger.info(f"[AgentSession - RA] Filtered out Whisper silence hallucination: '{clean_txt}'")
+                        return
+
                     agent_nm = getattr(agent_instance, 'bot_name', None) or locals().get('bot_name') or 'Vikram'
                     fem_flag = (getattr(agent_instance, 'gender', 'female') == 'female') if agent_instance else locals().get('is_female', True)
                     clean_txt = normalize_user_transcript(clean_txt, agent_name=agent_nm, is_female=fem_flag)
@@ -5908,32 +6145,17 @@ async def run_agent(room_name: str, agent_id: str | None = None, contact_id: str
         # already publishes transcripts for agent turns. Duplicate hooks caused 2-3x
         # repeated messages in the frontend.
 
+        yielded_to_worker = False
         try:
-            connected = False
             try:
-                await asyncio.wait_for(room_connect_task, timeout=4.0)
-                connected = True
-                print(f"[Agent] Connected to LiveKit (early handshake)", flush=True)
+                await asyncio.wait_for(room.connect(livekit_url, token), timeout=25.0)
+                print(f"[Agent] Connected to LiveKit room '{room_name}'", flush=True)
                 _active_livekit_rooms.add(room)
-            except Exception as e_early:
-                logger.warning(f"[Agent] Early connect task note: {e_early}. Retrying...")
-                for connect_attempt in range(2):
-                    try:
-                        await asyncio.wait_for(room.connect(livekit_url, token), timeout=4.0)
-                        connected = True
-                        print(f"[Agent] Connected to LiveKit", flush=True)
-                        _active_livekit_rooms.add(room)
-                        break
-                    except Exception as connect_err:
-                        logger.warning(f"[Agent] LiveKit connection attempt {connect_attempt + 1} failed: {connect_err}. Retrying...")
-                        await asyncio.sleep(0.2)
-
-            if not connected:
-                logger.error(f"[Agent] Failed to connect to LiveKit after 4 attempts for room {room_name}")
+            except Exception as connect_err:
+                logger.error(f"[Agent] Failed to connect to LiveKit for room {room_name}: {connect_err}")
                 return
                 
             # Guard: Check if an agent participant is already connected
-            yielded_to_worker = False
             if room.remote_participants:
                 for p in room.remote_participants.values():
                     p_identity = (getattr(p, 'identity', '') or '').lower()
@@ -5952,10 +6174,10 @@ async def run_agent(room_name: str, agent_id: str | None = None, contact_id: str
                         await room.disconnect()
                         return
 
-            # Listen for dedicated worker joining later to yield immediately
+            # Dedicated worker guard: in-process agent is actively handling this room.
+            # Do NOT yield or disconnect mid-call if another agent tries to join.
             @room.on("participant_connected")
             def on_participant_connected_ra(participant: rtc.RemoteParticipant):
-                nonlocal yielded_to_worker
                 p_id = (getattr(participant, 'identity', '') or '').lower()
                 p_name = (getattr(participant, 'name', '') or '').lower()
                 p_kind = getattr(participant, 'kind', None)
@@ -5966,9 +6188,7 @@ async def run_agent(room_name: str, agent_id: str | None = None, contact_id: str
                     "vikram" in p_id or
                     "agent" in p_name
                 ):
-                    logger.warning(f"[DUPLICATE WORKER GUARD] Dedicated agent worker '{participant.identity}' joined room '{room_name}'. In-process agent yielding and disconnecting.")
-                    yielded_to_worker = True
-                    done.set()
+                    logger.warning(f"[DUPLICATE WORKER GUARD] Second agent worker '{participant.identity}' entered room '{room_name}'. Active in-process agent retains room ownership.")
 
             async def _on_watchdog_disconnect_ra():
                 logger.info(f"[Watchdog Disconnect - RA] Ending idle call session in room '{room_name}' due to silence.")
@@ -5980,7 +6200,9 @@ async def run_agent(room_name: str, agent_id: str | None = None, contact_id: str
                         pass
 
             watchdog_ra = InCallNoAudioWatchdog(
-                silence_threshold_seconds=35.0,
+                silence_threshold_seconds=9.0,
+                repeat_interval_seconds=5.0,
+                max_repeats=3,
                 speak_fn=lambda prompt: agent_instance.session.say(prompt, allow_interruptions=True, add_to_chat_ctx=True) if agent_instance and getattr(agent_instance, 'session', None) else None,
                 disconnect_fn=_on_watchdog_disconnect_ra,
                 language=safe_language,
@@ -6153,7 +6375,7 @@ if __name__ == "__main__":
         entrypoint_fnc=entrypoint,
         job_executor_type=JobExecutorType.THREAD,
         load_threshold=float('inf'),
-        num_idle_processes=0,
+        num_idle_processes=1,  # Pre-warm 1 thread to eliminate cold-start delay on first call
     ))
 
 

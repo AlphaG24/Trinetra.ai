@@ -871,8 +871,7 @@ export function AgentOverviewTab({
           <div className="relative w-full max-w-2xl bg-[var(--card-bg)] border border-[var(--border)] rounded-3xl p-6 md:p-8 shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200 text-left z-10">
             <button
               onClick={handleCloseCallModal}
-              disabled={connectionState === 'active' || connectionState === 'connecting'}
-              className="absolute top-4 right-4 p-2 text-[var(--muted)] hover:text-[var(--heading)] rounded-lg hover:bg-[var(--hover-bg)] transition-colors disabled:opacity-30 cursor-pointer"
+              className="absolute top-4 right-4 p-2 text-[var(--muted)] hover:text-[var(--heading)] rounded-lg hover:bg-[var(--hover-bg)] transition-colors cursor-pointer"
             >
               <X className="w-5 h-5" />
             </button>
@@ -937,15 +936,15 @@ export function AgentOverviewTab({
                   )}
 
                   {connectionState === 'connecting' && (
-                    <>
-                      <div className="w-16 h-16 rounded-full border-4 border-[var(--border)] border-t-blue-600 animate-spin flex items-center justify-center">
-                        <Loader2 className="w-5 h-5 text-[var(--muted)] animate-pulse" />
+                    <div className="flex flex-col items-center justify-center gap-2.5">
+                      <div className="w-16 h-16 rounded-full bg-[var(--card-bg)] border border-[var(--border)] flex items-center justify-center shadow-sm">
+                        <Loader2 className="w-6 h-6 text-indigo-500 animate-spin" />
                       </div>
-                      <div>
-                        <h4 className="text-xs font-bold text-[var(--heading)] font-montserrat">Connecting...</h4>
-                        <p className="text-[10px] text-[var(--muted)] mt-0.5">Initializing WebRTC...</p>
+                      <div className="text-center">
+                        <span className="text-xs font-semibold text-[var(--heading)]">Connecting...</span>
+                        <p className="text-[10px] text-[var(--muted)]">Starting voice session</p>
                       </div>
-                    </>
+                    </div>
                   )}
 
                   {connectionState === 'active' && (
@@ -1019,11 +1018,11 @@ export function AgentOverviewTab({
                     Live Conversation Feed
                   </h4>
                   <div className="flex-1 overflow-y-auto space-y-2 pr-1 scrollbar-thin scrollbar-thumb-zinc-800 scrollbar-track-transparent">
-                    {connectionState === 'active' && transcripts.length === 0 ? (
-                      <div className="flex flex-col items-center justify-center py-10 gap-3 text-center">
-                        <Loader2 className="w-5 h-5 animate-spin text-blue-600 dark:text-blue-400" />
-                        <span className="text-[10px] font-mono text-[var(--muted)] animate-pulse">
-                          Connecting to AI agent...
+                    {(connectionState === 'connecting' || (connectionState === 'active' && transcripts.length === 0)) ? (
+                      <div className="flex flex-col items-center justify-center py-12 gap-2.5 text-center">
+                        <Loader2 className="w-5 h-5 text-indigo-500 animate-spin" />
+                        <span className="text-xs text-[var(--muted)]">
+                          {connectionState === 'connecting' ? 'Connecting to voice agent...' : 'Agent ready. Start speaking...'}
                         </span>
                       </div>
                     ) : transcripts.length === 0 ? (

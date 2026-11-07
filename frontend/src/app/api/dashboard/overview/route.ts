@@ -18,7 +18,7 @@ export async function GET() {
     try {
       const authPromise = supabase.auth.getUser().catch(() => ({ data: { user: null } }))
       const timeoutPromise = new Promise<any>((_, reject) =>
-        setTimeout(() => reject(new Error('Auth timeout')), 3000)
+        setTimeout(() => reject(new Error('Auth timeout')), 12000)
       )
       const authRes = await Promise.race([authPromise, timeoutPromise])
       user = authRes?.data?.user ?? null
@@ -47,16 +47,12 @@ export async function GET() {
       const isSuperAdmin = userEmail === 'raghav00424@gmail.com' || userEmail === 'raghav@trinetra.ai'
       const effectiveOrgId = orgId || (isSuperAdmin ? 'b1ddf1e9-abc1-4ff4-90f5-3ac66913738a' : null)
 
-      let agentQuery = admin
+      // Strict user-level agent scoping to match /api/dashboard/agents
+      const { data: userAgents } = await admin
         .from('agents')
         .select('id, name, agent_type, status, last_active_at, updated_at, health_score')
-      if (effectiveOrgId) {
-        agentQuery = agentQuery.or(`user_id.eq.${user.id},organization_id.eq.${effectiveOrgId}`)
-      } else {
-        agentQuery = agentQuery.eq('user_id', user.id)
-      }
-
-      const { data: userAgents } = await agentQuery
+        .eq('user_id', user.id)
+        .neq('status', 'deleted')
         
       const agents = userAgents || []
       const agentIds = agents.map(a => a.id)
@@ -103,12 +99,8 @@ export async function GET() {
         .from('agents')
         .select('id', { count: 'estimated', head: true })
         .in('status', ['live', 'active'])
-        
-      if (effectiveOrgId) {
-        activeToolsQuery = activeToolsQuery.or(`organization_id.eq.${effectiveOrgId},user_id.eq.${user.id}`)
-      } else {
-        activeToolsQuery = activeToolsQuery.eq('user_id', user.id)
-      }
+        .eq('user_id', user.id)
+        .neq('status', 'deleted')
 
       let totalLeadsQuery = admin
         .from('leads')
@@ -207,7 +199,7 @@ export async function GET() {
       }))
 
       return { stats, activity, tools }
-    }, 60) // 60s TTL
+    }, 5) // 5s TTL for fresh real-time metrics
 
     return NextResponse.json(result)
   } catch (err: any) {
