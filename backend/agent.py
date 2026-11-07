@@ -5232,6 +5232,14 @@ async def run_agent(room_name: str, agent_id: str | None = None, contact_id: str
     from livekit import rtc
     livekit_url = os.getenv("LIVEKIT_URL", "ws://127.0.0.1:7880").strip()
 
+    # Pre-generate agent token and initiate LiveKit room connection concurrently with setup
+    if 'room' not in locals() or room is None:
+        room = rtc.Room()
+        token = generate_agent_token(room_name)
+    _connect_task = asyncio.create_task(
+        room.connect(livekit_url, token, options=rtc.RoomOptions(auto_subscribe=True))
+    )
+
     provider = 'sarvam'
     voice_id = 'shubh'
     language = 'hinglish'
@@ -5303,14 +5311,15 @@ async def run_agent(room_name: str, agent_id: str | None = None, contact_id: str
 
                 # 2. Fetch User Profile & Business Info
                 profile_data = {}
-                try:
-                    prof_res = await asyncio.to_thread(
-                        supabase_admin.table("profiles").select("company_name, country").eq("id", user_id).execute
-                    )
-                    if prof_res.data:
-                        profile_data = prof_res.data[0]
-                except Exception as e:
-                    logger.error(f"Failed to fetch profile for business name in run_agent: {e}")
+                if user_id:
+                    try:
+                        prof_res = await asyncio.to_thread(
+                            supabase_admin.table("profiles").select("company_name, country").eq("id", user_id).execute
+                        )
+                        if prof_res.data:
+                            profile_data = prof_res.data[0]
+                    except Exception as e:
+                        logger.error(f"Failed to fetch profile for business name in run_agent: {e}")
 
                 if not agent_data.get("voice_provider") and profile_data:
                     country = profile_data.get("country", "")
@@ -5864,8 +5873,9 @@ async def run_agent(room_name: str, agent_id: str | None = None, contact_id: str
     print(f"[Agent] Joining room: {room_name}", flush=True)
     logger.info(f"[In-Process Agent] Connecting to room {room_name} at {livekit_url} (provider: {provider}, voice: {voice_id})")
 
-    room = rtc.Room()
-    token = generate_agent_token(room_name)
+    if 'room' not in locals() or room is None:
+        room = rtc.Room()
+        token = generate_agent_token(room_name)
 
     agent_instance = None
     safe_provider = locals().get('provider') or (agent_data.get('voice_provider') if agent_data else None) or 'sarvam'
@@ -6205,7 +6215,10 @@ async def run_agent(room_name: str, agent_id: str | None = None, contact_id: str
         yielded_to_worker = False
         try:
             try:
-                await asyncio.wait_for(room.connect(livekit_url, token), timeout=25.0)
+                if '_connect_task' in locals() and _connect_task:
+                    await asyncio.wait_for(_connect_task, timeout=20.0)
+                else:
+                    await asyncio.wait_for(room.connect(livekit_url, token, options=rtc.RoomOptions(auto_subscribe=True)), timeout=20.0)
                 print(f"[Agent] Connected to LiveKit room '{room_name}'", flush=True)
                 _active_livekit_rooms.add(room)
             except Exception as connect_err:
